@@ -54,6 +54,32 @@
     "anchorMode": "softAnchor",
     "contestedAnchor": "deferred"
   },
+  "occupancyProfile": {
+    "type": "coreStack",
+    "outerField": "exclusive",
+    "core": "multiOccupancyAllowed",
+    "maxStackSize": "unboundedDraft",
+    "ordinaryCaptureInCore": "disabledDraft",
+    "status": "specOnly"
+  },
+  "fusionProfile": {
+    "type": "stackFusion",
+    "friendlyFusion": "allowedDraft",
+    "enemyCoOccupancy": "contestedDraft",
+    "fusionEntity": "virtualStateDraft",
+    "colorPermutation": "future",
+    "volumeSurface216": "future",
+    "status": "specOnly"
+  },
+  "corePhysicsProfile": {
+    "type": "asgardCorePhysics",
+    "zoneModel": "outerExclusive_coreStack",
+    "implementationStage": "specOnly",
+    "volumeSurface216Principle": {
+      "enabled": false,
+      "description": "Future symbolic rule: 6x6x6 volume equals six 6x6 faces, both 216 unit cells."
+    }
+  },
   "layerTurnProfile": {
     "type": "disabled"
   },
@@ -75,6 +101,7 @@
     "Six-side target projection is draft.",
     "Checkmate is optional and not hardened for this profile.",
     "Contested anchor rules are deferred.",
+    "Core multi-occupancy and fusion are specOnly in P2C.",
     "Runtime centerAssembly victory detection is deferred to P2C."
   ]
 }

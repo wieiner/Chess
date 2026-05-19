@@ -35,28 +35,49 @@
 - Completed: profile JSON validation through `Chess3DEngineContractTests`.
 - Next six-side implementation work: map single-side local rules to six sides and six home faces.
 
-### P2C - Center Assembly Mechanics
+### P2C - Asgard Core Physics
+
+- Completed: Asgard core physics specification.
+- Completed: `occupancyProfile`, `fusionProfile`, and `corePhysicsProfile` data contracts.
+- Completed: profile JSON/schema/tests for exclusive, coreStack, stackFusion, and Volume-Surface 216 future metadata.
+- Completed: staged plan for moving from single integer cells to future CoreCell stacks without breaking old ABI.
+
+### P2D - Runtime Profile Selection And Simple Anchors
 
 - Implement centerAssembly mechanics.
+- Add runtime profile selection.
 - Add anchor state and target-slot derivation.
 - Add victory detection for allPiecesAnchored, requiredPieceCount, kingOnly, and percentageThreshold variants.
 
-### P2D - Knockback And Reserve
+### P2E - CoreCell Stack Board Model
+
+- Add stack-aware `CoreCell` model for Forbidden Core cells.
+- Preserve old 512-int board ABI as a projection.
+- Add stack-aware UI and network-safe state export.
+
+### P2F - Fusion Mechanics And Victory
+
+- Implement fusion entity descriptors.
+- Implement stackFusion, pairFusion, color/permutation state, and future implosion hooks.
+- Implement requiredFusionCount, requiredCoreStacks, kingQueenFusion, surfaceVolume216Completion, sixGateCoronation, and hybrid victory variants.
+
+### P2G - Knockback And Reserve
 
 - Implement knockbackCapture.
 - Return captured pieces to home slot when possible.
 - Add reserve state and reserve restore action.
 
-### P2E - Rubik Turns As Chess Actions
+### P2H - Rubik Turns Moving Pieces And Stacks
 
 - Implement `layerTurnProfile.type = ritualTurn`.
 - Enforce axes, layers, quarter turns, action cost, and turn order.
-- Define interaction with king safety, anchors, notation, and replay.
+- Define interaction with king safety, anchors, CoreCell stacks, notation, and replay.
 
 ### P3 - Full Six-Side Gameplay And Hybrid Victory
 
 - Later: harden king safety, check, mate, and stalemate for full 3D multiplayer.
 - Harden six-side full gameplay and hybrid checkmate/centerAssembly victory.
+- Synchronize profiles, stacks, anchors, fusion, and layer turns in online play.
 
 ## P4 - Online Relay Server for `chess3d.relay.v1`
 

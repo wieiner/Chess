@@ -472,6 +472,31 @@ bool ExtractIntValue(const std::string& json, const std::string& key, int& value
     return true;
 }
 
+bool ExtractBoolValue(const std::string& json, const std::string& key, bool& value)
+{
+    const auto colon = FindKeyColon(json, key);
+    if (colon == std::string::npos)
+    {
+        return false;
+    }
+    auto pos = colon + 1;
+    while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos])))
+    {
+        ++pos;
+    }
+    if (json.compare(pos, 4, "true") == 0)
+    {
+        value = true;
+        return true;
+    }
+    if (json.compare(pos, 5, "false") == 0)
+    {
+        value = false;
+        return true;
+    }
+    return false;
+}
+
 bool ValidateBoardProfile(const std::string& json)
 {
     const std::string board = ExtractObject(json, "boardProfile");
@@ -494,12 +519,16 @@ bool ValidateCommonRuleProfile(const std::string& json)
     const std::string rulesetId = ExtractStringValue(json, "rulesetId");
     const std::string goal = ExtractStringValue(ExtractObject(json, "goalProfile"), "type");
     const std::string capture = ExtractStringValue(ExtractObject(json, "captureProfile"), "type");
+    const std::string occupancy = ExtractStringValue(ExtractObject(json, "occupancyProfile"), "type");
+    const std::string fusion = ExtractStringValue(ExtractObject(json, "fusionProfile"), "type");
     const std::string layerTurn = ExtractStringValue(ExtractObject(json, "layerTurnProfile"), "type");
     return JsonParser(json).Parse() &&
         !rulesetId.empty() &&
         ValidateBoardProfile(json) &&
         IsAllowed(goal, { "classicCheckmate", "centerAssembly", "hybrid", "sandbox", "centerAssemblyTraining" }) &&
         IsAllowed(capture, { "classicCapture", "knockbackCapture" }) &&
+        IsAllowed(occupancy, { "exclusive", "coreStack", "quantumCore" }) &&
+        IsAllowed(fusion, { "none", "anchorOnly", "pairFusion", "stackFusion", "colorPermutation", "volumeSurface216" }) &&
         IsAllowed(layerTurn, { "disabled", "ritualTurn", "globalEvent", "sandbox" });
 }
 
@@ -800,6 +829,10 @@ int main()
         "classic six-side goalProfile is classicCheckmate");
     test.Check(ExtractStringValue(ExtractObject(classicProfile, "captureProfile"), "type") == "classicCapture",
         "classic six-side captureProfile is classicCapture");
+    test.Check(ExtractStringValue(ExtractObject(classicProfile, "occupancyProfile"), "type") == "exclusive",
+        "classic six-side occupancyProfile is exclusive");
+    test.Check(ExtractStringValue(ExtractObject(classicProfile, "fusionProfile"), "type") == "none",
+        "classic six-side fusionProfile is none");
     test.Check(ExtractStringValue(ExtractObject(classicProfile, "layerTurnProfile"), "type") == "disabled",
         "classic six-side layerTurnProfile is disabled");
 
@@ -807,12 +840,38 @@ int main()
         "single-side profile references central4x4 setup");
     test.Check(ExtractStringValue(ExtractObject(singleProfile, "goalProfile"), "type") == "sandbox",
         "single-side profile is sandbox goal mode");
+    test.Check(ExtractStringValue(ExtractObject(singleProfile, "occupancyProfile"), "type") == "exclusive",
+        "single-side occupancyProfile is exclusive");
+    test.Check(ExtractStringValue(ExtractObject(singleProfile, "fusionProfile"), "type") == "none",
+        "single-side fusionProfile is none");
 
     test.Check(ExtractStringValue(ExtractObject(asgardProfile, "goalProfile"), "type") == "centerAssembly",
         "asgard convergence goalProfile is centerAssembly");
     test.Check(ValidateCoreCube(asgardProfile, 2, 5), "asgard convergence coreCube is x/y/z 2..5");
     test.Check(ExtractStringValue(ExtractObject(asgardProfile, "captureProfile"), "type") == "knockbackCapture",
         "asgard convergence captureProfile is knockbackCapture");
+    const std::string asgardOccupancy = ExtractObject(asgardProfile, "occupancyProfile");
+    test.Check(ExtractStringValue(asgardOccupancy, "type") == "coreStack",
+        "asgard convergence occupancyProfile is coreStack");
+    test.Check(ExtractStringValue(asgardOccupancy, "outerField") == "exclusive",
+        "asgard convergence outer field is exclusive");
+    test.Check(ExtractStringValue(asgardOccupancy, "core") == "multiOccupancyAllowed",
+        "asgard convergence core allows multi-occupancy by profile");
+    test.Check(ExtractStringValue(asgardOccupancy, "status") == "specOnly",
+        "asgard convergence occupancyProfile is specOnly");
+    test.Check(ExtractStringValue(ExtractObject(asgardProfile, "fusionProfile"), "type") == "stackFusion",
+        "asgard convergence fusionProfile is stackFusion");
+    test.Check(ExtractStringValue(ExtractObject(asgardProfile, "fusionProfile"), "status") == "specOnly",
+        "asgard convergence fusionProfile is specOnly");
+    const std::string asgardCorePhysics = ExtractObject(asgardProfile, "corePhysicsProfile");
+    test.Check(ExtractStringValue(asgardCorePhysics, "type") == "asgardCorePhysics",
+        "asgard convergence corePhysicsProfile is asgardCorePhysics");
+    test.Check(ExtractStringValue(asgardCorePhysics, "implementationStage") == "specOnly",
+        "asgard convergence corePhysicsProfile is specOnly");
+    const std::string asgard216 = ExtractObject(asgardCorePhysics, "volumeSurface216Principle");
+    bool asgard216Enabled = true;
+    test.Check(!asgard216.empty() && ExtractBoolValue(asgard216, "enabled", asgard216Enabled) && !asgard216Enabled,
+        "asgard convergence volumeSurface216Principle exists and is disabled");
     test.Check(ExtractStringValue(ExtractObject(asgardProfile, "layerTurnProfile"), "type") == "disabled",
         "asgard convergence layerTurnProfile is disabled");
     test.Check(asgardProfile.find("Forbidden Core / Asgard / Meru") != std::string::npos,
@@ -820,6 +879,10 @@ int main()
 
     test.Check(ExtractStringValue(rubikProfile, "baseRuleset") == "asgard-convergence-3d-8x8x8-v0.1",
         "rubik convergence points to asgard convergence baseRuleset");
+    test.Check(ExtractStringValue(ExtractObject(rubikProfile, "occupancyProfile"), "type") == "coreStack",
+        "rubik convergence occupancyProfile is coreStack");
+    test.Check(ExtractStringValue(ExtractObject(rubikProfile, "fusionProfile"), "type") == "stackFusion",
+        "rubik convergence fusionProfile is stackFusion");
     const std::string rubikLayerTurn = ExtractObject(rubikProfile, "layerTurnProfile");
     test.Check(ExtractStringValue(rubikLayerTurn, "type") == "ritualTurn",
         "rubik convergence layerTurnProfile is ritualTurn");
@@ -835,6 +898,14 @@ int main()
         "rubik convergence ritualTurn layers are 0..7");
     test.Check(rubikLayerTurn.find("-1") != std::string::npos && rubikLayerTurn.find("1") != std::string::npos,
         "rubik convergence ritualTurn quarter turns include -1 and +1");
+    const std::string rubikCorePhysics = ExtractObject(rubikProfile, "corePhysicsProfile");
+    test.Check(ExtractStringValue(rubikCorePhysics, "layerTurnStackInteraction") == "deferred",
+        "rubik convergence defers stack/layer interaction");
+    bool rubik216Enabled = true;
+    test.Check(ExtractBoolValue(ExtractObject(rubikCorePhysics, "volumeSurface216Principle"), "enabled", rubik216Enabled) && !rubik216Enabled,
+        "rubik convergence volumeSurface216Principle is disabled");
+    test.Check(rubikProfile.find("Stack/layer interaction is deferred.") != std::string::npos,
+        "rubik convergence knownLimitations mention stack/layer interaction deferred");
 
     Chess3D_Destroy(game);
     return test.Finish("Chess3DEngineContractTests");

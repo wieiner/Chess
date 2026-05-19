@@ -11,6 +11,16 @@ P2B adds profile JSON files under `assets/rules/profiles`.
 | `asgard_convergence_3d_v0_1.json` | `asgard-convergence-3d-8x8x8-v0.1` | `centerAssembly` | `knockbackCapture` | `disabled` |
 | `rubik_convergence_3d_v0_1.json` | `rubik-convergence-3d-8x8x8-v0.1` | `centerAssembly` | `knockbackCapture` | `ritualTurn` |
 
+## Core Physics Fields
+
+P2C extends profiles with:
+
+- `occupancyProfile`: `exclusive`, `coreStack`, or future `quantumCore`.
+- `fusionProfile`: `none`, `anchorOnly`, `pairFusion`, `stackFusion`, `colorPermutation`, or `volumeSurface216`.
+- `corePhysicsProfile`: optional binding for core zone physics, including Asgard/Meru stack/fusion rules.
+
+Classic and single-side profiles remain `exclusive` with fusion `none`. Asgard and Rubik convergence profiles use `coreStack` and `stackFusion` as `specOnly`, because the current runtime board model still stores one integer piece per cell.
+
 `chess3d_rule_profile.schema.json` documents the minimal schema. Contract tests also perform manual validation so the baseline does not require an external JSON-schema tool.
 
 ## Runtime Status

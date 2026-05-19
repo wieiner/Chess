@@ -54,6 +54,33 @@
     "anchorMode": "softAnchor",
     "contestedAnchor": "deferred"
   },
+  "occupancyProfile": {
+    "type": "coreStack",
+    "outerField": "exclusive",
+    "core": "multiOccupancyAllowed",
+    "maxStackSize": "unboundedDraft",
+    "ordinaryCaptureInCore": "disabledDraft",
+    "status": "specOnly"
+  },
+  "fusionProfile": {
+    "type": "stackFusion",
+    "friendlyFusion": "allowedDraft",
+    "enemyCoOccupancy": "contestedDraft",
+    "fusionEntity": "virtualStateDraft",
+    "colorPermutation": "future",
+    "volumeSurface216": "future",
+    "status": "specOnly"
+  },
+  "corePhysicsProfile": {
+    "type": "asgardCorePhysics",
+    "zoneModel": "outerExclusive_coreStack",
+    "implementationStage": "specOnly",
+    "layerTurnStackInteraction": "deferred",
+    "volumeSurface216Principle": {
+      "enabled": false,
+      "description": "Future symbolic rule: 6x6x6 volume equals six 6x6 faces, both 216 unit cells."
+    }
+  },
   "layerTurnProfile": {
     "type": "ritualTurn",
     "axes": ["X", "Y", "Z"],
@@ -80,6 +107,8 @@
   "knownLimitations": [
     "King-safety after layer rotation is deferred.",
     "Anchor interaction with layer rotations is deferred.",
+    "Stack/layer interaction is deferred.",
+    "Layer turns may move stacks in a future CoreCell model.",
     "Runtime ritualTurn legality is deferred to P2E."
   ]
 }

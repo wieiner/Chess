@@ -38,6 +38,14 @@
   "coreProfile": {
     "type": "none"
   },
+  "occupancyProfile": {
+    "type": "exclusive",
+    "status": "implementedByCurrentBoardModel"
+  },
+  "fusionProfile": {
+    "type": "none",
+    "status": "implementedByCurrentBoardModel"
+  },
   "layerTurnProfile": {
     "type": "disabled"
   },

@@ -38,6 +38,7 @@ Deferred:
 - turn-cost enforcement;
 - king-safety after layer rotation;
 - anchor interaction after layer rotation;
+- stack/fusion movement when a layer contains future CoreCell stacks;
 - notation and replay semantics.
 
-These belong to P2E.
+These belong to P2H after the CoreCell stack model exists.

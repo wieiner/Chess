@@ -18,6 +18,9 @@ A rule profile is a JSON `RuleSet` with these top-level fields:
 - `captureProfile`: capture semantics.
 - `goalProfile`: what the game is trying to achieve.
 - `coreProfile`: central-core target and anchoring data.
+- `occupancyProfile`: board-cell occupancy semantics.
+- `fusionProfile`: transformation/progress rules for co-occupied core cells.
+- `corePhysicsProfile`: binding between core zone, occupancy, fusion, anchor, and symbolic laws.
 - `layerTurnProfile`: Rubik-like layer-turn behavior.
 - `turnProfile`: side order and action model.
 - `victoryProfile`: concrete victory detection rule.
@@ -46,7 +49,7 @@ Fields:
 - `sideNames`: names for sides/gates.
 - `lore`: optional flavor text.
 
-The Asgard/Meru idea belongs here when it is decorative. Gameplay-affecting central slots and anchoring belong in `coreProfile`, `goalProfile`, and `victoryProfile`.
+The Asgard/Meru idea belongs here when it is decorative. Gameplay-affecting central slots, occupancy, fusion, anchoring, and victory belong in `coreProfile`, `occupancyProfile`, `fusionProfile`, `corePhysicsProfile`, `goalProfile`, and `victoryProfile`.
 
 ## setupProfile
 
@@ -106,6 +109,46 @@ Asgard/Meru convergence uses a central core:
 - `contestedAnchor`: future rule for contested central slots.
 
 Anchoring is gameplay, not narrative. It belongs here and in `victoryProfile`.
+
+## occupancyProfile
+
+Occupancy profile affects board-cell semantics.
+
+Supported contract values:
+
+- `exclusive`: every cell contains at most one piece.
+- `coreStack`: outside the core every cell is exclusive; inside the core a stack may contain multiple pieces.
+- `quantumCore`: future mode where core occupants can carry state/color/layer/permutation data.
+
+The current engine runtime remains `exclusive` because its board ABI is 512 integer cells. Asgard profiles can specify `coreStack` as `specOnly` until the CoreCell stack model exists.
+
+## fusionProfile
+
+Fusion profile affects transformation and victory progress inside the core.
+
+Supported contract values:
+
+- `none`: no fusion.
+- `anchorOnly`: a piece reaches a target slot and anchors.
+- `pairFusion`: two compatible pieces form a fusion entity.
+- `stackFusion`: several pieces form a stack/fusion state.
+- `colorPermutation`: future color/permutation state.
+- `volumeSurface216`: future surface/volume symbolic completion mode.
+
+A fusion entity may be a virtual state, stack descriptor, transformed piece, victory progress marker, or ritual state. It is not necessarily a new classic chess piece.
+
+## corePhysicsProfile
+
+Core physics profile binds `coreProfile`, `occupancyProfile`, `fusionProfile`, anchor behavior, and victory interpretation.
+
+For Asgard/Meru:
+
+- `type`: `asgardCorePhysics`;
+- `zoneModel`: `outerExclusive_coreStack`;
+- `implementationStage`: `specOnly`;
+- `volumeSurface216Principle.enabled`: `false` for now.
+
+The Volume-Surface 216 Principle is an authorial mathematical-mythological concept: a 6x6x6 cube has volume 216, while six 6x6 faces also total 216 unit cells. It is documented as future symbolic game law, not as a factual physics claim.
 
 ## layerTurnProfile
 

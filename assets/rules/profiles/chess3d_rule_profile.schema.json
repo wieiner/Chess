@@ -12,6 +12,8 @@
     "movementProfile",
     "captureProfile",
     "goalProfile",
+    "occupancyProfile",
+    "fusionProfile",
     "layerTurnProfile",
     "turnProfile",
     "victoryProfile",
@@ -53,6 +55,41 @@
       }
     },
     "coreProfile": { "type": "object" },
+    "occupancyProfile": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["exclusive", "coreStack", "quantumCore"] },
+        "outerField": { "type": "string" },
+        "core": { "type": "string" },
+        "maxStackSize": { "type": ["string", "integer"] },
+        "ordinaryCaptureInCore": { "type": "string" },
+        "status": { "enum": ["implementedByCurrentBoardModel", "specOnly", "draft", "future"] }
+      }
+    },
+    "fusionProfile": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["none", "anchorOnly", "pairFusion", "stackFusion", "colorPermutation", "volumeSurface216"] },
+        "friendlyFusion": { "type": "string" },
+        "enemyCoOccupancy": { "type": "string" },
+        "fusionEntity": { "type": "string" },
+        "colorPermutation": { "type": "string" },
+        "volumeSurface216": { "type": "string" },
+        "status": { "enum": ["implementedByCurrentBoardModel", "specOnly", "draft", "future"] }
+      }
+    },
+    "corePhysicsProfile": {
+      "type": "object",
+      "properties": {
+        "type": { "enum": ["none", "asgardCorePhysics"] },
+        "zoneModel": { "type": "string" },
+        "implementationStage": { "enum": ["specOnly", "parserOnly", "runtime"] },
+        "volumeSurface216Principle": { "type": "object" },
+        "layerTurnStackInteraction": { "type": "string" }
+      }
+    },
     "layerTurnProfile": {
       "type": "object",
       "required": ["type"],
