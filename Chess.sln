@@ -1,0 +1,93 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ChessEngine", "src\ChessEngine\ChessEngine.vcxproj", "{E4C355C1-86B5-4F83-9B38-CA35D3486C1B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ChessGpuBackend", "src\ChessGpuBackend\ChessGpuBackend.vcxproj", "{8C0DE181-9E5B-4B77-A192-1B6737BB4F40}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ChessCudaBackend", "src\ChessCudaBackend\ChessCudaBackend.vcxproj", "{70F2A083-4F01-443E-B149-285F7B42839A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chess3DEngine", "src\Chess3DEngine\Chess3DEngine.vcxproj", "{D43E2469-8D91-42D0-9F53-C7B2B76A3D61}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RubikEngine", "src\RubikEngine\RubikEngine.vcxproj", "{9D3C75A2-0299-48D3-8F93-A1236DA4B71E}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chess2DBenchmark", "src\Chess2DBenchmark\Chess2DBenchmark.vcxproj", "{33C82C50-4D67-4E11-9893-33945064234C}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E4C355C1-86B5-4F83-9B38-CA35D3486C1B} = {E4C355C1-86B5-4F83-9B38-CA35D3486C1B}
+		{8C0DE181-9E5B-4B77-A192-1B6737BB4F40} = {8C0DE181-9E5B-4B77-A192-1B6737BB4F40}
+		{70F2A083-4F01-443E-B149-285F7B42839A} = {70F2A083-4F01-443E-B149-285F7B42839A}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChessApp", "src\ChessApp\ChessApp.csproj", "{2F0C57C0-F02C-4EE6-A8D4-86586F7D9B20}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E4C355C1-86B5-4F83-9B38-CA35D3486C1B} = {E4C355C1-86B5-4F83-9B38-CA35D3486C1B}
+		{8C0DE181-9E5B-4B77-A192-1B6737BB4F40} = {8C0DE181-9E5B-4B77-A192-1B6737BB4F40}
+		{70F2A083-4F01-443E-B149-285F7B42839A} = {70F2A083-4F01-443E-B149-285F7B42839A}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chess3DApp", "src\Chess3DApp\Chess3DApp.csproj", "{A8A7D7E9-4C3F-4CF5-8E10-93448C21E07D}"
+	ProjectSection(ProjectDependencies) = postProject
+		{8C0DE181-9E5B-4B77-A192-1B6737BB4F40} = {8C0DE181-9E5B-4B77-A192-1B6737BB4F40}
+		{70F2A083-4F01-443E-B149-285F7B42839A} = {70F2A083-4F01-443E-B149-285F7B42839A}
+		{D43E2469-8D91-42D0-9F53-C7B2B76A3D61} = {D43E2469-8D91-42D0-9F53-C7B2B76A3D61}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RubikApp", "src\RubikApp\RubikApp.csproj", "{CDAA84D9-8068-4082-9B70-46C31542C6EA}"
+	ProjectSection(ProjectDependencies) = postProject
+		{9D3C75A2-0299-48D3-8F93-A1236DA4B71E} = {9D3C75A2-0299-48D3-8F93-A1236DA4B71E}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChessOnlineApp", "src\ChessOnlineApp\ChessOnlineApp.csproj", "{6DB0D2D8-1C48-453F-8A2B-65BB542F7C31}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E4C355C1-86B5-4F83-9B38-CA35D3486C1B}.Debug|x64.ActiveCfg = Debug|x64
+		{E4C355C1-86B5-4F83-9B38-CA35D3486C1B}.Debug|x64.Build.0 = Debug|x64
+		{E4C355C1-86B5-4F83-9B38-CA35D3486C1B}.Release|x64.ActiveCfg = Release|x64
+		{E4C355C1-86B5-4F83-9B38-CA35D3486C1B}.Release|x64.Build.0 = Release|x64
+		{8C0DE181-9E5B-4B77-A192-1B6737BB4F40}.Debug|x64.ActiveCfg = Debug|x64
+		{8C0DE181-9E5B-4B77-A192-1B6737BB4F40}.Debug|x64.Build.0 = Debug|x64
+		{8C0DE181-9E5B-4B77-A192-1B6737BB4F40}.Release|x64.ActiveCfg = Release|x64
+		{8C0DE181-9E5B-4B77-A192-1B6737BB4F40}.Release|x64.Build.0 = Release|x64
+		{70F2A083-4F01-443E-B149-285F7B42839A}.Debug|x64.ActiveCfg = Debug|x64
+		{70F2A083-4F01-443E-B149-285F7B42839A}.Debug|x64.Build.0 = Debug|x64
+		{70F2A083-4F01-443E-B149-285F7B42839A}.Release|x64.ActiveCfg = Release|x64
+		{70F2A083-4F01-443E-B149-285F7B42839A}.Release|x64.Build.0 = Release|x64
+		{D43E2469-8D91-42D0-9F53-C7B2B76A3D61}.Debug|x64.ActiveCfg = Debug|x64
+		{D43E2469-8D91-42D0-9F53-C7B2B76A3D61}.Debug|x64.Build.0 = Debug|x64
+		{D43E2469-8D91-42D0-9F53-C7B2B76A3D61}.Release|x64.ActiveCfg = Release|x64
+		{D43E2469-8D91-42D0-9F53-C7B2B76A3D61}.Release|x64.Build.0 = Release|x64
+		{9D3C75A2-0299-48D3-8F93-A1236DA4B71E}.Debug|x64.ActiveCfg = Debug|x64
+		{9D3C75A2-0299-48D3-8F93-A1236DA4B71E}.Debug|x64.Build.0 = Debug|x64
+		{9D3C75A2-0299-48D3-8F93-A1236DA4B71E}.Release|x64.ActiveCfg = Release|x64
+		{9D3C75A2-0299-48D3-8F93-A1236DA4B71E}.Release|x64.Build.0 = Release|x64
+		{33C82C50-4D67-4E11-9893-33945064234C}.Debug|x64.ActiveCfg = Debug|x64
+		{33C82C50-4D67-4E11-9893-33945064234C}.Debug|x64.Build.0 = Debug|x64
+		{33C82C50-4D67-4E11-9893-33945064234C}.Release|x64.ActiveCfg = Release|x64
+		{33C82C50-4D67-4E11-9893-33945064234C}.Release|x64.Build.0 = Release|x64
+		{2F0C57C0-F02C-4EE6-A8D4-86586F7D9B20}.Debug|x64.ActiveCfg = Debug|x64
+		{2F0C57C0-F02C-4EE6-A8D4-86586F7D9B20}.Debug|x64.Build.0 = Debug|x64
+		{2F0C57C0-F02C-4EE6-A8D4-86586F7D9B20}.Release|x64.ActiveCfg = Release|x64
+		{2F0C57C0-F02C-4EE6-A8D4-86586F7D9B20}.Release|x64.Build.0 = Release|x64
+		{A8A7D7E9-4C3F-4CF5-8E10-93448C21E07D}.Debug|x64.ActiveCfg = Debug|x64
+		{A8A7D7E9-4C3F-4CF5-8E10-93448C21E07D}.Debug|x64.Build.0 = Debug|x64
+		{A8A7D7E9-4C3F-4CF5-8E10-93448C21E07D}.Release|x64.ActiveCfg = Release|x64
+		{A8A7D7E9-4C3F-4CF5-8E10-93448C21E07D}.Release|x64.Build.0 = Release|x64
+		{CDAA84D9-8068-4082-9B70-46C31542C6EA}.Debug|x64.ActiveCfg = Debug|x64
+		{CDAA84D9-8068-4082-9B70-46C31542C6EA}.Debug|x64.Build.0 = Debug|x64
+		{CDAA84D9-8068-4082-9B70-46C31542C6EA}.Release|x64.ActiveCfg = Release|x64
+		{CDAA84D9-8068-4082-9B70-46C31542C6EA}.Release|x64.Build.0 = Release|x64
+		{6DB0D2D8-1C48-453F-8A2B-65BB542F7C31}.Debug|x64.ActiveCfg = Debug|x64
+		{6DB0D2D8-1C48-453F-8A2B-65BB542F7C31}.Debug|x64.Build.0 = Debug|x64
+		{6DB0D2D8-1C48-453F-8A2B-65BB542F7C31}.Release|x64.ActiveCfg = Release|x64
+		{6DB0D2D8-1C48-453F-8A2B-65BB542F7C31}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

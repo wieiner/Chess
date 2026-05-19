@@ -1,0 +1,28 @@
+{
+  "name": "Cube Chess 8x8x8 Draft",
+  "board": { "width": 8, "height": 8, "depth": 8 },
+  "activeSideCount": 6,
+  "maxPiecesPerSide": 16,
+  "movementProfile": "draft3d",
+  "kingSafety": false,
+  "sides": [
+    { "id": 1, "name": "White", "homeFace": "zMin", "forward": [0, 0, 1] },
+    { "id": 2, "name": "Black", "homeFace": "zMax", "forward": [0, 0, -1] },
+    { "id": 3, "name": "North", "homeFace": "yMin", "forward": [0, 1, 0] },
+    { "id": 4, "name": "South", "homeFace": "yMax", "forward": [0, -1, 0] },
+    { "id": 5, "name": "West", "homeFace": "xMin", "forward": [1, 0, 0] },
+    { "id": 6, "name": "East", "homeFace": "xMax", "forward": [-1, 0, 0] }
+  ],
+  "draftRules": {
+    "setup": "Each cube face uses its central 4x4 square. Pawns occupy the eight side-middle cells of that 4x4 ring; the other eight classic pieces occupy the four corners plus central 2x2.",
+    "topology": "Six armies live on the six axis-aligned boundary faces of an 8x8x8 integer lattice. Opposite faces are paired by cube symmetry; adjacent faces meet through the shared volume rather than overlapping starts.",
+    "pawn": "one step toward side forward vector; captures on the forward-adjacent plane",
+    "rook": "orthogonal 3D axes",
+    "bishop": "2D and 3D diagonals",
+    "queen": "rook plus bishop",
+    "king": "one step in any of the 26 adjacent directions",
+    "knight": "3D L move: 2 on one axis, 1 on another axis",
+    "castling": false,
+    "enPassant": false
+  }
+}

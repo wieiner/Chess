@@ -1,0 +1,309 @@
+<Window x:Class="ChessApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Chess Advisor" Width="1220" Height="780" MinWidth="980" MinHeight="680"
+        Background="#20252B">
+    <Window.Resources>
+        <SolidColorBrush x:Key="PanelBrush" Color="#2B3138" />
+        <SolidColorBrush x:Key="PanelAltBrush" Color="#242A31" />
+        <SolidColorBrush x:Key="CommandBrush" Color="#20262D" />
+        <SolidColorBrush x:Key="CommandBorderBrush" Color="#3B4652" />
+        <SolidColorBrush x:Key="TextBrush" Color="#F3F5F7" />
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#AEB7C2" />
+        <Style TargetType="Button">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Background" Value="#39424C" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="#56616E" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Background" Value="#1D2228" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="#46505C" />
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+        </Style>
+        <Style TargetType="TabControl">
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource CommandBorderBrush}" />
+        </Style>
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+            <Setter Property="Background" Value="#20262D" />
+            <Setter Property="BorderBrush" Value="{StaticResource CommandBorderBrush}" />
+            <Setter Property="Padding" Value="10,6" />
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                    <Setter Property="Background" Value="{StaticResource PanelAltBrush}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CommandGroupStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource CommandBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource CommandBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+        </Style>
+        <Style x:Key="CommandLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+        <Style x:Key="PanelHeaderStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style x:Key="BoardButtonStyle" TargetType="Button">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontFamily" Value="Segoe UI Symbol" />
+            <Setter Property="FontSize" Value="56" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style x:Key="PaletteButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="54" />
+            <Setter Property="Height" Value="54" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Background" Value="#20252B" />
+            <Setter Property="BorderBrush" Value="#56616E" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        </Style>
+    </Window.Resources>
+
+    <DockPanel LastChildFill="True">
+        <Border DockPanel.Dock="Top" Background="#171B20" Padding="12,10" BorderBrush="#303943" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <DockPanel Margin="0,0,0,8">
+                    <TextBlock x:Name="BusyText" DockPanel.Dock="Right" Foreground="#F6D365" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    <StackPanel>
+                        <TextBlock Text="Chess Advisor" Foreground="{StaticResource TextBrush}" FontSize="18" FontWeight="SemiBold" />
+                        <TextBlock Text="2D board, 3D view, engine settings and online endpoint are separated into focused panels." Foreground="{StaticResource MutedTextBrush}" FontSize="12" />
+                    </StackPanel>
+                </DockPanel>
+
+                <WrapPanel Grid.Row="1">
+                    <Border Style="{StaticResource CommandGroupStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Новая игра" Click="NewGame_Click" />
+                            <Button Content="Отменить" Click="Undo_Click" />
+                            <Button x:Name="AiMoveButton" Content="Ход ИИ" Click="AiMove_Click" />
+                            <TextBlock Text="Глубина" Style="{StaticResource CommandLabelStyle}" Margin="4,0,6,0" />
+                            <TextBox x:Name="DepthBox" Width="48" Text="5" VerticalAlignment="Center"
+                                     ToolTip="Глубина 6-8 уже может быть тяжелой; для больших значений лучше оставить лимит времени." />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CommandGroupStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Играю" Style="{StaticResource CommandLabelStyle}" />
+                            <ComboBox x:Name="PlayerSideBox" Width="90" SelectedIndex="0" VerticalAlignment="Center" SelectionChanged="PlayerSideBox_SelectionChanged">
+                                <ComboBoxItem Content="Белые" />
+                                <ComboBoxItem Content="Черные" />
+                                <ComboBoxItem Content="Оба" />
+                            </ComboBox>
+                            <TextBlock Text="Превращение" Style="{StaticResource CommandLabelStyle}" Margin="10,0,6,0" />
+                            <ComboBox x:Name="PromotionBox" Width="82" SelectedIndex="0" VerticalAlignment="Center">
+                                <ComboBoxItem Content="Ферзь" />
+                                <ComboBoxItem Content="Ладья" />
+                                <ComboBoxItem Content="Слон" />
+                                <ComboBoxItem Content="Конь" />
+                            </ComboBox>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CommandGroupStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Вид" Style="{StaticResource CommandLabelStyle}" />
+                            <ComboBox x:Name="ThemeBox" Width="132" SelectedIndex="0" VerticalAlignment="Center" SelectionChanged="ThemeBox_SelectionChanged">
+                                <ComboBoxItem Content="Мои прозрачные" />
+                                <ComboBoxItem Content="Мои BMP" />
+                                <ComboBoxItem Content="Unicode" />
+                            </ComboBox>
+                            <CheckBox x:Name="Mode3DBox" Content="3D" Margin="10,0,8,0"
+                                      Checked="Mode3DBox_Changed" Unchecked="Mode3DBox_Changed" />
+                            <TextBlock Text="3D set" Style="{StaticResource CommandLabelStyle}" />
+                            <ComboBox x:Name="ModelSetBox" Width="132" VerticalAlignment="Center" SelectionChanged="ModelSetBox_SelectionChanged" />
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
+            </Grid>
+        </Border>
+
+        <Grid Margin="14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="320" />
+            </Grid.ColumnDefinitions>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="70" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="70" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel x:Name="WhitePalette" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                <Grid Grid.Column="1">
+                    <Viewbox x:Name="Board2DView" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Grid Width="704" Height="704">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="32" />
+                                <RowDefinition Height="640" />
+                                <RowDefinition Height="32" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="32" />
+                                <ColumnDefinition Width="640" />
+                                <ColumnDefinition Width="32" />
+                            </Grid.ColumnDefinitions>
+
+                            <UniformGrid x:Name="TopFiles" Grid.Row="0" Grid.Column="1" Rows="1" Columns="8" />
+                            <UniformGrid x:Name="BottomFiles" Grid.Row="2" Grid.Column="1" Rows="1" Columns="8" />
+                            <UniformGrid x:Name="LeftRanks" Grid.Row="1" Grid.Column="0" Rows="8" Columns="1" />
+                            <UniformGrid x:Name="RightRanks" Grid.Row="1" Grid.Column="2" Rows="8" Columns="1" />
+
+                            <Border Grid.Row="1" Grid.Column="1" BorderBrush="#111418" BorderThickness="2">
+                                <UniformGrid x:Name="BoardGrid" Rows="8" Columns="8" />
+                            </Border>
+                        </Grid>
+                    </Viewbox>
+
+                    <Border x:Name="Board3DHost" Visibility="Collapsed" Background="#111418" BorderBrush="#48515D" BorderThickness="1">
+                        <Viewport3D x:Name="Board3DView" ClipToBounds="True"
+                                    MouseDown="Board3DView_MouseDown"
+                                    MouseMove="Board3DView_MouseMove"
+                                    MouseUp="Board3DView_MouseUp"
+                                    MouseWheel="Board3DView_MouseWheel" />
+                    </Border>
+                </Grid>
+
+                <StackPanel x:Name="BlackPalette" Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Grid>
+
+            <Border Grid.Column="1" Background="{StaticResource PanelBrush}" Padding="12" Margin="14,0,0,0">
+                <TabControl>
+                    <TabItem Header="Обзор">
+                        <Grid Margin="10">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock x:Name="StatusText" Foreground="{StaticResource TextBrush}" FontSize="16" TextWrapping="Wrap" />
+                            <TextBlock x:Name="SearchText" Grid.Row="1" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,10,0,12" />
+                            <ListBox x:Name="MoveList" Grid.Row="2" Background="#20252B" Foreground="{StaticResource TextBrush}" BorderBrush="#46505C" />
+                        </Grid>
+                    </TabItem>
+
+                    <TabItem Header="ИИ">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
+                            <StackPanel>
+                                <TextBlock Text="Поиск и оценка" Style="{StaticResource PanelHeaderStyle}" />
+                                <UniformGrid Columns="2" Margin="0,0,0,8">
+                                    <CheckBox x:Name="AutoDepthBox" Content="Авто-глубина" IsChecked="True" />
+                                    <CheckBox x:Name="QuiescenceBox" Content="Quiescence" IsChecked="True" />
+                                    <CheckBox x:Name="TranspositionBox" Content="Transposition" IsChecked="True" />
+                                    <CheckBox x:Name="MoveOrderingBox" Content="Move ordering" IsChecked="True" />
+                                    <CheckBox x:Name="PieceSquareBox" Content="Поля фигур" IsChecked="True" />
+                                    <CheckBox x:Name="KingSafetyBox" Content="Безопасность короля" IsChecked="True" />
+                                    <CheckBox x:Name="GpuEvalBox" Content="GPU eval" IsChecked="True" />
+                                    <CheckBox x:Name="EndgameBox" Content="Endgame tables" IsChecked="True" />
+                                    <CheckBox x:Name="AutoThreefoldBox" Content="Авто 3 повтора" IsChecked="True" Checked="DrawRules_Changed" Unchecked="DrawRules_Changed" />
+                                </UniformGrid>
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <TextBlock Text="Лимит, мс" Style="{StaticResource CommandLabelStyle}" />
+                                    <TextBox x:Name="TimeLimitBox" Width="72" Text="1500" Margin="8,0,0,0" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <TextBlock Text="Вариативность" Style="{StaticResource CommandLabelStyle}" />
+                                    <TextBox x:Name="OpeningRandomBox" Width="44" Text="20" Margin="8,0,0,0"
+                                             ToolTip="0 выключает дебютный вариатор, 100 чаще выбирает между близкими ходами." />
+                                    <TextBlock Text="ply" Style="{StaticResource CommandLabelStyle}" Margin="10,0,0,0" />
+                                    <TextBox x:Name="OpeningPlyBox" Width="44" Text="16" Margin="8,0,0,0" />
+                                </StackPanel>
+                                <Separator Margin="0,14,0,12" Background="#3B4652" />
+                                <TextBlock Text="Syzygy tablebases" Style="{StaticResource PanelHeaderStyle}" />
+                                <DockPanel>
+                                    <Button Content="TB" DockPanel.Dock="Right" Click="ApplyTablebase_Click" Margin="8,0,0,0" />
+                                    <TextBox x:Name="TablebasePathBox" Text="Assets\Tablebases" />
+                                </DockPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem Header="Позиция">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
+                            <StackPanel>
+                                <TextBlock Text="Расстановка" Style="{StaticResource PanelHeaderStyle}" />
+                                <CheckBox x:Name="SetupModeBox" Content="Режим расстановки"
+                                          ToolTip="Перетаскивайте фигуры с боковых панелей на доску; правый клик по клетке очищает ее."
+                                          Checked="SetupModeBox_Changed" Unchecked="SetupModeBox_Changed" />
+                                <WrapPanel Margin="0,6,0,10">
+                                    <ComboBox x:Name="SetupSideBox" Width="112" SelectedIndex="0" Margin="0,0,8,8">
+                                        <ComboBoxItem Content="Ход белых" />
+                                        <ComboBoxItem Content="Ход черных" />
+                                    </ComboBox>
+                                    <Button Content="Очистить" Click="ClearSetup_Click" />
+                                    <Button Content="Старт" Click="StartSetup_Click" />
+                                    <Button Content="Применить" Click="ApplySetup_Click" />
+                                </WrapPanel>
+                                <Button Content="Заявить ничью" Click="ClaimDraw_Click" HorizontalAlignment="Left" />
+                                <Separator Margin="0,14,0,12" Background="#3B4652" />
+                                <TextBlock Text="FEN" Style="{StaticResource PanelHeaderStyle}" />
+                                <TextBox x:Name="FenBox" MinHeight="78" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button Content="Загрузить FEN" Click="LoadFen_Click" />
+                                    <Button Content="Копировать FEN" Click="CopyFen_Click" />
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem Header="Сеть">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
+                            <StackPanel>
+                                <TextBlock Text="Endpoint API" Style="{StaticResource PanelHeaderStyle}" />
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="76" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="NetworkHostBox" Text="127.0.0.1" />
+                                    <TextBox x:Name="NetworkPortBox" Grid.Column="1" Text="43100" Margin="8,0,0,0" />
+                                </Grid>
+                                <WrapPanel Margin="0,0,0,8">
+                                    <Button Content="Host" Click="NetworkHost_Click" />
+                                    <Button Content="Connect" Click="NetworkConnect_Click" />
+                                    <Button Content="Stop" Click="NetworkStop_Click" />
+                                </WrapPanel>
+                                <TextBlock x:Name="NetworkStatusText" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Text="Endpoint: off" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                </TabControl>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

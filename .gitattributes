@@ -1,0 +1,40 @@
+# ============================================================
+# Line ending policy
+# ============================================================
+
+# Let Git detect text files and normalize them.
+* text=auto
+
+# Visual Studio / Windows project files: CRLF in working tree.
+*.sln              text eol=crlf
+*.vcxproj          text eol=crlf
+*.vcxproj.filters  text eol=crlf
+*.csproj           text eol=crlf
+*.xaml             text eol=crlf
+*.bat              text eol=crlf
+*.cmd              text eol=crlf
+*.ps1              text eol=crlf
+
+# Source/documentation files are text.
+*.cs    text
+*.cpp   text
+*.h     text
+*.hpp   text
+*.cu    text
+*.json  text
+*.md    text
+*.txt   text
+
+# Binary assets: never modify line endings.
+*.png   binary
+*.bmp   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.dll   binary
+*.exe   binary
+*.pdb   binary
+*.zip   binary
+*.7z    binary
+*.rar   binary

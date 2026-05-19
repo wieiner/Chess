@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>ChessApp</AssemblyName>
+    <RootNamespace>ChessApp</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChessEngine\ChessEngine.vcxproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\ChessGpuBackend\ChessGpuBackend.vcxproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\ChessCudaBackend\ChessCudaBackend.vcxproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Chess3DWindow.xaml.cs" />
+    <Compile Remove="NativeChess3DEngine.cs" />
+    <Compile Remove="Chess3DNetworkEndpoint.cs" />
+    <Page Remove="Chess3DWindow.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\Figures\ClassicBmp\*.bmp">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\Figures\TransparentPng\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\Models\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <Target Name="CopyNativeEngine" AfterTargets="Build">
+    <PropertyGroup>
+      <NativeEnginePath>$(MSBuildThisFileDirectory)..\..\bin\$(Platform)\$(Configuration)\ChessEngine.dll</NativeEnginePath>
+      <GpuBackendPath>$(MSBuildThisFileDirectory)..\..\bin\$(Platform)\$(Configuration)\ChessGpuBackend.dll</GpuBackendPath>
+      <CudaBackendPath>$(MSBuildThisFileDirectory)..\..\bin\$(Platform)\$(Configuration)\ChessCudaBackend.dll</CudaBackendPath>
+    </PropertyGroup>
+    <Copy SourceFiles="$(NativeEnginePath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('$(NativeEnginePath)')" />
+    <Copy SourceFiles="$(GpuBackendPath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('$(GpuBackendPath)')" />
+    <Copy SourceFiles="$(CudaBackendPath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('$(CudaBackendPath)')" />
+  </Target>
+</Project>

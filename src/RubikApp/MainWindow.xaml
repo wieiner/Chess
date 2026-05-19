@@ -1,0 +1,258 @@
+<Window x:Class="RubikApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Rubik Studio"
+        Width="1320"
+        Height="900"
+        MinWidth="1040"
+        MinHeight="720"
+        Background="#0F1218"
+        Foreground="#EEF3F8">
+    <Window.Resources>
+        <SolidColorBrush x:Key="PanelBrush" Color="#171D26" />
+        <SolidColorBrush x:Key="PanelAltBrush" Color="#202734" />
+        <SolidColorBrush x:Key="CommandBrush" Color="#151B24" />
+        <SolidColorBrush x:Key="CommandBorderBrush" Color="#2D3848" />
+        <SolidColorBrush x:Key="TextBrush" Color="#EEF3F8" />
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#AEBCCD" />
+
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="MinWidth" Value="76" />
+            <Setter Property="Background" Value="#35404E" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="#536071" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="MinWidth" Value="54" />
+            <Setter Property="Background" Value="#0E131A" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="#2D3848" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="MinWidth" Value="66" />
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+        </Style>
+        <Style x:Key="CommandGroupStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource CommandBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource CommandBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10" />
+            <Setter Property="Margin" Value="0,0,10,10" />
+        </Style>
+        <Style x:Key="LabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+            <Setter Property="Margin" Value="0,0,6,8" />
+        </Style>
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="#181E27" Padding="12,10" BorderBrush="#273141" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <DockPanel Margin="0,0,0,8">
+                    <TextBlock x:Name="StatusText"
+                               DockPanel.Dock="Right"
+                               Foreground="#B8C7D8"
+                               HorizontalAlignment="Right"
+                               TextWrapping="Wrap"
+                               MaxWidth="620" />
+                    <StackPanel>
+                        <TextBlock Text="Rubik Studio" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="N x N x N cube workspace with animated layer turns, notation and reverse-history solving." Foreground="{StaticResource MutedTextBrush}" FontSize="12" />
+                    </StackPanel>
+                </DockPanel>
+
+                <WrapPanel Grid.Row="1">
+                    <Border Style="{StaticResource CommandGroupStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Размер" Style="{StaticResource LabelStyle}" />
+                            <TextBox x:Name="SizeBox" Text="8" Width="54" />
+                            <Button Content="Применить" Click="ApplySize_Click" />
+                            <Button Content="Сброс" Click="Reset_Click" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CommandGroupStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Поворот" Style="{StaticResource LabelStyle}" />
+                            <ComboBox x:Name="AxisBox" SelectedIndex="0">
+                                <ComboBoxItem Content="Z" />
+                                <ComboBoxItem Content="Y" />
+                                <ComboBoxItem Content="X" />
+                            </ComboBox>
+                            <TextBlock Text="Слой" Style="{StaticResource LabelStyle}" />
+                            <TextBox x:Name="LayerBox" Text="1" Width="54" />
+                            <ComboBox x:Name="QuarterBox" SelectedIndex="0">
+                                <ComboBoxItem Content="+90" Tag="1" />
+                                <ComboBoxItem Content="180" Tag="2" />
+                                <ComboBoxItem Content="-90" Tag="3" />
+                            </ComboBox>
+                            <Button Content="Повернуть" Click="Rotate_Click" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CommandGroupStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Анимация" Style="{StaticResource LabelStyle}" />
+                            <Slider x:Name="AnimationSpeedSlider"
+                                    Width="130"
+                                    Minimum="0.25"
+                                    Maximum="4"
+                                    Value="1"
+                                    TickFrequency="0.25"
+                                    IsSnapToTickEnabled="True"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,8,8" />
+                            <TextBlock Text="{Binding ElementName=AnimationSpeedSlider, Path=Value, StringFormat={}{0:0.##}x}" Margin="0,0,8,8" />
+                            <Button Content="Стоп" Click="StopPlayback_Click" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CommandGroupStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <CheckBox x:Name="SurfaceOnlyBox" Content="только оболочка" IsChecked="True" Checked="SurfaceMode_Changed" Unchecked="SurfaceMode_Changed" />
+                            <Button Content="Вид" Click="ResetCamera_Click" />
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="390" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Background="#10151D" BorderBrush="#273141" BorderThickness="0,0,1,0">
+                <Grid>
+                    <Viewport3D x:Name="RubikViewport"
+                                ClipToBounds="True"
+                                MouseDown="RubikViewport_MouseDown"
+                                MouseMove="RubikViewport_MouseMove"
+                                MouseUp="RubikViewport_MouseUp"
+                                MouseWheel="RubikViewport_MouseWheel" />
+                    <Border HorizontalAlignment="Left"
+                            VerticalAlignment="Bottom"
+                            Margin="14"
+                            Padding="10,8"
+                            Background="#AA0E131A"
+                            BorderBrush="#334052"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                        <StackPanel>
+                            <TextBlock x:Name="MouseHintText" Text="ЛКМ drag: повернуть камеру. ЛКМ drag по кубику: повернуть слой. Shift/ПКМ: панорама." Foreground="#D9E4EF" TextWrapping="Wrap" MaxWidth="520" />
+                            <TextBlock x:Name="SelectionText" Text="Слой не выбран." Foreground="#AEBCCD" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1" Background="{StaticResource PanelBrush}" Padding="12">
+                <TabControl Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource CommandBorderBrush}">
+                    <TabItem Header="Скрамбл">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
+                            <StackPanel>
+                                <TextBlock Text="Скрамбл и reverse-history solver" Style="{StaticResource SectionTitleStyle}" />
+                                <WrapPanel>
+                                    <TextBlock Text="seed" Style="{StaticResource LabelStyle}" />
+                                    <TextBox x:Name="SeedBox" Text="2026" Width="72" />
+                                    <TextBlock Text="ходов" Style="{StaticResource LabelStyle}" />
+                                    <TextBox x:Name="LengthBox" Text="24" Width="58" />
+                                    <Button Content="Смешать" Click="Scramble_Click" />
+                                </WrapPanel>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button Content="Рассчитать сборку" MinWidth="138" Click="Solve_Click" />
+                                    <Button Content="Применить" MinWidth="96" Click="ApplySolution_Click" />
+                                    <Button Content="Проиграть" MinWidth="96" Click="PlaySolution_Click" />
+                                </WrapPanel>
+                                <TextBlock Text="Сборка сейчас реверсирует известную историю поворотов. Для полностью ручных состояний нужен отдельный solver." Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,12,0,0" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem Header="Позиция">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
+                            <StackPanel>
+                                <TextBlock Text="Ручная позиция" Style="{StaticResource SectionTitleStyle}" />
+                                <WrapPanel>
+                                    <TextBlock Text="x" Style="{StaticResource LabelStyle}" />
+                                    <TextBox x:Name="XBox" Text="1" Width="42" />
+                                    <TextBlock Text="y" Style="{StaticResource LabelStyle}" />
+                                    <TextBox x:Name="YBox" Text="1" Width="42" />
+                                    <TextBlock Text="z" Style="{StaticResource LabelStyle}" />
+                                    <TextBox x:Name="ZBox" Text="1" Width="42" />
+                                </WrapPanel>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <TextBlock Text="value" Style="{StaticResource LabelStyle}" />
+                                    <TextBox x:Name="ValueBox" Text="0" Width="72" />
+                                    <Button Content="Задать" Click="SetCell_Click" />
+                                </WrapPanel>
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button Content="Экспорт" Click="ExportState_Click" />
+                                    <Button Content="Загрузить текст" MinWidth="122" Click="LoadState_Click" />
+                                </WrapPanel>
+                                <TextBlock Text="Формат состояния использует текущую размерность. При N=8 это 512 значений, при N=4 — 64." Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,12,0,0" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem Header="Нотация">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
+                            <StackPanel>
+                                <TextBlock Text="Нотация поворотов" Style="{StaticResource SectionTitleStyle}" />
+                                <WrapPanel>
+                                    <Button Content="История" Click="ExportNotation_Click" />
+                                    <Button Content="Нотация" Click="ApplyNotation_Click" />
+                                    <Button Content="Плей" Click="PlayNotation_Click" />
+                                </WrapPanel>
+                                <TextBlock Text="Поддерживаются R U R' U', X5x2, wide moves и повороты всего куба x/y/z в пределах текущего N." Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,12,0,0" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem Header="Вывод">
+                        <TextBox x:Name="OutputBox"
+                                 Margin="10"
+                                 AcceptsReturn="True"
+                                 IsReadOnly="False"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Background="#0E131A"
+                                 Foreground="#E9EEF4"
+                                 BorderBrush="#2D3848" />
+                    </TabItem>
+                </TabControl>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
