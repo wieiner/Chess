@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P0 GitHub import stabilization.
+Last audited locally for P1 contract-test stabilization.
 
 ## Exists
 
@@ -16,6 +16,7 @@ Last audited locally for P0 GitHub import stabilization.
 - `src/ChessOnlineApp`: separate online integrations hub.
 - `src/Chess2DBenchmark`: 2D chess benchmark console executable.
 - `tools/release/Build-Production.ps1`: central production packaging script.
+- `tests/run-tests.ps1`: contract-test runner for native engine and GPU ABI smoke checks.
 - `rude-resource/`: local ignored read-only resource archive.
 
 ## Build-Verified
@@ -23,6 +24,8 @@ Last audited locally for P0 GitHub import stabilization.
 - `Release|x64` solution build works without requiring CUDA Toolkit MSBuild integration.
 - The default solution configuration intentionally skips `ChessCudaBackend`; CUDA remains an optional backend built separately.
 - Packaging creates `ProductionOutput` folders for all user-facing products.
+- `scripts/verify.ps1` runs release packaging plus contract tests.
+- Contract tests cover `ChessEngine.dll`, `Chess3DEngine.dll`, `RubikEngine.dll`, and `ChessGpuBackend.dll`.
 
 ## User Executables
 
@@ -49,12 +52,15 @@ Portable outputs:
 - Native 3D chess and Rubik DLLs build and are copied to their apps.
 - Root launch scripts target `ProductionOutput` and trigger packaging when needed.
 - `rude-resource/` is ignored by Git.
+- Native contract tests run without UI, CUDA, or `rude-resource/`.
+- `Chess2DBenchmark --quick` is part of the contract-test runner when the benchmark executable exists.
 
 ## Draft
 
 - Formal 3D chess laws are still draft and JSON-driven.
 - 3D relay/web-platform contract is a documented client-side foundation, not a hosted production service.
 - Rubik arbitrary-state solving beyond trusted move history remains future work.
+- UI smoke tests are still manual.
 
 ## Optional
 

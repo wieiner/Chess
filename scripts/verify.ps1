@@ -142,12 +142,16 @@ try {
         throw "ProductionOutput contains build intermediates or debug leftovers."
     }
 
-    if (-not $SkipBenchmark) {
-        Write-Step "Quick benchmark"
-        $benchmark = Join-Path $Root "ProductionOutput\Chess2DBenchmark\Chess2DBenchmark.exe"
-        if (Test-Path -LiteralPath $benchmark) {
-            Invoke-Checked { & $benchmark "--quick" } "Chess2DBenchmark --quick failed."
-        }
+    Write-Step "Contract tests"
+    $testScript = Join-Path $Root "tests\run-tests.ps1"
+    if (-not (Test-Path -LiteralPath $testScript -PathType Leaf)) {
+        throw "Contract test runner is missing: $testScript"
+    }
+    if ($SkipBenchmark) {
+        Invoke-Checked { powershell -NoProfile -ExecutionPolicy Bypass -File ".\tests\run-tests.ps1" -SkipSolutionBuild -SkipBenchmark } "Contract tests failed."
+    }
+    else {
+        Invoke-Checked { powershell -NoProfile -ExecutionPolicy Bypass -File ".\tests\run-tests.ps1" -SkipSolutionBuild } "Contract tests failed."
     }
 
     Write-Step "Verify complete"

@@ -74,3 +74,19 @@ For full local verification:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
 ```
+
+`scripts\verify.ps1` builds `Release|x64`, creates `ProductionOutput`, runs `tests\run-tests.ps1`, and fails on the first build/package/test failure. The test runner builds and runs native contract tests and then runs `Chess2DBenchmark --quick` unless `-SkipBenchmark` is passed.
+
+## Contract Tests
+
+Run all contract tests directly:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1
+```
+
+The tests do not require UI, CUDA, or `rude-resource/`. See `docs\TESTING.md`.
+
+## CI
+
+The GitHub Actions workflow `.github\workflows\windows-build.yml` verifies the CPU/Direct3D-safe baseline on `windows-latest` without CUDA, secrets, or `rude-resource/`.

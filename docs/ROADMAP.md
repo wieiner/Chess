@@ -9,9 +9,10 @@
 
 ## P1 - Tests and Rule Contracts
 
-- Add smoke tests around native exports.
-- Add rule contract tests for 2D legal moves, draw rules, FEN, and search telemetry.
-- Add package verification to CI once the Windows build agent is ready.
+- Native contract smoke tests now cover ChessEngine, Chess3DEngine, RubikEngine, and ChessGpuBackend.
+- `tests/run-tests.ps1` builds and runs the contract suite plus `Chess2DBenchmark --quick`.
+- `scripts/verify.ps1` now includes contract tests after packaging.
+- Next P1 work: expand assertions into deeper rule-contract suites and add UI smoke automation.
 
 ## P2 - Formal 3D Chess Rules
 
@@ -39,6 +40,6 @@
 
 ## P6 - Release Packaging and GitHub Actions
 
-- Add GitHub Actions for Windows build verification.
+- Keep GitHub Actions Windows build verification green.
 - Produce zipped portable artifacts.
 - Optionally add installer packaging later.
