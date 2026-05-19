@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P1 contract-test stabilization.
+Last audited locally for P1 contract-test stabilization and the green GitHub Actions baseline.
 
 ## Exists
 
@@ -26,6 +26,8 @@ Last audited locally for P1 contract-test stabilization.
 - Packaging creates `ProductionOutput` folders for all user-facing products.
 - `scripts/verify.ps1` runs release packaging plus contract tests.
 - Contract tests cover `ChessEngine.dll`, `Chess3DEngine.dll`, `RubikEngine.dll`, and `ChessGpuBackend.dll`.
+- GitHub Actions `Windows Build` is green on `master`.
+- CI verifies a clean checkout, Release x64 build, production packaging, contract tests, `Chess2DBenchmark --quick`, and the baseline without CUDA.
 
 ## User Executables
 
@@ -52,6 +54,8 @@ Portable outputs:
 - Native 3D chess and Rubik DLLs build and are copied to their apps.
 - Root launch scripts target `ProductionOutput` and trigger packaging when needed.
 - `rude-resource/` is ignored by Git.
+- `rude-resource/` is a local ignored resource archive and is absent on CI.
+- `scripts\verify.ps1` checks the ignore rule through the probe path `rude-resource/.verify-ignore-probe`, so CI does not require the archive directory to exist.
 - Native contract tests run without UI, CUDA, or `rude-resource/`.
 - `Chess2DBenchmark --quick` is part of the contract-test runner when the benchmark executable exists.
 
@@ -72,3 +76,4 @@ Portable outputs:
 - Full UI automation tests are not present yet.
 - GPU parity/performance needs more benchmark baselines on real target hardware.
 - The project currently relies on local Visual Studio/MSBuild and vcpkg environment availability.
+- Recommended next stage is P2: formal 3D chess rules specification for cube 8x8x8, six sides, and Rubik layer turns.

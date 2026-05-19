@@ -12,10 +12,14 @@
 - Native contract smoke tests now cover ChessEngine, Chess3DEngine, RubikEngine, and ChessGpuBackend.
 - `tests/run-tests.ps1` builds and runs the contract suite plus `Chess2DBenchmark --quick`.
 - `scripts/verify.ps1` now includes contract tests after packaging.
+- GitHub Actions `Windows Build` is green on `master` for clean checkout, Release x64 build, production packaging, contract tests, `Chess2DBenchmark --quick`, and the no-CUDA baseline.
+- `rude-resource/` remains a local ignored resource archive and is absent on CI; verification checks it through `rude-resource/.verify-ignore-probe`.
+- CUDA backend remains optional.
 - Next P1 work: expand assertions into deeper rule-contract suites and add UI smoke automation.
 
 ## P2 - Formal 3D Chess Rules
 
+- Recommended next stage: formal 3D chess rules specification for cube 8x8x8, six sides, and Rubik layer turns.
 - Replace draft movement semantics with explicit, versioned rule contracts.
 - Define six-side king safety, check/mate semantics, pawn rules, and turn order.
 - Keep rules data-driven where practical.

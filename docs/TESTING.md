@@ -10,6 +10,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
 
 It builds `Release|x64`, creates portable output, runs native contract tests, and runs `Chess2DBenchmark --quick`.
 
+The same baseline is now covered by the green GitHub Actions `Windows Build` workflow on `master`. CI runs from a clean checkout, builds `Release|x64`, creates production packages, runs the contract tests, runs `Chess2DBenchmark --quick`, and validates the no-CUDA baseline.
+
 To run only the contract-test layer:
 
 ```powershell
@@ -41,11 +43,14 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - They do not automate WPF UI behavior yet.
 - They do not require or validate `rude-resource/`.
 
+`rude-resource/` is a local ignored resource archive and is absent on CI. Verification checks the ignore rule through the probe path `rude-resource/.verify-ignore-probe` without creating or requiring the archive.
+
 ## CUDA
 
 CUDA is optional. Contract tests must pass without `ChessCudaBackend.dll`. If CUDA is built and placed next to `ChessGpuBackend.dll`, the GPU backend may use it, but absence of CUDA is not a test failure.
 
+The next recommended testing milestone is P2: formal 3D chess rules specification for cube 8x8x8, six sides, and Rubik layer turns.
+
 ## UI Smoke Tests
 
 UI smoke tests are currently manual. The next useful layer is a small launcher/screenshot check for `ChessApp.exe`, `Chess3DApp.exe`, `RubikApp.exe`, and `ChessOnlineApp.exe`.
-
