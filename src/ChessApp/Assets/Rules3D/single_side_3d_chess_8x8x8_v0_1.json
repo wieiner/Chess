@@ -1,0 +1,92 @@
+{
+  "rulesetId": "single-side-3d-chess-8x8x8-v0.1",
+  "name": "Single-Side 3D Chess 8x8x8 v0.1",
+  "specDocument": "docs/CHESS3D_SINGLE_SIDE_RULES_SPEC.md",
+  "board": {
+    "width": 8,
+    "height": 8,
+    "depth": 8
+  },
+  "activeSideCount": 1,
+  "maxPiecesPerSide": 16,
+  "movementProfile": "draft3d",
+  "kingSafety": false,
+  "homeFace": "Z0",
+  "forwardAxis": "+Z",
+  "setupBlock": {
+    "xMin": 2,
+    "xMax": 5,
+    "yMin": 2,
+    "yMax": 5,
+    "z": 0
+  },
+  "sides": [
+    {
+      "id": 1,
+      "name": "SingleSide",
+      "homeFace": "Z0",
+      "forward": [0, 0, 1]
+    }
+  ],
+  "setup": [
+    { "piece": "rook", "side": 1, "x": 2, "y": 2, "z": 0 },
+    { "piece": "pawn", "side": 1, "x": 3, "y": 2, "z": 0 },
+    { "piece": "pawn", "side": 1, "x": 4, "y": 2, "z": 0 },
+    { "piece": "knight", "side": 1, "x": 5, "y": 2, "z": 0 },
+    { "piece": "pawn", "side": 1, "x": 2, "y": 3, "z": 0 },
+    { "piece": "bishop", "side": 1, "x": 3, "y": 3, "z": 0 },
+    { "piece": "bishop", "side": 1, "x": 4, "y": 3, "z": 0 },
+    { "piece": "pawn", "side": 1, "x": 5, "y": 3, "z": 0 },
+    { "piece": "pawn", "side": 1, "x": 2, "y": 4, "z": 0 },
+    { "piece": "queen", "side": 1, "x": 3, "y": 4, "z": 0 },
+    { "piece": "king", "side": 1, "x": 4, "y": 4, "z": 0 },
+    { "piece": "pawn", "side": 1, "x": 5, "y": 4, "z": 0 },
+    { "piece": "knight", "side": 1, "x": 2, "y": 5, "z": 0 },
+    { "piece": "pawn", "side": 1, "x": 3, "y": 5, "z": 0 },
+    { "piece": "pawn", "side": 1, "x": 4, "y": 5, "z": 0 },
+    { "piece": "rook", "side": 1, "x": 5, "y": 5, "z": 0 }
+  ],
+  "movementProfiles": {
+    "rook3d": {
+      "kind": "line",
+      "directions": "exactly one coordinate changes"
+    },
+    "bishop3d": {
+      "kind": "line",
+      "directions": "two or three coordinates change by equal absolute distance"
+    },
+    "queen3d": {
+      "kind": "line",
+      "directions": "rook3d plus bishop3d"
+    },
+    "king3d": {
+      "kind": "step",
+      "directions": "any of the 26 neighboring cells"
+    },
+    "knight3d": {
+      "kind": "leaper",
+      "directions": "all coordinate permutations of (+/-2,+/-1,0)"
+    },
+    "pawn3d": {
+      "kind": "forward",
+      "quiet": [0, 0, 1],
+      "initialDoubleFromZ": 0,
+      "captures": "dx,dy,+1 where dx and dy are in -1..1 and not both zero",
+      "promotionZ": 7
+    }
+  },
+  "captureRules": {
+    "onePiecePerCell": true,
+    "ownPieceBlocks": true,
+    "enemyPieceCapturable": true,
+    "linePiecesCannotJump": true,
+    "knightJumps": true,
+    "pawnCapturesOnlyByCaptureVectors": true
+  },
+  "knownLimitations": [
+    "King safety, check, mate, and stalemate are draft for 3D chess.",
+    "En passant is out of scope for P2A.",
+    "Six-sided mapping is a later P2B layer over these local rules.",
+    "Rubik layer turns as legal chess actions are a later P2C task."
+  ]
+}

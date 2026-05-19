@@ -287,6 +287,17 @@ bool extractBool(const std::string& json, const std::string& key, bool fallback)
     return fallback;
 }
 
+bool hasJsonObjectEnvelope(const std::string& json)
+{
+    const auto first = json.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos)
+    {
+        return true;
+    }
+    const auto last = json.find_last_not_of(" \t\r\n");
+    return json[first] == '{' && json[last] == '}';
+}
+
 std::string extractString(const std::string& json, const std::string& key, const std::string& fallback)
 {
     const auto keyPos = json.find("\"" + key + "\"");
@@ -439,8 +450,8 @@ void placeFaceCenter(Position& pos, int side)
         { 1, 0 }, { 2, 0 }, { 0, 1 }, { 0, 2 }, { 3, 1 }, { 3, 2 }, { 1, 3 }, { 2, 3 }
     } };
     constexpr std::array<std::array<int, 3>, 8> pieceCells = { {
-        { 0, 0, Rook }, { 3, 0, Knight }, { 0, 3, Bishop }, { 3, 3, Rook },
-        { 1, 1, Bishop }, { 2, 1, Queen }, { 1, 2, King }, { 2, 2, Knight }
+        { 0, 0, Rook }, { 3, 0, Knight }, { 0, 3, Knight }, { 3, 3, Rook },
+        { 1, 1, Bishop }, { 2, 1, Bishop }, { 1, 2, Queen }, { 2, 2, King }
     } };
 
     for (const auto& cell : pawnCells)
@@ -597,6 +608,14 @@ bool isPromotionSquare(const Rules& rules, int side, int square)
         (f.z > 0 && zOf(square) == 7) || (f.z < 0 && zOf(square) == 0);
 }
 
+bool isPawnStartSquare(const Rules& rules, int side, int square)
+{
+    const Vec3 f = rules.sides[side].forward;
+    return (f.x > 0 && xOf(square) == 0) || (f.x < 0 && xOf(square) == 7) ||
+        (f.y > 0 && yOf(square) == 0) || (f.y < 0 && yOf(square) == 7) ||
+        (f.z > 0 && zOf(square) == 0) || (f.z < 0 && zOf(square) == 7);
+}
+
 void generatePawnMoves(const Game& game, const Position& pos, int from, std::vector<Move>& moves)
 {
     const int piece = pos.board[from];
@@ -612,6 +631,16 @@ void generatePawnMoves(const Game& game, const Position& pos, int from, std::vec
     if (inside(oneX, oneY, oneZ) && pos.board[indexOf(oneX, oneY, oneZ)] == Empty)
     {
         addMoveIfValid(pos, moves, from, oneX, oneY, oneZ);
+
+        const int twoX = x + f.x * 2;
+        const int twoY = y + f.y * 2;
+        const int twoZ = z + f.z * 2;
+        if (isPawnStartSquare(game.rules, side, from) &&
+            inside(twoX, twoY, twoZ) &&
+            pos.board[indexOf(twoX, twoY, twoZ)] == Empty)
+        {
+            addMoveIfValid(pos, moves, from, twoX, twoY, twoZ);
+        }
     }
 
     for (Vec3 offset : perpendicularOffsets(f))
@@ -917,7 +946,13 @@ CHESS3D_API int Chess3D_LoadRulesJson(void* handle, const char* json)
     {
         return 0;
     }
-    loadRules(game->rules, json != nullptr ? json : "");
+    const std::string text = json != nullptr ? json : "";
+    if (!hasJsonObjectEnvelope(text))
+    {
+        game->lastInfo = "3D rules JSON rejected: expected a JSON object.";
+        return 0;
+    }
+    loadRules(game->rules, text);
     resetPosition(*game);
     game->lastInfo = "3D rules JSON loaded and face-centered setup applied.";
     return 1;
