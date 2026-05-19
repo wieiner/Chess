@@ -1,7 +1,5 @@
 # Chess Advisor
 
-Modern rewrite of the old WPF chess advisor from `!!other`.
-
 ## Structure
 
 - `src/ChessEngine` - native C++ DLL with chess rules, legal move generation, FEN, undo and AI search.
@@ -14,7 +12,9 @@ Modern rewrite of the old WPF chess advisor from `!!other`.
 - `src/RubikApp` - separate WPF 3D frontend for the 8x8x8 Rubik assembly project.
 - `src/ChessOnlineApp` - separate WPF hub for internet integrations, online portal accounts, read-only platform APIs, ICS text servers and the future 3D chess web relay.
 - `src/Chess2DBenchmark` - separate native console benchmark executable for ordinary 2D chess engine and CPU/Direct3D/CUDA batch evaluation.
-- `!!other` - original materials, archives and analysis kept unchanged.
+- `rude-resource/` - local ignored read-only archive with historical/source materials. It is not part of Git and is not used as runtime content.
+- `src/.../Assets` - runtime assets that are copied to application output during build.
+- `ProductionOutput/` - generated portable release output. It is not stored in Git.
 
 ## Executables
 
@@ -79,7 +79,7 @@ The implementation now tries CUDA first by loading `ChessCudaBackend.dll` from t
 
 The WPF app includes:
 
-- classic BMP pieces copied from `!!other\chessadvisor\fig`;
+- classic BMP pieces copied into tracked runtime assets from the local historical archive;
 - a transparent PNG set derived from the classic BMP pieces;
 - a fallback Unicode piece theme;
 - replaceable figure files under `Assets\Figures\ClassicBmp`;

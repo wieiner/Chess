@@ -14,7 +14,6 @@
   <ItemGroup>
     <ProjectReference Include="..\ChessEngine\ChessEngine.vcxproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\ChessGpuBackend\ChessGpuBackend.vcxproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\ChessCudaBackend\ChessCudaBackend.vcxproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>

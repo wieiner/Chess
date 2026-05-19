@@ -1,5 +1,5 @@
 @echo off
 setlocal
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\release\Build-Production.ps1" -Product Chess2DBenchmark
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\release\Build-Production.ps1" -Product Benchmark2D
 exit /b %ERRORLEVEL%
