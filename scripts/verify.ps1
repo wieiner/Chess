@@ -96,11 +96,12 @@ try {
     git remote -v
 
     Write-Step "Ignored resource archive"
-    git check-ignore -q rude-resource
+    $ignoredProbe = "rude-resource/.verify-ignore-probe"
+    git check-ignore -q -- $ignoredProbe
     if ($LASTEXITCODE -ne 0) {
-        throw "rude-resource must be ignored by Git."
+        throw "rude-resource/ contents must be ignored by Git."
     }
-    git check-ignore -v rude-resource
+    git check-ignore -v -- $ignoredProbe
 
     Write-Step "Build Release x64"
     $msbuild = Resolve-MSBuild
