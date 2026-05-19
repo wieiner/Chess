@@ -1,0 +1,156 @@
+# Chess3D Rule Profile Architecture
+
+P2B introduces a configurable rule-profile contract. The immediate goal is not to implement every profile fully, but to prevent new modes from becoming hardcoded branches in the engine.
+
+## RuleSet
+
+A rule profile is a JSON `RuleSet` with these top-level fields:
+
+- `rulesetId`: stable id, for example `asgard-convergence-3d-8x8x8-v0.1`.
+- `version`: profile version.
+- `displayName`: user-facing name.
+- `description`: short explanation.
+- `tags`: search/filter labels.
+- `boardProfile`: board dimensions and coordinate conventions.
+- `mythProfile`: optional narrative/decorative theme.
+- `setupProfile`: initial army placement and randomization hooks.
+- `movementProfile`: piece movement family.
+- `captureProfile`: capture semantics.
+- `goalProfile`: what the game is trying to achieve.
+- `coreProfile`: central-core target and anchoring data.
+- `layerTurnProfile`: Rubik-like layer-turn behavior.
+- `turnProfile`: side order and action model.
+- `victoryProfile`: concrete victory detection rule.
+- `randomizationProfile`: seed-based variation controls.
+- `knownLimitations`: honest implementation notes.
+
+## boardProfile
+
+Current board profile:
+
+- width: 8
+- height: 8
+- depth: 8
+- coordinates: `x,y,z` in `0..7`
+
+The native engine is still fixed to 8x8x8. Future engines can generalize this field, but current profile validation intentionally requires 8.
+
+## mythProfile
+
+`mythProfile` is narrative and visual metadata. It must not affect headless tests or engine correctness.
+
+Fields:
+
+- `theme`: `none`, `asgard`, `meru`, `asgard-meru`, or `custom`.
+- `centerName`: for example `Asgard`, `Meru`, or `Forbidden City`.
+- `sideNames`: names for sides/gates.
+- `lore`: optional flavor text.
+
+The Asgard/Meru idea belongs here when it is decorative. Gameplay-affecting central slots and anchoring belong in `coreProfile`, `goalProfile`, and `victoryProfile`.
+
+## setupProfile
+
+Setup profile describes how armies are placed:
+
+- `singleSideCentral4x4`: P2A one-side setup.
+- `sixSideProjectedFromSingleSide`: project the P2A local setup to all six home faces.
+- `baseSetup`: `central4x4`.
+- `homeFace` or `homeFaces`.
+- `piecesPerSide`.
+- `randomizationProfile`.
+
+Optional minor randomization:
+
+- rooks and pawns stay fixed;
+- king and queen stay fixed by default;
+- two knights and two bishops/officers may be permuted through seed-based randomization.
+
+## movementProfile
+
+Movement profiles name reusable movement families:
+
+- `rook3d`: one coordinate changes, line path clear.
+- `bishop3d` / `officer3d`: two or three coordinates change by equal absolute distance, line path clear.
+- `queen3d`: rook3d plus bishop3d.
+- `king3d`: one step in any of 26 neighboring cells.
+- `knight3d`: leaper using coordinate permutations of `(+-2,+-1,0)`.
+- `pawn3d`: side-local forward move, initial double move, forward-layer captures, promotion.
+- custom/fairy pieces: later extension point.
+
+## captureProfile
+
+Supported contract values:
+
+- `classicCapture`: captured piece is removed from the board.
+- `knockbackCapture`: captured piece returns to its home slot if free; otherwise it goes to reserve.
+
+Reserve restore is deferred. P2B only defines the data contract.
+
+## goalProfile
+
+Supported contract values:
+
+- `classicCheckmate`: chess-like objective. Full 3D mate remains later work.
+- `centerAssembly`: pieces converge on central target slots and become anchored.
+- `hybrid`: either checkmate or center assembly can win.
+- `sandbox`: no automatic victory; useful for editor/testing.
+- `centerAssemblyTraining`: training-only center assembly variant.
+
+## coreProfile
+
+Asgard/Meru convergence uses a central core:
+
+- `coreCube`: `x=2..5`, `y=2..5`, `z=2..5`.
+- `targetSlots`: derived from side home-face projection.
+- `anchorMode`: `softAnchor` initially.
+- `contestedAnchor`: future rule for contested central slots.
+
+Anchoring is gameplay, not narrative. It belongs here and in `victoryProfile`.
+
+## layerTurnProfile
+
+Supported contract values:
+
+- `disabled`: no Rubik layer turns.
+- `ritualTurn`: `rotateLayer` is a legal action instead of a normal move.
+- `globalEvent`: automatic layer rotations later.
+- `sandbox`: UI/debug may rotate layers without normal turn semantics.
+
+For ritual turns:
+
+- axes: `X`, `Y`, `Z`;
+- layers: `0..7`;
+- quarter turns: `-1`, `+1`;
+- action cost: `oneTurn`.
+
+## turnProfile
+
+Turn profile defines side order and action kinds:
+
+- `singleSideLoop`: used by one-side tests/training.
+- `roundRobin`: sides act in order.
+- `roundRobinWithLayerActions`: sides can choose a piece move or a legal layer-turn action.
+
+## victoryProfile
+
+Supported contract values:
+
+- `allPiecesAnchored`;
+- `requiredPieceCount`;
+- `kingOnly`;
+- `percentageThreshold`;
+- `checkmate`;
+- `hybrid`;
+- `sandbox`.
+
+P2B validates these fields as data. P2C/P3 will implement runtime state and detection.
+
+## randomizationProfile
+
+Supported contract values:
+
+- `none`;
+- `minorRandom`;
+- `fullSymmetricRandom` later.
+
+Randomized profiles must include a seed when used in a reproducible match.

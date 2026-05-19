@@ -1,0 +1,59 @@
+{
+  "rulesetId": "single-side-3d-8x8x8-v0.1",
+  "version": "0.1",
+  "displayName": "Single-Side 3D Training",
+  "description": "One-side training and contract-test profile for the P2A local movement core.",
+  "tags": ["single-side", "training", "contract", "sandbox"],
+  "boardProfile": {
+    "width": 8,
+    "height": 8,
+    "depth": 8,
+    "coordinateSystem": "x,y,z in 0..7"
+  },
+  "mythProfile": {
+    "theme": "none",
+    "centerName": "Center",
+    "sideNames": ["SingleSide"],
+    "lore": ""
+  },
+  "setupProfile": {
+    "type": "singleSideCentral4x4",
+    "baseSetup": "central4x4",
+    "homeFace": "Z0",
+    "forwardAxis": "+Z",
+    "piecesPerSide": 16,
+    "randomizationProfile": "none"
+  },
+  "movementProfile": {
+    "type": "classic3d",
+    "pieces": ["rook3d", "bishop3d", "queen3d", "king3d", "knight3d", "pawn3d"]
+  },
+  "captureProfile": {
+    "type": "classicCapture",
+    "capturedPiece": "removedFromBoard"
+  },
+  "goalProfile": {
+    "type": "sandbox",
+    "notes": "No automatic victory; used for editor, training, and ABI testing."
+  },
+  "coreProfile": {
+    "type": "none"
+  },
+  "layerTurnProfile": {
+    "type": "disabled"
+  },
+  "turnProfile": {
+    "type": "singleSideLoop",
+    "sideOrder": [1]
+  },
+  "victoryProfile": {
+    "type": "sandbox"
+  },
+  "randomizationProfile": {
+    "type": "none"
+  },
+  "knownLimitations": [
+    "This profile is not a complete competitive game.",
+    "It exists to keep the local 3D movement contract stable."
+  ]
+}

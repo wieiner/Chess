@@ -1,0 +1,85 @@
+{
+  "rulesetId": "rubik-convergence-3d-8x8x8-v0.1",
+  "version": "0.1",
+  "displayName": "Rubik Convergence",
+  "description": "Asgard / Meru convergence with ritual Rubik-like layer turns as legal turn actions.",
+  "tags": ["asgard", "meru", "convergence", "rubik", "layer-turns"],
+  "baseRuleset": "asgard-convergence-3d-8x8x8-v0.1",
+  "boardProfile": {
+    "width": 8,
+    "height": 8,
+    "depth": 8,
+    "coordinateSystem": "x,y,z in 0..7"
+  },
+  "mythProfile": {
+    "theme": "asgard-meru",
+    "centerName": "Forbidden Core / Asgard / Meru",
+    "sideNames": ["Z0 Gate", "Z7 Gate", "Y0 Gate", "Y7 Gate", "X0 Gate", "X7 Gate"],
+    "lore": "The sacred city can be approached by movement and by ritual shifts of the cube's layers."
+  },
+  "setupProfile": {
+    "type": "sixSideProjectedFromSingleSide",
+    "baseSetup": "central4x4",
+    "homeFaces": ["Z0", "Z7", "Y0", "Y7", "X0", "X7"],
+    "piecesPerSide": 16,
+    "randomizationProfile": "none"
+  },
+  "movementProfile": {
+    "type": "classic3d",
+    "pieces": ["rook3d", "bishop3d", "queen3d", "king3d", "knight3d", "pawn3d"]
+  },
+  "captureProfile": {
+    "type": "knockbackCapture",
+    "capturedPiece": "returnToHomeSlotIfFree",
+    "fallback": "reserve",
+    "reserveRestoreAction": "deferred"
+  },
+  "goalProfile": {
+    "type": "centerAssembly"
+  },
+  "coreProfile": {
+    "type": "asgardMeruCore",
+    "coreCube": {
+      "xMin": 2,
+      "xMax": 5,
+      "yMin": 2,
+      "yMax": 5,
+      "zMin": 2,
+      "zMax": 5
+    },
+    "targetSlots": {
+      "derivation": "derivedFromSideHomeFaceProjection",
+      "status": "draft"
+    },
+    "anchorMode": "softAnchor",
+    "contestedAnchor": "deferred"
+  },
+  "layerTurnProfile": {
+    "type": "ritualTurn",
+    "axes": ["X", "Y", "Z"],
+    "layerRange": {
+      "min": 0,
+      "max": 7
+    },
+    "quarterTurns": [-1, 1],
+    "actionCost": "oneTurn"
+  },
+  "turnProfile": {
+    "type": "roundRobinWithLayerActions",
+    "sideOrder": [1, 2, 3, 4, 5, 6]
+  },
+  "victoryProfile": {
+    "type": "allPiecesAnchored",
+    "requiredPieceCount": 16,
+    "percentageThreshold": 1.0,
+    "checkmate": "optional"
+  },
+  "randomizationProfile": {
+    "type": "none"
+  },
+  "knownLimitations": [
+    "King-safety after layer rotation is deferred.",
+    "Anchor interaction with layer rotations is deferred.",
+    "Runtime ritualTurn legality is deferred to P2E."
+  ]
+}

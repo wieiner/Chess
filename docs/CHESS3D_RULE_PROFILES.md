@@ -1,0 +1,28 @@
+# Chess3D Rule Profiles
+
+P2B adds profile JSON files under `assets/rules/profiles`.
+
+## Profiles
+
+| File | Ruleset id | Goal | Capture | Layer turns |
+| --- | --- | --- | --- | --- |
+| `classic_six_side_3d_v0_1.json` | `classic-six-side-3d-8x8x8-v0.1` | `classicCheckmate` | `classicCapture` | `disabled` |
+| `single_side_3d_v0_1.json` | `single-side-3d-8x8x8-v0.1` | `sandbox` | `classicCapture` | `disabled` |
+| `asgard_convergence_3d_v0_1.json` | `asgard-convergence-3d-8x8x8-v0.1` | `centerAssembly` | `knockbackCapture` | `disabled` |
+| `rubik_convergence_3d_v0_1.json` | `rubik-convergence-3d-8x8x8-v0.1` | `centerAssembly` | `knockbackCapture` | `ritualTurn` |
+
+`chess3d_rule_profile.schema.json` documents the minimal schema. Contract tests also perform manual validation so the baseline does not require an external JSON-schema tool.
+
+## Runtime Status
+
+These profiles are data/spec assets. The current native engine still implements the P2A/P1 draft movement core and a tolerant rules JSON loader. P2C and later phases will connect selected profile fields to runtime game state and victory detection.
+
+## Why Profiles
+
+Profiles keep the game from becoming a pile of hardcoded branches:
+
+- movement can stay reusable;
+- goals can vary between checkmate, center assembly, hybrid, and sandbox;
+- capture behavior can differ by mode;
+- Rubik layer turns can be disabled, sandbox-only, or legal actions;
+- myth/narrative can change without breaking headless engine tests.

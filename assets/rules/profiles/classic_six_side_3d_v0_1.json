@@ -1,0 +1,59 @@
+{
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "version": "0.1",
+  "displayName": "Classic Six-Side 3D Chess",
+  "description": "Draft six-player cube chess profile using classic capture and chess-like victory semantics.",
+  "tags": ["classic", "six-side", "draft", "no-layer-turns"],
+  "boardProfile": {
+    "width": 8,
+    "height": 8,
+    "depth": 8,
+    "coordinateSystem": "x,y,z in 0..7"
+  },
+  "mythProfile": {
+    "theme": "none",
+    "centerName": "Center",
+    "sideNames": ["White", "Black", "North", "South", "West", "East"],
+    "lore": ""
+  },
+  "setupProfile": {
+    "type": "sixSideProjectedFromSingleSide",
+    "baseSetup": "central4x4",
+    "homeFaces": ["Z0", "Z7", "Y0", "Y7", "X0", "X7"],
+    "piecesPerSide": 16,
+    "randomizationProfile": "none"
+  },
+  "movementProfile": {
+    "type": "classic3d",
+    "pieces": ["rook3d", "bishop3d", "queen3d", "king3d", "knight3d", "pawn3d"]
+  },
+  "captureProfile": {
+    "type": "classicCapture",
+    "capturedPiece": "removedFromBoard"
+  },
+  "goalProfile": {
+    "type": "classicCheckmate",
+    "checkmateImplementation": "draft"
+  },
+  "coreProfile": {
+    "type": "none"
+  },
+  "layerTurnProfile": {
+    "type": "disabled"
+  },
+  "turnProfile": {
+    "type": "roundRobin",
+    "sideOrder": [1, 2, 3, 4, 5, 6]
+  },
+  "victoryProfile": {
+    "type": "checkmate"
+  },
+  "randomizationProfile": {
+    "type": "none"
+  },
+  "knownLimitations": [
+    "Full 3D king safety and checkmate remain draft.",
+    "Projected six-side setup collision policy is draft.",
+    "Layer turns are disabled in this profile."
+  ]
+}

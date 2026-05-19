@@ -26,40 +26,57 @@
 - Completed: machine-readable rules asset `src/ChessApp/Assets/Rules3D/single_side_3d_chess_8x8x8_v0_1.json`.
 - Completed: starting 4x4 setup, movement/capture contract, pawn promotion smoke, and JSON metadata tests in `Chess3DEngineContractTests`.
 
-### P2B - Six-Side Generalization
+### P2B - Configurable Rule Profiles
 
-- Next: map single-side local rules to six sides and six home faces.
-- Define side transforms for the existing cube-face side ids.
-- Define six-side turn order, side identity, and setup collision policy.
+- Completed: configurable rule profile architecture in `docs/CHESS3D_RULE_PROFILE_ARCHITECTURE.md`.
+- Completed: Asgard/Meru convergence profile as data/spec.
+- Completed: Rubik convergence profile as data/spec.
+- Completed: classic six-side and single-side profile JSON contracts.
+- Completed: profile JSON validation through `Chess3DEngineContractTests`.
+- Next six-side implementation work: map single-side local rules to six sides and six home faces.
 
-### P2C - Rubik Turns As Chess Actions
+### P2C - Center Assembly Mechanics
 
-- Later: define when layer rotations are legal chess actions.
-- Specify turn cost, ownership, check interaction, and notation.
+- Implement centerAssembly mechanics.
+- Add anchor state and target-slot derivation.
+- Add victory detection for allPiecesAnchored, requiredPieceCount, kingOnly, and percentageThreshold variants.
 
-### Later - Full 3D Rule Hardening
+### P2D - Knockback And Reserve
+
+- Implement knockbackCapture.
+- Return captured pieces to home slot when possible.
+- Add reserve state and reserve restore action.
+
+### P2E - Rubik Turns As Chess Actions
+
+- Implement `layerTurnProfile.type = ritualTurn`.
+- Enforce axes, layers, quarter turns, action cost, and turn order.
+- Define interaction with king safety, anchors, notation, and replay.
+
+### P3 - Full Six-Side Gameplay And Hybrid Victory
 
 - Later: harden king safety, check, mate, and stalemate for full 3D multiplayer.
+- Harden six-side full gameplay and hybrid checkmate/centerAssembly victory.
 
-## P3 - Online Relay Server for `chess3d.relay.v1`
+## P4 - Online Relay Server for `chess3d.relay.v1`
 
 - Build the hosted room/relay service for 3D chess.
 - Support six clients per table and bridge groups between six-player tables.
 - Formalize sync, move, rotate, chat, reconnect, and authority messages.
 
-## P4 - Asset Pipeline
+## P5 - Asset Pipeline
 
 - Keep OBJ loading now.
 - Add future glTF/GLB support.
 - Add manifests, validation, scale/origin checks, and missing-asset reports.
 
-## P5 - GPU Benchmark, Parity, Frontier Evaluation
+## P6 - GPU Benchmark, Parity, Frontier Evaluation
 
 - Expand CPU/Direct3D/CUDA benchmarks.
 - Add correctness parity checks across backends.
 - Identify where GPU batching really wins and where CPU remains better.
 
-## P6 - Release Packaging and GitHub Actions
+## P7 - Release Packaging and GitHub Actions
 
 - Keep GitHub Actions Windows build verification green.
 - Produce zipped portable artifacts.

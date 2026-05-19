@@ -3,10 +3,12 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -103,6 +105,423 @@ bool ValidateSingleSideRulesJson(const std::string& json)
         json.find("\"height\": 8") != std::string::npos &&
         json.find("\"depth\": 8") != std::string::npos &&
         json.find("\"setup\"") != std::string::npos;
+}
+
+class JsonParser
+{
+public:
+    explicit JsonParser(const std::string& text) : text_(text)
+    {
+    }
+
+    bool Parse()
+    {
+        SkipWhitespace();
+        if (!ParseValue())
+        {
+            return false;
+        }
+        SkipWhitespace();
+        return pos_ == text_.size();
+    }
+
+private:
+    void SkipWhitespace()
+    {
+        while (pos_ < text_.size() && std::isspace(static_cast<unsigned char>(text_[pos_])))
+        {
+            ++pos_;
+        }
+    }
+
+    bool ParseValue()
+    {
+        SkipWhitespace();
+        if (pos_ >= text_.size())
+        {
+            return false;
+        }
+        switch (text_[pos_])
+        {
+        case '{': return ParseObject();
+        case '[': return ParseArray();
+        case '"': return ParseString();
+        case 't': return Match("true");
+        case 'f': return Match("false");
+        case 'n': return Match("null");
+        default: return ParseNumber();
+        }
+    }
+
+    bool ParseObject()
+    {
+        if (text_[pos_++] != '{')
+        {
+            return false;
+        }
+        SkipWhitespace();
+        if (pos_ < text_.size() && text_[pos_] == '}')
+        {
+            ++pos_;
+            return true;
+        }
+        while (true)
+        {
+            SkipWhitespace();
+            if (pos_ >= text_.size() || text_[pos_] != '"' || !ParseString())
+            {
+                return false;
+            }
+            SkipWhitespace();
+            if (pos_ >= text_.size() || text_[pos_++] != ':')
+            {
+                return false;
+            }
+            if (!ParseValue())
+            {
+                return false;
+            }
+            SkipWhitespace();
+            if (pos_ >= text_.size())
+            {
+                return false;
+            }
+            if (text_[pos_] == '}')
+            {
+                ++pos_;
+                return true;
+            }
+            if (text_[pos_++] != ',')
+            {
+                return false;
+            }
+        }
+    }
+
+    bool ParseArray()
+    {
+        if (text_[pos_++] != '[')
+        {
+            return false;
+        }
+        SkipWhitespace();
+        if (pos_ < text_.size() && text_[pos_] == ']')
+        {
+            ++pos_;
+            return true;
+        }
+        while (true)
+        {
+            if (!ParseValue())
+            {
+                return false;
+            }
+            SkipWhitespace();
+            if (pos_ >= text_.size())
+            {
+                return false;
+            }
+            if (text_[pos_] == ']')
+            {
+                ++pos_;
+                return true;
+            }
+            if (text_[pos_++] != ',')
+            {
+                return false;
+            }
+        }
+    }
+
+    bool ParseString()
+    {
+        if (text_[pos_++] != '"')
+        {
+            return false;
+        }
+        while (pos_ < text_.size())
+        {
+            const char ch = text_[pos_++];
+            if (ch == '"')
+            {
+                return true;
+            }
+            if (ch == '\\')
+            {
+                if (pos_ >= text_.size())
+                {
+                    return false;
+                }
+                const char escaped = text_[pos_++];
+                if (escaped == 'u')
+                {
+                    for (int i = 0; i < 4; ++i)
+                    {
+                        if (pos_ >= text_.size() || !std::isxdigit(static_cast<unsigned char>(text_[pos_++])))
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+            else if (static_cast<unsigned char>(ch) < 0x20)
+            {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    bool ParseNumber()
+    {
+        const std::size_t start = pos_;
+        if (pos_ < text_.size() && text_[pos_] == '-')
+        {
+            ++pos_;
+        }
+        if (pos_ >= text_.size() || !std::isdigit(static_cast<unsigned char>(text_[pos_])))
+        {
+            return false;
+        }
+        if (text_[pos_] == '0')
+        {
+            ++pos_;
+        }
+        else
+        {
+            while (pos_ < text_.size() && std::isdigit(static_cast<unsigned char>(text_[pos_])))
+            {
+                ++pos_;
+            }
+        }
+        if (pos_ < text_.size() && text_[pos_] == '.')
+        {
+            ++pos_;
+            if (pos_ >= text_.size() || !std::isdigit(static_cast<unsigned char>(text_[pos_])))
+            {
+                return false;
+            }
+            while (pos_ < text_.size() && std::isdigit(static_cast<unsigned char>(text_[pos_])))
+            {
+                ++pos_;
+            }
+        }
+        if (pos_ < text_.size() && (text_[pos_] == 'e' || text_[pos_] == 'E'))
+        {
+            ++pos_;
+            if (pos_ < text_.size() && (text_[pos_] == '+' || text_[pos_] == '-'))
+            {
+                ++pos_;
+            }
+            if (pos_ >= text_.size() || !std::isdigit(static_cast<unsigned char>(text_[pos_])))
+            {
+                return false;
+            }
+            while (pos_ < text_.size() && std::isdigit(static_cast<unsigned char>(text_[pos_])))
+            {
+                ++pos_;
+            }
+        }
+        return pos_ > start;
+    }
+
+    bool Match(const char* literal)
+    {
+        const std::string value(literal);
+        if (text_.compare(pos_, value.size(), value) != 0)
+        {
+            return false;
+        }
+        pos_ += value.size();
+        return true;
+    }
+
+    const std::string& text_;
+    std::size_t pos_ = 0;
+};
+
+std::size_t FindKeyColon(const std::string& json, const std::string& key)
+{
+    const auto keyPos = json.find("\"" + key + "\"");
+    if (keyPos == std::string::npos)
+    {
+        return std::string::npos;
+    }
+    return json.find(':', keyPos);
+}
+
+std::string ExtractObject(const std::string& json, const std::string& key)
+{
+    const auto colon = FindKeyColon(json, key);
+    if (colon == std::string::npos)
+    {
+        return {};
+    }
+    auto pos = json.find('{', colon + 1);
+    if (pos == std::string::npos)
+    {
+        return {};
+    }
+    const std::size_t start = pos;
+    int depth = 0;
+    bool inString = false;
+    bool escaped = false;
+    for (; pos < json.size(); ++pos)
+    {
+        const char ch = json[pos];
+        if (inString)
+        {
+            if (escaped)
+            {
+                escaped = false;
+            }
+            else if (ch == '\\')
+            {
+                escaped = true;
+            }
+            else if (ch == '"')
+            {
+                inString = false;
+            }
+            continue;
+        }
+        if (ch == '"')
+        {
+            inString = true;
+        }
+        else if (ch == '{')
+        {
+            ++depth;
+        }
+        else if (ch == '}')
+        {
+            --depth;
+            if (depth == 0)
+            {
+                return json.substr(start, pos - start + 1);
+            }
+        }
+    }
+    return {};
+}
+
+std::string ExtractStringValue(const std::string& json, const std::string& key)
+{
+    const auto colon = FindKeyColon(json, key);
+    if (colon == std::string::npos)
+    {
+        return {};
+    }
+    auto first = json.find('"', colon + 1);
+    if (first == std::string::npos)
+    {
+        return {};
+    }
+    auto second = first + 1;
+    bool escaped = false;
+    for (; second < json.size(); ++second)
+    {
+        const char ch = json[second];
+        if (escaped)
+        {
+            escaped = false;
+            continue;
+        }
+        if (ch == '\\')
+        {
+            escaped = true;
+            continue;
+        }
+        if (ch == '"')
+        {
+            return json.substr(first + 1, second - first - 1);
+        }
+    }
+    return {};
+}
+
+bool ExtractIntValue(const std::string& json, const std::string& key, int& value)
+{
+    const auto colon = FindKeyColon(json, key);
+    if (colon == std::string::npos)
+    {
+        return false;
+    }
+    auto pos = colon + 1;
+    while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos])))
+    {
+        ++pos;
+    }
+    int sign = 1;
+    if (pos < json.size() && json[pos] == '-')
+    {
+        sign = -1;
+        ++pos;
+    }
+    if (pos >= json.size() || !std::isdigit(static_cast<unsigned char>(json[pos])))
+    {
+        return false;
+    }
+    int parsed = 0;
+    while (pos < json.size() && std::isdigit(static_cast<unsigned char>(json[pos])))
+    {
+        parsed = parsed * 10 + (json[pos] - '0');
+        ++pos;
+    }
+    value = parsed * sign;
+    return true;
+}
+
+bool ValidateBoardProfile(const std::string& json)
+{
+    const std::string board = ExtractObject(json, "boardProfile");
+    int width = 0;
+    int height = 0;
+    int depth = 0;
+    return ExtractIntValue(board, "width", width) &&
+        ExtractIntValue(board, "height", height) &&
+        ExtractIntValue(board, "depth", depth) &&
+        width == 8 && height == 8 && depth == 8;
+}
+
+bool IsAllowed(const std::string& value, const std::set<std::string>& allowed)
+{
+    return allowed.find(value) != allowed.end();
+}
+
+bool ValidateCommonRuleProfile(const std::string& json)
+{
+    const std::string rulesetId = ExtractStringValue(json, "rulesetId");
+    const std::string goal = ExtractStringValue(ExtractObject(json, "goalProfile"), "type");
+    const std::string capture = ExtractStringValue(ExtractObject(json, "captureProfile"), "type");
+    const std::string layerTurn = ExtractStringValue(ExtractObject(json, "layerTurnProfile"), "type");
+    return JsonParser(json).Parse() &&
+        !rulesetId.empty() &&
+        ValidateBoardProfile(json) &&
+        IsAllowed(goal, { "classicCheckmate", "centerAssembly", "hybrid", "sandbox", "centerAssemblyTraining" }) &&
+        IsAllowed(capture, { "classicCapture", "knockbackCapture" }) &&
+        IsAllowed(layerTurn, { "disabled", "ritualTurn", "globalEvent", "sandbox" });
+}
+
+bool ValidateCoreCube(const std::string& json, int expectedMin, int expectedMax)
+{
+    const std::string core = ExtractObject(ExtractObject(json, "coreProfile"), "coreCube");
+    int xMin = -1;
+    int xMax = -1;
+    int yMin = -1;
+    int yMax = -1;
+    int zMin = -1;
+    int zMax = -1;
+    return ExtractIntValue(core, "xMin", xMin) &&
+        ExtractIntValue(core, "xMax", xMax) &&
+        ExtractIntValue(core, "yMin", yMin) &&
+        ExtractIntValue(core, "yMax", yMax) &&
+        ExtractIntValue(core, "zMin", zMin) &&
+        ExtractIntValue(core, "zMax", zMax) &&
+        xMin == expectedMin && xMax == expectedMax &&
+        yMin == expectedMin && yMax == expectedMax &&
+        zMin == expectedMin && zMax == expectedMax &&
+        xMin >= 0 && xMax < 8 && yMin >= 0 && yMax < 8 && zMin >= 0 && zMax < 8;
 }
 }
 
@@ -349,6 +768,73 @@ int main()
     test.Check(Chess3D_TryMakeMove(game, 3, 3, 6, 3, 3, 7, 0, &played) == 1, "pawn promotion move is accepted");
     test.Check((played.flags & MovePromotion) != 0 && Chess3D_GetPiece(game, 3, 3, 7) == PieceCode(1, Queen),
         "pawn reaching z=7 promotes to queen by default");
+
+    const std::string profileSchema = ReadTextFile("assets\\rules\\profiles\\chess3d_rule_profile.schema.json");
+    test.Check(!profileSchema.empty(), "Chess3D rule profile schema exists");
+    test.Check(JsonParser(profileSchema).Parse(), "Chess3D rule profile schema parses as JSON");
+
+    const std::string classicProfile = ReadTextFile("assets\\rules\\profiles\\classic_six_side_3d_v0_1.json");
+    const std::string singleProfile = ReadTextFile("assets\\rules\\profiles\\single_side_3d_v0_1.json");
+    const std::string asgardProfile = ReadTextFile("assets\\rules\\profiles\\asgard_convergence_3d_v0_1.json");
+    const std::string rubikProfile = ReadTextFile("assets\\rules\\profiles\\rubik_convergence_3d_v0_1.json");
+    test.Check(!classicProfile.empty(), "classic six-side profile exists");
+    test.Check(!singleProfile.empty(), "single-side profile exists");
+    test.Check(!asgardProfile.empty(), "asgard convergence profile exists");
+    test.Check(!rubikProfile.empty(), "rubik convergence profile exists");
+
+    test.Check(ValidateCommonRuleProfile(classicProfile), "classic six-side profile passes common validation");
+    test.Check(ValidateCommonRuleProfile(singleProfile), "single-side profile passes common validation");
+    test.Check(ValidateCommonRuleProfile(asgardProfile), "asgard convergence profile passes common validation");
+    test.Check(ValidateCommonRuleProfile(rubikProfile), "rubik convergence profile passes common validation");
+
+    test.Check(ExtractStringValue(classicProfile, "rulesetId") == "classic-six-side-3d-8x8x8-v0.1",
+        "classic six-side ruleset id matches");
+    test.Check(ExtractStringValue(singleProfile, "rulesetId") == "single-side-3d-8x8x8-v0.1",
+        "single-side profile ruleset id matches");
+    test.Check(ExtractStringValue(asgardProfile, "rulesetId") == "asgard-convergence-3d-8x8x8-v0.1",
+        "asgard convergence ruleset id matches");
+    test.Check(ExtractStringValue(rubikProfile, "rulesetId") == "rubik-convergence-3d-8x8x8-v0.1",
+        "rubik convergence ruleset id matches");
+
+    test.Check(ExtractStringValue(ExtractObject(classicProfile, "goalProfile"), "type") == "classicCheckmate",
+        "classic six-side goalProfile is classicCheckmate");
+    test.Check(ExtractStringValue(ExtractObject(classicProfile, "captureProfile"), "type") == "classicCapture",
+        "classic six-side captureProfile is classicCapture");
+    test.Check(ExtractStringValue(ExtractObject(classicProfile, "layerTurnProfile"), "type") == "disabled",
+        "classic six-side layerTurnProfile is disabled");
+
+    test.Check(ExtractStringValue(ExtractObject(singleProfile, "setupProfile"), "baseSetup") == "central4x4",
+        "single-side profile references central4x4 setup");
+    test.Check(ExtractStringValue(ExtractObject(singleProfile, "goalProfile"), "type") == "sandbox",
+        "single-side profile is sandbox goal mode");
+
+    test.Check(ExtractStringValue(ExtractObject(asgardProfile, "goalProfile"), "type") == "centerAssembly",
+        "asgard convergence goalProfile is centerAssembly");
+    test.Check(ValidateCoreCube(asgardProfile, 2, 5), "asgard convergence coreCube is x/y/z 2..5");
+    test.Check(ExtractStringValue(ExtractObject(asgardProfile, "captureProfile"), "type") == "knockbackCapture",
+        "asgard convergence captureProfile is knockbackCapture");
+    test.Check(ExtractStringValue(ExtractObject(asgardProfile, "layerTurnProfile"), "type") == "disabled",
+        "asgard convergence layerTurnProfile is disabled");
+    test.Check(asgardProfile.find("Forbidden Core / Asgard / Meru") != std::string::npos,
+        "asgard convergence mythProfile names the forbidden core");
+
+    test.Check(ExtractStringValue(rubikProfile, "baseRuleset") == "asgard-convergence-3d-8x8x8-v0.1",
+        "rubik convergence points to asgard convergence baseRuleset");
+    const std::string rubikLayerTurn = ExtractObject(rubikProfile, "layerTurnProfile");
+    test.Check(ExtractStringValue(rubikLayerTurn, "type") == "ritualTurn",
+        "rubik convergence layerTurnProfile is ritualTurn");
+    test.Check(rubikLayerTurn.find("\"X\"") != std::string::npos &&
+        rubikLayerTurn.find("\"Y\"") != std::string::npos &&
+        rubikLayerTurn.find("\"Z\"") != std::string::npos,
+        "rubik convergence ritualTurn axes include X/Y/Z");
+    const std::string layerRange = ExtractObject(rubikLayerTurn, "layerRange");
+    int minLayer = -1;
+    int maxLayer = -1;
+    test.Check(ExtractIntValue(layerRange, "min", minLayer) && ExtractIntValue(layerRange, "max", maxLayer) &&
+        minLayer == 0 && maxLayer == 7,
+        "rubik convergence ritualTurn layers are 0..7");
+    test.Check(rubikLayerTurn.find("-1") != std::string::npos && rubikLayerTurn.find("1") != std::string::npos,
+        "rubik convergence ritualTurn quarter turns include -1 and +1");
 
     Chess3D_Destroy(game);
     return test.Finish("Chess3DEngineContractTests");

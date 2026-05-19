@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P2A single-side 3D chess rule contracts.
+Last audited locally for P2B configurable Chess3D rule profiles.
 
 ## Exists
 
@@ -21,6 +21,10 @@ Last audited locally for P2A single-side 3D chess rule contracts.
 - `docs/CHESS3D_SINGLE_SIDE_AUDIT.md`: factual audit of the current 3D engine before six-side generalization.
 - `docs/CHESS3D_SINGLE_SIDE_RULES_SPEC.md`: formal P2A single-side 8x8x8 ruleset specification.
 - `src/ChessApp/Assets/Rules3D/single_side_3d_chess_8x8x8_v0_1.json`: machine-readable P2A rules asset.
+- `assets/rules/profiles`: P2B profile JSON assets for classic six-side, single-side, Asgard/Meru convergence, and Rubik convergence modes.
+- `docs/CHESS3D_RULE_PROFILE_ARCHITECTURE.md`: configurable rule-profile architecture.
+- `docs/CHESS3D_ASGARD_CONVERGENCE.md`: Asgard/Meru centerAssembly design.
+- `docs/CHESS3D_RUBIK_LAYER_TURNS.md`: Rubik layer-turn profile contract.
 
 ## Build-Verified
 
@@ -32,6 +36,7 @@ Last audited locally for P2A single-side 3D chess rule contracts.
 - GitHub Actions `Windows Build` is green on `master`.
 - CI verifies a clean checkout, Release x64 build, production packaging, contract tests, `Chess2DBenchmark --quick`, and the baseline without CUDA.
 - Chess3D contract tests now include P2A single-side setup, movement, capture, promotion, and JSON metadata smoke checks.
+- Chess3D contract tests now validate the P2B profile JSON files and schema-level profile fields.
 
 ## User Executables
 
@@ -63,12 +68,15 @@ Portable outputs:
 - Native contract tests run without UI, CUDA, or `rude-resource/`.
 - `Chess2DBenchmark --quick` is part of the contract-test runner when the benchmark executable exists.
 - Single-side 3D ruleset `single-side-3d-chess-8x8x8-v0.1` is documented and covered by ABI-level contract tests.
+- Rule profile assets define classic six-side, single-side sandbox, Asgard/Meru convergence, and Rubik convergence modes as data contracts.
 
 ## Draft
 
 - Six-sided 3D chess laws are still draft and JSON-driven.
 - 3D king safety, check, mate, and stalemate remain draft after P2A.
-- Rubik layer turns as legal chess actions remain future work.
+- Asgard/Meru centerAssembly runtime mechanics are specified but not implemented yet.
+- Knockback/reserve captures are specified but not implemented yet.
+- Rubik layer turns as legal chess actions are specified as `ritualTurn` but not implemented yet.
 - 3D relay/web-platform contract is a documented client-side foundation, not a hosted production service.
 - Rubik arbitrary-state solving beyond trusted move history remains future work.
 - UI smoke tests are still manual.
@@ -83,4 +91,4 @@ Portable outputs:
 - Full UI automation tests are not present yet.
 - GPU parity/performance needs more benchmark baselines on real target hardware.
 - The project currently relies on local Visual Studio/MSBuild and vcpkg environment availability.
-- Recommended next stage is P2B: generalize the single-side local rules to six sides and six home faces.
+- Recommended next stage is P2C: implement centerAssembly mechanics, anchor state, target slots, and victory detection.

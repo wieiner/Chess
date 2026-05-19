@@ -1,0 +1,80 @@
+{
+  "rulesetId": "asgard-convergence-3d-8x8x8-v0.1",
+  "version": "0.1",
+  "displayName": "Asgard / Meru Convergence",
+  "description": "Six sides race toward the forbidden central core, anchoring pieces into a sacred central formation while attacking and dislodging rivals.",
+  "tags": ["asgard", "meru", "convergence", "six-side", "center-assembly"],
+  "boardProfile": {
+    "width": 8,
+    "height": 8,
+    "depth": 8,
+    "coordinateSystem": "x,y,z in 0..7"
+  },
+  "mythProfile": {
+    "theme": "asgard-meru",
+    "centerName": "Forbidden Core / Asgard / Meru",
+    "sideNames": ["Z0 Gate", "Z7 Gate", "Y0 Gate", "Y7 Gate", "X0 Gate", "X7 Gate"],
+    "lore": "Six kings converge on the sacred city at the center of the cube. Pieces that reach the core may become anchored into the central formation."
+  },
+  "setupProfile": {
+    "type": "sixSideProjectedFromSingleSide",
+    "baseSetup": "central4x4",
+    "homeFaces": ["Z0", "Z7", "Y0", "Y7", "X0", "X7"],
+    "piecesPerSide": 16,
+    "randomizationProfile": "none"
+  },
+  "movementProfile": {
+    "type": "classic3d",
+    "pieces": ["rook3d", "bishop3d", "queen3d", "king3d", "knight3d", "pawn3d"]
+  },
+  "captureProfile": {
+    "type": "knockbackCapture",
+    "capturedPiece": "returnToHomeSlotIfFree",
+    "fallback": "reserve",
+    "reserveRestoreAction": "deferred"
+  },
+  "goalProfile": {
+    "type": "centerAssembly",
+    "description": "Victory is based on anchoring enough pieces into central target slots rather than mandatory checkmate."
+  },
+  "coreProfile": {
+    "type": "asgardMeruCore",
+    "coreCube": {
+      "xMin": 2,
+      "xMax": 5,
+      "yMin": 2,
+      "yMax": 5,
+      "zMin": 2,
+      "zMax": 5
+    },
+    "targetSlots": {
+      "derivation": "derivedFromSideHomeFaceProjection",
+      "status": "draft"
+    },
+    "anchorMode": "softAnchor",
+    "contestedAnchor": "deferred"
+  },
+  "layerTurnProfile": {
+    "type": "disabled"
+  },
+  "turnProfile": {
+    "type": "roundRobin",
+    "sideOrder": [1, 2, 3, 4, 5, 6]
+  },
+  "victoryProfile": {
+    "type": "allPiecesAnchored",
+    "requiredPieceCount": 16,
+    "percentageThreshold": 1.0,
+    "checkmate": "optional"
+  },
+  "randomizationProfile": {
+    "type": "none"
+  },
+  "knownLimitations": [
+    "Reserve restore is not implemented.",
+    "Six-side target projection is draft.",
+    "Checkmate is optional and not hardened for this profile.",
+    "Contested anchor rules are deferred.",
+    "Runtime centerAssembly victory detection is deferred to P2C."
+  ]
+}
