@@ -4,6 +4,7 @@
 #include <array>
 #include <cctype>
 #include <cstring>
+#include <initializer_list>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -52,6 +53,24 @@ struct Rules
     bool kingSafetyEnabled = false;
     int maxPiecesPerSide = 16;
     std::array<SideRule, 7> sides{};
+    std::string rulesetId = "cube-chess-8x8x8-draft";
+    std::string rulesetVersion = "draft";
+    std::string rulesetDisplayName = "Cube Chess 8x8x8 Draft";
+    std::string goalProfileType = "sandbox";
+    std::string captureProfileType = "classicCapture";
+    std::string occupancyProfileType = "exclusive";
+    std::string fusionProfileType = "none";
+    std::string corePhysicsProfileType = "none";
+    std::string layerTurnProfileType = "disabled";
+    std::string victoryProfileType = "sandbox";
+    int coreXMin = 2;
+    int coreXMax = 5;
+    int coreYMin = 2;
+    int coreYMax = 5;
+    int coreZMin = 2;
+    int coreZMax = 5;
+    std::string anchorMode = "none";
+    int requiredAnchorCount = 16;
     std::string json;
 };
 
@@ -77,6 +96,10 @@ struct Game
 {
     Rules rules;
     Position pos;
+    std::array<int, 7> anchorCounts{};
+    bool gameOver = false;
+    int winnerSide = 0;
+    std::string lastProfileLoadError;
     std::string lastInfo = "3D module ready.";
 };
 
@@ -323,6 +346,235 @@ std::string extractString(const std::string& json, const std::string& key, const
     return json.substr(first + 1, second - first - 1);
 }
 
+std::size_t findMatchingDelimiter(const std::string& text, std::size_t open, char left, char right)
+{
+    if (open >= text.size() || text[open] != left)
+    {
+        return std::string::npos;
+    }
+
+    int depth = 0;
+    bool inString = false;
+    bool escaped = false;
+    for (std::size_t pos = open; pos < text.size(); ++pos)
+    {
+        const char ch = text[pos];
+        if (inString)
+        {
+            if (escaped)
+            {
+                escaped = false;
+            }
+            else if (ch == '\\')
+            {
+                escaped = true;
+            }
+            else if (ch == '"')
+            {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (ch == '"')
+        {
+            inString = true;
+            continue;
+        }
+        if (ch == left)
+        {
+            ++depth;
+        }
+        else if (ch == right)
+        {
+            --depth;
+            if (depth == 0)
+            {
+                return pos;
+            }
+        }
+    }
+    return std::string::npos;
+}
+
+std::string extractObject(const std::string& json, const std::string& key)
+{
+    const auto keyPos = json.find("\"" + key + "\"");
+    if (keyPos == std::string::npos)
+    {
+        return {};
+    }
+    const auto colon = json.find(':', keyPos);
+    if (colon == std::string::npos)
+    {
+        return {};
+    }
+    const auto open = json.find('{', colon + 1);
+    if (open == std::string::npos)
+    {
+        return {};
+    }
+    const auto close = findMatchingDelimiter(json, open, '{', '}');
+    if (close == std::string::npos)
+    {
+        return {};
+    }
+    return json.substr(open, close - open + 1);
+}
+
+std::string extractArray(const std::string& json, const std::string& key)
+{
+    const auto keyPos = json.find("\"" + key + "\"");
+    if (keyPos == std::string::npos)
+    {
+        return {};
+    }
+    const auto colon = json.find(':', keyPos);
+    if (colon == std::string::npos)
+    {
+        return {};
+    }
+    const auto open = json.find('[', colon + 1);
+    if (open == std::string::npos)
+    {
+        return {};
+    }
+    const auto close = findMatchingDelimiter(json, open, '[', ']');
+    if (close == std::string::npos)
+    {
+        return {};
+    }
+    return json.substr(open, close - open + 1);
+}
+
+bool stringInSet(const std::string& value, std::initializer_list<const char*> allowed)
+{
+    return std::find_if(allowed.begin(), allowed.end(), [&](const char* item)
+    {
+        return value == item;
+    }) != allowed.end();
+}
+
+std::string profileTypeOrFallback(const std::string& json, const std::string& objectKey, const std::string& fallback)
+{
+    const std::string object = extractObject(json, objectKey);
+    if (object.empty())
+    {
+        return fallback;
+    }
+    return extractString(object, "type", fallback);
+}
+
+bool extractCoreCube(const std::string& json, Rules& rules)
+{
+    const std::string coreProfile = extractObject(json, "coreProfile");
+    const std::string coreCube = extractObject(coreProfile.empty() ? json : coreProfile, "coreCube");
+    if (coreCube.empty())
+    {
+        return true;
+    }
+
+    const int xMin = extractInt(coreCube, "xMin", rules.coreXMin);
+    const int xMax = extractInt(coreCube, "xMax", rules.coreXMax);
+    const int yMin = extractInt(coreCube, "yMin", rules.coreYMin);
+    const int yMax = extractInt(coreCube, "yMax", rules.coreYMax);
+    const int zMin = extractInt(coreCube, "zMin", rules.coreZMin);
+    const int zMax = extractInt(coreCube, "zMax", rules.coreZMax);
+    if (xMin < 0 || xMax >= BoardSize || xMin > xMax ||
+        yMin < 0 || yMax >= BoardSize || yMin > yMax ||
+        zMin < 0 || zMax >= BoardSize || zMin > zMax)
+    {
+        return false;
+    }
+
+    rules.coreXMin = xMin;
+    rules.coreXMax = xMax;
+    rules.coreYMin = yMin;
+    rules.coreYMax = yMax;
+    rules.coreZMin = zMin;
+    rules.coreZMax = zMax;
+    return true;
+}
+
+bool parseRuleProfileMetadata(Rules& rules, std::string& error)
+{
+    const std::string& json = rules.json;
+    const std::string rulesetId = extractString(json, "rulesetId", "");
+    if (rulesetId.empty())
+    {
+        error = "RuleProfile rejected: rulesetId is required.";
+        return false;
+    }
+
+    rules.rulesetId = rulesetId;
+    rules.rulesetVersion = extractString(json, "version", "");
+    rules.rulesetDisplayName = extractString(json, "displayName", rules.rulesetId);
+    rules.goalProfileType = profileTypeOrFallback(json, "goalProfile", "");
+    rules.captureProfileType = profileTypeOrFallback(json, "captureProfile", "");
+    rules.occupancyProfileType = profileTypeOrFallback(json, "occupancyProfile", "");
+    rules.fusionProfileType = profileTypeOrFallback(json, "fusionProfile", "");
+    rules.corePhysicsProfileType = profileTypeOrFallback(json, "corePhysicsProfile", "none");
+    rules.layerTurnProfileType = profileTypeOrFallback(json, "layerTurnProfile", "");
+    rules.victoryProfileType = profileTypeOrFallback(json, "victoryProfile", "sandbox");
+    rules.anchorMode = extractString(extractObject(json, "coreProfile"), "anchorMode", "none");
+    rules.requiredAnchorCount = std::clamp(extractInt(extractObject(json, "victoryProfile"), "requiredPieceCount", 16), 1, 96);
+
+    if (!stringInSet(rules.goalProfileType, { "sandbox", "centerAssembly", "centerAssemblyTraining", "classicCheckmate", "hybrid" }))
+    {
+        error = "RuleProfile rejected: unsupported goalProfile.type.";
+        return false;
+    }
+    if (!stringInSet(rules.captureProfileType, { "classicCapture", "knockbackCapture" }))
+    {
+        error = "RuleProfile rejected: unsupported captureProfile.type.";
+        return false;
+    }
+    if (!stringInSet(rules.occupancyProfileType, { "exclusive", "coreStack", "quantumCore" }))
+    {
+        error = "RuleProfile rejected: unsupported occupancyProfile.type.";
+        return false;
+    }
+    if (!stringInSet(rules.fusionProfileType, { "none", "anchorOnly", "pairFusion", "stackFusion", "colorPermutation", "volumeSurface216" }))
+    {
+        error = "RuleProfile rejected: unsupported fusionProfile.type.";
+        return false;
+    }
+    if (!stringInSet(rules.corePhysicsProfileType, { "none", "asgardCorePhysics" }))
+    {
+        error = "RuleProfile rejected: unsupported corePhysicsProfile.type.";
+        return false;
+    }
+    if (!stringInSet(rules.layerTurnProfileType, { "disabled", "ritualTurn", "globalEvent", "sandbox" }))
+    {
+        error = "RuleProfile rejected: unsupported layerTurnProfile.type.";
+        return false;
+    }
+    if (!stringInSet(rules.victoryProfileType, { "sandbox", "checkmate", "allPiecesAnchored", "requiredPieceCount", "kingOnly", "percentageThreshold", "hybrid" }))
+    {
+        error = "RuleProfile rejected: unsupported victoryProfile.type.";
+        return false;
+    }
+    if (!extractCoreCube(json, rules))
+    {
+        error = "RuleProfile rejected: coreCube bounds are invalid.";
+        return false;
+    }
+
+    const std::string setup = extractObject(json, "setupProfile");
+    const std::string setupType = extractString(setup, "type", "");
+    const std::string homeFaces = extractArray(setup, "homeFaces");
+    if (setupType.find("sixSide") != std::string::npos || homeFaces.find("X7") != std::string::npos)
+    {
+        rules.activeSideCount = 6;
+    }
+    else if (rules.rulesetId.find("single-side") != std::string::npos || setupType.find("single") != std::string::npos)
+    {
+        rules.activeSideCount = 1;
+    }
+
+    return true;
+}
+
 bool extractSideForward(const std::string& json, int side, Vec3& forward)
 {
     std::size_t pos = 0;
@@ -419,6 +671,16 @@ void loadRules(Rules& rules, const std::string& json)
             rules.sides[side].forward = forward;
         }
     }
+
+    std::string ignoredError;
+    if (rules.json.find("\"rulesetId\"") != std::string::npos)
+    {
+        Rules candidate = rules;
+        if (parseRuleProfileMetadata(candidate, ignoredError))
+        {
+            rules = candidate;
+        }
+    }
 }
 
 void clear(Position& pos)
@@ -466,6 +728,130 @@ void placeFaceCenter(Position& pos, int side)
     }
 }
 
+int central4x4TargetType(int localU, int localV)
+{
+    constexpr int pattern[4][4] = {
+        { Rook, Pawn, Pawn, Knight },
+        { Pawn, Bishop, Bishop, Pawn },
+        { Pawn, Queen, King, Pawn },
+        { Knight, Pawn, Pawn, Rook }
+    };
+    if (localU < 0 || localU > 3 || localV < 0 || localV > 3)
+    {
+        return Empty;
+    }
+    return pattern[localV][localU];
+}
+
+int targetSlotType(const Rules& rules, int side, int x, int y, int z)
+{
+    if (side < 1 || side > 6)
+    {
+        return Empty;
+    }
+
+    int localU = -1;
+    int localV = -1;
+    switch (side)
+    {
+    case 1:
+        if (z != rules.coreZMin) return Empty;
+        localU = x - rules.coreXMin;
+        localV = y - rules.coreYMin;
+        break;
+    case 2:
+        if (z != rules.coreZMax) return Empty;
+        localU = x - rules.coreXMin;
+        localV = y - rules.coreYMin;
+        break;
+    case 3:
+        if (y != rules.coreYMin) return Empty;
+        localU = x - rules.coreXMin;
+        localV = z - rules.coreZMin;
+        break;
+    case 4:
+        if (y != rules.coreYMax) return Empty;
+        localU = x - rules.coreXMin;
+        localV = z - rules.coreZMin;
+        break;
+    case 5:
+        if (x != rules.coreXMin) return Empty;
+        localU = y - rules.coreYMin;
+        localV = z - rules.coreZMin;
+        break;
+    case 6:
+        if (x != rules.coreXMax) return Empty;
+        localU = y - rules.coreYMin;
+        localV = z - rules.coreZMin;
+        break;
+    default:
+        return Empty;
+    }
+    return central4x4TargetType(localU, localV);
+}
+
+bool isCenterAssemblyGoal(const Rules& rules)
+{
+    return rules.goalProfileType == "centerAssembly" || rules.goalProfileType == "centerAssemblyTraining";
+}
+
+bool anchorsCanWin(const Rules& rules)
+{
+    return rules.victoryProfileType == "allPiecesAnchored" ||
+        rules.victoryProfileType == "requiredPieceCount" ||
+        rules.victoryProfileType == "hybrid";
+}
+
+void recomputeAnchors(Game& game)
+{
+    game.anchorCounts.fill(0);
+    game.gameOver = false;
+    game.winnerSide = 0;
+
+    if (!isCenterAssemblyGoal(game.rules))
+    {
+        return;
+    }
+
+    for (int z = game.rules.coreZMin; z <= game.rules.coreZMax; ++z)
+    {
+        for (int y = game.rules.coreYMin; y <= game.rules.coreYMax; ++y)
+        {
+            for (int x = game.rules.coreXMin; x <= game.rules.coreXMax; ++x)
+            {
+                const int piece = game.pos.board[indexOf(x, y, z)];
+                if (piece == Empty)
+                {
+                    continue;
+                }
+                const int side = pieceSide(piece);
+                if (side < 1 || side > 6)
+                {
+                    continue;
+                }
+                if (targetSlotType(game.rules, side, x, y, z) == pieceType(piece))
+                {
+                    ++game.anchorCounts[side];
+                }
+            }
+        }
+    }
+
+    if (!anchorsCanWin(game.rules))
+    {
+        return;
+    }
+    for (int side = 1; side <= 6; ++side)
+    {
+        if (game.anchorCounts[side] >= game.rules.requiredAnchorCount)
+        {
+            game.gameOver = true;
+            game.winnerSide = side;
+            return;
+        }
+    }
+}
+
 void resetPosition(Game& game)
 {
     clear(game.pos);
@@ -474,6 +860,7 @@ void resetPosition(Game& game)
         placeFaceCenter(game.pos, side);
     }
     game.pos.sideToMove = 1;
+    recomputeAnchors(game);
     game.lastInfo = "3D cube face-centered draft reset.";
 }
 
@@ -935,6 +1322,7 @@ CHESS3D_API void Chess3D_Clear(void* handle)
     if (auto* game = asGame(handle))
     {
         clear(game->pos);
+        recomputeAnchors(*game);
         game->lastInfo = "3D cube cleared for setup.";
     }
 }
@@ -958,10 +1346,192 @@ CHESS3D_API int Chess3D_LoadRulesJson(void* handle, const char* json)
     return 1;
 }
 
+CHESS3D_API int Chess3D_LoadRuleProfileJson(void* handle, const char* json)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    const std::string text = json != nullptr ? json : "";
+    if (text.empty() || !hasJsonObjectEnvelope(text))
+    {
+        game->lastProfileLoadError = "RuleProfile rejected: expected a non-empty JSON object.";
+        game->lastInfo = game->lastProfileLoadError;
+        return 0;
+    }
+
+    Rules candidate;
+    loadRules(candidate, text);
+    std::string error;
+    if (!parseRuleProfileMetadata(candidate, error))
+    {
+        game->lastProfileLoadError = error;
+        game->lastInfo = error;
+        return 0;
+    }
+
+    game->rules = candidate;
+    resetPosition(*game);
+    game->lastProfileLoadError.clear();
+    game->lastInfo = "3D rule profile loaded: " + game->rules.rulesetId;
+    return 1;
+}
+
 CHESS3D_API int Chess3D_GetRulesJson(void* handle, char* buffer, int capacity)
 {
     auto* game = asGame(handle);
     return game != nullptr ? copyString(game->rules.json, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_GetCurrentRulesetId(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->rules.rulesetId, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_GetCurrentRulesetVersion(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->rules.rulesetVersion, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_GetCurrentRulesetDisplayName(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->rules.rulesetDisplayName, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_GetGoalProfileType(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->rules.goalProfileType, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_GetCaptureProfileType(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->rules.captureProfileType, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_GetOccupancyProfileType(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->rules.occupancyProfileType, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_GetFusionProfileType(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->rules.fusionProfileType, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_GetCorePhysicsProfileType(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->rules.corePhysicsProfileType, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_GetLayerTurnProfileType(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->rules.layerTurnProfileType, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_GetVictoryProfileType(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->rules.victoryProfileType, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_GetCoreCube(void* handle, int* xMin, int* xMax, int* yMin, int* yMax, int* zMin, int* zMax)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || xMin == nullptr || xMax == nullptr || yMin == nullptr || yMax == nullptr || zMin == nullptr || zMax == nullptr)
+    {
+        return 0;
+    }
+    *xMin = game->rules.coreXMin;
+    *xMax = game->rules.coreXMax;
+    *yMin = game->rules.coreYMin;
+    *yMax = game->rules.coreYMax;
+    *zMin = game->rules.coreZMin;
+    *zMax = game->rules.coreZMax;
+    return 1;
+}
+
+CHESS3D_API int Chess3D_RecomputeAnchors(void* handle)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    recomputeAnchors(*game);
+    return 1;
+}
+
+CHESS3D_API int Chess3D_GetAnchorCount(void* handle, int side)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || side < 1 || side > 6)
+    {
+        return 0;
+    }
+    return game->anchorCounts[side];
+}
+
+CHESS3D_API int Chess3D_GetRequiredAnchorCount(void* handle, int side)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || side < 1 || side > 6)
+    {
+        return 0;
+    }
+    return game->rules.requiredAnchorCount;
+}
+
+CHESS3D_API int Chess3D_IsTargetSlot(void* handle, int side, int x, int y, int z)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !inside(x, y, z))
+    {
+        return 0;
+    }
+    return targetSlotType(game->rules, side, x, y, z) != Empty ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_IsAnchoredCell(void* handle, int x, int y, int z)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !inside(x, y, z) || !isCenterAssemblyGoal(game->rules))
+    {
+        return 0;
+    }
+    const int piece = game->pos.board[indexOf(x, y, z)];
+    if (piece == Empty)
+    {
+        return 0;
+    }
+    return targetSlotType(game->rules, pieceSide(piece), x, y, z) == pieceType(piece) ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_IsGameOver(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr && game->gameOver ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_GetWinnerSide(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? game->winnerSide : 0;
+}
+
+CHESS3D_API int Chess3D_GetLastProfileError(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->lastProfileLoadError, buffer, capacity) : 0;
 }
 
 CHESS3D_API int Chess3D_GetRulesInfo(void* handle, Chess3DRulesInfoDto* info)
@@ -1042,6 +1612,7 @@ CHESS3D_API int Chess3D_SetBoard(void* handle, const int* pieces512, int sideToM
     std::copy(pieces512, pieces512 + CellCount, game->pos.board.begin());
     game->pos.sideToMove = std::clamp(sideToMove, 1, game->rules.activeSideCount);
     game->pos.lastMove = Move{};
+    recomputeAnchors(*game);
     game->lastInfo = "3D board synchronized.";
     return 1;
 }
@@ -1054,6 +1625,7 @@ CHESS3D_API int Chess3D_SetPiece(void* handle, int x, int y, int z, int side, in
         return 0;
     }
     game->pos.board[indexOf(x, y, z)] = side == 0 || type == 0 ? Empty : makePiece(side, type);
+    recomputeAnchors(*game);
     game->lastInfo = "3D setup changed.";
     return 1;
 }
@@ -1136,6 +1708,7 @@ CHESS3D_API int Chess3D_TryMakeMove(void* handle, int fromX, int fromY, int from
                 move.promotionType = promotionType;
             }
             applyMove(game->rules, game->pos, move);
+            recomputeAnchors(*game);
             game->lastInfo = "3D move played.";
             if (playedMove != nullptr)
             {
@@ -1177,6 +1750,7 @@ CHESS3D_API int Chess3D_MakeBestMove(void* handle, int depth, Chess3DMoveDto* pl
     }
     best.score = bestScore;
     applyMove(game->rules, game->pos, best);
+    recomputeAnchors(*game);
     if (playedMove != nullptr)
     {
         *playedMove = toDto(best);
@@ -1209,6 +1783,7 @@ CHESS3D_API int Chess3D_RotateLayer(void* handle, int axis, int layer, int quart
     }
 
     rotateLayer(game->pos, axis, layer, turns);
+    recomputeAnchors(*game);
     std::ostringstream info;
     const char axisName = axis == 0 ? 'Z' : axis == 1 ? 'Y' : 'X';
     info << "3D Rubik rotate " << axisName << (layer + 1) << " x" << turns;

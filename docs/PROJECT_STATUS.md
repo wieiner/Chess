@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P2C Asgard core occupancy and fusion profiles.
+Last audited locally for P2D runtime RuleProfile selection and simple centerAssembly anchors.
 
 ## Exists
 
@@ -27,6 +27,10 @@ Last audited locally for P2C Asgard core occupancy and fusion profiles.
 - `docs/CHESS3D_RUBIK_LAYER_TURNS.md`: Rubik layer-turn profile contract.
 - `docs/CHESS3D_ASGARD_CORE_PHYSICS.md`: P2C two-zone core physics, occupancy, fusion, and Volume-Surface 216 specification.
 - `docs/CHESS3D_ASGARD_CORE_PHYSICS_AUDIT.md`: audit of current single-occupancy board storage and staged refactor path.
+- `docs/CHESS3D_P2D_RUNTIME_PROFILE_AUDIT.md`: runtime profile boundary and asset-pipeline audit.
+- `docs/CHESS3D_P2D_RUNTIME_PROFILE_SELECTION.md`: strict RuleProfile loader and profile summary ABI notes.
+- `docs/CHESS3D_TARGET_SLOTS.md`: six-side typed target-slot projection for the current core.
+- `docs/CHESS3D_SIMPLE_ANCHOR_PROJECTION.md`: temporary single-occupancy centerAssembly anchor model.
 
 ## Build-Verified
 
@@ -40,6 +44,8 @@ Last audited locally for P2C Asgard core occupancy and fusion profiles.
 - Chess3D contract tests now include P2A single-side setup, movement, capture, promotion, and JSON metadata smoke checks.
 - Chess3D contract tests now validate the P2B profile JSON files and schema-level profile fields.
 - Chess3D contract tests now validate P2C occupancy/fusion/corePhysics profile fields as data contracts.
+- Chess3D contract tests now load P2D RuleProfiles at runtime, check profile summary ABI getters, target slots, simple anchor progress, profile isolation, and centerAssembly victory projection.
+- `scripts/verify.ps1` checks that representative RuleProfile JSON files are copied into Chess3D development output and `ProductionOutput`.
 
 ## User Executables
 
@@ -73,12 +79,15 @@ Portable outputs:
 - Single-side 3D ruleset `single-side-3d-chess-8x8x8-v0.1` is documented and covered by ABI-level contract tests.
 - Rule profile assets define classic six-side, single-side sandbox, Asgard/Meru convergence, and Rubik convergence modes as data contracts.
 - Asgard/Rubik convergence profiles define `coreStack`, `stackFusion`, and `asgardCorePhysics` as `specOnly`.
+- `Chess3DEngine.dll` can load strict RuleProfile JSON through an append-only ABI.
+- `Chess3DApp.exe` can load profile-shaped JSON files and shows a compact profile/anchor summary in the status area.
+- CenterAssembly victory can be detected in P2D's simple single-occupancy anchor projection mode.
 
 ## Draft
 
 - Six-sided 3D chess laws are still draft and JSON-driven.
 - 3D king safety, check, mate, and stalemate remain draft after P2A.
-- Asgard/Meru centerAssembly runtime mechanics are specified but not implemented yet.
+- Final Asgard/Meru centerAssembly physics are not implemented yet; P2D only provides a compatibility projection over the current board.
 - Core multi-occupancy and fusion are specified but not implemented yet; runtime board storage remains one integer piece per cell.
 - Knockback/reserve captures are specified but not implemented yet.
 - Rubik layer turns as legal chess actions are specified as `ritualTurn` but not implemented yet.
@@ -96,4 +105,4 @@ Portable outputs:
 - Full UI automation tests are not present yet.
 - GPU parity/performance needs more benchmark baselines on real target hardware.
 - The project currently relies on local Visual Studio/MSBuild and vcpkg environment availability.
-- Recommended next stage is P2D: runtime profile selection and simple centerAssembly anchors.
+- Recommended next stage is P2E: CoreCell Stack Board Model.

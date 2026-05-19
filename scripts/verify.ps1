@@ -113,6 +113,8 @@ try {
     Assert-File "src\RubikApp\bin\x64\Release\net8.0-windows\RubikApp.exe"
     Assert-File "src\ChessOnlineApp\bin\x64\Release\net8.0-windows\ChessOnlineApp.exe"
     Assert-File "bin\x64\Release\Chess2DBenchmark.exe"
+    Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Profiles\asgard_convergence_3d_v0_1.json"
+    Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Profiles\rubik_convergence_3d_v0_1.json"
 
     Write-Step "Production packaging"
     Invoke-Checked { powershell -NoProfile -ExecutionPolicy Bypass -File ".\tools\release\Build-Production.ps1" -Product All } "Production packaging failed."
@@ -123,6 +125,8 @@ try {
     Assert-File "ProductionOutput\Rubik\RubikApp.exe"
     Assert-File "ProductionOutput\ChessOnlineIntegrations\ChessOnlineApp.exe"
     Assert-File "ProductionOutput\Chess2DBenchmark\Chess2DBenchmark.exe"
+    Assert-File "ProductionOutput\Chess3D\Assets\Rules3D\Profiles\asgard_convergence_3d_v0_1.json"
+    Assert-File "ProductionOutput\Chess3D\Assets\Rules3D\Profiles\rubik_convergence_3d_v0_1.json"
 
     $excludedExtensions = @(".pdb", ".ipdb", ".iobj", ".lib", ".exp", ".ilk")
     $excludedNames = @("*.tlog", "*.lastbuildstate", "*.recipe", "*.cache", "*.log")

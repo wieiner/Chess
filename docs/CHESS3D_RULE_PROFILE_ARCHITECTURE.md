@@ -1,6 +1,6 @@
 # Chess3D Rule Profile Architecture
 
-P2B introduces a configurable rule-profile contract. The immediate goal is not to implement every profile fully, but to prevent new modes from becoming hardcoded branches in the engine.
+P2B introduces a configurable rule-profile contract. P2D adds the first runtime bridge for selected profile fields. The goal is still to avoid hardcoded mode branches while keeping the current stable ABI intact.
 
 ## RuleSet
 
@@ -186,7 +186,7 @@ Supported contract values:
 - `hybrid`;
 - `sandbox`.
 
-P2B validates these fields as data. P2C/P3 will implement runtime state and detection.
+P2D implements a narrow subset at runtime: `centerAssembly` / `centerAssemblyTraining` can win through simple typed target-slot anchors when `victoryProfile.type` is `allPiecesAnchored`, `requiredPieceCount`, or `hybrid`. Other victory modes remain contracts for later stages.
 
 ## randomizationProfile
 
@@ -197,3 +197,16 @@ Supported contract values:
 - `fullSymmetricRandom` later.
 
 Randomized profiles must include a seed when used in a reproducible match.
+
+## P2D Runtime Projection
+
+`Chess3D_LoadRuleProfileJson` loads a selected RuleProfile into the engine. The engine stores profile summary fields, core cube bounds, anchor mode, and required anchor count. It also exposes append-only ABI getters so apps and tests can inspect the selected profile without parsing JSON themselves.
+
+Target slots are computed from the P2A central 4x4 pattern projected onto the six core planes. Matching is type-based because the current board stores only side/type integer codes, not unique piece ids.
+
+The anchor model is a compatibility projection:
+
+- current board storage remains one integer per cell;
+- a target is anchored when the occupying piece has the matching side and piece type;
+- overlapping target regions are allowed conceptually, but true co-occupancy waits for CoreCell stacks;
+- fusion, implosion, knockback/reserve, and ritual Rubik turns remain later runtime work.

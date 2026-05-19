@@ -1,6 +1,6 @@
 # Chess3D Asgard Core Physics
 
-P2C defines a richer center model for Asgard/Meru Convergence. This is a specification and profile-contract stage; the native engine remains single-occupancy until a later board-model refactor.
+P2C defines a richer center model for Asgard/Meru Convergence. P2D adds a small runtime bridge, but the native engine remains single-occupancy until a later board-model refactor.
 
 ## 1. Two-Zone Physics
 
@@ -128,16 +128,16 @@ Asgard Convergence can support victory profiles beyond `allPiecesAnchored`:
 - `sixGateCoronation`;
 - `hybrid`.
 
-P2C stores these as design vocabulary. Runtime victory detection remains later work.
+P2D implements only simple `allPiecesAnchored` / `requiredPieceCount` style centerAssembly victory over the current single-occupancy board. Fusion-based victory remains later work.
 
 ## 8. Implementation Staging
 
-Stage 1: JSON/spec/tests only. Engine remains single-occupancy.
+Stage 1: JSON/spec/tests only. Engine remains single-occupancy. Completed in P2C.
 
-Stage 2: runtime parses `occupancyProfile`, `fusionProfile`, and `corePhysicsProfile`.
+Stage 2: runtime parses profile metadata, exposes profile summary ABI, derives target slots, and computes simple anchor projection. Completed in P2D.
 
-Stage 3: board model supports `CoreCell` stacks without breaking old ABI.
+Stage 3: board model supports `CoreCell` stacks without breaking old ABI. Planned for P2E.
 
-Stage 4: fusion and victory logic.
+Stage 4: fusion and advanced victory logic.
 
 Stage 5: UI visualization for stacks, resonance, color/permutation, and implosion/fusion states.

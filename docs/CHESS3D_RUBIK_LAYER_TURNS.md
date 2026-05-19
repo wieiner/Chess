@@ -30,7 +30,7 @@ This separation allows classic six-side chess and Asgard/Meru convergence to exi
 
 ## Current Runtime Status
 
-`Chess3D_RotateLayer` already transforms the board and is used by the UI and network messages. P2B does not make it a legal chess action.
+`Chess3D_RotateLayer` already transforms the board and is used by the UI and network messages. P2D can load the Rubik convergence profile and expose `layerTurnProfile.type = ritualTurn` through profile summary ABI, but it does not make layer turns legal chess actions.
 
 Deferred:
 

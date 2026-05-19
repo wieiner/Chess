@@ -67,7 +67,16 @@ It is disabled in the current profile and is not asserted as physical fact.
 
 ## Target Slots
 
-Target slots are currently specified as derived from each side's home-face projection. The exact six-side target projection is draft and will be formalized in P2C/P3.
+Target slots are derived from each side's home-face projection into CoreCube `2..5`.
+
+P2D implements this as a typed runtime projection:
+
+- each side has 16 logical target slots;
+- the P2A 4x4 pattern is projected onto that side's core plane;
+- slots match by side and piece type, not by unique piece id;
+- physical target cells can overlap between sides.
+
+Because the runtime board is still single-occupancy, overlapping target regions are only partially expressible until P2E CoreCell stacks.
 
 ## Anchoring
 
@@ -77,7 +86,7 @@ Initial anchor mode is `softAnchor`:
 - anchored pieces are intended to become part of the central formation;
 - contested anchors are deferred.
 
-Runtime anchor state is not implemented in P2B.
+P2D implements a simple anchor projection over the current single-occupancy board. It is enough to count matching target cells and detect `allPiecesAnchored` victory, but it is not final fusion/stack behavior.
 
 ## Knockback Capture
 
@@ -87,7 +96,7 @@ Convergence uses `knockbackCapture`:
 - otherwise it goes to reserve;
 - reserve restore is deferred.
 
-Runtime knockback/reserve is not implemented in P2B.
+Runtime knockback/reserve is not implemented yet.
 
 ## Implemented Now
 
@@ -97,14 +106,15 @@ Implemented now:
 - schema/data documentation;
 - headless validation tests for profile files;
 - occupancy/fusion/core-physics fields as `specOnly`;
+- runtime RuleProfile loading and profile summary ABI;
+- typed target-slot projection for sides 1..6;
+- simple anchor count and centerAssembly victory projection;
 - P2A movement/setup contracts remain executable through `Chess3DEngineContractTests`.
 
 Deferred:
 
-- runtime centerAssembly victory;
 - runtime core multi-occupancy;
 - fusion entity model;
-- anchor state;
-- target-slot projection;
+- contested/fusion anchor state;
 - knockback/reserve behavior;
 - checkmate/hybrid hardening.

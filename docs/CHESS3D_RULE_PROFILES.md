@@ -1,6 +1,6 @@
 # Chess3D Rule Profiles
 
-P2B adds profile JSON files under `assets/rules/profiles`.
+P2B adds profile JSON files under `assets/rules/profiles`. P2D makes those profiles available to Chess3D runtime code and portable builds.
 
 ## Profiles
 
@@ -25,7 +25,20 @@ Classic and single-side profiles remain `exclusive` with fusion `none`. Asgard a
 
 ## Runtime Status
 
-These profiles are data/spec assets. The current native engine still implements the P2A/P1 draft movement core and a tolerant rules JSON loader. P2C and later phases will connect selected profile fields to runtime game state and victory detection.
+The native engine now has two loader paths:
+
+- `Chess3D_LoadRulesJson`: legacy draft rules loader.
+- `Chess3D_LoadRuleProfileJson`: strict RuleProfile loader.
+
+P2D stores profile summary fields, exposes append-only ABI getters, derives CoreCube target slots, and computes simple centerAssembly anchor/victory projection. CoreStack and fusion fields remain `specOnly` until P2E/P2F.
+
+Profile files are copied to:
+
+```text
+Assets/Rules3D/Profiles
+```
+
+inside Chess3D development and portable output.
 
 ## Why Profiles
 

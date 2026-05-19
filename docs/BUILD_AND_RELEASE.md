@@ -35,6 +35,12 @@ No CUDA Toolkit is required for the default build. `ChessGpuBackend.dll` remains
 - `src\ChessOnlineApp\bin\x64\Release\net8.0-windows\ChessOnlineApp.exe`
 - `bin\x64\Release\Chess2DBenchmark.exe`
 
+`Chess3DApp` also copies configurable RuleProfile JSON files into:
+
+```text
+src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Profiles
+```
+
 ## Portable Packaging
 
 Run:
@@ -59,6 +65,12 @@ Products are generated under:
 
 `ProductionOutput/` is generated output and is not committed.
 
+The Chess3D portable folder includes runtime profiles under:
+
+```text
+ProductionOutput\Chess3D\Assets\Rules3D\Profiles
+```
+
 ## Root Scripts
 
 - `run_chess_2d.bat`
@@ -75,7 +87,7 @@ For full local verification:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
 ```
 
-`scripts\verify.ps1` builds `Release|x64`, creates `ProductionOutput`, runs `tests\run-tests.ps1`, and fails on the first build/package/test failure. The test runner builds and runs native contract tests and then runs `Chess2DBenchmark --quick` unless `-SkipBenchmark` is passed.
+`scripts\verify.ps1` builds `Release|x64`, checks representative Chess3D RuleProfile assets in development output, creates `ProductionOutput`, checks representative Chess3D RuleProfile assets in portable output, runs `tests\run-tests.ps1`, and fails on the first build/package/test failure. The test runner builds and runs native contract tests and then runs `Chess2DBenchmark --quick` unless `-SkipBenchmark` is passed.
 
 ## Contract Tests
 
@@ -102,4 +114,4 @@ CI verifies:
 
 `rude-resource/` is a local ignored resource archive and is absent on CI. `scripts\verify.ps1` checks the ignore rule through the probe path `rude-resource/.verify-ignore-probe`, without creating that file.
 
-CUDA remains optional in CI and in the default local build. The next recommended project stage is P2: formal 3D chess rules specification for cube 8x8x8, six sides, and Rubik layer turns.
+CUDA remains optional in CI and in the default local build. The next recommended project stage is P2E: CoreCell Stack Board Model for the Asgard/Meru core.

@@ -98,10 +98,10 @@
   },
   "knownLimitations": [
     "Reserve restore is not implemented.",
-    "Six-side target projection is draft.",
+    "Six-side target projection has a P2D simple runtime projection but remains stack/fusion-limited.",
     "Checkmate is optional and not hardened for this profile.",
     "Contested anchor rules are deferred.",
     "Core multi-occupancy and fusion are specOnly in P2C.",
-    "Runtime centerAssembly victory detection is deferred to P2C."
+    "P2D centerAssembly victory uses a temporary single-occupancy anchor projection."
   ]
 }

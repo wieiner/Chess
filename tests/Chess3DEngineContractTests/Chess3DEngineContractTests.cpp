@@ -552,6 +552,61 @@ bool ValidateCoreCube(const std::string& json, int expectedMin, int expectedMax)
         zMin == expectedMin && zMax == expectedMax &&
         xMin >= 0 && xMax < 8 && yMin >= 0 && yMax < 8 && zMin >= 0 && zMax < 8;
 }
+
+std::string ReadAbiString(void* game, int (*reader)(void*, char*, int))
+{
+    char buffer[512] = {};
+    const int needed = reader(game, buffer, static_cast<int>(sizeof(buffer)));
+    if (needed <= 0)
+    {
+        return {};
+    }
+    return std::string(buffer);
+}
+
+struct TargetCell
+{
+    int x;
+    int y;
+    int z;
+    int type;
+};
+
+int TargetTypeForLocal(int localU, int localV)
+{
+    constexpr int pattern[4][4] = {
+        { Rook, Pawn, Pawn, Knight },
+        { Pawn, Bishop, Bishop, Pawn },
+        { Pawn, Queen, King, Pawn },
+        { Knight, Pawn, Pawn, Rook }
+    };
+    return pattern[localV][localU];
+}
+
+std::vector<TargetCell> TargetCellsForSide(int side)
+{
+    std::vector<TargetCell> cells;
+    for (int localV = 0; localV < 4; ++localV)
+    {
+        for (int localU = 0; localU < 4; ++localU)
+        {
+            const int a = 2 + localU;
+            const int b = 2 + localV;
+            const int type = TargetTypeForLocal(localU, localV);
+            switch (side)
+            {
+            case 1: cells.push_back({ a, b, 2, type }); break;
+            case 2: cells.push_back({ a, b, 5, type }); break;
+            case 3: cells.push_back({ a, 2, b, type }); break;
+            case 4: cells.push_back({ a, 5, b, type }); break;
+            case 5: cells.push_back({ 2, a, b, type }); break;
+            case 6: cells.push_back({ 5, a, b, type }); break;
+            default: break;
+            }
+        }
+    }
+    return cells;
+}
 }
 
 int main()
@@ -906,6 +961,149 @@ int main()
         "rubik convergence volumeSurface216Principle is disabled");
     test.Check(rubikProfile.find("Stack/layer interaction is deferred.") != std::string::npos,
         "rubik convergence knownLimitations mention stack/layer interaction deferred");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, classicProfile.c_str()) == 1, "runtime loads classic six-side profile");
+    test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "classic-six-side-3d-8x8x8-v0.1",
+        "runtime exposes classic ruleset id");
+    test.Check(ReadAbiString(game, Chess3D_GetGoalProfileType) == "classicCheckmate",
+        "runtime exposes classic goal profile");
+    test.Check(ReadAbiString(game, Chess3D_GetCaptureProfileType) == "classicCapture",
+        "runtime exposes classic capture profile");
+    test.Check(ReadAbiString(game, Chess3D_GetOccupancyProfileType) == "exclusive",
+        "runtime exposes classic occupancy profile");
+    test.Check(ReadAbiString(game, Chess3D_GetFusionProfileType) == "none",
+        "runtime exposes classic fusion profile");
+    test.Check(ReadAbiString(game, Chess3D_GetLayerTurnProfileType) == "disabled",
+        "runtime exposes classic layer profile");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, singleProfile.c_str()) == 1, "runtime loads single-side profile");
+    test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "single-side-3d-8x8x8-v0.1",
+        "runtime exposes single-side ruleset id");
+    test.Check(ReadAbiString(game, Chess3D_GetGoalProfileType) == "sandbox",
+        "runtime exposes single-side sandbox goal");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime loads asgard convergence profile");
+    test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "asgard-convergence-3d-8x8x8-v0.1",
+        "runtime exposes asgard ruleset id");
+    test.Check(ReadAbiString(game, Chess3D_GetGoalProfileType) == "centerAssembly",
+        "runtime exposes asgard centerAssembly goal");
+    test.Check(ReadAbiString(game, Chess3D_GetCaptureProfileType) == "knockbackCapture",
+        "runtime exposes asgard knockback capture profile");
+    test.Check(ReadAbiString(game, Chess3D_GetOccupancyProfileType) == "coreStack",
+        "runtime exposes asgard coreStack occupancy profile");
+    test.Check(ReadAbiString(game, Chess3D_GetFusionProfileType) == "stackFusion",
+        "runtime exposes asgard stackFusion profile");
+    test.Check(ReadAbiString(game, Chess3D_GetCorePhysicsProfileType) == "asgardCorePhysics",
+        "runtime exposes asgard core physics profile");
+    test.Check(ReadAbiString(game, Chess3D_GetLayerTurnProfileType) == "disabled",
+        "runtime exposes asgard disabled layer turns");
+    test.Check(ReadAbiString(game, Chess3D_GetVictoryProfileType) == "allPiecesAnchored",
+        "runtime exposes asgard allPiecesAnchored victory");
+
+    int xMin = -1;
+    int xMax = -1;
+    int yMin = -1;
+    int yMax = -1;
+    int zMin = -1;
+    int zMax = -1;
+    test.Check(Chess3D_GetCoreCube(game, &xMin, &xMax, &yMin, &yMax, &zMin, &zMax) == 1,
+        "runtime exposes coreCube bounds");
+    test.Check(xMin == 2 && xMax == 5 && yMin == 2 && yMax == 5 && zMin == 2 && zMax == 5,
+        "runtime coreCube is x/y/z 2..5");
+
+    for (int side = 1; side <= 6; ++side)
+    {
+        int targetCount = 0;
+        for (int z = 0; z < 8; ++z)
+        {
+            for (int y = 0; y < 8; ++y)
+            {
+                for (int x = 0; x < 8; ++x)
+                {
+                    targetCount += Chess3D_IsTargetSlot(game, side, x, y, z) != 0 ? 1 : 0;
+                }
+            }
+        }
+        test.Check(targetCount == 16, "runtime target slot count is 16 for side " + std::to_string(side));
+        for (const TargetCell& cell : TargetCellsForSide(side))
+        {
+            test.Check(Chess3D_IsTargetSlot(game, side, cell.x, cell.y, cell.z) == 1,
+                "runtime target slot coordinate is recognized for side " + std::to_string(side));
+            test.Check(cell.x >= 2 && cell.x <= 5 && cell.y >= 2 && cell.y <= 5 && cell.z >= 2 && cell.z <= 5,
+                "runtime target slot coordinate is inside coreCube for side " + std::to_string(side));
+        }
+    }
+    test.Check(Chess3D_IsTargetSlot(game, 1, 0, 0, 0) == 0, "runtime rejects non-core target slot coordinate");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, "{\"rulesetId\":") == 0,
+        "runtime rejects invalid profile JSON cleanly");
+    test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "asgard-convergence-3d-8x8x8-v0.1",
+        "runtime keeps previous valid profile after invalid profile load");
+    test.Check(!ReadAbiString(game, Chess3D_GetLastProfileError).empty(),
+        "runtime exposes profile load error after invalid profile load");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile after invalid load");
+    Chess3D_Clear(game);
+    for (const TargetCell& cell : TargetCellsForSide(1))
+    {
+        test.Check(Chess3D_SetPiece(game, cell.x, cell.y, cell.z, 1, cell.type) == 1,
+            "runtime places matching side-1 target piece");
+    }
+    test.Check(Chess3D_RecomputeAnchors(game) == 1, "runtime recomputes anchors");
+    test.Check(Chess3D_GetAnchorCount(game, 1) == 16, "runtime anchors all 16 matching side-1 target slots");
+    test.Check(Chess3D_GetRequiredAnchorCount(game, 1) == 16, "runtime required anchor count defaults to profile value 16");
+    test.Check(Chess3D_IsAnchoredCell(game, 2, 2, 2) == 1, "runtime reports matching target cell as anchored");
+    test.Check(Chess3D_IsGameOver(game) == 1, "runtime centerAssembly victory triggers after all anchors");
+    test.Check(Chess3D_GetWinnerSide(game) == 1, "runtime centerAssembly winner is side 1");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for type matching tests");
+    Chess3D_Clear(game);
+    const TargetCell firstTarget = TargetCellsForSide(1).front();
+    test.Check(Chess3D_SetPiece(game, firstTarget.x, firstTarget.y, firstTarget.z, 2, firstTarget.type) == 1,
+        "runtime places wrong-side piece on side-1 target");
+    test.Check(Chess3D_RecomputeAnchors(game) == 1, "runtime recomputes wrong-side anchor test");
+    test.Check(Chess3D_GetAnchorCount(game, 1) == 0, "wrong side does not satisfy side-1 anchor");
+    test.Check(Chess3D_SetPiece(game, firstTarget.x, firstTarget.y, firstTarget.z, 1, Queen) == 1,
+        "runtime places wrong-type piece on side-1 target");
+    test.Check(Chess3D_RecomputeAnchors(game) == 1, "runtime recomputes wrong-type anchor test");
+    test.Check(Chess3D_GetAnchorCount(game, 1) == 0, "wrong type does not satisfy side-1 anchor");
+    test.Check(Chess3D_SetPiece(game, firstTarget.x, firstTarget.y, firstTarget.z, 1, firstTarget.type) == 1,
+        "runtime places correct side/type on side-1 target");
+    test.Check(Chess3D_RecomputeAnchors(game) == 1, "runtime recomputes correct side/type anchor test");
+    test.Check(Chess3D_GetAnchorCount(game, 1) == 1, "correct side/type satisfies one anchor");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, classicProfile.c_str()) == 1, "runtime reloads classic profile for isolation test");
+    Chess3D_Clear(game);
+    for (const TargetCell& cell : TargetCellsForSide(1))
+    {
+        Chess3D_SetPiece(game, cell.x, cell.y, cell.z, 1, cell.type);
+    }
+    test.Check(Chess3D_RecomputeAnchors(game) == 1, "runtime recomputes classic isolation anchors");
+    test.Check(Chess3D_GetAnchorCount(game, 1) == 0, "classic profile does not count centerAssembly anchors");
+    test.Check(Chess3D_IsGameOver(game) == 0 && Chess3D_GetWinnerSide(game) == 0,
+        "classic profile does not trigger centerAssembly winner");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, singleProfile.c_str()) == 1, "runtime reloads single-side sandbox profile for isolation test");
+    Chess3D_Clear(game);
+    for (const TargetCell& cell : TargetCellsForSide(1))
+    {
+        Chess3D_SetPiece(game, cell.x, cell.y, cell.z, 1, cell.type);
+    }
+    test.Check(Chess3D_RecomputeAnchors(game) == 1, "runtime recomputes sandbox isolation anchors");
+    test.Check(Chess3D_IsGameOver(game) == 0 && Chess3D_GetWinnerSide(game) == 0,
+        "sandbox profile does not trigger accidental winner");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, rubikProfile.c_str()) == 1, "runtime loads rubik convergence profile");
+    test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "rubik-convergence-3d-8x8x8-v0.1",
+        "runtime exposes rubik ruleset id");
+    test.Check(ReadAbiString(game, Chess3D_GetGoalProfileType) == "centerAssembly",
+        "runtime exposes rubik centerAssembly goal");
+    test.Check(ReadAbiString(game, Chess3D_GetLayerTurnProfileType) == "ritualTurn",
+        "runtime exposes rubik ritualTurn layer profile");
+    test.Check(ReadAbiString(game, Chess3D_GetOccupancyProfileType) == "coreStack",
+        "runtime exposes rubik coreStack occupancy profile");
+    test.Check(ReadAbiString(game, Chess3D_GetFusionProfileType) == "stackFusion",
+        "runtime exposes rubik stackFusion profile");
 
     Chess3D_Destroy(game);
     return test.Finish("Chess3DEngineContractTests");

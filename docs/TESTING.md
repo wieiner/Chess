@@ -35,6 +35,8 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - P2A single-side 3D chess contracts cover `single-side-3d-chess-8x8x8-v0.1`, the 16-piece central 4x4 setup, movement vectors, blocking, captures, invalid moves, promotion smoke, and rules JSON metadata.
 - P2B Chess3D profile tests validate the four profile JSON files under `assets/rules/profiles`, including Asgard/Meru convergence and Rubik convergence metadata.
 - P2C Chess3D profile tests validate `occupancyProfile`, `fusionProfile`, `corePhysicsProfile`, and disabled Volume-Surface 216 metadata.
+- P2D Chess3D runtime tests load all four RuleProfile JSON files through `Chess3D_LoadRuleProfileJson`, verify profile summary ABI getters, confirm invalid-profile rollback, validate CoreCube and target slots for sides 1..6, and check simple centerAssembly anchors/victory in projection mode.
+- `scripts/verify.ps1` checks that Asgard and Rubik convergence profiles are copied into `Chess3DApp` output and `ProductionOutput/Chess3D`.
 - Rubik size, state, rotation, scramble, reverse-history solve, and manual-state ABI calls still work.
 - GPU backend CPU/Auto paths work without CUDA, and Direct3D/CUDA absence is handled as non-fatal where appropriate.
 
@@ -44,7 +46,7 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - They do not prove search strength or GPU performance.
 - They do not validate final six-sided 3D chess laws; P2A validates only the single-side local rule core.
 - They do not prove full 3D king safety, checkmate, or stalemate yet.
-- They do not implement or prove runtime centerAssembly, anchoring, knockback/reserve, or ritual Rubik layer-turn legality yet.
+- They prove only P2D's simple centerAssembly anchor projection; they do not prove final Forbidden Core stack/fusion behavior, knockback/reserve, or ritual Rubik layer-turn legality yet.
 - They do not implement or prove runtime core multi-occupancy, CoreCell stacks, fusion entities, resonance, color/permutation, or implosion mechanics yet.
 - They do not automate WPF UI behavior yet.
 - They do not require or validate `rude-resource/`.
@@ -55,7 +57,7 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 
 CUDA is optional. Contract tests must pass without `ChessCudaBackend.dll`. If CUDA is built and placed next to `ChessGpuBackend.dll`, the GPU backend may use it, but absence of CUDA is not a test failure.
 
-The next recommended testing milestone is P2D: runtime profile selection and simple centerAssembly anchor mechanics.
+The next recommended testing milestone is P2E: CoreCell stack ABI/projection tests that preserve the old 512-int board contract while adding stack-aware core behavior.
 
 ## UI Smoke Tests
 

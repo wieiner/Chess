@@ -149,8 +149,19 @@ public partial class Chess3DWindow : Window
         var path = ResolveAppPath(RulesPathBox.Text);
         if (File.Exists(path))
         {
-            _engine.LoadRulesJson(File.ReadAllText(path));
+            LoadRulesText(File.ReadAllText(path));
         }
+    }
+
+    private void LoadRulesText(string json)
+    {
+        if (json.Contains("\"rulesetId\"", StringComparison.Ordinal) &&
+            json.Contains("\"goalProfile\"", StringComparison.Ordinal) &&
+            _engine.LoadRuleProfileJson(json))
+        {
+            return;
+        }
+        _engine.LoadRulesJson(json);
     }
 
     private static string ResolveAppPath(string path)
@@ -215,8 +226,12 @@ public partial class Chess3DWindow : Window
         var state = _engine.GetState();
         var rules = _engine.GetRulesInfo();
         var selectedMoves = SelectedPieceMoves();
+        var anchorCount = _engine.GetAnchorCount(state.SideToMove);
+        var requiredAnchors = _engine.GetRequiredAnchorCount(state.SideToMove);
+        var winner = _engine.GetWinnerSide();
+        var gameOverText = _engine.IsGameOver() ? $", winner side {winner}" : string.Empty;
         HeaderStatus.Text = $"Side {state.SideToMove}, pieces {state.PieceCount}, moves {state.LegalMoveCount}";
-        RulesText.Text = $"Board {rules.Width}x{rules.Height}x{rules.Depth}, sides {rules.ActiveSideCount}, profile {(rules.MovementProfile == 0 ? "setup-only" : "draft3d")}, max {rules.MaxPiecesPerSide}/side, view {SelectedAxis()} {(IsAllLayersView() ? "all" : "slice")}, grid {SelectedGridMode()}";
+        RulesText.Text = $"Board {rules.Width}x{rules.Height}x{rules.Depth}, sides {rules.ActiveSideCount}, profile {(rules.MovementProfile == 0 ? "setup-only" : "draft3d")}, max {rules.MaxPiecesPerSide}/side, view {SelectedAxis()} {(IsAllLayersView() ? "all" : "slice")}, grid {SelectedGridMode()}\nRuleset {_engine.GetCurrentRulesetId()}, goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}, layer {_engine.GetLayerTurnProfileType()}, anchors {anchorCount}/{requiredAnchors}{gameOverText}";
         InfoText.Text = _engine.GetLastInfo();
         PositionText.Text = $"Models: {SelectedModelSetName()}, OBJ {_lastObjModels}, fallback {_lastFallbackModels}, hints {selectedMoves.Length}\n{_engine.GetPositionText()}";
     }
@@ -552,7 +567,7 @@ public partial class Chess3DWindow : Window
             MessageBox.Show(this, "Rules JSON not found.", "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        _engine.LoadRulesJson(File.ReadAllText(path));
+        LoadRulesText(File.ReadAllText(path));
         _ = BroadcastBoard3DAsync();
         _selectedSquare = null;
         RefreshAll();

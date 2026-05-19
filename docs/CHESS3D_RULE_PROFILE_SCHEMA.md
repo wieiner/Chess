@@ -8,6 +8,8 @@ assets/rules/profiles/chess3d_rule_profile.schema.json
 
 The local contract tests also perform manual validation, because the repository baseline must not require an external JSON-schema validator.
 
+P2D also uses the same profile shape at runtime through `Chess3D_LoadRuleProfileJson`. The runtime parser is intentionally narrower than a full JSON-schema implementation: it reads known fields, ignores unknown optional metadata, and fails cleanly when required profile fields are missing or unsupported.
+
 Minimum validation:
 
 - `rulesetId` is present and non-empty;

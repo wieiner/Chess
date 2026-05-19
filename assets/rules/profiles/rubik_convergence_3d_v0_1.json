@@ -109,6 +109,7 @@
     "Anchor interaction with layer rotations is deferred.",
     "Stack/layer interaction is deferred.",
     "Layer turns may move stacks in a future CoreCell model.",
+    "P2D centerAssembly victory uses a temporary single-occupancy anchor projection.",
     "Runtime ritualTurn legality is deferred to P2E."
   ]
 }

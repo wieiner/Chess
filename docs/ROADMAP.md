@@ -44,16 +44,20 @@
 
 ### P2D - Runtime Profile Selection And Simple Anchors
 
-- Implement centerAssembly mechanics.
-- Add runtime profile selection.
-- Add anchor state and target-slot derivation.
-- Add victory detection for allPiecesAnchored, requiredPieceCount, kingOnly, and percentageThreshold variants.
+- Completed: strict runtime RuleProfile loading through `Chess3D_LoadRuleProfileJson`.
+- Completed: append-only profile summary ABI getters.
+- Completed: profile asset copying into Chess3D build output and `ProductionOutput`.
+- Completed: six-side typed target-slot derivation over CoreCube `2..5`.
+- Completed: simple anchor projection over the current single-occupancy board.
+- Completed: centerAssembly victory detection for `allPiecesAnchored` / `requiredPieceCount` style profiles.
+- Deferred: final CoreCell stacks, fusion, contested anchors, knockback/reserve, and Rubik layer turns as legal chess actions.
 
 ### P2E - CoreCell Stack Board Model
 
 - Add stack-aware `CoreCell` model for Forbidden Core cells.
 - Preserve old 512-int board ABI as a projection.
 - Add stack-aware UI and network-safe state export.
+- Resolve the six-side 96-pieces-vs-64-core-cells pressure through real co-occupancy instead of P2D projection.
 
 ### P2F - Fusion Mechanics And Victory
 

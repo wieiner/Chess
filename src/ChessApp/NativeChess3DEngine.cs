@@ -42,6 +42,12 @@ internal sealed class NativeChess3DEngine : IDisposable
         return Chess3D_LoadRulesJson(_handle, json) != 0;
     }
 
+    public bool LoadRuleProfileJson(string json)
+    {
+        ThrowIfDisposed();
+        return Chess3D_LoadRuleProfileJson(_handle, json) != 0;
+    }
+
     public Chess3DRulesInfoDto GetRulesInfo()
     {
         ThrowIfDisposed();
@@ -149,6 +155,66 @@ internal sealed class NativeChess3DEngine : IDisposable
         return ReadString((buffer, capacity) => Chess3D_GetLastInfo(_handle, buffer, capacity));
     }
 
+    public string GetCurrentRulesetId()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetCurrentRulesetId(_handle, buffer, capacity));
+    }
+
+    public string GetGoalProfileType()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetGoalProfileType(_handle, buffer, capacity));
+    }
+
+    public string GetCaptureProfileType()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetCaptureProfileType(_handle, buffer, capacity));
+    }
+
+    public string GetOccupancyProfileType()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetOccupancyProfileType(_handle, buffer, capacity));
+    }
+
+    public string GetFusionProfileType()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetFusionProfileType(_handle, buffer, capacity));
+    }
+
+    public string GetLayerTurnProfileType()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetLayerTurnProfileType(_handle, buffer, capacity));
+    }
+
+    public int GetAnchorCount(int side)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetAnchorCount(_handle, side);
+    }
+
+    public int GetRequiredAnchorCount(int side)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetRequiredAnchorCount(_handle, side);
+    }
+
+    public bool IsGameOver()
+    {
+        ThrowIfDisposed();
+        return Chess3D_IsGameOver(_handle) != 0;
+    }
+
+    public int GetWinnerSide()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetWinnerSide(_handle);
+    }
+
     public void Dispose()
     {
         if (_handle != IntPtr.Zero)
@@ -190,6 +256,9 @@ internal sealed class NativeChess3DEngine : IDisposable
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_LoadRulesJson(IntPtr handle, string json);
 
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_LoadRuleProfileJson(IntPtr handle, string json);
+
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Chess3D_GetRulesInfo(IntPtr handle, out Chess3DRulesInfoDto info);
 
@@ -228,6 +297,36 @@ internal sealed class NativeChess3DEngine : IDisposable
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_GetLastInfo(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetCurrentRulesetId(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetGoalProfileType(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetCaptureProfileType(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetOccupancyProfileType(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetFusionProfileType(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetLayerTurnProfileType(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetAnchorCount(IntPtr handle, int side);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetRequiredAnchorCount(IntPtr handle, int side);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_IsGameOver(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetWinnerSide(IntPtr handle);
 }
 
 [StructLayout(LayoutKind.Sequential)]

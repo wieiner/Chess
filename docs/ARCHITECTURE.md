@@ -5,7 +5,7 @@ The repository is split into separate native DLLs and separate user-facing appli
 ## Native Layers
 
 - `ChessEngine.dll`: ordinary 8x8 chess rules, legal move generation, FEN, draw rules, search, evaluation, and search telemetry.
-- `Chess3DEngine.dll`: 8x8x8 cube board state, P2A single-side movement/capture contracts, P2B/P2C profile data contracts, draft six-side setup, and Rubik-style layer rotations for cube chess.
+- `Chess3DEngine.dll`: 8x8x8 cube board state, P2A single-side movement/capture contracts, P2B/P2C profile data contracts, P2D runtime RuleProfile loading, simple centerAssembly anchor projection, draft six-side setup, and Rubik-style layer rotations for cube chess.
 - `RubikEngine.dll`: N x N x N Rubik state, layer rotations, scramble/history, and trusted reverse playback.
 - `ChessGpuBackend.dll`: stable GPU ABI boundary. It routes work to CUDA when available, otherwise Direct3D/CPU fallback paths.
 - `ChessCudaBackend.dll`: optional CUDA backend built from `.cu` kernels. It is dynamically loaded and is not required for the default solution build.
@@ -33,7 +33,7 @@ C# apps call native DLLs through narrow P/Invoke wrappers. Native state and rule
 - `rude-resource/` is local, ignored, read-only historical material.
 - `src/.../Assets` contains runtime assets used by apps and copied during build.
 - `src/ChessApp/Assets/Rules3D` contains runtime 3D rules JSON assets, including the P2A `single_side_3d_chess_8x8x8_v0_1.json` ruleset.
-- `assets/rules/profiles` contains P2B machine-readable profile contracts. These are validated by tests but are not yet full runtime behavior switches.
+- `assets/rules/profiles` contains machine-readable profile contracts. `Chess3DApp` copies them to `Assets/Rules3D/Profiles`, and `ProductionOutput/Chess3D` carries the same runtime profile assets.
 - `ProductionOutput/` is generated portable output and is ignored.
 
 ### 3D Rules Boundary
@@ -43,6 +43,10 @@ P2A defines one local 3D chess ruleset, `single-side-3d-chess-8x8x8-v0.1`, for o
 P2B adds a data-first `RuleSet` architecture for goal, capture, central core, victory, turn, randomization, and layer-turn profiles. The Asgard/Meru convergence idea is split into `mythProfile` for narrative and `goalProfile`/`coreProfile`/`victoryProfile` for gameplay.
 
 P2C adds core physics profile contracts: `occupancyProfile`, `fusionProfile`, and `corePhysicsProfile`. These describe future Asgard behavior where the outer field remains one-piece-per-cell, but the Forbidden Core can allow stacks and fusion states. Runtime board storage is still `512` integer cells, so stack/fusion behavior is currently data/spec only.
+
+P2D adds the first runtime bridge from profile JSON to the engine. `Chess3D_LoadRuleProfileJson` stores the active ruleset id/version/display name, goal/capture/occupancy/fusion/core-physics/layer/victory profile types, core cube bounds, anchor mode, required anchor count, and last profile-load error. It also derives typed target slots for sides 1..6 and computes a simple centerAssembly anchor projection over the existing single-occupancy board.
+
+This P2D anchor projection is not final Asgard physics. It counts current single-piece cells that match target side/type requirements. P2E must add CoreCell stacks before true multi-occupancy, contested targets, and fusion can exist at runtime.
 
 The engine still reserves side ids `1..6`. Six-sided chess should be built by mapping this local rule core to each cube face through coordinate transforms, rather than inventing six unrelated movement systems. Rubik-style layer rotation remains a board transform until P2E implements `layerTurnProfile.type = ritualTurn` as a legal chess action.
 
