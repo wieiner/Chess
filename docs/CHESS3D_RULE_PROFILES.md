@@ -19,7 +19,7 @@ P2C extends profiles with:
 - `fusionProfile`: `none`, `anchorOnly`, `pairFusion`, `stackFusion`, `colorPermutation`, or `volumeSurface216`.
 - `corePhysicsProfile`: optional binding for core zone physics, including Asgard/Meru stack/fusion rules.
 
-Classic and single-side profiles remain `exclusive` with fusion `none`. Asgard and Rubik convergence profiles use `coreStack` and `stackFusion` as `specOnly`, because the current runtime board model still stores one integer piece per cell.
+Classic and single-side profiles remain `exclusive` with fusion `none`. Asgard and Rubik convergence profiles use `coreStack` and `stackFusion`. P2E implements the stack overlay; P2F implements the runtimePartial fusion descriptor layer.
 
 `chess3d_rule_profile.schema.json` documents the minimal schema. Contract tests also perform manual validation so the baseline does not require an external JSON-schema tool.
 
@@ -30,7 +30,7 @@ The native engine now has two loader paths:
 - `Chess3D_LoadRulesJson`: legacy draft rules loader.
 - `Chess3D_LoadRuleProfileJson`: strict RuleProfile loader.
 
-P2D stores profile summary fields, exposes append-only ABI getters, derives CoreCube target slots, and computes simple centerAssembly anchor/victory projection. P2E implements runtime CoreCell stacks for `coreStack` / `asgardCorePhysics` profiles and makes anchors stack-aware. Fusion fields remain `specOnly` until P2F.
+P2D stores profile summary fields, exposes append-only ABI getters, derives CoreCube target slots, and computes simple centerAssembly anchor/victory projection. P2E implements runtime CoreCell stacks for `coreStack` / `asgardCorePhysics` profiles and makes anchors stack-aware. P2F evaluates fusion descriptors and implosion progress for stack-enabled Asgard/Rubik profiles.
 
 Profile files are copied to:
 

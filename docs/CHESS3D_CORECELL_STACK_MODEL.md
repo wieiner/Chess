@@ -48,7 +48,7 @@ pieceCode
 flags
 ```
 
-`flags` is currently `0` and reserved for future states:
+`flags` is currently `0` for normal entries and reserved for future per-entry states:
 
 - anchored;
 - fused;
@@ -56,7 +56,7 @@ flags
 - reserve/future;
 - color/permutation/future.
 
-Fusion and implosion are not active mechanics in P2E.
+P2F fusion/implosion descriptors are stored outside the entries, so stack entries are not destroyed or rewritten.
 
 ## 4. Projection Semantics
 
@@ -106,3 +106,7 @@ Invalid coordinates, outside-core pushes, disabled-stack pushes, invalid indices
 Classic and single-side profiles use `occupancyProfile.type = exclusive`. Their stack APIs report disabled behavior and do not produce centerAssembly victories.
 
 Asgard and Rubik convergence profiles enable stacks, but Rubik layer turns still do not move stacks in P2E.
+
+## 8. Fusion Descriptor Overlay
+
+P2F adds a read-only descriptor overlay over these stacks. It can classify a core cell as `single`, `friendlyPair`, `friendlyStack`, `royalPair`, or `contested`. The overlay never replaces the stack entries.

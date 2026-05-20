@@ -55,4 +55,4 @@ Different sides can project into overlapping physical core cells. That is intent
 
 P2E adds CoreCell stacks for stack-enabled profiles, so overlapping target regions can now contain multiple side/type entries in one Forbidden Core cell. The legacy board projection still shows only the top stack entry.
 
-Contested target interpretation is still deferred: a cell can contain multiple entries, but fusion, contested-anchor scoring, and dislodging rules are later work.
+P2F adds fusion descriptors, so a contested cell can now be detected and reported. Contested-anchor scoring and dislodging rules are still later work.

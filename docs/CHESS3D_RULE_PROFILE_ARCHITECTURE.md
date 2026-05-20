@@ -21,6 +21,7 @@ A rule profile is a JSON `RuleSet` with these top-level fields:
 - `occupancyProfile`: board-cell occupancy semantics.
 - `fusionProfile`: transformation/progress rules for co-occupied core cells.
 - `corePhysicsProfile`: binding between core zone, occupancy, fusion, anchor, and symbolic laws.
+- `implosionProfile`: optional non-destructive or future destructive completion behavior.
 - `layerTurnProfile`: Rubik-like layer-turn behavior.
 - `turnProfile`: side order and action model.
 - `victoryProfile`: concrete victory detection rule.
@@ -120,7 +121,7 @@ Supported contract values:
 - `coreStack`: outside the core every cell is exclusive; inside the core a stack may contain multiple pieces.
 - `quantumCore`: future mode where core occupants can carry state/color/layer/permutation data.
 
-The current engine runtime remains `exclusive` because its board ABI is 512 integer cells. Asgard profiles can specify `coreStack` as `specOnly` until the CoreCell stack model exists.
+The old projected board ABI remains 512 integer cells. P2E adds `coreStack` as a runtime overlay for Asgard/Rubik profiles while classic and single-side profiles remain exclusive.
 
 ## fusionProfile
 
@@ -136,6 +137,20 @@ Supported contract values:
 - `volumeSurface216`: future surface/volume symbolic completion mode.
 
 A fusion entity may be a virtual state, stack descriptor, transformed piece, victory progress marker, or ritual state. It is not necessarily a new classic chess piece.
+
+P2F implements the stack-descriptor subset. Supported runtime fusion kinds are `none`, `single`, `friendlyPair`, `friendlyStack`, `royalPair`, and `contested`. `implosionSeed` and `implosionReady` remain reserved names; P2F exposes seed/readiness through flags and side progress.
+
+## implosionProfile
+
+Implosion profile describes central completion behavior.
+
+Current runtime support:
+
+- `type = centerCompletion`;
+- `mode = progressState`;
+- `destructive = false`.
+
+P2F progress does not remove or transform pieces. Volume-Surface 216 remains disabled/future metadata.
 
 ## corePhysicsProfile
 
@@ -210,4 +225,14 @@ P2E replaces the purely single-cell anchor scan with a CoreCell stack overlay:
 - stack-enabled core cells can store multiple side/type entries;
 - a target is anchored when any stack entry has the matching side and piece type;
 - overlapping target regions can now share a physical core cell at runtime;
-- fusion, implosion, knockback/reserve, and ritual Rubik turns moving stacks remain later runtime work.
+- destructive fusion/implosion events, knockback/reserve, and ritual Rubik turns moving stacks remain later runtime work.
+
+## P2F Runtime Fusion
+
+P2F adds `CoreFusionState` descriptors over CoreCell stacks:
+
+- friendly same-side pairs/stacks are counted per side;
+- king+queen in one same-side core stack reports `royalPair`;
+- multi-side stacks report `contested`;
+- side implosion progress is `anchorCount + friendlyFusionCount + royalPairBonusCount`;
+- default `allPiecesAnchored` victory remains compatible and is not replaced by fusion victory.

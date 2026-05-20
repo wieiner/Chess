@@ -47,6 +47,9 @@
     "type": "none",
     "status": "implementedByCurrentBoardModel"
   },
+  "implosionProfile": {
+    "type": "none"
+  },
   "layerTurnProfile": {
     "type": "disabled"
   },

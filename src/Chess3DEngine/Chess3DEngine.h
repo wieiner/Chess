@@ -63,6 +63,18 @@ struct Chess3DCoreStackEntryDto
     int pieceCode;
     int flags;
 };
+
+struct Chess3DCoreFusionStateDto
+{
+    int fusionKind;
+    int ownerSide;
+    int sideMask;
+    int entryCount;
+    int friendlyCount;
+    int enemyCount;
+    int dominantPieceType;
+    int flags;
+};
 #pragma pack(pop)
 
 CHESS3D_API void* Chess3D_Create();
@@ -98,6 +110,16 @@ CHESS3D_API int Chess3D_PushCoreStackPiece(void* handle, int x, int y, int z, in
 CHESS3D_API int Chess3D_ClearCoreStack(void* handle, int x, int y, int z);
 CHESS3D_API int Chess3D_RemoveCoreStackEntry(void* handle, int x, int y, int z, int stackIndex);
 CHESS3D_API int Chess3D_GetProjectedPiece(void* handle, int x, int y, int z);
+CHESS3D_API int Chess3D_IsFusionEnabled(void* handle);
+CHESS3D_API int Chess3D_RecomputeFusion(void* handle);
+CHESS3D_API int Chess3D_GetCoreFusionKind(void* handle, int x, int y, int z);
+CHESS3D_API int Chess3D_GetCoreFusionState(void* handle, int x, int y, int z, int* fusionKind, int* ownerSide, int* sideMask, int* entryCount, int* friendlyCount, int* enemyCount, int* dominantPieceType, int* flags);
+CHESS3D_API int Chess3D_IsCoreCellContested(void* handle, int x, int y, int z);
+CHESS3D_API int Chess3D_HasRoyalPairFusion(void* handle, int x, int y, int z, int side);
+CHESS3D_API int Chess3D_GetSideFusionCount(void* handle, int side);
+CHESS3D_API int Chess3D_GetSideContestedCount(void* handle, int side);
+CHESS3D_API int Chess3D_GetSideImplosionProgress(void* handle, int side);
+CHESS3D_API int Chess3D_GetFusionKindName(int fusionKind, char* buffer, int capacity);
 CHESS3D_API int Chess3D_GetRulesInfo(void* handle, Chess3DRulesInfoDto* info);
 CHESS3D_API int Chess3D_GetState(void* handle, Chess3DStateDto* state);
 CHESS3D_API int Chess3D_GetBoard(void* handle, int* pieces512);

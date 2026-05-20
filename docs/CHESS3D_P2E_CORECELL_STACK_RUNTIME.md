@@ -2,6 +2,8 @@
 
 P2E implements runtime stacks inside the Forbidden Core while preserving the old projected board ABI.
 
+P2F builds on this by adding fusion descriptors over the same stack entries.
+
 ## Runtime Shape
 
 The native game state now has:
@@ -47,12 +49,10 @@ Anchor recomputation is now stack-aware:
 
 P2E does not implement:
 
-- fusion entities;
-- implosion;
 - contested anchor resolution;
 - knockback/reserve;
 - dislodging;
 - Volume-Surface 216 victory;
 - Rubik rotations moving stacks.
 
-These remain staged for P2F and later.
+P2F implements non-destructive fusion descriptors and implosion progress, but destructive events and contested scoring remain later work.

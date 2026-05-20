@@ -1,6 +1,6 @@
 # Chess3D Asgard Core Physics
 
-P2C defines a richer center model for Asgard/Meru Convergence. P2D adds a small runtime bridge. P2E adds the first runtime CoreCell stack overlay inside the Forbidden Core while preserving the old projected board.
+P2C defines a richer center model for Asgard/Meru Convergence. P2D adds a small runtime bridge. P2E adds the first runtime CoreCell stack overlay inside the Forbidden Core while preserving the old projected board. P2F adds non-destructive fusion and implosion-progress descriptors over those stacks.
 
 ## 1. Two-Zone Physics
 
@@ -84,7 +84,7 @@ Two compatible pieces in one core-cell form a fusion entity.
 
 ### stackFusion
 
-Several pieces form a stack. Count/state can matter more than a single piece identity.
+Several pieces form a stack. Count/state can matter more than a single piece identity. P2F implements this as a runtime descriptor, not as destructive merge.
 
 ### colorPermutation
 
@@ -116,7 +116,7 @@ Possible rules:
 - enemy co-occupancy may create contested fusion;
 - friendly co-occupancy may create assembly/fusion progress.
 
-The exact contested-fusion and implosion rules are intentionally deferred.
+P2F detects contested co-occupancy and exposes it through fusion ABI. Scoring/dislodging for contested anchors remains deferred.
 
 ## 7. Victory
 
@@ -129,7 +129,7 @@ Asgard Convergence can support victory profiles beyond `allPiecesAnchored`:
 - `sixGateCoronation`;
 - `hybrid`.
 
-P2E implements `allPiecesAnchored` / `requiredPieceCount` style centerAssembly victory over stack-aware target slots. Fusion-based victory remains later work.
+P2E implements `allPiecesAnchored` / `requiredPieceCount` style centerAssembly victory over stack-aware target slots. P2F adds implosion progress and royal/friendly fusion counts, but does not make fusion a new mandatory victory condition by default.
 
 ## 8. Implementation Staging
 
@@ -139,6 +139,6 @@ Stage 2: runtime parses profile metadata, exposes profile summary ABI, derives t
 
 Stage 3: board model supports `CoreCell` stacks without breaking old ABI. Completed in P2E as a Forbidden Core overlay.
 
-Stage 4: fusion, implosion, and advanced victory logic.
+Stage 4: fusion descriptors and implosion progress. Completed in P2F.
 
 Stage 5: UI visualization for stacks, resonance, color/permutation, and implosion/fusion states.

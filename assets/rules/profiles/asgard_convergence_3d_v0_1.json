@@ -64,12 +64,28 @@
   },
   "fusionProfile": {
     "type": "stackFusion",
-    "friendlyFusion": "allowedDraft",
-    "enemyCoOccupancy": "contestedDraft",
-    "fusionEntity": "virtualStateDraft",
+    "friendlyFusion": "enabled",
+    "enemyCoOccupancy": "contested",
+    "fusionEntity": "descriptor",
+    "royalPairFusion": "enabled",
+    "implosion": "progressState",
+    "destructiveMerge": false,
     "colorPermutation": "future",
     "volumeSurface216": "future",
-    "status": "specOnly"
+    "status": "runtimePartial"
+  },
+  "implosionProfile": {
+    "type": "centerCompletion",
+    "mode": "progressState",
+    "destructive": false,
+    "localSeedFromFriendlyFusion": true,
+    "royalPairCountsAsFusion": true,
+    "volumeSurface216Principle": {
+      "enabled": false,
+      "runtime": "disabled",
+      "description": "Future symbolic rule: 6x6x6 volume equals six 6x6 faces, both 216 unit cells."
+    },
+    "status": "runtimePartial"
   },
   "corePhysicsProfile": {
     "type": "asgardCorePhysics",
@@ -100,8 +116,8 @@
     "Reserve restore is not implemented.",
     "Six-side target projection uses P2E CoreCell stack-aware anchors but remains fusion-limited.",
     "Checkmate is optional and not hardened for this profile.",
-    "Contested anchor rules are deferred.",
-    "Core multi-occupancy has a P2E stack runtime; fusion remains specOnly.",
-    "P2E centerAssembly victory uses stack-aware anchors but not fusion entities."
+    "Contested cells are visible as runtime fusion descriptors, but contested anchor scoring remains deferred.",
+    "Core multi-occupancy has a P2E stack runtime and P2F runtimePartial fusion descriptors.",
+    "P2F implosion is progress state only; it does not destroy or transform stack entries."
   ]
 }

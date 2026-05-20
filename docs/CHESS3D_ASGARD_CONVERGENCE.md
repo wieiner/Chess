@@ -45,15 +45,16 @@ This 4x4x4 volume is the `coreCube`.
 
 Outside the core, normal chess occupancy applies: one cell contains at most one piece.
 
-Inside the Forbidden Core, Asgard profiles allow a future `coreStack` model:
+Inside the Forbidden Core, Asgard profiles allow `coreStack` model:
 
 - multiple pieces may share one core-cell;
 - ordinary capture in the core can be disabled;
 - friendly co-occupancy may form assembly/fusion progress;
 - enemy co-occupancy may become contested fusion;
-- stack, resonance, color/permutation, and implosion ideas are reserved for later rules.
+- P2F reports friendly, royal, and contested fusion descriptors;
+- resonance, color/permutation, destructive implosion, and dislodging ideas are reserved for later rules.
 
-P2C documents this as profile data only. The runtime board still stores one integer piece per cell.
+The runtime board still stores one projected integer per cell for compatibility, but stack/fusion state lives beside it.
 
 ## Volume-Surface 216 Principle
 
@@ -86,7 +87,7 @@ Initial anchor mode is `softAnchor`:
 - anchored pieces are intended to become part of the central formation;
 - contested anchors are deferred.
 
-P2E makes anchors stack-aware. A target slot is anchored when any entry in that core-cell stack has the expected side and type. This is still not final fusion behavior.
+P2E makes anchors stack-aware. A target slot is anchored when any entry in that core-cell stack has the expected side and type. P2F adds fusion descriptors over the same stack. If a matching target entry shares a friendly fusion cell, the descriptor can carry anchored-fusion and implosion-seed flags.
 
 ## Knockback Capture
 
@@ -105,16 +106,18 @@ Implemented now:
 - profile JSON contract;
 - schema/data documentation;
 - headless validation tests for profile files;
-- occupancy/fusion/core-physics fields as `specOnly`;
+- occupancy/core-physics fields and runtimePartial fusion profile data;
 - runtime RuleProfile loading and profile summary ABI;
 - typed target-slot projection for sides 1..6;
 - CoreCell stack runtime in the Forbidden Core;
 - stack-aware anchor count and centerAssembly victory;
+- fusion descriptors for single, friendlyPair, friendlyStack, royalPair, and contested cells;
+- implosion progress state;
 - P2A movement/setup contracts remain executable through `Chess3DEngineContractTests`.
 
 Deferred:
 
-- fusion entity model;
-- contested/fusion anchor state;
+- destructive fusion/implosion event model;
+- contested anchor scoring/dislodging;
 - knockback/reserve behavior;
 - checkmate/hybrid hardening.

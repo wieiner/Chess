@@ -8,7 +8,7 @@ assets/rules/profiles/chess3d_rule_profile.schema.json
 
 The local contract tests also perform manual validation, because the repository baseline must not require an external JSON-schema validator.
 
-P2D also uses the same profile shape at runtime through `Chess3D_LoadRuleProfileJson`. The runtime parser is intentionally narrower than a full JSON-schema implementation: it reads known fields, ignores unknown optional metadata, and fails cleanly when required profile fields are missing or unsupported.
+P2D also uses the same profile shape at runtime through `Chess3D_LoadRuleProfileJson`. P2F reads the fusion and implosion profile fields needed for runtime descriptors. The runtime parser is intentionally narrower than a full JSON-schema implementation: it reads known fields, ignores unknown optional metadata, and fails cleanly when required profile fields are missing or unsupported.
 
 Minimum validation:
 
@@ -19,7 +19,10 @@ Minimum validation:
 - `occupancyProfile.type` is one of `exclusive`, `coreStack`, `quantumCore`;
 - `fusionProfile.type` is one of `none`, `anchorOnly`, `pairFusion`, `stackFusion`, `colorPermutation`, `volumeSurface216`;
 - `corePhysicsProfile.type` is optional and can declare `asgardCorePhysics`;
-- `status` fields can mark profile data as `specOnly` when runtime mechanics are not implemented yet;
+- `fusionProfile.status` may be `runtimePartial` for P2F descriptor support;
+- `implosionProfile.type` is optional and can be `none` or `centerCompletion`;
+- `implosionProfile.mode` can be `progressState`;
+- `status` fields can mark profile data as `specOnly`, `runtimePartial`, or future/draft when runtime mechanics are partial or not implemented yet;
 - `layerTurnProfile.type` is one of `disabled`, `ritualTurn`, `globalEvent`, `sandbox`;
 - if `coreProfile.coreCube` is present, all bounds are in `0..7` and min <= max;
 - if `corePhysicsProfile.volumeSurface216Principle` is present, it must parse and can be disabled for future symbolic rules;

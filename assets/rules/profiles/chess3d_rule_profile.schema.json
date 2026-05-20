@@ -64,7 +64,7 @@
         "core": { "type": "string" },
         "maxStackSize": { "type": ["string", "integer"] },
         "ordinaryCaptureInCore": { "type": "string" },
-        "status": { "enum": ["implementedByCurrentBoardModel", "specOnly", "draft", "future"] }
+        "status": { "enum": ["implementedByCurrentBoardModel", "runtimePartial", "specOnly", "draft", "future"] }
       }
     },
     "fusionProfile": {
@@ -75,9 +75,27 @@
         "friendlyFusion": { "type": "string" },
         "enemyCoOccupancy": { "type": "string" },
         "fusionEntity": { "type": "string" },
+        "royalPairFusion": { "type": "string" },
+        "implosion": { "type": "string" },
+        "destructiveMerge": { "type": "boolean" },
         "colorPermutation": { "type": "string" },
         "volumeSurface216": { "type": "string" },
-        "status": { "enum": ["implementedByCurrentBoardModel", "specOnly", "draft", "future"] }
+        "fusionKind": {
+          "enum": ["none", "single", "friendlyPair", "friendlyStack", "royalPair", "contested", "mixedStack", "implosionSeed", "implosionReady"]
+        },
+        "status": { "enum": ["implementedByCurrentBoardModel", "runtimePartial", "specOnly", "draft", "future"] }
+      }
+    },
+    "implosionProfile": {
+      "type": "object",
+      "properties": {
+        "type": { "enum": ["none", "centerCompletion"] },
+        "mode": { "enum": ["none", "progressState"] },
+        "destructive": { "type": "boolean" },
+        "localSeedFromFriendlyFusion": { "type": "boolean" },
+        "royalPairCountsAsFusion": { "type": "boolean" },
+        "volumeSurface216Principle": { "type": "object" },
+        "status": { "enum": ["implementedByCurrentBoardModel", "runtimePartial", "specOnly", "draft", "future"] }
       }
     },
     "corePhysicsProfile": {

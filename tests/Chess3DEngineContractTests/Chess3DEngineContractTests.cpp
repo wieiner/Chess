@@ -22,6 +22,16 @@ constexpr int Queen = 5;
 constexpr int King = 6;
 constexpr int MoveCapture = 1;
 constexpr int MovePromotion = 8;
+constexpr int FusionNone = 0;
+constexpr int FusionSingle = 1;
+constexpr int FusionFriendlyPair = 2;
+constexpr int FusionFriendlyStack = 3;
+constexpr int FusionRoyalPair = 4;
+constexpr int FusionContested = 5;
+constexpr int FusionFlagContested = 1;
+constexpr int FusionFlagRoyalPair = 2;
+constexpr int FusionFlagAnchoredFusion = 4;
+constexpr int FusionFlagImplosionSeed = 8;
 
 std::string ReadTextFile(const std::string& path)
 {
@@ -564,6 +574,17 @@ std::string ReadAbiString(void* game, int (*reader)(void*, char*, int))
     return std::string(buffer);
 }
 
+std::string ReadFusionKindName(int fusionKind)
+{
+    char buffer[128] = {};
+    const int needed = Chess3D_GetFusionKindName(fusionKind, buffer, static_cast<int>(sizeof(buffer)));
+    if (needed <= 0)
+    {
+        return {};
+    }
+    return std::string(buffer);
+}
+
 struct TargetCell
 {
     int x;
@@ -914,10 +935,24 @@ int main()
         "asgard convergence core allows multi-occupancy by profile");
     test.Check(ExtractStringValue(asgardOccupancy, "status") == "specOnly",
         "asgard convergence occupancyProfile is specOnly");
-    test.Check(ExtractStringValue(ExtractObject(asgardProfile, "fusionProfile"), "type") == "stackFusion",
+    const std::string asgardFusion = ExtractObject(asgardProfile, "fusionProfile");
+    test.Check(ExtractStringValue(asgardFusion, "type") == "stackFusion",
         "asgard convergence fusionProfile is stackFusion");
-    test.Check(ExtractStringValue(ExtractObject(asgardProfile, "fusionProfile"), "status") == "specOnly",
-        "asgard convergence fusionProfile is specOnly");
+    test.Check(ExtractStringValue(asgardFusion, "status") == "runtimePartial",
+        "asgard convergence fusionProfile is runtimePartial");
+    test.Check(ExtractStringValue(asgardFusion, "royalPairFusion") == "enabled",
+        "asgard convergence enables royal pair fusion metadata");
+    bool destructiveMerge = true;
+    test.Check(ExtractBoolValue(asgardFusion, "destructiveMerge", destructiveMerge) && !destructiveMerge,
+        "asgard convergence fusion is non-destructive");
+    const std::string asgardImplosion = ExtractObject(asgardProfile, "implosionProfile");
+    test.Check(ExtractStringValue(asgardImplosion, "type") == "centerCompletion",
+        "asgard convergence has centerCompletion implosionProfile");
+    test.Check(ExtractStringValue(asgardImplosion, "mode") == "progressState",
+        "asgard convergence implosion is progress state");
+    bool implosionDestructive = true;
+    test.Check(ExtractBoolValue(asgardImplosion, "destructive", implosionDestructive) && !implosionDestructive,
+        "asgard convergence implosion is non-destructive");
     const std::string asgardCorePhysics = ExtractObject(asgardProfile, "corePhysicsProfile");
     test.Check(ExtractStringValue(asgardCorePhysics, "type") == "asgardCorePhysics",
         "asgard convergence corePhysicsProfile is asgardCorePhysics");
@@ -938,6 +973,8 @@ int main()
         "rubik convergence occupancyProfile is coreStack");
     test.Check(ExtractStringValue(ExtractObject(rubikProfile, "fusionProfile"), "type") == "stackFusion",
         "rubik convergence fusionProfile is stackFusion");
+    test.Check(ExtractStringValue(ExtractObject(rubikProfile, "implosionProfile"), "mode") == "progressState",
+        "rubik convergence implosion is progress state");
     const std::string rubikLayerTurn = ExtractObject(rubikProfile, "layerTurnProfile");
     test.Check(ExtractStringValue(rubikLayerTurn, "type") == "ritualTurn",
         "rubik convergence layerTurnProfile is ritualTurn");
@@ -964,6 +1001,9 @@ int main()
 
     test.Check(Chess3D_LoadRuleProfileJson(game, classicProfile.c_str()) == 1, "runtime loads classic six-side profile");
     test.Check(Chess3D_IsCoreStackEnabled(game) == 0, "classic profile keeps core stacks disabled");
+    test.Check(Chess3D_IsFusionEnabled(game) == 0, "classic profile keeps fusion disabled");
+    test.Check(Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionNone, "classic profile reports no core fusion");
+    test.Check(Chess3D_GetCoreFusionKind(game, 0, 0, 0) == FusionNone, "outside core fusion kind is none");
     test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 0,
         "classic profile rejects explicit core stack push");
     test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "classic-six-side-3d-8x8x8-v0.1",
@@ -980,6 +1020,7 @@ int main()
         "runtime exposes classic layer profile");
 
     test.Check(Chess3D_LoadRuleProfileJson(game, singleProfile.c_str()) == 1, "runtime loads single-side profile");
+    test.Check(Chess3D_IsFusionEnabled(game) == 0, "single-side profile keeps fusion disabled");
     test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "single-side-3d-8x8x8-v0.1",
         "runtime exposes single-side ruleset id");
     test.Check(ReadAbiString(game, Chess3D_GetGoalProfileType) == "sandbox",
@@ -987,6 +1028,7 @@ int main()
 
     test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime loads asgard convergence profile");
     test.Check(Chess3D_IsCoreStackEnabled(game) == 1, "asgard profile enables core stacks");
+    test.Check(Chess3D_IsFusionEnabled(game) == 1, "asgard profile enables fusion descriptors");
     Chess3D_Clear(game);
     test.Check(Chess3D_GetCoreStackCount(game, 2, 2, 2) == 0, "asgard clear leaves target stack empty");
     test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 1, "asgard push first core stack piece succeeds");
@@ -1029,6 +1071,74 @@ int main()
         "RemoveCoreStackEntry removes selected entry and updates projection");
     Chess3D_Reset(game);
     test.Check(Chess3D_GetCoreStackCount(game, 2, 2, 2) == 0, "Reset clears explicit core stacks");
+    test.Check(Chess3D_GetSideImplosionProgress(game, 1) == 0, "Reset clears implosion progress");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for fusion tests");
+    Chess3D_Clear(game);
+    int fusionKind = -1;
+    int fusionOwner = -1;
+    int fusionMask = 0;
+    int fusionEntries = -1;
+    int fusionFriendly = -1;
+    int fusionEnemy = -1;
+    int fusionDominantType = -1;
+    int fusionFlags = -1;
+
+    test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 1, "fusion test pushes single piece");
+    test.Check(Chess3D_RecomputeFusion(game) == 1, "fusion recompute succeeds");
+    test.Check(Chess3D_GetCoreFusionState(game, 2, 2, 2, &fusionKind, &fusionOwner, &fusionMask, &fusionEntries, &fusionFriendly, &fusionEnemy, &fusionDominantType, &fusionFlags) == 1 &&
+        fusionKind == FusionSingle && fusionOwner == 1 && fusionEntries == 1 && fusionFriendly == 1 && fusionEnemy == 0 &&
+        (fusionMask & (1 << 1)) != 0 && fusionDominantType == Pawn,
+        "single core entry reports single fusion state");
+    test.Check(ReadFusionKindName(FusionSingle) == "single", "fusion kind name exposes single");
+
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn));
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Rook));
+    test.Check(Chess3D_RecomputeFusion(game) == 1 &&
+        Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionFriendlyPair &&
+        Chess3D_IsCoreCellContested(game, 2, 2, 2) == 0 &&
+        Chess3D_GetSideFusionCount(game, 1) == 1,
+        "friendly pair fusion is detected");
+
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Bishop));
+    test.Check(Chess3D_RecomputeFusion(game) == 1 &&
+        Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionFriendlyStack &&
+        Chess3D_GetCoreFusionState(game, 2, 2, 2, &fusionKind, &fusionOwner, &fusionMask, &fusionEntries, &fusionFriendly, &fusionEnemy, &fusionDominantType, &fusionFlags) == 1 &&
+        fusionEntries == 3 && fusionOwner == 1,
+        "friendly stack fusion is detected");
+
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, King));
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Queen));
+    test.Check(Chess3D_RecomputeFusion(game) == 1 &&
+        Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionRoyalPair &&
+        Chess3D_HasRoyalPairFusion(game, 2, 2, 2, 1) == 1 &&
+        Chess3D_GetCoreFusionState(game, 2, 2, 2, &fusionKind, &fusionOwner, &fusionMask, &fusionEntries, &fusionFriendly, &fusionEnemy, &fusionDominantType, &fusionFlags) == 1 &&
+        (fusionFlags & FusionFlagRoyalPair) != 0,
+        "king and queen form royalPair fusion descriptor");
+
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn));
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(2, Knight));
+    test.Check(Chess3D_RecomputeFusion(game) == 1 &&
+        Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionContested &&
+        Chess3D_IsCoreCellContested(game, 2, 2, 2) == 1 &&
+        Chess3D_GetCoreFusionState(game, 2, 2, 2, &fusionKind, &fusionOwner, &fusionMask, &fusionEntries, &fusionFriendly, &fusionEnemy, &fusionDominantType, &fusionFlags) == 1 &&
+        fusionOwner == 0 && fusionEntries == 2 && (fusionMask & (1 << 1)) != 0 && (fusionMask & (1 << 2)) != 0 &&
+        (fusionFlags & FusionFlagContested) != 0 && Chess3D_GetCoreStackCount(game, 2, 2, 2) == 2 &&
+        Chess3D_GetSideContestedCount(game, 1) == 1 && Chess3D_GetSideContestedCount(game, 2) == 1,
+        "enemy co-occupancy reports contested state without removing entries");
+
+    test.Check(Chess3D_RemoveCoreStackEntry(game, 2, 2, 2, 1) == 1 &&
+        Chess3D_RecomputeFusion(game) == 1 &&
+        Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionSingle &&
+        Chess3D_IsCoreCellContested(game, 2, 2, 2) == 0,
+        "removing enemy entry clears contested fusion state");
+    test.Check(Chess3D_ClearCoreStack(game, 2, 2, 2) == 1 &&
+        Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionNone,
+        "clearing stack resets fusion kind");
+
     test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "asgard-convergence-3d-8x8x8-v0.1",
         "runtime exposes asgard ruleset id");
     test.Check(ReadAbiString(game, Chess3D_GetGoalProfileType) == "centerAssembly",
@@ -1098,6 +1208,8 @@ int main()
     test.Check(Chess3D_GetPiece(game, 2, 2, 1) == 0, "entering core clears source square");
     test.Check(Chess3D_GetProjectedPiece(game, 2, 2, 2) == PieceCode(1, Rook), "entering core projects moved top piece");
     test.Check(played.captured == 0 && (played.flags & MoveCapture) == 0, "entering core does not ordinary-capture previous occupant");
+    test.Check(Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionFriendlyPair,
+        "entering occupied core updates fusion state automatically");
 
     test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for core-to-core move test");
     Chess3D_Clear(game);
@@ -1136,6 +1248,24 @@ int main()
     test.Check(Chess3D_IsAnchoredCell(game, 2, 2, 2) == 1, "runtime reports matching target cell as anchored");
     test.Check(Chess3D_IsGameOver(game) == 1, "runtime centerAssembly victory triggers after all anchors");
     test.Check(Chess3D_GetWinnerSide(game) == 1, "runtime centerAssembly winner is side 1");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for fusion anchor test");
+    Chess3D_Clear(game);
+    const TargetCell fusionTarget = TargetCellsForSide(1).front();
+    test.Check(Chess3D_PushCoreStackPiece(game, fusionTarget.x, fusionTarget.y, fusionTarget.z, PieceCode(1, fusionTarget.type)) == 1 &&
+        Chess3D_PushCoreStackPiece(game, fusionTarget.x, fusionTarget.y, fusionTarget.z, PieceCode(1, Rook)) == 1 &&
+        Chess3D_RecomputeFusion(game) == 1,
+        "runtime creates matching target slot with friendly fusion");
+    test.Check(Chess3D_GetAnchorCount(game, 1) == 1 &&
+        Chess3D_GetSideFusionCount(game, 1) == 1 &&
+        Chess3D_GetSideImplosionProgress(game, 1) > 0,
+        "anchor and friendly fusion contribute to implosion progress");
+    test.Check(Chess3D_GetCoreFusionState(game, fusionTarget.x, fusionTarget.y, fusionTarget.z, &fusionKind, &fusionOwner, &fusionMask, &fusionEntries, &fusionFriendly, &fusionEnemy, &fusionDominantType, &fusionFlags) == 1 &&
+        (fusionFlags & FusionFlagAnchoredFusion) != 0 &&
+        (fusionFlags & FusionFlagImplosionSeed) != 0,
+        "anchored friendly fusion exposes implosion seed flags");
+    Chess3D_Reset(game);
+    test.Check(Chess3D_GetSideImplosionProgress(game, 1) == 0, "implosion progress resets after Reset");
 
     test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for type matching tests");
     Chess3D_Clear(game);
@@ -1176,6 +1306,7 @@ int main()
 
     test.Check(Chess3D_LoadRuleProfileJson(game, rubikProfile.c_str()) == 1, "runtime loads rubik convergence profile");
     test.Check(Chess3D_IsCoreStackEnabled(game) == 1, "rubik convergence enables core stacks");
+    test.Check(Chess3D_IsFusionEnabled(game) == 1, "rubik convergence enables fusion descriptors");
     test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "rubik-convergence-3d-8x8x8-v0.1",
         "runtime exposes rubik ruleset id");
     test.Check(ReadAbiString(game, Chess3D_GetGoalProfileType) == "centerAssembly",
@@ -1186,6 +1317,14 @@ int main()
         "runtime exposes rubik coreStack occupancy profile");
     test.Check(ReadAbiString(game, Chess3D_GetFusionProfileType) == "stackFusion",
         "runtime exposes rubik stackFusion profile");
+    Chess3D_Clear(game);
+    test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 1 &&
+        Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Rook)) == 1 &&
+        Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionFriendlyPair,
+        "rubik convergence evaluates stack fusion before layer turns");
+    test.Check(Chess3D_RotateLayer(game, 0, 2, 1) == 0 &&
+        Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionFriendlyPair,
+        "rubik convergence keeps fusion stable after deferred stack rotation");
 
     Chess3D_Destroy(game);
     return test.Finish("Chess3DEngineContractTests");

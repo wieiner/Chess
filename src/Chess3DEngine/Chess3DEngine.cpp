@@ -29,6 +29,25 @@ constexpr int Infinity = 2000000;
 
 constexpr std::array<int, 7> Material = { 0, 100, 320, 330, 500, 900, 0 };
 
+enum FusionKind
+{
+    FusionNone = 0,
+    FusionSingle = 1,
+    FusionFriendlyPair = 2,
+    FusionFriendlyStack = 3,
+    FusionRoyalPair = 4,
+    FusionContested = 5,
+    FusionMixedStack = 6,
+    FusionImplosionSeed = 7,
+    FusionImplosionReady = 8
+};
+
+constexpr int FusionFlagContested = 1;
+constexpr int FusionFlagRoyalPair = 2;
+constexpr int FusionFlagAnchoredFusion = 4;
+constexpr int FusionFlagImplosionSeed = 8;
+constexpr int FusionFlagImplosionReady = 16;
+
 struct Vec3
 {
     int x = 0;
@@ -63,6 +82,8 @@ struct Rules
     std::string corePhysicsProfileType = "none";
     std::string layerTurnProfileType = "disabled";
     std::string victoryProfileType = "sandbox";
+    std::string implosionProfileType = "none";
+    std::string implosionProfileMode = "none";
     int coreXMin = 2;
     int coreXMax = 5;
     int coreYMin = 2;
@@ -100,12 +121,30 @@ struct CoreStackEntry
     int flags = 0;
 };
 
+struct CoreFusionState
+{
+    int fusionKind = FusionNone;
+    int ownerSide = 0;
+    int sideMask = 0;
+    int entryCount = 0;
+    int friendlyCount = 0;
+    int enemyCount = 0;
+    int dominantPieceType = 0;
+    int flags = 0;
+    int implosionStage = 0;
+};
+
 struct Game
 {
     Rules rules;
     Position pos;
     std::array<std::vector<CoreStackEntry>, CellCount> coreStacks{};
+    std::array<CoreFusionState, CellCount> fusionStates{};
     std::array<int, 7> anchorCounts{};
+    std::array<int, 7> sideFusionCounts{};
+    std::array<int, 7> sideRoyalPairCounts{};
+    std::array<int, 7> sideContestedCounts{};
+    std::array<int, 7> sideImplosionProgress{};
     bool gameOver = false;
     int winnerSide = 0;
     std::string lastProfileLoadError;
@@ -188,6 +227,28 @@ bool isInsideCore(const Rules& rules, int index)
 bool isCoreStackEnabled(const Rules& rules)
 {
     return rules.occupancyProfileType == "coreStack" || rules.corePhysicsProfileType == "asgardCorePhysics";
+}
+
+bool isFusionEnabled(const Rules& rules)
+{
+    return isCoreStackEnabled(rules) && rules.fusionProfileType != "none";
+}
+
+std::string fusionKindName(int fusionKind)
+{
+    switch (fusionKind)
+    {
+    case FusionNone: return "none";
+    case FusionSingle: return "single";
+    case FusionFriendlyPair: return "friendlyPair";
+    case FusionFriendlyStack: return "friendlyStack";
+    case FusionRoyalPair: return "royalPair";
+    case FusionContested: return "contested";
+    case FusionMixedStack: return "mixedStack";
+    case FusionImplosionSeed: return "implosionSeed";
+    case FusionImplosionReady: return "implosionReady";
+    default: return "unknown";
+    }
 }
 
 char typeChar(int type)
@@ -547,6 +608,8 @@ bool parseRuleProfileMetadata(Rules& rules, std::string& error)
     rules.corePhysicsProfileType = profileTypeOrFallback(json, "corePhysicsProfile", "none");
     rules.layerTurnProfileType = profileTypeOrFallback(json, "layerTurnProfile", "");
     rules.victoryProfileType = profileTypeOrFallback(json, "victoryProfile", "sandbox");
+    rules.implosionProfileType = profileTypeOrFallback(json, "implosionProfile", "none");
+    rules.implosionProfileMode = extractString(extractObject(json, "implosionProfile"), "mode", "none");
     rules.anchorMode = extractString(extractObject(json, "coreProfile"), "anchorMode", "none");
     rules.requiredAnchorCount = std::clamp(extractInt(extractObject(json, "victoryProfile"), "requiredPieceCount", 16), 1, 96);
 
@@ -583,6 +646,11 @@ bool parseRuleProfileMetadata(Rules& rules, std::string& error)
     if (!stringInSet(rules.victoryProfileType, { "sandbox", "checkmate", "allPiecesAnchored", "requiredPieceCount", "kingOnly", "percentageThreshold", "hybrid" }))
     {
         error = "RuleProfile rejected: unsupported victoryProfile.type.";
+        return false;
+    }
+    if (!stringInSet(rules.implosionProfileType, { "none", "centerCompletion" }))
+    {
+        error = "RuleProfile rejected: unsupported implosionProfile.type.";
         return false;
     }
     if (!extractCoreCube(json, rules))
@@ -741,10 +809,23 @@ void clearCoreStacks(Game& game)
     }
 }
 
+void clearFusionStates(Game& game)
+{
+    for (auto& state : game.fusionStates)
+    {
+        state = CoreFusionState{};
+    }
+    game.sideFusionCounts.fill(0);
+    game.sideRoyalPairCounts.fill(0);
+    game.sideContestedCounts.fill(0);
+    game.sideImplosionProgress.fill(0);
+}
+
 void clearGamePosition(Game& game)
 {
     clear(game.pos);
     clearCoreStacks(game);
+    clearFusionStates(game);
 }
 
 bool setCoreStackSingle(Game& game, int index, int pieceCode)
@@ -899,6 +980,179 @@ int targetSlotType(const Rules& rules, int side, int x, int y, int z)
     return central4x4TargetType(localU, localV);
 }
 
+bool stackHasTypeForSide(const std::vector<CoreStackEntry>& stack, int side, int type)
+{
+    return std::any_of(stack.begin(), stack.end(), [&](const CoreStackEntry& entry)
+    {
+        return entry.side == side && entry.pieceType == type;
+    });
+}
+
+CoreFusionState computeCoreFusionStateForCell(const Game& game, int index)
+{
+    CoreFusionState state{};
+    if (!isFusionEnabled(game.rules) || !isInsideCore(game.rules, index))
+    {
+        return state;
+    }
+
+    const auto& stack = game.coreStacks[static_cast<std::size_t>(index)];
+    state.entryCount = static_cast<int>(stack.size());
+    if (stack.empty())
+    {
+        return state;
+    }
+
+    std::array<int, 7> sideCounts{};
+    std::array<int, 7> typeCounts{};
+    std::array<bool, 7> hasKing{};
+    std::array<bool, 7> hasQueen{};
+    int sideCount = 0;
+    int dominantSide = 0;
+    int dominantSideCount = 0;
+    int dominantType = 0;
+    int dominantTypeCount = 0;
+
+    for (const CoreStackEntry& entry : stack)
+    {
+        if (entry.side < 1 || entry.side > 6 || entry.pieceType < Pawn || entry.pieceType > King)
+        {
+            continue;
+        }
+        if (sideCounts[entry.side] == 0)
+        {
+            ++sideCount;
+            state.sideMask |= 1 << entry.side;
+        }
+        const int nextSideCount = ++sideCounts[entry.side];
+        if (nextSideCount > dominantSideCount)
+        {
+            dominantSide = entry.side;
+            dominantSideCount = nextSideCount;
+        }
+        const int nextTypeCount = ++typeCounts[entry.pieceType];
+        if (nextTypeCount > dominantTypeCount)
+        {
+            dominantType = entry.pieceType;
+            dominantTypeCount = nextTypeCount;
+        }
+        hasKing[entry.side] = hasKing[entry.side] || entry.pieceType == King;
+        hasQueen[entry.side] = hasQueen[entry.side] || entry.pieceType == Queen;
+    }
+
+    state.dominantPieceType = dominantType;
+    if (state.entryCount == 1)
+    {
+        state.ownerSide = dominantSide;
+        state.friendlyCount = 1;
+        state.fusionKind = FusionSingle;
+        return state;
+    }
+
+    if (sideCount > 1)
+    {
+        state.fusionKind = FusionContested;
+        state.ownerSide = 0;
+        state.friendlyCount = dominantSideCount;
+        state.enemyCount = state.entryCount - dominantSideCount;
+        state.flags |= FusionFlagContested;
+        return state;
+    }
+
+    state.ownerSide = dominantSide;
+    state.friendlyCount = state.entryCount;
+    state.enemyCount = 0;
+    if (dominantSide >= 1 && dominantSide <= 6 && hasKing[dominantSide] && hasQueen[dominantSide])
+    {
+        state.fusionKind = FusionRoyalPair;
+        state.flags |= FusionFlagRoyalPair;
+    }
+    else if (state.entryCount == 2)
+    {
+        state.fusionKind = FusionFriendlyPair;
+    }
+    else
+    {
+        state.fusionKind = FusionFriendlyStack;
+    }
+
+    const int x = xOf(index);
+    const int y = yOf(index);
+    const int z = zOf(index);
+    const int expectedType = targetSlotType(game.rules, dominantSide, x, y, z);
+    if (expectedType != Empty && stackHasTypeForSide(stack, dominantSide, expectedType))
+    {
+        state.flags |= FusionFlagAnchoredFusion | FusionFlagImplosionSeed;
+        state.implosionStage = 1;
+    }
+    return state;
+}
+
+void recomputeFusion(Game& game)
+{
+    clearFusionStates(game);
+    if (!isFusionEnabled(game.rules))
+    {
+        return;
+    }
+
+    for (int z = game.rules.coreZMin; z <= game.rules.coreZMax; ++z)
+    {
+        for (int y = game.rules.coreYMin; y <= game.rules.coreYMax; ++y)
+        {
+            for (int x = game.rules.coreXMin; x <= game.rules.coreXMax; ++x)
+            {
+                const int index = indexOf(x, y, z);
+                CoreFusionState state = computeCoreFusionStateForCell(game, index);
+                game.fusionStates[static_cast<std::size_t>(index)] = state;
+                if ((state.flags & FusionFlagContested) != 0)
+                {
+                    for (int side = 1; side <= 6; ++side)
+                    {
+                        if ((state.sideMask & (1 << side)) != 0)
+                        {
+                            ++game.sideContestedCounts[side];
+                        }
+                    }
+                    continue;
+                }
+                if (state.ownerSide >= 1 && state.ownerSide <= 6 &&
+                    (state.fusionKind == FusionFriendlyPair ||
+                     state.fusionKind == FusionFriendlyStack ||
+                     state.fusionKind == FusionRoyalPair ||
+                     state.fusionKind == FusionImplosionSeed ||
+                     state.fusionKind == FusionImplosionReady))
+                {
+                    ++game.sideFusionCounts[state.ownerSide];
+                    if ((state.flags & FusionFlagRoyalPair) != 0)
+                    {
+                        ++game.sideRoyalPairCounts[state.ownerSide];
+                    }
+                }
+            }
+        }
+    }
+}
+
+void updateImplosionProgress(Game& game)
+{
+    game.sideImplosionProgress.fill(0);
+    if (!isFusionEnabled(game.rules) ||
+        game.rules.implosionProfileType == "none" ||
+        game.rules.implosionProfileMode != "progressState")
+    {
+        return;
+    }
+
+    for (int side = 1; side <= 6; ++side)
+    {
+        game.sideImplosionProgress[side] =
+            game.anchorCounts[side] +
+            game.sideFusionCounts[side] +
+            game.sideRoyalPairCounts[side];
+    }
+}
+
 bool isCenterAssemblyGoal(const Rules& rules)
 {
     return rules.goalProfileType == "centerAssembly" || rules.goalProfileType == "centerAssemblyTraining";
@@ -913,12 +1167,14 @@ bool anchorsCanWin(const Rules& rules)
 
 void recomputeAnchors(Game& game)
 {
+    recomputeFusion(game);
     game.anchorCounts.fill(0);
     game.gameOver = false;
     game.winnerSide = 0;
 
     if (!isCenterAssemblyGoal(game.rules))
     {
+        updateImplosionProgress(game);
         return;
     }
 
@@ -967,6 +1223,7 @@ void recomputeAnchors(Game& game)
 
     if (!anchorsCanWin(game.rules))
     {
+        updateImplosionProgress(game);
         return;
     }
     for (int side = 1; side <= 6; ++side)
@@ -975,9 +1232,11 @@ void recomputeAnchors(Game& game)
         {
             game.gameOver = true;
             game.winnerSide = side;
+            updateImplosionProgress(game);
             return;
         }
     }
+    updateImplosionProgress(game);
 }
 
 void resetPosition(Game& game)
@@ -1821,6 +2080,115 @@ CHESS3D_API int Chess3D_GetProjectedPiece(void* handle, int x, int y, int z)
         return 0;
     }
     return projectedPiece(*game, indexOf(x, y, z));
+}
+
+CHESS3D_API int Chess3D_IsFusionEnabled(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr && isFusionEnabled(game->rules) ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_RecomputeFusion(void* handle)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    recomputeAnchors(*game);
+    return 1;
+}
+
+CHESS3D_API int Chess3D_GetCoreFusionKind(void* handle, int x, int y, int z)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !inside(x, y, z) || !isFusionEnabled(game->rules) || !isInsideCore(game->rules, x, y, z))
+    {
+        return FusionNone;
+    }
+    return game->fusionStates[static_cast<std::size_t>(indexOf(x, y, z))].fusionKind;
+}
+
+CHESS3D_API int Chess3D_GetCoreFusionState(void* handle, int x, int y, int z, int* fusionKind, int* ownerSide, int* sideMask, int* entryCount, int* friendlyCount, int* enemyCount, int* dominantPieceType, int* flags)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || fusionKind == nullptr || ownerSide == nullptr || sideMask == nullptr ||
+        entryCount == nullptr || friendlyCount == nullptr || enemyCount == nullptr ||
+        dominantPieceType == nullptr || flags == nullptr || !inside(x, y, z))
+    {
+        return 0;
+    }
+    CoreFusionState state{};
+    if (isFusionEnabled(game->rules) && isInsideCore(game->rules, x, y, z))
+    {
+        state = game->fusionStates[static_cast<std::size_t>(indexOf(x, y, z))];
+    }
+    *fusionKind = state.fusionKind;
+    *ownerSide = state.ownerSide;
+    *sideMask = state.sideMask;
+    *entryCount = state.entryCount;
+    *friendlyCount = state.friendlyCount;
+    *enemyCount = state.enemyCount;
+    *dominantPieceType = state.dominantPieceType;
+    *flags = state.flags;
+    return 1;
+}
+
+CHESS3D_API int Chess3D_IsCoreCellContested(void* handle, int x, int y, int z)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !inside(x, y, z) || !isFusionEnabled(game->rules) || !isInsideCore(game->rules, x, y, z))
+    {
+        return 0;
+    }
+    return (game->fusionStates[static_cast<std::size_t>(indexOf(x, y, z))].flags & FusionFlagContested) != 0 ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_HasRoyalPairFusion(void* handle, int x, int y, int z, int side)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !inside(x, y, z) || side < 1 || side > 6 ||
+        !isFusionEnabled(game->rules) || !isInsideCore(game->rules, x, y, z))
+    {
+        return 0;
+    }
+    const CoreFusionState& state = game->fusionStates[static_cast<std::size_t>(indexOf(x, y, z))];
+    return state.ownerSide == side && (state.flags & FusionFlagRoyalPair) != 0 ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_GetSideFusionCount(void* handle, int side)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || side < 1 || side > 6 || !isFusionEnabled(game->rules))
+    {
+        return 0;
+    }
+    return game->sideFusionCounts[side];
+}
+
+CHESS3D_API int Chess3D_GetSideContestedCount(void* handle, int side)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || side < 1 || side > 6 || !isFusionEnabled(game->rules))
+    {
+        return 0;
+    }
+    return game->sideContestedCounts[side];
+}
+
+CHESS3D_API int Chess3D_GetSideImplosionProgress(void* handle, int side)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || side < 1 || side > 6 || !isFusionEnabled(game->rules))
+    {
+        return 0;
+    }
+    return game->sideImplosionProgress[side];
+}
+
+CHESS3D_API int Chess3D_GetFusionKindName(int fusionKind, char* buffer, int capacity)
+{
+    return copyString(fusionKindName(fusionKind), buffer, capacity);
 }
 
 CHESS3D_API int Chess3D_GetRulesInfo(void* handle, Chess3DRulesInfoDto* info)

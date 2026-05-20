@@ -58,3 +58,7 @@ projected piece = last pushed stack entry
 ```
 
 This is simple, deterministic, and sufficient for old UI and tests until a richer stack visualizer exists.
+
+## Fusion ABI
+
+P2F adds a separate read-only fusion ABI over these same stacks. Stack APIs remain the source-of-truth entry access; fusion APIs expose descriptors such as `friendlyPair`, `royalPair`, and `contested`.

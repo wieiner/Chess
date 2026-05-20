@@ -2,7 +2,7 @@
 
 P2D implemented a temporary runtime projection for Asgard/Meru centerAssembly progress. P2E supersedes the cell scan with stack-aware anchors while keeping the same target-slot vocabulary.
 
-It is intentionally not the final Forbidden Core fusion model.
+It is intentionally not the final Forbidden Core fusion model. P2F adds non-destructive fusion descriptors beside this anchor model.
 
 ## Why projection is needed
 
@@ -48,20 +48,20 @@ Then:
 
 Classic and sandbox profiles do not trigger centerAssembly victory.
 
-## What P2E still does not implement
+## What P2F still does not implement
 
-P2E still does not implement:
+P2F still does not implement:
 
-- fusion entities;
-- implosion/resonance/color-permutation;
+- destructive fusion entities;
+- destructive implosion/resonance/color-permutation;
 - contested anchors;
 - knockback/reserve;
 - dislodging anchored pieces;
 - Rubik layer turns as legal turn actions;
 - Volume-Surface 216 victory.
 
-Those remain staged work for P2F and later.
+Those remain staged work for P2G and later.
 
 ## 96 pieces vs 64 core cells
 
-Six sides have 96 total pieces, but the current tactical core has 64 cells. P2E solves the storage problem for stack-enabled profiles by letting multiple entries occupy one Forbidden Core cell. It still does not solve the game-design problem of how contested stacks, fusion, and dislodging should score.
+Six sides have 96 total pieces, but the current tactical core has 64 cells. P2E solves the storage problem for stack-enabled profiles by letting multiple entries occupy one Forbidden Core cell. P2F can report contested/friendly/royal descriptors, but it still does not solve the game-design problem of how contested stacks and dislodging should score.

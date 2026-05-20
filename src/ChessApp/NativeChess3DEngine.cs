@@ -233,6 +233,42 @@ internal sealed class NativeChess3DEngine : IDisposable
         return Chess3D_GetProjectedPiece(_handle, x, y, z);
     }
 
+    public bool IsFusionEnabled()
+    {
+        ThrowIfDisposed();
+        return Chess3D_IsFusionEnabled(_handle) != 0;
+    }
+
+    public int GetCoreFusionKind(int x, int y, int z)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetCoreFusionKind(_handle, x, y, z);
+    }
+
+    public bool IsCoreCellContested(int x, int y, int z)
+    {
+        ThrowIfDisposed();
+        return Chess3D_IsCoreCellContested(_handle, x, y, z) != 0;
+    }
+
+    public int GetSideFusionCount(int side)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetSideFusionCount(_handle, side);
+    }
+
+    public int GetSideImplosionProgress(int side)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetSideImplosionProgress(_handle, side);
+    }
+
+    public string GetFusionKindName(int fusionKind)
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetFusionKindName(fusionKind, buffer, capacity));
+    }
+
     public void Dispose()
     {
         if (_handle != IntPtr.Zero)
@@ -354,6 +390,24 @@ internal sealed class NativeChess3DEngine : IDisposable
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Chess3D_GetProjectedPiece(IntPtr handle, int x, int y, int z);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_IsFusionEnabled(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetCoreFusionKind(IntPtr handle, int x, int y, int z);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_IsCoreCellContested(IntPtr handle, int x, int y, int z);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetSideFusionCount(IntPtr handle, int side);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetSideImplosionProgress(IntPtr handle, int side);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetFusionKindName(int fusionKind, StringBuilder buffer, int capacity);
 }
 
 [StructLayout(LayoutKind.Sequential)]

@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P2E CoreCell stack runtime model.
+Last audited locally for P2F Asgard fusion and implosion runtime descriptors.
 
 ## Exists
 
@@ -36,6 +36,12 @@ Last audited locally for P2E CoreCell stack runtime model.
 - `docs/CHESS3D_P2E_CORECELL_STACK_RUNTIME.md`: implementation behavior for stack-enabled profiles.
 - `docs/CHESS3D_CORE_STACK_ABI.md`: append-only stack ABI contract.
 - `docs/CHESS3D_CORE_STACK_MOVE_SEMANTICS.md`: move behavior for entering, leaving, and moving within the core.
+- `docs/CHESS3D_P2F_FUSION_AUDIT.md`: audit of the boundary between core stacks and fusion descriptors.
+- `docs/CHESS3D_FUSION_MODEL.md`: P2F non-destructive fusion descriptor model.
+- `docs/CHESS3D_P2F_FUSION_RUNTIME.md`: runtime recomputation and profile-isolation notes for fusion.
+- `docs/CHESS3D_FUSION_ABI.md`: append-only fusion ABI contract.
+- `docs/CHESS3D_IMPLOSION_PROGRESS.md`: progress-state implosion notes.
+- `docs/CHESS3D_FUSION_AND_ANCHORS.md`: relationship between target-slot anchors and fusion descriptors.
 
 ## Build-Verified
 
@@ -51,6 +57,7 @@ Last audited locally for P2E CoreCell stack runtime model.
 - Chess3D contract tests now validate P2C occupancy/fusion/corePhysics profile fields as data contracts.
 - Chess3D contract tests now load P2D RuleProfiles at runtime, check profile summary ABI getters, target slots, simple anchor progress, profile isolation, and centerAssembly victory projection.
 - Chess3D contract tests now cover P2E CoreCell stacks, stack ABI, stack projection, stack-aware anchors, and basic entering/core-to-core/leaving-core moves.
+- Chess3D contract tests now cover P2F fusion descriptors: disabled profile isolation, single/friendly/royal/contested states, fusion recompute, move integration, implosion progress, and Rubik deferred layer-turn stability.
 - `scripts/verify.ps1` checks that representative RuleProfile JSON files are copied into Chess3D development output and `ProductionOutput`.
 
 ## User Executables
@@ -84,18 +91,20 @@ Portable outputs:
 - `Chess2DBenchmark --quick` is part of the contract-test runner when the benchmark executable exists.
 - Single-side 3D ruleset `single-side-3d-chess-8x8x8-v0.1` is documented and covered by ABI-level contract tests.
 - Rule profile assets define classic six-side, single-side sandbox, Asgard/Meru convergence, and Rubik convergence modes as data contracts.
-- Asgard/Rubik convergence profiles define `coreStack`, `stackFusion`, and `asgardCorePhysics`; P2E implements the stack storage part while fusion remains `specOnly`.
+- Asgard/Rubik convergence profiles define `coreStack`, `stackFusion`, and `asgardCorePhysics`; P2E implements stack storage and P2F implements runtimePartial fusion descriptors.
 - `Chess3DEngine.dll` can load strict RuleProfile JSON through an append-only ABI.
 - `Chess3DApp.exe` can load profile-shaped JSON files and shows a compact profile/anchor summary in the status area.
 - CenterAssembly victory can be detected through the P2D target-slot model and P2E stack-aware anchor scan.
 - Forbidden Core cells can store multiple stack entries for Asgard/Rubik convergence profiles while old APIs still see a projected/top piece.
 - CenterAssembly anchors are stack-aware for stack-enabled profiles.
+- Fusion descriptors report `single`, `friendlyPair`, `friendlyStack`, `royalPair`, and `contested` state over core stacks without destroying stack entries.
+- Implosion progress is exposed as progress state for Asgard/Rubik profiles and remains non-destructive.
 
 ## Draft
 
 - Six-sided 3D chess laws are still draft and JSON-driven.
 - 3D king safety, check, mate, and stalemate remain draft after P2A.
-- Final Asgard/Meru fusion physics are not implemented yet; P2E provides multi-entry core stacks but not fusion/implosion.
+- Final Asgard/Meru fusion physics are not implemented yet; P2F provides descriptor/progress state but not destructive transformation, visual effects, or full victory variants.
 - Runtime board projection remains one integer piece per cell for compatibility, while stack data exists as a Forbidden Core overlay.
 - Knockback/reserve captures are specified but not implemented yet.
 - Rubik layer turns as legal chess actions are specified as `ritualTurn` but not implemented yet.
@@ -113,4 +122,4 @@ Portable outputs:
 - Full UI automation tests are not present yet.
 - GPU parity/performance needs more benchmark baselines on real target hardware.
 - The project currently relies on local Visual Studio/MSBuild and vcpkg environment availability.
-- Recommended next stage is P2F: fusion / implosion mechanics.
+- Recommended next stage is P2G: knockback / reserve.

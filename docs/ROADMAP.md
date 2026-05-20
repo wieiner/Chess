@@ -65,9 +65,12 @@
 
 ### P2F - Fusion Mechanics And Victory
 
-- Implement fusion entity descriptors.
-- Implement stackFusion, pairFusion, color/permutation state, and future implosion hooks.
-- Implement requiredFusionCount, requiredCoreStacks, kingQueenFusion, surfaceVolume216Completion, sixGateCoronation, and hybrid victory variants.
+- Completed: non-destructive fusion descriptors over CoreCell stacks.
+- Completed: friendly pair, friendly stack, royal pair, and contested core-cell state.
+- Completed: append-only fusion ABI and fusion kind names.
+- Completed: implosion progress state for Asgard/Rubik convergence profiles.
+- Completed: contract tests for fusion disabled isolation, move integration, anchor interaction, and deferred Rubik stack rotation stability.
+- Deferred: color/permutation state, destructive implosion events, requiredFusionCount victory, surfaceVolume216Completion, sixGateCoronation, and hybrid victory variants.
 
 ### P2G - Knockback And Reserve
 
@@ -79,7 +82,13 @@
 
 - Implement `layerTurnProfile.type = ritualTurn`.
 - Enforce axes, layers, quarter turns, action cost, and turn order.
-- Define interaction with king safety, anchors, CoreCell stacks, notation, and replay.
+- Define interaction with king safety, anchors, CoreCell stacks, fusion descriptors, notation, and replay.
+
+### P2I - Stack And Fusion UI
+
+- Visualize multiple stack entries in one core cell.
+- Display fusion/contested/royal/implosion state in the board view.
+- Add safe editor workflows for stack inspection without changing fusion descriptors manually.
 
 ### P3 - Full Six-Side Gameplay And Hybrid Victory
 

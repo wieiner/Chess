@@ -64,12 +64,28 @@
   },
   "fusionProfile": {
     "type": "stackFusion",
-    "friendlyFusion": "allowedDraft",
-    "enemyCoOccupancy": "contestedDraft",
-    "fusionEntity": "virtualStateDraft",
+    "friendlyFusion": "enabled",
+    "enemyCoOccupancy": "contested",
+    "fusionEntity": "descriptor",
+    "royalPairFusion": "enabled",
+    "implosion": "progressState",
+    "destructiveMerge": false,
     "colorPermutation": "future",
     "volumeSurface216": "future",
-    "status": "specOnly"
+    "status": "runtimePartial"
+  },
+  "implosionProfile": {
+    "type": "centerCompletion",
+    "mode": "progressState",
+    "destructive": false,
+    "localSeedFromFriendlyFusion": true,
+    "royalPairCountsAsFusion": true,
+    "volumeSurface216Principle": {
+      "enabled": false,
+      "runtime": "disabled",
+      "description": "Future symbolic rule: 6x6x6 volume equals six 6x6 faces, both 216 unit cells."
+    },
+    "status": "runtimePartial"
   },
   "corePhysicsProfile": {
     "type": "asgardCorePhysics",
@@ -109,7 +125,8 @@
     "Anchor interaction with layer rotations is deferred.",
     "Stack/layer interaction is deferred.",
     "P2E CoreCell stacks are implemented for the Forbidden Core, but Rubik layer turns do not move stacks yet.",
-    "P2E centerAssembly victory uses stack-aware anchors, not final fusion entities.",
+    "Stack fusion is evaluated after the current board/stack state; Rubik layer turns do not move stacks yet.",
+    "P2F centerAssembly victory remains compatible and exposes fusion/implosion as progress descriptors.",
     "Runtime ritualTurn legality is deferred to P2H."
   ]
 }
