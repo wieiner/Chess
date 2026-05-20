@@ -215,6 +215,24 @@ internal sealed class NativeChess3DEngine : IDisposable
         return Chess3D_GetWinnerSide(_handle);
     }
 
+    public bool IsCoreStackEnabled()
+    {
+        ThrowIfDisposed();
+        return Chess3D_IsCoreStackEnabled(_handle) != 0;
+    }
+
+    public int GetCoreStackCount(int x, int y, int z)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetCoreStackCount(_handle, x, y, z);
+    }
+
+    public int GetProjectedPiece(int x, int y, int z)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetProjectedPiece(_handle, x, y, z);
+    }
+
     public void Dispose()
     {
         if (_handle != IntPtr.Zero)
@@ -327,6 +345,15 @@ internal sealed class NativeChess3DEngine : IDisposable
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Chess3D_GetWinnerSide(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_IsCoreStackEnabled(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetCoreStackCount(IntPtr handle, int x, int y, int z);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetProjectedPiece(IntPtr handle, int x, int y, int z);
 }
 
 [StructLayout(LayoutKind.Sequential)]

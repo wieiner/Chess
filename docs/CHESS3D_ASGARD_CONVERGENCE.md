@@ -76,7 +76,7 @@ P2D implements this as a typed runtime projection:
 - slots match by side and piece type, not by unique piece id;
 - physical target cells can overlap between sides.
 
-Because the runtime board is still single-occupancy, overlapping target regions are only partially expressible until P2E CoreCell stacks.
+P2E adds CoreCell stacks inside the Forbidden Core, so overlapping target regions can now contain multiple entries at runtime. The old board projection still shows only the top entry.
 
 ## Anchoring
 
@@ -86,7 +86,7 @@ Initial anchor mode is `softAnchor`:
 - anchored pieces are intended to become part of the central formation;
 - contested anchors are deferred.
 
-P2D implements a simple anchor projection over the current single-occupancy board. It is enough to count matching target cells and detect `allPiecesAnchored` victory, but it is not final fusion/stack behavior.
+P2E makes anchors stack-aware. A target slot is anchored when any entry in that core-cell stack has the expected side and type. This is still not final fusion behavior.
 
 ## Knockback Capture
 
@@ -108,12 +108,12 @@ Implemented now:
 - occupancy/fusion/core-physics fields as `specOnly`;
 - runtime RuleProfile loading and profile summary ABI;
 - typed target-slot projection for sides 1..6;
-- simple anchor count and centerAssembly victory projection;
+- CoreCell stack runtime in the Forbidden Core;
+- stack-aware anchor count and centerAssembly victory;
 - P2A movement/setup contracts remain executable through `Chess3DEngineContractTests`.
 
 Deferred:
 
-- runtime core multi-occupancy;
 - fusion entity model;
 - contested/fusion anchor state;
 - knockback/reserve behavior;

@@ -108,8 +108,8 @@
     "King-safety after layer rotation is deferred.",
     "Anchor interaction with layer rotations is deferred.",
     "Stack/layer interaction is deferred.",
-    "Layer turns may move stacks in a future CoreCell model.",
-    "P2D centerAssembly victory uses a temporary single-occupancy anchor projection.",
-    "Runtime ritualTurn legality is deferred to P2E."
+    "P2E CoreCell stacks are implemented for the Forbidden Core, but Rubik layer turns do not move stacks yet.",
+    "P2E centerAssembly victory uses stack-aware anchors, not final fusion entities.",
+    "Runtime ritualTurn legality is deferred to P2H."
   ]
 }

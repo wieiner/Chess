@@ -230,8 +230,11 @@ public partial class Chess3DWindow : Window
         var requiredAnchors = _engine.GetRequiredAnchorCount(state.SideToMove);
         var winner = _engine.GetWinnerSide();
         var gameOverText = _engine.IsGameOver() ? $", winner side {winner}" : string.Empty;
+        var stackText = _selectedSquare is { } selected
+            ? $", stack {(_engine.IsCoreStackEnabled() ? "on" : "off")} selected {_engine.GetCoreStackCount(selected.X, selected.Y, selected.Z)} projected {LabelForPiece(_engine.GetProjectedPiece(selected.X, selected.Y, selected.Z))}"
+            : $", stack {(_engine.IsCoreStackEnabled() ? "on" : "off")}";
         HeaderStatus.Text = $"Side {state.SideToMove}, pieces {state.PieceCount}, moves {state.LegalMoveCount}";
-        RulesText.Text = $"Board {rules.Width}x{rules.Height}x{rules.Depth}, sides {rules.ActiveSideCount}, profile {(rules.MovementProfile == 0 ? "setup-only" : "draft3d")}, max {rules.MaxPiecesPerSide}/side, view {SelectedAxis()} {(IsAllLayersView() ? "all" : "slice")}, grid {SelectedGridMode()}\nRuleset {_engine.GetCurrentRulesetId()}, goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}, layer {_engine.GetLayerTurnProfileType()}, anchors {anchorCount}/{requiredAnchors}{gameOverText}";
+        RulesText.Text = $"Board {rules.Width}x{rules.Height}x{rules.Depth}, sides {rules.ActiveSideCount}, profile {(rules.MovementProfile == 0 ? "setup-only" : "draft3d")}, max {rules.MaxPiecesPerSide}/side, view {SelectedAxis()} {(IsAllLayersView() ? "all" : "slice")}, grid {SelectedGridMode()}\nRuleset {_engine.GetCurrentRulesetId()}, goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}, layer {_engine.GetLayerTurnProfileType()}, anchors {anchorCount}/{requiredAnchors}{gameOverText}{stackText}";
         InfoText.Text = _engine.GetLastInfo();
         PositionText.Text = $"Models: {SelectedModelSetName()}, OBJ {_lastObjModels}, fallback {_lastFallbackModels}, hints {selectedMoves.Length}\n{_engine.GetPositionText()}";
     }

@@ -30,7 +30,7 @@ The native engine now has two loader paths:
 - `Chess3D_LoadRulesJson`: legacy draft rules loader.
 - `Chess3D_LoadRuleProfileJson`: strict RuleProfile loader.
 
-P2D stores profile summary fields, exposes append-only ABI getters, derives CoreCube target slots, and computes simple centerAssembly anchor/victory projection. CoreStack and fusion fields remain `specOnly` until P2E/P2F.
+P2D stores profile summary fields, exposes append-only ABI getters, derives CoreCube target slots, and computes simple centerAssembly anchor/victory projection. P2E implements runtime CoreCell stacks for `coreStack` / `asgardCorePhysics` profiles and makes anchors stack-aware. Fusion fields remain `specOnly` until P2F.
 
 Profile files are copied to:
 

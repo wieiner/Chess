@@ -963,6 +963,9 @@ int main()
         "rubik convergence knownLimitations mention stack/layer interaction deferred");
 
     test.Check(Chess3D_LoadRuleProfileJson(game, classicProfile.c_str()) == 1, "runtime loads classic six-side profile");
+    test.Check(Chess3D_IsCoreStackEnabled(game) == 0, "classic profile keeps core stacks disabled");
+    test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 0,
+        "classic profile rejects explicit core stack push");
     test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "classic-six-side-3d-8x8x8-v0.1",
         "runtime exposes classic ruleset id");
     test.Check(ReadAbiString(game, Chess3D_GetGoalProfileType) == "classicCheckmate",
@@ -983,6 +986,49 @@ int main()
         "runtime exposes single-side sandbox goal");
 
     test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime loads asgard convergence profile");
+    test.Check(Chess3D_IsCoreStackEnabled(game) == 1, "asgard profile enables core stacks");
+    Chess3D_Clear(game);
+    test.Check(Chess3D_GetCoreStackCount(game, 2, 2, 2) == 0, "asgard clear leaves target stack empty");
+    test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 1, "asgard push first core stack piece succeeds");
+    test.Check(Chess3D_GetCoreStackCount(game, 2, 2, 2) == 1, "asgard stack count is one after first push");
+    int stackSide = 0;
+    int stackType = 0;
+    int stackPiece = 0;
+    int stackFlags = -1;
+    test.Check(Chess3D_GetCoreStackEntry(game, 2, 2, 2, 0, &stackSide, &stackType, &stackPiece, &stackFlags) == 1 &&
+        stackSide == 1 && stackType == Pawn && stackPiece == PieceCode(1, Pawn) && stackFlags == 0,
+        "asgard stack entry exposes side/type/pieceCode/flags");
+    test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(2, Knight)) == 1, "asgard push second core stack piece succeeds");
+    test.Check(Chess3D_GetCoreStackCount(game, 2, 2, 2) == 2, "asgard stack count is two after second push");
+    test.Check(Chess3D_GetPiece(game, 2, 2, 2) == PieceCode(2, Knight) &&
+        Chess3D_GetProjectedPiece(game, 2, 2, 2) == PieceCode(2, Knight),
+        "asgard projected piece is top stack entry");
+    test.Check(Chess3D_PushCoreStackPiece(game, 0, 0, 0, PieceCode(1, Pawn)) == 0, "core stack push outside core fails");
+    test.Check(Chess3D_PushCoreStackPiece(game, -1, 2, 2, PieceCode(1, Pawn)) == 0, "core stack push with invalid coords fails");
+    test.Check(Chess3D_GetCoreStackEntry(game, 2, 2, 2, 99, &stackSide, &stackType, &stackPiece, &stackFlags) == 0,
+        "invalid stack index fails cleanly");
+    test.Check(Chess3D_GetCoreStackEntry(game, 2, 2, 2, 0, nullptr, &stackType, &stackPiece, &stackFlags) == 0,
+        "null stack entry pointer fails cleanly");
+    test.Check(Chess3D_SetPiece(game, 2, 2, 2, 1, Rook) == 1 &&
+        Chess3D_GetCoreStackCount(game, 2, 2, 2) == 1 &&
+        Chess3D_GetProjectedPiece(game, 2, 2, 2) == PieceCode(1, Rook),
+        "SetPiece inside core replaces stack with one entry");
+    test.Check(Chess3D_SetPiece(game, 2, 2, 2, 0, 0) == 1 &&
+        Chess3D_GetCoreStackCount(game, 2, 2, 2) == 0 &&
+        Chess3D_GetPiece(game, 2, 2, 2) == 0,
+        "SetPiece empty inside core clears stack");
+    test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 1 &&
+        Chess3D_ClearCoreStack(game, 2, 2, 2) == 1 &&
+        Chess3D_GetCoreStackCount(game, 2, 2, 2) == 0,
+        "ClearCoreStack clears a core stack");
+    test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 1 &&
+        Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Rook)) == 1 &&
+        Chess3D_RemoveCoreStackEntry(game, 2, 2, 2, 1) == 1 &&
+        Chess3D_GetCoreStackCount(game, 2, 2, 2) == 1 &&
+        Chess3D_GetProjectedPiece(game, 2, 2, 2) == PieceCode(1, Pawn),
+        "RemoveCoreStackEntry removes selected entry and updates projection");
+    Chess3D_Reset(game);
+    test.Check(Chess3D_GetCoreStackCount(game, 2, 2, 2) == 0, "Reset clears explicit core stacks");
     test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "asgard-convergence-3d-8x8x8-v0.1",
         "runtime exposes asgard ruleset id");
     test.Check(ReadAbiString(game, Chess3D_GetGoalProfileType) == "centerAssembly",
@@ -1044,13 +1090,48 @@ int main()
 
     test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile after invalid load");
     Chess3D_Clear(game);
+    test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 1, "move test seeds occupied core stack");
+    test.Check(Chess3D_SetPiece(game, 2, 2, 1, 1, Rook) == 1, "move test places rook outside core");
+    test.Check(Chess3D_TryMakeMove(game, 2, 2, 1, 2, 2, 2, 0, &played) == 1,
+        "TryMakeMove entering occupied core stack succeeds");
+    test.Check(Chess3D_GetCoreStackCount(game, 2, 2, 2) == 2, "entering core appends to existing stack");
+    test.Check(Chess3D_GetPiece(game, 2, 2, 1) == 0, "entering core clears source square");
+    test.Check(Chess3D_GetProjectedPiece(game, 2, 2, 2) == PieceCode(1, Rook), "entering core projects moved top piece");
+    test.Check(played.captured == 0 && (played.flags & MoveCapture) == 0, "entering core does not ordinary-capture previous occupant");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for core-to-core move test");
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn));
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Rook));
+    test.Check(Chess3D_TryMakeMove(game, 2, 2, 2, 3, 2, 2, 0, &played) == 1,
+        "TryMakeMove core-to-core moves projected stack entry");
+    test.Check(Chess3D_GetCoreStackCount(game, 2, 2, 2) == 1 &&
+        Chess3D_GetCoreStackCount(game, 3, 2, 2) == 1 &&
+        Chess3D_GetProjectedPiece(game, 3, 2, 2) == PieceCode(1, Rook),
+        "core-to-core move updates source and target stacks");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for leaving-core move test");
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn));
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Rook));
+    test.Check(Chess3D_TryMakeMove(game, 2, 2, 2, 2, 2, 1, 0, &played) == 1,
+        "TryMakeMove leaving core moves projected stack entry outside");
+    test.Check(Chess3D_GetCoreStackCount(game, 2, 2, 2) == 1 &&
+        Chess3D_GetProjectedPiece(game, 2, 2, 2) == PieceCode(1, Pawn) &&
+        Chess3D_GetPiece(game, 2, 2, 1) == PieceCode(1, Rook),
+        "leaving core removes top entry and places it outside");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for anchor stack test");
+    Chess3D_Clear(game);
     for (const TargetCell& cell : TargetCellsForSide(1))
     {
-        test.Check(Chess3D_SetPiece(game, cell.x, cell.y, cell.z, 1, cell.type) == 1,
-            "runtime places matching side-1 target piece");
+        test.Check(Chess3D_PushCoreStackPiece(game, cell.x, cell.y, cell.z, PieceCode(2, Queen)) == 1,
+            "runtime places non-matching stack entry before matching anchor");
+        test.Check(Chess3D_PushCoreStackPiece(game, cell.x, cell.y, cell.z, PieceCode(1, cell.type)) == 1,
+            "runtime pushes matching side-1 target stack piece");
     }
     test.Check(Chess3D_RecomputeAnchors(game) == 1, "runtime recomputes anchors");
-    test.Check(Chess3D_GetAnchorCount(game, 1) == 16, "runtime anchors all 16 matching side-1 target slots");
+    test.Check(Chess3D_GetAnchorCount(game, 1) == 16, "runtime anchors all 16 matching side-1 target slots over stacks");
     test.Check(Chess3D_GetRequiredAnchorCount(game, 1) == 16, "runtime required anchor count defaults to profile value 16");
     test.Check(Chess3D_IsAnchoredCell(game, 2, 2, 2) == 1, "runtime reports matching target cell as anchored");
     test.Check(Chess3D_IsGameOver(game) == 1, "runtime centerAssembly victory triggers after all anchors");
@@ -1094,6 +1175,7 @@ int main()
         "sandbox profile does not trigger accidental winner");
 
     test.Check(Chess3D_LoadRuleProfileJson(game, rubikProfile.c_str()) == 1, "runtime loads rubik convergence profile");
+    test.Check(Chess3D_IsCoreStackEnabled(game) == 1, "rubik convergence enables core stacks");
     test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "rubik-convergence-3d-8x8x8-v0.1",
         "runtime exposes rubik ruleset id");
     test.Check(ReadAbiString(game, Chess3D_GetGoalProfileType) == "centerAssembly",

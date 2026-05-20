@@ -204,9 +204,10 @@ Randomized profiles must include a seed when used in a reproducible match.
 
 Target slots are computed from the P2A central 4x4 pattern projected onto the six core planes. Matching is type-based because the current board stores only side/type integer codes, not unique piece ids.
 
-The anchor model is a compatibility projection:
+P2E replaces the purely single-cell anchor scan with a CoreCell stack overlay:
 
-- current board storage remains one integer per cell;
-- a target is anchored when the occupying piece has the matching side and piece type;
-- overlapping target regions are allowed conceptually, but true co-occupancy waits for CoreCell stacks;
-- fusion, implosion, knockback/reserve, and ritual Rubik turns remain later runtime work.
+- the old board remains one projected integer per cell;
+- stack-enabled core cells can store multiple side/type entries;
+- a target is anchored when any stack entry has the matching side and piece type;
+- overlapping target regions can now share a physical core cell at runtime;
+- fusion, implosion, knockback/reserve, and ritual Rubik turns moving stacks remain later runtime work.

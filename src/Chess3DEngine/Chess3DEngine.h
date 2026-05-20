@@ -55,6 +55,14 @@ struct Chess3DRulesInfoDto
     int kingSafetyEnabled;
     int maxPiecesPerSide;
 };
+
+struct Chess3DCoreStackEntryDto
+{
+    int side;
+    int pieceType;
+    int pieceCode;
+    int flags;
+};
 #pragma pack(pop)
 
 CHESS3D_API void* Chess3D_Create();
@@ -83,6 +91,13 @@ CHESS3D_API int Chess3D_IsAnchoredCell(void* handle, int x, int y, int z);
 CHESS3D_API int Chess3D_IsGameOver(void* handle);
 CHESS3D_API int Chess3D_GetWinnerSide(void* handle);
 CHESS3D_API int Chess3D_GetLastProfileError(void* handle, char* buffer, int capacity);
+CHESS3D_API int Chess3D_IsCoreStackEnabled(void* handle);
+CHESS3D_API int Chess3D_GetCoreStackCount(void* handle, int x, int y, int z);
+CHESS3D_API int Chess3D_GetCoreStackEntry(void* handle, int x, int y, int z, int stackIndex, int* side, int* pieceType, int* pieceCode, int* flags);
+CHESS3D_API int Chess3D_PushCoreStackPiece(void* handle, int x, int y, int z, int pieceCode);
+CHESS3D_API int Chess3D_ClearCoreStack(void* handle, int x, int y, int z);
+CHESS3D_API int Chess3D_RemoveCoreStackEntry(void* handle, int x, int y, int z, int stackIndex);
+CHESS3D_API int Chess3D_GetProjectedPiece(void* handle, int x, int y, int z);
 CHESS3D_API int Chess3D_GetRulesInfo(void* handle, Chess3DRulesInfoDto* info);
 CHESS3D_API int Chess3D_GetState(void* handle, Chess3DStateDto* state);
 CHESS3D_API int Chess3D_GetBoard(void* handle, int* pieces512);

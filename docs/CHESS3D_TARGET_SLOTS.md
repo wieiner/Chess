@@ -53,4 +53,6 @@ Unique piece identity is deferred.
 
 Different sides can project into overlapping physical core cells. That is intentional for the future Asgard/Meru design.
 
-In P2D the board is still single-occupancy, so only one piece can physically occupy a cell at a time. P2E CoreCell stacks will be needed before multiple sides can truly co-occupy and contest the same target volume.
+P2E adds CoreCell stacks for stack-enabled profiles, so overlapping target regions can now contain multiple side/type entries in one Forbidden Core cell. The legacy board projection still shows only the top stack entry.
+
+Contested target interpretation is still deferred: a cell can contain multiple entries, but fusion, contested-anchor scoring, and dislodging rules are later work.

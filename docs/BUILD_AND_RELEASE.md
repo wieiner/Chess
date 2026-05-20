@@ -101,7 +101,7 @@ The tests do not require UI, CUDA, or `rude-resource/`. See `docs\TESTING.md`.
 
 ## CI
 
-The GitHub Actions workflow `.github\workflows\windows-build.yml` is green for the `Windows Build` baseline on `master`.
+The GitHub Actions workflow `.github\workflows\windows-build.yml` is green for the `Windows Build` baseline. The repository default branch is `main`; the workflow also keeps `master` in the trigger list for compatibility with older local references.
 
 CI verifies:
 
@@ -114,4 +114,4 @@ CI verifies:
 
 `rude-resource/` is a local ignored resource archive and is absent on CI. `scripts\verify.ps1` checks the ignore rule through the probe path `rude-resource/.verify-ignore-probe`, without creating that file.
 
-CUDA remains optional in CI and in the default local build. The next recommended project stage is P2E: CoreCell Stack Board Model for the Asgard/Meru core.
+CUDA remains optional in CI and in the default local build. The next recommended project stage is P2F: fusion / implosion mechanics on top of the P2E CoreCell stack model.

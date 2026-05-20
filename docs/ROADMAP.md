@@ -12,7 +12,7 @@
 - Native contract smoke tests now cover ChessEngine, Chess3DEngine, RubikEngine, and ChessGpuBackend.
 - `tests/run-tests.ps1` builds and runs the contract suite plus `Chess2DBenchmark --quick`.
 - `scripts/verify.ps1` now includes contract tests after packaging.
-- GitHub Actions `Windows Build` is green on `master` for clean checkout, Release x64 build, production packaging, contract tests, `Chess2DBenchmark --quick`, and the no-CUDA baseline.
+- GitHub Actions `Windows Build` is green for clean checkout, Release x64 build, production packaging, contract tests, `Chess2DBenchmark --quick`, and the no-CUDA baseline. The workflow tracks `main` and keeps `master` for compatibility.
 - `rude-resource/` remains a local ignored resource archive and is absent on CI; verification checks it through `rude-resource/.verify-ignore-probe`.
 - CUDA backend remains optional.
 - Next P1 work: expand assertions into deeper rule-contract suites and add UI smoke automation.
@@ -40,7 +40,7 @@
 - Completed: Asgard core physics specification.
 - Completed: `occupancyProfile`, `fusionProfile`, and `corePhysicsProfile` data contracts.
 - Completed: profile JSON/schema/tests for exclusive, coreStack, stackFusion, and Volume-Surface 216 future metadata.
-- Completed: staged plan for moving from single integer cells to future CoreCell stacks without breaking old ABI.
+- Completed: staged plan for moving from single integer cells to CoreCell stacks without breaking old ABI.
 
 ### P2D - Runtime Profile Selection And Simple Anchors
 
@@ -50,14 +50,18 @@
 - Completed: six-side typed target-slot derivation over CoreCube `2..5`.
 - Completed: simple anchor projection over the current single-occupancy board.
 - Completed: centerAssembly victory detection for `allPiecesAnchored` / `requiredPieceCount` style profiles.
-- Deferred: final CoreCell stacks, fusion, contested anchors, knockback/reserve, and Rubik layer turns as legal chess actions.
+- Deferred: CoreCell stack runtime, fusion, contested anchors, knockback/reserve, and Rubik layer turns as legal chess actions.
 
 ### P2E - CoreCell Stack Board Model
 
-- Add stack-aware `CoreCell` model for Forbidden Core cells.
-- Preserve old 512-int board ABI as a projection.
-- Add stack-aware UI and network-safe state export.
-- Resolve the six-side 96-pieces-vs-64-core-cells pressure through real co-occupancy instead of P2D projection.
+- Completed: stack-aware `CoreCell` overlay for Forbidden Core cells.
+- Completed: old 512-int board ABI preserved as projected/top-piece board.
+- Completed: append-only stack ABI for count, entry, push, clear, remove, and projected-piece reads.
+- Completed: old `GetPiece`/`SetPiece` compatibility semantics over core stacks.
+- Completed: stack-aware anchors and centerAssembly victory.
+- Completed: basic move integration for entering core, core-to-core, and leaving core.
+- Completed: minimal Chess3DApp status visibility for stack enabled/count/projection.
+- Deferred: Rubik layer turns moving stacks.
 
 ### P2F - Fusion Mechanics And Victory
 

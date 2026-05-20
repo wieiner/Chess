@@ -92,10 +92,19 @@ struct Position
     Move lastMove{};
 };
 
+struct CoreStackEntry
+{
+    int side = 0;
+    int pieceType = 0;
+    int pieceCode = 0;
+    int flags = 0;
+};
+
 struct Game
 {
     Rules rules;
     Position pos;
+    std::array<std::vector<CoreStackEntry>, CellCount> coreStacks{};
     std::array<int, 7> anchorCounts{};
     bool gameOver = false;
     int winnerSide = 0;
@@ -157,6 +166,28 @@ bool isValidPieceCode(int piece)
     const int side = pieceSide(piece);
     const int type = pieceType(piece);
     return side >= 1 && side <= 6 && type >= Pawn && type <= King;
+}
+
+CoreStackEntry makeStackEntry(int pieceCode, int flags = 0)
+{
+    return CoreStackEntry{ pieceSide(pieceCode), pieceType(pieceCode), pieceCode, flags };
+}
+
+bool isInsideCore(const Rules& rules, int x, int y, int z)
+{
+    return x >= rules.coreXMin && x <= rules.coreXMax &&
+        y >= rules.coreYMin && y <= rules.coreYMax &&
+        z >= rules.coreZMin && z <= rules.coreZMax;
+}
+
+bool isInsideCore(const Rules& rules, int index)
+{
+    return isInsideCore(rules, xOf(index), yOf(index), zOf(index));
+}
+
+bool isCoreStackEnabled(const Rules& rules)
+{
+    return rules.occupancyProfileType == "coreStack" || rules.corePhysicsProfileType == "asgardCorePhysics";
 }
 
 char typeChar(int type)
@@ -690,6 +721,84 @@ void clear(Position& pos)
     pos.lastMove = Move{};
 }
 
+int projectedPiece(const Game& game, int index)
+{
+    const auto& stack = game.coreStacks[static_cast<std::size_t>(index)];
+    return !stack.empty() ? stack.back().pieceCode : game.pos.board[static_cast<std::size_t>(index)];
+}
+
+void syncProjectedPiece(Game& game, int index)
+{
+    const auto& stack = game.coreStacks[static_cast<std::size_t>(index)];
+    game.pos.board[static_cast<std::size_t>(index)] = stack.empty() ? Empty : stack.back().pieceCode;
+}
+
+void clearCoreStacks(Game& game)
+{
+    for (auto& stack : game.coreStacks)
+    {
+        stack.clear();
+    }
+}
+
+void clearGamePosition(Game& game)
+{
+    clear(game.pos);
+    clearCoreStacks(game);
+}
+
+bool setCoreStackSingle(Game& game, int index, int pieceCode)
+{
+    if (!isCoreStackEnabled(game.rules) || !isInsideCore(game.rules, index) || !isValidPieceCode(pieceCode))
+    {
+        return false;
+    }
+    auto& stack = game.coreStacks[static_cast<std::size_t>(index)];
+    stack.clear();
+    if (pieceCode != Empty)
+    {
+        stack.push_back(makeStackEntry(pieceCode));
+    }
+    syncProjectedPiece(game, index);
+    return true;
+}
+
+bool pushCoreStackPiece(Game& game, int index, int pieceCode)
+{
+    if (!isCoreStackEnabled(game.rules) || !isInsideCore(game.rules, index) || !isValidPieceCode(pieceCode) || pieceCode == Empty)
+    {
+        return false;
+    }
+    auto& stack = game.coreStacks[static_cast<std::size_t>(index)];
+    if (stack.empty() && game.pos.board[static_cast<std::size_t>(index)] != Empty)
+    {
+        stack.push_back(makeStackEntry(game.pos.board[static_cast<std::size_t>(index)]));
+    }
+    stack.push_back(makeStackEntry(pieceCode));
+    syncProjectedPiece(game, index);
+    return true;
+}
+
+bool removeCoreStackEntry(Game& game, int index, int stackIndex, CoreStackEntry* removed = nullptr)
+{
+    if (!isCoreStackEnabled(game.rules) || !isInsideCore(game.rules, index))
+    {
+        return false;
+    }
+    auto& stack = game.coreStacks[static_cast<std::size_t>(index)];
+    if (stackIndex < 0 || stackIndex >= static_cast<int>(stack.size()))
+    {
+        return false;
+    }
+    if (removed != nullptr)
+    {
+        *removed = stack[static_cast<std::size_t>(stackIndex)];
+    }
+    stack.erase(stack.begin() + stackIndex);
+    syncProjectedPiece(game, index);
+    return true;
+}
+
 Vec3 faceCenterSquare(int side, int localU, int localV)
 {
     const int u = 2 + localU;
@@ -819,17 +928,36 @@ void recomputeAnchors(Game& game)
         {
             for (int x = game.rules.coreXMin; x <= game.rules.coreXMax; ++x)
             {
-                const int piece = game.pos.board[indexOf(x, y, z)];
+                const int index = indexOf(x, y, z);
+                if (isCoreStackEnabled(game.rules))
+                {
+                    const auto& stack = game.coreStacks[static_cast<std::size_t>(index)];
+                    for (int side = 1; side <= 6; ++side)
+                    {
+                        const int expectedType = targetSlotType(game.rules, side, x, y, z);
+                        if (expectedType == Empty)
+                        {
+                            continue;
+                        }
+                        const bool anchored = std::any_of(stack.begin(), stack.end(), [&](const CoreStackEntry& entry)
+                        {
+                            return entry.side == side && entry.pieceType == expectedType;
+                        });
+                        if (anchored)
+                        {
+                            ++game.anchorCounts[side];
+                        }
+                    }
+                    continue;
+                }
+
+                const int piece = game.pos.board[static_cast<std::size_t>(index)];
                 if (piece == Empty)
                 {
                     continue;
                 }
                 const int side = pieceSide(piece);
-                if (side < 1 || side > 6)
-                {
-                    continue;
-                }
-                if (targetSlotType(game.rules, side, x, y, z) == pieceType(piece))
+                if (side >= 1 && side <= 6 && targetSlotType(game.rules, side, x, y, z) == pieceType(piece))
                 {
                     ++game.anchorCounts[side];
                 }
@@ -854,7 +982,7 @@ void recomputeAnchors(Game& game)
 
 void resetPosition(Game& game)
 {
-    clear(game.pos);
+    clearGamePosition(game);
     for (int side = 1; side <= game.rules.activeSideCount; ++side)
     {
         placeFaceCenter(game.pos, side);
@@ -878,7 +1006,7 @@ int nextSide(const Rules& rules, int side)
     return 1;
 }
 
-void addMoveIfValid(const Position& pos, std::vector<Move>& moves, int from, int x, int y, int z)
+void addMoveIfValid(const Game& game, const Position& pos, std::vector<Move>& moves, int from, int x, int y, int z)
 {
     if (!inside(x, y, z))
     {
@@ -887,7 +1015,8 @@ void addMoveIfValid(const Position& pos, std::vector<Move>& moves, int from, int
     const int to = indexOf(x, y, z);
     const int piece = pos.board[from];
     const int target = pos.board[to];
-    if (target != Empty && isSameSide(piece, target))
+    const bool stackTarget = isCoreStackEnabled(game.rules) && isInsideCore(game.rules, to);
+    if (target != Empty && isSameSide(piece, target) && !stackTarget)
     {
         return;
     }
@@ -895,8 +1024,8 @@ void addMoveIfValid(const Position& pos, std::vector<Move>& moves, int from, int
     move.from = from;
     move.to = to;
     move.piece = piece;
-    move.captured = target;
-    if (target != Empty)
+    move.captured = stackTarget ? Empty : target;
+    if (target != Empty && !stackTarget)
     {
         move.flags |= MoveCapture;
     }
@@ -1017,7 +1146,7 @@ void generatePawnMoves(const Game& game, const Position& pos, int from, std::vec
     const int oneZ = z + f.z;
     if (inside(oneX, oneY, oneZ) && pos.board[indexOf(oneX, oneY, oneZ)] == Empty)
     {
-        addMoveIfValid(pos, moves, from, oneX, oneY, oneZ);
+        addMoveIfValid(game, pos, moves, from, oneX, oneY, oneZ);
 
         const int twoX = x + f.x * 2;
         const int twoY = y + f.y * 2;
@@ -1026,7 +1155,7 @@ void generatePawnMoves(const Game& game, const Position& pos, int from, std::vec
             inside(twoX, twoY, twoZ) &&
             pos.board[indexOf(twoX, twoY, twoZ)] == Empty)
         {
-            addMoveIfValid(pos, moves, from, twoX, twoY, twoZ);
+            addMoveIfValid(game, pos, moves, from, twoX, twoY, twoZ);
         }
     }
 
@@ -1042,7 +1171,7 @@ void generatePawnMoves(const Game& game, const Position& pos, int from, std::vec
         const int target = pos.board[indexOf(tx, ty, tz)];
         if (target != Empty && !isSameSide(piece, target))
         {
-            addMoveIfValid(pos, moves, from, tx, ty, tz);
+            addMoveIfValid(game, pos, moves, from, tx, ty, tz);
         }
     }
 
@@ -1073,7 +1202,7 @@ void generatePieceMoves(const Game& game, const Position& pos, int from, std::ve
     {
         for (Vec3 d : knightDirections())
         {
-            addMoveIfValid(pos, moves, from, x + d.x, y + d.y, z + d.z);
+            addMoveIfValid(game, pos, moves, from, x + d.x, y + d.y, z + d.z);
         }
         return;
     }
@@ -1087,7 +1216,7 @@ void generatePieceMoves(const Game& game, const Position& pos, int from, std::ve
         while (inside(tx, ty, tz))
         {
             const int before = static_cast<int>(moves.size());
-            addMoveIfValid(pos, moves, from, tx, ty, tz);
+            addMoveIfValid(game, pos, moves, from, tx, ty, tz);
             const int target = pos.board[indexOf(tx, ty, tz)];
             if (!sliding || target != Empty || before == static_cast<int>(moves.size()))
             {
@@ -1129,6 +1258,49 @@ void applyMove(const Rules& rules, Position& pos, Move move)
     pos.board[move.from] = Empty;
     pos.lastMove = move;
     pos.sideToMove = nextSide(rules, pos.sideToMove);
+}
+
+void applyMove(Game& game, Move move)
+{
+    const bool stackEnabled = isCoreStackEnabled(game.rules);
+    const bool fromCore = stackEnabled && isInsideCore(game.rules, move.from);
+    const bool toCore = stackEnabled && isInsideCore(game.rules, move.to);
+
+    int piece = fromCore ? projectedPiece(game, move.from) : game.pos.board[static_cast<std::size_t>(move.from)];
+    if ((move.flags & MovePromotion) != 0 && move.promotionType != 0)
+    {
+        piece = makePiece(pieceSide(piece), move.promotionType);
+    }
+
+    if (fromCore)
+    {
+        auto& sourceStack = game.coreStacks[static_cast<std::size_t>(move.from)];
+        if (!sourceStack.empty())
+        {
+            sourceStack.pop_back();
+            syncProjectedPiece(game, move.from);
+        }
+        else
+        {
+            game.pos.board[static_cast<std::size_t>(move.from)] = Empty;
+        }
+    }
+    else
+    {
+        game.pos.board[static_cast<std::size_t>(move.from)] = Empty;
+    }
+
+    if (toCore)
+    {
+        pushCoreStackPiece(game, move.to, piece);
+    }
+    else
+    {
+        game.pos.board[static_cast<std::size_t>(move.to)] = piece;
+    }
+
+    game.pos.lastMove = move;
+    game.pos.sideToMove = nextSide(game.rules, game.pos.sideToMove);
 }
 
 Vec3 rotateLayerSquare(int axis, int layer, int turns, int x, int y, int z)
@@ -1321,7 +1493,7 @@ CHESS3D_API void Chess3D_Clear(void* handle)
 {
     if (auto* game = asGame(handle))
     {
-        clear(game->pos);
+        clearGamePosition(*game);
         recomputeAnchors(*game);
         game->lastInfo = "3D cube cleared for setup.";
     }
@@ -1508,7 +1680,29 @@ CHESS3D_API int Chess3D_IsAnchoredCell(void* handle, int x, int y, int z)
     {
         return 0;
     }
-    const int piece = game->pos.board[indexOf(x, y, z)];
+    const int index = indexOf(x, y, z);
+    if (isCoreStackEnabled(game->rules) && isInsideCore(game->rules, index))
+    {
+        const auto& stack = game->coreStacks[static_cast<std::size_t>(index)];
+        for (int side = 1; side <= 6; ++side)
+        {
+            const int expectedType = targetSlotType(game->rules, side, x, y, z);
+            if (expectedType == Empty)
+            {
+                continue;
+            }
+            if (std::any_of(stack.begin(), stack.end(), [&](const CoreStackEntry& entry)
+            {
+                return entry.side == side && entry.pieceType == expectedType;
+            }))
+            {
+                return 1;
+            }
+        }
+        return 0;
+    }
+
+    const int piece = game->pos.board[static_cast<std::size_t>(index)];
     if (piece == Empty)
     {
         return 0;
@@ -1532,6 +1726,101 @@ CHESS3D_API int Chess3D_GetLastProfileError(void* handle, char* buffer, int capa
 {
     auto* game = asGame(handle);
     return game != nullptr ? copyString(game->lastProfileLoadError, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_IsCoreStackEnabled(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr && isCoreStackEnabled(game->rules) ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_GetCoreStackCount(void* handle, int x, int y, int z)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !inside(x, y, z) || !isCoreStackEnabled(game->rules) || !isInsideCore(game->rules, x, y, z))
+    {
+        return 0;
+    }
+    return static_cast<int>(game->coreStacks[static_cast<std::size_t>(indexOf(x, y, z))].size());
+}
+
+CHESS3D_API int Chess3D_GetCoreStackEntry(void* handle, int x, int y, int z, int stackIndex, int* side, int* pieceTypeOut, int* pieceCode, int* flags)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || side == nullptr || pieceTypeOut == nullptr || pieceCode == nullptr || flags == nullptr ||
+        !inside(x, y, z) || !isCoreStackEnabled(game->rules) || !isInsideCore(game->rules, x, y, z))
+    {
+        return 0;
+    }
+    const auto& stack = game->coreStacks[static_cast<std::size_t>(indexOf(x, y, z))];
+    if (stackIndex < 0 || stackIndex >= static_cast<int>(stack.size()))
+    {
+        return 0;
+    }
+    const CoreStackEntry& entry = stack[static_cast<std::size_t>(stackIndex)];
+    *side = entry.side;
+    *pieceTypeOut = entry.pieceType;
+    *pieceCode = entry.pieceCode;
+    *flags = entry.flags;
+    return 1;
+}
+
+CHESS3D_API int Chess3D_PushCoreStackPiece(void* handle, int x, int y, int z, int pieceCode)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !inside(x, y, z))
+    {
+        return 0;
+    }
+    const int index = indexOf(x, y, z);
+    if (!pushCoreStackPiece(*game, index, pieceCode))
+    {
+        return 0;
+    }
+    recomputeAnchors(*game);
+    game->lastInfo = "3D core stack piece pushed.";
+    return 1;
+}
+
+CHESS3D_API int Chess3D_ClearCoreStack(void* handle, int x, int y, int z)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !inside(x, y, z) || !isCoreStackEnabled(game->rules) || !isInsideCore(game->rules, x, y, z))
+    {
+        return 0;
+    }
+    const int index = indexOf(x, y, z);
+    game->coreStacks[static_cast<std::size_t>(index)].clear();
+    syncProjectedPiece(*game, index);
+    recomputeAnchors(*game);
+    game->lastInfo = "3D core stack cleared.";
+    return 1;
+}
+
+CHESS3D_API int Chess3D_RemoveCoreStackEntry(void* handle, int x, int y, int z, int stackIndex)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !inside(x, y, z))
+    {
+        return 0;
+    }
+    if (!removeCoreStackEntry(*game, indexOf(x, y, z), stackIndex))
+    {
+        return 0;
+    }
+    recomputeAnchors(*game);
+    game->lastInfo = "3D core stack entry removed.";
+    return 1;
+}
+
+CHESS3D_API int Chess3D_GetProjectedPiece(void* handle, int x, int y, int z)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !inside(x, y, z))
+    {
+        return 0;
+    }
+    return projectedPiece(*game, indexOf(x, y, z));
 }
 
 CHESS3D_API int Chess3D_GetRulesInfo(void* handle, Chess3DRulesInfoDto* info)
@@ -1609,7 +1898,18 @@ CHESS3D_API int Chess3D_SetBoard(void* handle, const int* pieces512, int sideToM
             return 0;
         }
     }
+    clearCoreStacks(*game);
     std::copy(pieces512, pieces512 + CellCount, game->pos.board.begin());
+    if (isCoreStackEnabled(game->rules))
+    {
+        for (int i = 0; i < CellCount; ++i)
+        {
+            if (game->pos.board[static_cast<std::size_t>(i)] != Empty && isInsideCore(game->rules, i))
+            {
+                setCoreStackSingle(*game, i, game->pos.board[static_cast<std::size_t>(i)]);
+            }
+        }
+    }
     game->pos.sideToMove = std::clamp(sideToMove, 1, game->rules.activeSideCount);
     game->pos.lastMove = Move{};
     recomputeAnchors(*game);
@@ -1624,7 +1924,17 @@ CHESS3D_API int Chess3D_SetPiece(void* handle, int x, int y, int z, int side, in
     {
         return 0;
     }
-    game->pos.board[indexOf(x, y, z)] = side == 0 || type == 0 ? Empty : makePiece(side, type);
+    const int index = indexOf(x, y, z);
+    const int piece = side == 0 || type == 0 ? Empty : makePiece(side, type);
+    if (isCoreStackEnabled(game->rules) && isInsideCore(game->rules, x, y, z))
+    {
+        setCoreStackSingle(*game, index, piece);
+    }
+    else
+    {
+        game->coreStacks[static_cast<std::size_t>(index)].clear();
+        game->pos.board[static_cast<std::size_t>(index)] = piece;
+    }
     recomputeAnchors(*game);
     game->lastInfo = "3D setup changed.";
     return 1;
@@ -1707,7 +2017,7 @@ CHESS3D_API int Chess3D_TryMakeMove(void* handle, int fromX, int fromY, int from
             {
                 move.promotionType = promotionType;
             }
-            applyMove(game->rules, game->pos, move);
+            applyMove(*game, move);
             recomputeAnchors(*game);
             game->lastInfo = "3D move played.";
             if (playedMove != nullptr)
@@ -1749,7 +2059,7 @@ CHESS3D_API int Chess3D_MakeBestMove(void* handle, int depth, Chess3DMoveDto* pl
         }
     }
     best.score = bestScore;
-    applyMove(game->rules, game->pos, best);
+    applyMove(*game, best);
     recomputeAnchors(*game);
     if (playedMove != nullptr)
     {
@@ -1768,6 +2078,11 @@ CHESS3D_API int Chess3D_RotateLayer(void* handle, int axis, int layer, int quart
     auto* game = asGame(handle);
     if (game == nullptr || axis < 0 || axis > 2 || layer < 0 || layer >= BoardSize)
     {
+        return 0;
+    }
+    if (isCoreStackEnabled(game->rules))
+    {
+        game->lastInfo = "3D Rubik rotation with CoreCell stacks is deferred.";
         return 0;
     }
 

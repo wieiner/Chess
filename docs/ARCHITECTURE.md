@@ -5,7 +5,7 @@ The repository is split into separate native DLLs and separate user-facing appli
 ## Native Layers
 
 - `ChessEngine.dll`: ordinary 8x8 chess rules, legal move generation, FEN, draw rules, search, evaluation, and search telemetry.
-- `Chess3DEngine.dll`: 8x8x8 cube board state, P2A single-side movement/capture contracts, P2B/P2C profile data contracts, P2D runtime RuleProfile loading, simple centerAssembly anchor projection, draft six-side setup, and Rubik-style layer rotations for cube chess.
+- `Chess3DEngine.dll`: 8x8x8 cube board state, P2A single-side movement/capture contracts, P2B/P2C profile data contracts, P2D runtime RuleProfile loading, P2E Forbidden Core stack overlay, stack-aware centerAssembly anchors, draft six-side setup, and Rubik-style layer rotations for cube chess.
 - `RubikEngine.dll`: N x N x N Rubik state, layer rotations, scramble/history, and trusted reverse playback.
 - `ChessGpuBackend.dll`: stable GPU ABI boundary. It routes work to CUDA when available, otherwise Direct3D/CPU fallback paths.
 - `ChessCudaBackend.dll`: optional CUDA backend built from `.cu` kernels. It is dynamically loaded and is not required for the default solution build.
@@ -46,7 +46,9 @@ P2C adds core physics profile contracts: `occupancyProfile`, `fusionProfile`, an
 
 P2D adds the first runtime bridge from profile JSON to the engine. `Chess3D_LoadRuleProfileJson` stores the active ruleset id/version/display name, goal/capture/occupancy/fusion/core-physics/layer/victory profile types, core cube bounds, anchor mode, required anchor count, and last profile-load error. It also derives typed target slots for sides 1..6 and computes a simple centerAssembly anchor projection over the existing single-occupancy board.
 
-This P2D anchor projection is not final Asgard physics. It counts current single-piece cells that match target side/type requirements. P2E must add CoreCell stacks before true multi-occupancy, contested targets, and fusion can exist at runtime.
+P2E adds CoreCell stacks inside the Forbidden Core while preserving the old 512-int board as a projection. Old APIs see the top stack entry; new stack ABI functions expose stack count and entries. Anchors now search stack entries instead of only the projected piece.
+
+This is still not final Asgard fusion physics. Fusion, implosion, contested targets, knockback/reserve, and Rubik turns moving stacks remain later stages.
 
 The engine still reserves side ids `1..6`. Six-sided chess should be built by mapping this local rule core to each cube face through coordinate transforms, rather than inventing six unrelated movement systems. Rubik-style layer rotation remains a board transform until P2E implements `layerTurnProfile.type = ritualTurn` as a legal chess action.
 

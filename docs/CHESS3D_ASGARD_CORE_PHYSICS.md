@@ -1,6 +1,6 @@
 # Chess3D Asgard Core Physics
 
-P2C defines a richer center model for Asgard/Meru Convergence. P2D adds a small runtime bridge, but the native engine remains single-occupancy until a later board-model refactor.
+P2C defines a richer center model for Asgard/Meru Convergence. P2D adds a small runtime bridge. P2E adds the first runtime CoreCell stack overlay inside the Forbidden Core while preserving the old projected board.
 
 ## 1. Two-Zone Physics
 
@@ -59,6 +59,7 @@ This is not treated as a factual physics claim. It is a future symbolic/game-law
 - Outside the core: at most one piece.
 - Inside the core: a stack of multiple pieces may occupy one cell.
 - Stack size can be bounded later; current profile uses `unboundedDraft`.
+- Implemented as a P2E runtime storage layer for side/type/pieceCode/flags entries.
 
 ### quantumCore
 
@@ -128,7 +129,7 @@ Asgard Convergence can support victory profiles beyond `allPiecesAnchored`:
 - `sixGateCoronation`;
 - `hybrid`.
 
-P2D implements only simple `allPiecesAnchored` / `requiredPieceCount` style centerAssembly victory over the current single-occupancy board. Fusion-based victory remains later work.
+P2E implements `allPiecesAnchored` / `requiredPieceCount` style centerAssembly victory over stack-aware target slots. Fusion-based victory remains later work.
 
 ## 8. Implementation Staging
 
@@ -136,8 +137,8 @@ Stage 1: JSON/spec/tests only. Engine remains single-occupancy. Completed in P2C
 
 Stage 2: runtime parses profile metadata, exposes profile summary ABI, derives target slots, and computes simple anchor projection. Completed in P2D.
 
-Stage 3: board model supports `CoreCell` stacks without breaking old ABI. Planned for P2E.
+Stage 3: board model supports `CoreCell` stacks without breaking old ABI. Completed in P2E as a Forbidden Core overlay.
 
-Stage 4: fusion and advanced victory logic.
+Stage 4: fusion, implosion, and advanced victory logic.
 
 Stage 5: UI visualization for stacks, resonance, color/permutation, and implosion/fusion states.
