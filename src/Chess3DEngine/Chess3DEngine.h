@@ -143,5 +143,10 @@ CHESS3D_API int Chess3D_GetPieceMoves(void* handle, int fromX, int fromY, int fr
 CHESS3D_API int Chess3D_TryMakeMove(void* handle, int fromX, int fromY, int fromZ, int toX, int toY, int toZ, int promotionType, Chess3DMoveDto* playedMove);
 CHESS3D_API int Chess3D_MakeBestMove(void* handle, int depth, Chess3DMoveDto* playedMove);
 CHESS3D_API int Chess3D_RotateLayer(void* handle, int axis, int layer, int quarterTurns);
+CHESS3D_API int Chess3D_IsLayerTurnEnabled(void* handle);
+CHESS3D_API int Chess3D_CanRotateLayer(void* handle, int axis, int layer, int quarterTurns);
+CHESS3D_API int Chess3D_GetLastLayerTurnInfo(void* handle, int* axis, int* layer, int* quarterTurns, int* resultCode);
+CHESS3D_API int Chess3D_GetLayerTurnProfileSummary(void* handle, char* buffer, int capacity);
+CHESS3D_API int Chess3D_GetLayerTurnResultName(int resultCode, char* buffer, int capacity);
 CHESS3D_API int Chess3D_GetPositionText(void* handle, char* buffer, int capacity);
 CHESS3D_API int Chess3D_GetLastInfo(void* handle, char* buffer, int capacity);

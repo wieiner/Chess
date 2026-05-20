@@ -39,9 +39,15 @@ If source is inside the core and target is outside:
 
 ## Rubik Layer Turns
 
-P2E does not rotate stacks with Rubik layer turns. When core stacks are enabled, `Chess3D_RotateLayer` fails cleanly with an informational message instead of corrupting stack state.
+P2H rotates stacks for `rubik_convergence_3d_v0_1`:
 
-P2H will define layer turns that move pieces and stacks together.
+- whole CoreCell stacks move with the rotated layer;
+- projected core cells are resynchronized from the moved stacks;
+- ordinary capture is not involved in a layer turn;
+- fusion, anchors, implosion progress, and compatible victory are recomputed;
+- reserve counts are unaffected.
+
+Profiles with `layerTurnProfile.type = disabled` clean-fail for ritual turns.
 
 ## Known Limits
 

@@ -205,7 +205,10 @@ For ritual turns:
 - axes: `X`, `Y`, `Z`;
 - layers: `0..7`;
 - quarter turns: `-1`, `+1`;
-- action cost: `oneTurn`.
+- action cost: `oneTurn`;
+- optional runtime flags: `movesProjectedBoard`, `movesCoreStacks`, `recomputesFusion`, `recomputesAnchors`, `reserveInteraction`.
+
+P2H implements the Rubik convergence subset: projected board rotation, whole CoreCell stack relocation, fusion/anchor recompute, and reserve-unaffected semantics.
 
 ## turnProfile
 
@@ -251,7 +254,8 @@ P2E replaces the purely single-cell anchor scan with a CoreCell stack overlay:
 - stack-enabled core cells can store multiple side/type entries;
 - a target is anchored when any stack entry has the matching side and piece type;
 - overlapping target regions can now share a physical core cell at runtime;
-- destructive fusion/implosion events, reserve restore actions, and ritual Rubik turns moving stacks remain later runtime work.
+- destructive fusion/implosion events and reserve restore actions remain later runtime work;
+- P2H implements ritual Rubik turns moving projected board cells and whole core stacks for Rubik convergence.
 
 ## P2F Runtime Fusion
 
@@ -272,3 +276,14 @@ P2G adds profile-gated capture routing:
 - outer-field enemy captures route the captured piece to home or reserve;
 - entering the Forbidden Core appends to stacks and does not knock back occupants;
 - core-to-outside captures route the outside captured piece through the same home-or-reserve policy.
+
+## P2H Runtime Rubik Layer Turns
+
+P2H adds profile-gated ritual turns:
+
+- Rubik convergence enables `ritualTurn`;
+- Asgard, classic, and single-side profiles keep layer turns disabled;
+- ABI axes are `0=Z`, `1=Y`, `2=X`;
+- a successful ritual turn moves the projected board and whole CoreCell stacks;
+- fusion descriptors, anchors, implosion progress, and compatible victory are recomputed;
+- reserve counts are preserved.

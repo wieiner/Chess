@@ -39,6 +39,7 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - P2E Chess3D runtime tests validate CoreCell stack enablement, stack push/read/clear/remove ABI, `SetPiece` compatibility, reset clearing, projected/top-piece behavior, stack-aware anchors, profile isolation, and basic moves entering, leaving, and crossing the core.
 - P2F Chess3D runtime tests validate fusion disabled isolation, fusion descriptor ABI, `single`, `friendlyPair`, `friendlyStack`, `royalPair`, `contested`, side fusion/contested counts, move integration, anchor/fusion interaction, implosion progress, and Rubik deferred stack rotation stability.
 - P2G Chess3D runtime tests validate classic capture isolation, Asgard/Rubik reserve and knockback enablement, home-slot return, reserve fallback, own-piece rejection, outside-to-core no-knockback stack entry, core-to-outside capture routing, reserve clearing, reset clearing, and Rubik profile safety.
+- P2H Chess3D runtime tests validate Rubik profile layer-turn enablement, Asgard/classic/single-side disabled isolation, projected board rotation for Z/Y/X engine conventions, four-turn identity, CoreCell stack relocation, fusion recompute, fixed-world target-slot anchor recompute, reserve invariance, and last-result telemetry.
 - `scripts/verify.ps1` checks that Asgard and Rubik convergence profiles are copied into `Chess3DApp` output and `ProductionOutput/Chess3D`.
 - Rubik size, state, rotation, scramble, reverse-history solve, and manual-state ABI calls still work.
 - GPU backend CPU/Auto paths work without CUDA, and Direct3D/CUDA absence is handled as non-fatal where appropriate.
@@ -49,8 +50,8 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - They do not prove search strength or GPU performance.
 - They do not validate final six-sided 3D chess laws; P2A validates only the single-side local rule core.
 - They do not prove full 3D king safety, checkmate, or stalemate yet.
-- They prove P2E CoreCell stack storage, P2F non-destructive fusion descriptors, and P2G home-or-reserve capture routing. They do not prove reserve restore actions, destructive implosion behavior, contested anchor scoring, or ritual Rubik layer-turn legality yet.
-- They do not implement or prove color/permutation, destructive transformation, final Volume-Surface 216 mechanics, or Rubik layer turns moving stacks/fusion yet.
+- They prove P2E CoreCell stack storage, P2F non-destructive fusion descriptors, P2G home-or-reserve capture routing, and P2H runtimePartial Rubik layer turns for projected board plus whole CoreCell stacks. They do not prove reserve restore actions, destructive implosion behavior, contested anchor scoring, or full six-side king safety.
+- They do not implement or prove color/permutation, destructive transformation, final Volume-Surface 216 mechanics, notation/replay, online serialization, AI/search generation for layer turns, or GPU stack snapshots.
 - They do not automate WPF UI behavior yet.
 - They do not require or validate `rude-resource/`.
 
@@ -60,7 +61,7 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 
 CUDA is optional. Contract tests must pass without `ChessCudaBackend.dll`. If CUDA is built and placed next to `ChessGpuBackend.dll`, the GPU backend may use it, but absence of CUDA is not a test failure.
 
-The next recommended testing milestone is P2H: contract tests for Rubik layer turns that move projected board cells, core stacks, fusion descriptors, and reserve state safely.
+The next recommended testing milestone is P2I/P2J: reserve restore/inventory contracts and UI smoke checks for layer-turn/stack/fusion visualization.
 
 ## UI Smoke Tests
 

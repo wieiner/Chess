@@ -113,7 +113,9 @@
     }
   },
   "layerTurnProfile": {
-    "type": "disabled"
+    "type": "disabled",
+    "status": "implementedByCurrentBoardModel",
+    "notes": "Asgard convergence does not allow Rubik-like layer turns; use rubik_convergence_3d_v0_1 for ritual turns."
   },
   "turnProfile": {
     "type": "roundRobin",
@@ -136,5 +138,6 @@
     "Contested cells are visible as runtime fusion descriptors, but contested anchor scoring remains deferred.",
     "Core multi-occupancy has a P2E stack runtime and P2F runtimePartial fusion descriptors.",
     "P2F implosion is progress state only; it does not destroy or transform stack entries."
+    ,"Rubik layer turns are disabled in this profile and clean-fail at runtime."
   ]
 }

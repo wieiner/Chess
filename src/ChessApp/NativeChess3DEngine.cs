@@ -143,6 +143,38 @@ internal sealed class NativeChess3DEngine : IDisposable
         return Chess3D_RotateLayer(_handle, axis, layer, quarterTurns) != 0;
     }
 
+    public bool IsLayerTurnEnabled()
+    {
+        ThrowIfDisposed();
+        return Chess3D_IsLayerTurnEnabled(_handle) != 0;
+    }
+
+    public bool CanRotateLayer(int axis, int layer, int quarterTurns)
+    {
+        ThrowIfDisposed();
+        return Chess3D_CanRotateLayer(_handle, axis, layer, quarterTurns) != 0;
+    }
+
+    public (int Axis, int Layer, int QuarterTurns, int ResultCode) GetLastLayerTurnInfo()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetLastLayerTurnInfo(_handle, out var axis, out var layer, out var quarterTurns, out var resultCode) != 0
+            ? (axis, layer, quarterTurns, resultCode)
+            : (-1, -1, 0, 0);
+    }
+
+    public string GetLayerTurnProfileSummary()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetLayerTurnProfileSummary(_handle, buffer, capacity));
+    }
+
+    public string GetLayerTurnResultName(int resultCode)
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetLayerTurnResultName(resultCode, buffer, capacity));
+    }
+
     public string GetPositionText()
     {
         ThrowIfDisposed();
@@ -389,6 +421,21 @@ internal sealed class NativeChess3DEngine : IDisposable
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Chess3D_RotateLayer(IntPtr handle, int axis, int layer, int quarterTurns);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_IsLayerTurnEnabled(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_CanRotateLayer(IntPtr handle, int axis, int layer, int quarterTurns);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastLayerTurnInfo(IntPtr handle, out int axis, out int layer, out int quarterTurns, out int resultCode);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetLayerTurnProfileSummary(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetLayerTurnResultName(int resultCode, StringBuilder buffer, int capacity);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_GetPositionText(IntPtr handle, StringBuilder buffer, int capacity);

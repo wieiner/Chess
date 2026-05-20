@@ -137,7 +137,19 @@
       "type": "object",
       "required": ["type"],
       "properties": {
-        "type": { "enum": ["disabled", "ritualTurn", "globalEvent", "sandbox"] }
+        "type": { "enum": ["disabled", "ritualTurn", "globalEvent", "sandbox"] },
+        "axes": { "type": "array", "items": { "enum": ["X", "Y", "Z"] } },
+        "layers": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 7 } },
+        "layerRange": { "type": "object" },
+        "quarterTurns": { "type": "array", "items": { "enum": [-1, 1] } },
+        "actionCost": { "enum": ["none", "oneTurn", "debugOnly"] },
+        "movesProjectedBoard": { "type": "boolean" },
+        "movesCoreStacks": { "type": "boolean" },
+        "recomputesFusion": { "type": "boolean" },
+        "recomputesAnchors": { "type": "boolean" },
+        "reserveInteraction": { "enum": ["unaffected", "future", "none"] },
+        "status": { "enum": ["implementedByCurrentBoardModel", "runtimePartial", "specOnly", "draft", "future"] },
+        "notes": { "type": "string" }
       }
     },
     "turnProfile": { "type": "object" },

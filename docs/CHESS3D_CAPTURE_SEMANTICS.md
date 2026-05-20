@@ -46,5 +46,7 @@ P2G does not implement:
 - reserve restore action;
 - dislodging pieces from contested core stacks;
 - destructive implosion;
-- Rubik layer turns moving stacks/reserve;
+- reserve movement during Rubik layer turns;
 - full six-side checkmate.
+
+P2H layer turns move projected board cells and whole CoreCell stacks for Rubik convergence. They do not perform capture and do not change reserve counts.

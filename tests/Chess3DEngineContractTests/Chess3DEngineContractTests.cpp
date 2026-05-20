@@ -36,6 +36,11 @@ constexpr int KnockbackNone = 0;
 constexpr int KnockbackHome = 1;
 constexpr int KnockbackReserve = 2;
 constexpr int KnockbackClassicRemoved = 3;
+constexpr int LayerTurnSuccess = 1;
+constexpr int LayerTurnDisabled = 2;
+constexpr int LayerTurnInvalidAxis = 3;
+constexpr int LayerTurnInvalidLayer = 4;
+constexpr int LayerTurnInvalidQuarterTurns = 5;
 
 std::string ReadTextFile(const std::string& path)
 {
@@ -597,6 +602,106 @@ struct TargetCell
     int type;
 };
 
+std::string ReadLayerTurnResultName(int resultCode)
+{
+    char buffer[128] = {};
+    const int needed = Chess3D_GetLayerTurnResultName(resultCode, buffer, static_cast<int>(sizeof(buffer)));
+    if (needed <= 0)
+    {
+        return {};
+    }
+    return std::string(buffer);
+}
+
+std::vector<int> BoardSnapshot(void* game)
+{
+    std::vector<int> board(512);
+    Chess3D_GetBoard(game, board.data());
+    return board;
+}
+
+struct CoreStackEntrySnapshot
+{
+    int side = 0;
+    int type = 0;
+    int piece = 0;
+    int flags = 0;
+};
+
+std::vector<CoreStackEntrySnapshot> StackSnapshot(void* game, int x, int y, int z)
+{
+    const int count = Chess3D_GetCoreStackCount(game, x, y, z);
+    std::vector<CoreStackEntrySnapshot> entries;
+    for (int i = 0; i < count; ++i)
+    {
+        CoreStackEntrySnapshot entry{};
+        if (Chess3D_GetCoreStackEntry(game, x, y, z, i, &entry.side, &entry.type, &entry.piece, &entry.flags) == 1)
+        {
+            entries.push_back(entry);
+        }
+    }
+    return entries;
+}
+
+bool SameStack(const std::vector<CoreStackEntrySnapshot>& left, const std::vector<CoreStackEntrySnapshot>& right)
+{
+    if (left.size() != right.size())
+    {
+        return false;
+    }
+    for (std::size_t i = 0; i < left.size(); ++i)
+    {
+        if (left[i].side != right[i].side || left[i].type != right[i].type ||
+            left[i].piece != right[i].piece || left[i].flags != right[i].flags)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+TargetCell RotateCell(int axis, int layer, int quarterTurns, int x, int y, int z, int type = 0)
+{
+    int turns = quarterTurns % 4;
+    if (turns < 0)
+    {
+        turns += 4;
+    }
+    int u = 0;
+    int v = 0;
+    switch (axis)
+    {
+    case 0:
+        u = x;
+        v = y;
+        break;
+    case 1:
+        u = x;
+        v = z;
+        break;
+    default:
+        u = y;
+        v = z;
+        break;
+    }
+    for (int i = 0; i < turns; ++i)
+    {
+        const int nextU = 7 - v;
+        const int nextV = u;
+        u = nextU;
+        v = nextV;
+    }
+    switch (axis)
+    {
+    case 0:
+        return { u, v, layer, type };
+    case 1:
+        return { u, layer, v, type };
+    default:
+        return { layer, u, v, type };
+    }
+}
+
 int TargetTypeForLocal(int localU, int localV)
 {
     constexpr int pattern[4][4] = {
@@ -1038,22 +1143,31 @@ int main()
         rubikLayerTurn.find("\"Y\"") != std::string::npos &&
         rubikLayerTurn.find("\"Z\"") != std::string::npos,
         "rubik convergence ritualTurn axes include X/Y/Z");
-    const std::string layerRange = ExtractObject(rubikLayerTurn, "layerRange");
-    int minLayer = -1;
-    int maxLayer = -1;
-    test.Check(ExtractIntValue(layerRange, "min", minLayer) && ExtractIntValue(layerRange, "max", maxLayer) &&
-        minLayer == 0 && maxLayer == 7,
+    test.Check(rubikLayerTurn.find("\"layers\"") != std::string::npos &&
+        rubikLayerTurn.find("0") != std::string::npos && rubikLayerTurn.find("7") != std::string::npos,
         "rubik convergence ritualTurn layers are 0..7");
     test.Check(rubikLayerTurn.find("-1") != std::string::npos && rubikLayerTurn.find("1") != std::string::npos,
         "rubik convergence ritualTurn quarter turns include -1 and +1");
+    bool movesProjected = false;
+    bool movesStacks = false;
+    bool recomputesFusion = false;
+    bool recomputesAnchors = false;
+    test.Check(ExtractBoolValue(rubikLayerTurn, "movesProjectedBoard", movesProjected) && movesProjected &&
+        ExtractBoolValue(rubikLayerTurn, "movesCoreStacks", movesStacks) && movesStacks &&
+        ExtractBoolValue(rubikLayerTurn, "recomputesFusion", recomputesFusion) && recomputesFusion &&
+        ExtractBoolValue(rubikLayerTurn, "recomputesAnchors", recomputesAnchors) && recomputesAnchors,
+        "rubik convergence ritualTurn declares runtime board/stack/fusion/anchor recompute");
+    test.Check(ExtractStringValue(rubikLayerTurn, "reserveInteraction") == "unaffected" &&
+        ExtractStringValue(rubikLayerTurn, "status") == "runtimePartial",
+        "rubik convergence ritualTurn declares reserve unaffected runtimePartial behavior");
     const std::string rubikCorePhysics = ExtractObject(rubikProfile, "corePhysicsProfile");
-    test.Check(ExtractStringValue(rubikCorePhysics, "layerTurnStackInteraction") == "deferred",
-        "rubik convergence defers stack/layer interaction");
+    test.Check(ExtractStringValue(rubikCorePhysics, "layerTurnStackInteraction") == "movesWholeCoreStacks",
+        "rubik convergence moves whole CoreCell stacks during layer turns");
     bool rubik216Enabled = true;
     test.Check(ExtractBoolValue(ExtractObject(rubikCorePhysics, "volumeSurface216Principle"), "enabled", rubik216Enabled) && !rubik216Enabled,
         "rubik convergence volumeSurface216Principle is disabled");
-    test.Check(rubikProfile.find("Stack/layer interaction is deferred.") != std::string::npos,
-        "rubik convergence knownLimitations mention stack/layer interaction deferred");
+    test.Check(rubikProfile.find("P2H layer turns move the projected board and whole CoreCell stacks") != std::string::npos,
+        "rubik convergence knownLimitations mention P2H runtime stack layer turns");
 
     test.Check(Chess3D_LoadRuleProfileJson(game, classicProfile.c_str()) == 1, "runtime loads classic six-side profile");
     test.Check(Chess3D_IsCoreStackEnabled(game) == 0, "classic profile keeps core stacks disabled");
@@ -1467,6 +1581,52 @@ int main()
     test.Check(Chess3D_IsGameOver(game) == 0 && Chess3D_GetWinnerSide(game) == 0,
         "sandbox profile does not trigger accidental winner");
 
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for disabled layer-turn test");
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn));
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(2, Knight));
+    Chess3D_RecomputeFusion(game);
+    for (const TargetCell& home : HomeCellsForSide(2))
+    {
+        if (home.type == Pawn)
+        {
+            Chess3D_SetPiece(game, home.x, home.y, home.z, 2, Pawn);
+        }
+    }
+    Chess3D_SetPiece(game, 0, 0, 0, 1, Rook);
+    Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn);
+    Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 3, 0, &played);
+    const std::vector<int> asgardBoardBeforeLayerTurn = BoardSnapshot(game);
+    const auto asgardStackBeforeLayerTurn = StackSnapshot(game, 2, 2, 2);
+    const int asgardFusionBeforeLayerTurn = Chess3D_GetCoreFusionKind(game, 2, 2, 2);
+    const int asgardReserveBeforeLayerTurn = Chess3D_GetReserveCount(game, 2, Pawn);
+    test.Check(Chess3D_IsLayerTurnEnabled(game) == 0 &&
+        Chess3D_CanRotateLayer(game, 0, 2, 1) == 0,
+        "asgard convergence keeps ritual layer turns disabled");
+    test.Check(Chess3D_RotateLayer(game, 0, 2, 1) == 0,
+        "asgard convergence rejects layer turn without mutating state");
+    int lastAxis = -2;
+    int lastLayer = -2;
+    int lastQuarterTurns = 0;
+    int lastLayerResult = 0;
+    test.Check(Chess3D_GetLastLayerTurnInfo(game, &lastAxis, &lastLayer, &lastQuarterTurns, &lastLayerResult) == 1 &&
+        lastLayerResult == LayerTurnDisabled && ReadLayerTurnResultName(lastLayerResult) == "disabled",
+        "disabled layer turn reports disabled result code");
+    test.Check(BoardSnapshot(game) == asgardBoardBeforeLayerTurn &&
+        SameStack(StackSnapshot(game, 2, 2, 2), asgardStackBeforeLayerTurn) &&
+        Chess3D_GetCoreFusionKind(game, 2, 2, 2) == asgardFusionBeforeLayerTurn &&
+        Chess3D_GetReserveCount(game, 2, Pawn) == asgardReserveBeforeLayerTurn,
+        "disabled layer turn preserves projected board, stack, fusion, and reserve");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, classicProfile.c_str()) == 1 &&
+        Chess3D_IsLayerTurnEnabled(game) == 0 &&
+        Chess3D_CanRotateLayer(game, 0, 0, 1) == 0,
+        "classic profile does not enable ritual layer turns");
+    test.Check(Chess3D_LoadRuleProfileJson(game, singleProfile.c_str()) == 1 &&
+        Chess3D_IsLayerTurnEnabled(game) == 0 &&
+        Chess3D_CanRotateLayer(game, 0, 0, 1) == 0,
+        "single-side profile does not enable ritual layer turns");
+
     test.Check(Chess3D_LoadRuleProfileJson(game, rubikProfile.c_str()) == 1, "runtime loads rubik convergence profile");
     test.Check(Chess3D_IsCoreStackEnabled(game) == 1, "rubik convergence enables core stacks");
     test.Check(Chess3D_IsFusionEnabled(game) == 1, "rubik convergence enables fusion descriptors");
@@ -1482,14 +1642,108 @@ int main()
         "runtime exposes rubik stackFusion profile");
     test.Check(Chess3D_IsReserveEnabled(game) == 1 && Chess3D_IsKnockbackEnabled(game) == 1,
         "rubik convergence loads reserve and knockback runtime profiles");
+    test.Check(Chess3D_IsLayerTurnEnabled(game) == 1 &&
+        Chess3D_CanRotateLayer(game, 0, 2, 1) == 1 &&
+        Chess3D_CanRotateLayer(game, 1, 3, -1) == 1 &&
+        Chess3D_CanRotateLayer(game, 2, 4, 1) == 1 &&
+        Chess3D_CanRotateLayer(game, 3, 2, 1) == 0 &&
+        Chess3D_CanRotateLayer(game, 0, 8, 1) == 0 &&
+        Chess3D_CanRotateLayer(game, 0, 2, 2) == 0,
+        "rubik convergence validates axes, layers, and quarter turns");
+    test.Check(ReadAbiString(game, Chess3D_GetLayerTurnProfileSummary).find("coreStacks=true") != std::string::npos,
+        "rubik convergence layer-turn summary reports core stack movement");
+
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 0, 0, 0, 1, Pawn);
+    Chess3D_SetPiece(game, 1, 2, 0, 2, Knight);
+    test.Check(Chess3D_RotateLayer(game, 0, 0, 1) == 1, "rubik profile rotates projected Z layer +1");
+    test.Check(Chess3D_GetPiece(game, 7, 0, 0) == PieceCode(1, Pawn) &&
+        Chess3D_GetPiece(game, 5, 1, 0) == PieceCode(2, Knight),
+        "projected Z +1 coordinates follow documented transform");
+    test.Check(Chess3D_RotateLayer(game, 0, 0, -1) == 1 &&
+        Chess3D_GetPiece(game, 0, 0, 0) == PieceCode(1, Pawn) &&
+        Chess3D_GetPiece(game, 1, 2, 0) == PieceCode(2, Knight),
+        "projected Z -1 returns pieces to original cells");
+
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 2, 3, 4, 1, Bishop);
+    TargetCell rotated = RotateCell(1, 3, 1, 2, 3, 4, Bishop);
+    test.Check(Chess3D_RotateLayer(game, 1, 3, 1) == 1 &&
+        Chess3D_GetPiece(game, rotated.x, rotated.y, rotated.z) == PieceCode(1, Bishop),
+        "projected Y layer rotation follows engine convention");
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 4, 1, 2, 1, Queen);
+    rotated = RotateCell(2, 4, 1, 4, 1, 2, Queen);
+    test.Check(Chess3D_RotateLayer(game, 2, 4, 1) == 1 &&
+        Chess3D_GetPiece(game, rotated.x, rotated.y, rotated.z) == PieceCode(1, Queen),
+        "projected X layer rotation follows engine convention");
+
     Chess3D_Clear(game);
     test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 1 &&
         Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Rook)) == 1 &&
         Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionFriendlyPair,
         "rubik convergence evaluates stack fusion before layer turns");
-    test.Check(Chess3D_RotateLayer(game, 0, 2, 1) == 0 &&
-        Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionFriendlyPair,
-        "rubik convergence keeps fusion stable after deferred stack rotation");
+    const auto originalStack = StackSnapshot(game, 2, 2, 2);
+    const TargetCell movedStackCell = RotateCell(0, 2, 1, 2, 2, 2);
+    test.Check(Chess3D_RotateLayer(game, 0, 2, 1) == 1 &&
+        Chess3D_GetCoreStackCount(game, 2, 2, 2) == 0 &&
+        SameStack(StackSnapshot(game, movedStackCell.x, movedStackCell.y, movedStackCell.z), originalStack) &&
+        Chess3D_GetProjectedPiece(game, movedStackCell.x, movedStackCell.y, movedStackCell.z) == PieceCode(1, Rook),
+        "rubik layer turn moves whole CoreCell stack and projected top piece");
+    test.Check(Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionNone &&
+        Chess3D_GetCoreFusionKind(game, movedStackCell.x, movedStackCell.y, movedStackCell.z) == FusionFriendlyPair,
+        "fusion descriptor follows moved core stack");
+
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn));
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Rook));
+    Chess3D_PushCoreStackPiece(game, 3, 5, 2, PieceCode(2, King));
+    Chess3D_PushCoreStackPiece(game, 3, 5, 2, PieceCode(2, Queen));
+    const auto boardBeforeFourTurns = BoardSnapshot(game);
+    const auto stackA = StackSnapshot(game, 2, 2, 2);
+    const auto stackB = StackSnapshot(game, 3, 5, 2);
+    for (int i = 0; i < 4; ++i)
+    {
+        test.Check(Chess3D_RotateLayer(game, 0, 2, 1) == 1, "four-turn identity step succeeds");
+    }
+    test.Check(BoardSnapshot(game) == boardBeforeFourTurns &&
+        SameStack(StackSnapshot(game, 2, 2, 2), stackA) &&
+        SameStack(StackSnapshot(game, 3, 5, 2), stackB),
+        "four identical layer turns restore projected board and stacks");
+
+    Chess3D_Clear(game);
+    const TargetCell anchorBefore = TargetCellsForSide(1).front();
+    Chess3D_PushCoreStackPiece(game, anchorBefore.x, anchorBefore.y, anchorBefore.z, PieceCode(1, anchorBefore.type));
+    Chess3D_RecomputeAnchors(game);
+    const int anchorCountBeforeTurn = Chess3D_GetAnchorCount(game, 1);
+    test.Check(anchorCountBeforeTurn == 1, "rubik anchor is counted before rotating fixed world target slot away");
+    test.Check(Chess3D_RotateLayer(game, 0, anchorBefore.z, 1) == 1 &&
+        Chess3D_GetAnchorCount(game, 1) == 0,
+        "anchor/victory recomputes after layer turn against fixed world target slots");
+
+    Chess3D_Clear(game);
+    for (const TargetCell& home : HomeCellsForSide(2))
+    {
+        if (home.type == Pawn)
+        {
+            Chess3D_SetPiece(game, home.x, home.y, home.z, 2, Pawn);
+        }
+    }
+    Chess3D_SetPiece(game, 0, 0, 0, 1, Rook);
+    Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn);
+    Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 3, 0, &played);
+    const int reserveBeforeTurn = Chess3D_GetReserveCount(game, 2, Pawn);
+    test.Check(reserveBeforeTurn == 1, "rubik reserve setup creates reserve count before layer turn");
+    test.Check(Chess3D_RotateLayer(game, 0, 0, 1) == 1 &&
+        Chess3D_GetReserveCount(game, 2, Pawn) == reserveBeforeTurn,
+        "rubik layer turn leaves reserve counts unaffected");
+    test.Check(Chess3D_GetLastLayerTurnInfo(game, &lastAxis, &lastLayer, &lastQuarterTurns, &lastLayerResult) == 1 &&
+        lastAxis == 0 && lastLayer == 0 && lastQuarterTurns == 1 && lastLayerResult == LayerTurnSuccess,
+        "successful layer turn reports last axis/layer/quarter/result");
+    test.Check(Chess3D_RotateLayer(game, 0, 0, 2) == 0 &&
+        Chess3D_GetLastLayerTurnInfo(game, &lastAxis, &lastLayer, &lastQuarterTurns, &lastLayerResult) == 1 &&
+        lastLayerResult == LayerTurnInvalidQuarterTurns,
+        "invalid quarter turn reports invalidQuarterTurns result code");
 
     Chess3D_Destroy(game);
     return test.Finish("Chess3DEngineContractTests");

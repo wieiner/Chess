@@ -114,4 +114,4 @@ CI verifies:
 
 `rude-resource/` is a local ignored resource archive and is absent on CI. `scripts\verify.ps1` checks the ignore rule through the probe path `rude-resource/.verify-ignore-probe`, without creating that file.
 
-CUDA remains optional in CI and in the default local build. The next recommended project stage is P2H: Rubik layer turns that move projected board cells, CoreCell stacks, fusion descriptors, and reserve state safely.
+CUDA remains optional in CI and in the default local build. After P2H, the same verification pipeline also covers Rubik convergence layer turns that rotate the projected board, move CoreCell stacks, recompute fusion/anchors, and preserve reserve counts.

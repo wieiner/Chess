@@ -106,8 +106,8 @@
   "corePhysicsProfile": {
     "type": "asgardCorePhysics",
     "zoneModel": "outerExclusive_coreStack",
-    "implementationStage": "specOnly",
-    "layerTurnStackInteraction": "deferred",
+    "implementationStage": "runtime",
+    "layerTurnStackInteraction": "movesWholeCoreStacks",
     "volumeSurface216Principle": {
       "enabled": false,
       "description": "Future symbolic rule: 6x6x6 volume equals six 6x6 faces, both 216 unit cells."
@@ -116,12 +116,15 @@
   "layerTurnProfile": {
     "type": "ritualTurn",
     "axes": ["X", "Y", "Z"],
-    "layerRange": {
-      "min": 0,
-      "max": 7
-    },
+    "layers": [0, 1, 2, 3, 4, 5, 6, 7],
     "quarterTurns": [-1, 1],
-    "actionCost": "oneTurn"
+    "actionCost": "oneTurn",
+    "movesProjectedBoard": true,
+    "movesCoreStacks": true,
+    "recomputesFusion": true,
+    "recomputesAnchors": true,
+    "reserveInteraction": "unaffected",
+    "status": "runtimePartial"
   },
   "turnProfile": {
     "type": "roundRobinWithLayerActions",
@@ -138,12 +141,10 @@
   },
   "knownLimitations": [
     "King-safety after layer rotation is deferred.",
-    "Anchor interaction with layer rotations is deferred.",
-    "Stack/layer interaction is deferred.",
-    "P2E CoreCell stacks are implemented for the Forbidden Core, but Rubik layer turns do not move stacks yet.",
-    "Stack fusion is evaluated after the current board/stack state; Rubik layer turns do not move stacks yet.",
+    "P2H layer turns move the projected board and whole CoreCell stacks, then recompute fusion and anchors.",
+    "Stack fusion is evaluated after the current board/stack state and after each runtime layer turn.",
     "P2G knockback/reserve is evaluated for ordinary outer-field captures; layer turns do not move reserve.",
     "P2F centerAssembly victory remains compatible and exposes fusion/implosion as progress descriptors.",
-    "Runtime ritualTurn legality is deferred to P2H."
+    "Notation, replay, online serialization, animation, and AI/search integration for ritual turns are deferred."
   ]
 }

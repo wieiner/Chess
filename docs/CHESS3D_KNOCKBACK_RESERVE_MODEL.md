@@ -58,4 +58,6 @@ Deferred:
 - restoring pieces from reserve;
 - visual reserve inventory;
 - online serialization;
-- Rubik layer turns moving reserve or stacks.
+- moving reserve during Rubik layer turns.
+
+P2H moves projected board cells and whole CoreCell stacks for Rubik convergence. Reserve counts remain outside the board and are unaffected by layer turns.

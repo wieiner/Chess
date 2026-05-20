@@ -53,3 +53,7 @@ The Volume-Surface 216 Principle remains future/disabled metadata. P2F does not 
 P2G does not make fusion destructive.
 
 When a piece enters the Forbidden Core, existing occupants remain in the stack. If entries from different sides share the cell, fusion reports contested state. Knockback applies only to ordinary outside destinations, including core-to-outside captures against an enemy outside piece.
+
+## P2H Layer-Turn Interaction
+
+P2H moves whole CoreCell stacks during Rubik convergence ritual layer turns. Fusion descriptors are recomputed after the stack relocation, so a `friendlyPair`, `royalPair`, or `contested` state follows the moved stack to its new core cell. Layer turns do not merge, split, or destroy stack entries.

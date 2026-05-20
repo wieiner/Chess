@@ -60,7 +60,9 @@
     "type": "none"
   },
   "layerTurnProfile": {
-    "type": "disabled"
+    "type": "disabled",
+    "status": "implementedByCurrentBoardModel",
+    "notes": "Single-side training keeps layer turns disabled."
   },
   "turnProfile": {
     "type": "singleSideLoop",

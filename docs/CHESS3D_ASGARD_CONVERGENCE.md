@@ -32,6 +32,7 @@ Gameplay comes from these profiles:
 - `corePhysicsProfile.type = asgardCorePhysics`;
 - `victoryProfile.type = allPiecesAnchored`;
 - `layerTurnProfile.type = disabled` in the base Asgard profile.
+- Rubik-style ritual turns are implemented only in the separate Rubik convergence profile.
 
 ## Core Cube
 
@@ -123,4 +124,5 @@ Deferred:
 - destructive fusion/implosion event model;
 - contested anchor scoring/dislodging;
 - reserve restore action and inventory UI;
+- Rubik layer-turn animation/notation/online serialization;
 - checkmate/hybrid hardening.

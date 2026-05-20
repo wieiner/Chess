@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P2G Asgard knockback/reserve capture semantics.
+Last audited locally for P2H Rubik layer-turn runtime.
 
 ## Exists
 
@@ -47,6 +47,12 @@ Last audited locally for P2G Asgard knockback/reserve capture semantics.
 - `docs/CHESS3D_KNOCKBACK_RESERVE_ABI.md`: append-only reserve/knockback ABI contract.
 - `docs/CHESS3D_CAPTURE_SEMANTICS.md`: classic vs Asgard/Rubik capture behavior.
 - `docs/CHESS3D_P2G_KNOCKBACK_RESERVE_RUNTIME.md`: P2G implementation notes.
+- `docs/CHESS3D_P2H_RUBIK_LAYER_TURN_AUDIT.md`: audit of the previous rotate-layer boundary.
+- `docs/CHESS3D_RUBIK_LAYER_TURN_SEMANTICS.md`: formal layer-turn coordinate transforms.
+- `docs/CHESS3D_P2H_RUBIK_LAYER_TURN_RUNTIME.md`: runtime behavior for ritual layer turns.
+- `docs/CHESS3D_RUBIK_LAYER_TURN_ABI.md`: append-only layer-turn ABI contract.
+- `docs/CHESS3D_RUBIK_LAYER_TURN_COORDINATES.md`: axis-code and invariant notes.
+- `docs/CHESS3D_RUBIK_STACK_ROTATION.md`: whole-stack relocation model.
 
 ## Build-Verified
 
@@ -64,6 +70,7 @@ Last audited locally for P2G Asgard knockback/reserve capture semantics.
 - Chess3D contract tests now cover P2E CoreCell stacks, stack ABI, stack projection, stack-aware anchors, and basic entering/core-to-core/leaving-core moves.
 - Chess3D contract tests now cover P2F fusion descriptors: disabled profile isolation, single/friendly/royal/contested states, fusion recompute, move integration, implosion progress, and Rubik deferred layer-turn stability.
 - Chess3D contract tests now cover P2G knockback/reserve: classic isolation, Asgard home-slot return, reserve fallback, own-piece rejection, outside-to-core no-knockback behavior, core-to-outside capture routing, reset clearing, and Rubik profile loading.
+- Chess3D contract tests now cover P2H Rubik layer turns: profile gating, projected board rotation for X/Y/Z conventions, CoreCell stack relocation, fusion recompute, anchor/victory recompute, reserve invariance, four-turn identity, and last-result telemetry.
 - `scripts/verify.ps1` checks that representative RuleProfile JSON files are copied into Chess3D development output and `ProductionOutput`.
 
 ## User Executables
@@ -108,6 +115,11 @@ Portable outputs:
 - Asgard/Rubik convergence profiles route ordinary outer-field captures through knockback/home-or-reserve semantics.
 - Reserve is stored as side/type counts without unique piece ids.
 - Chess3DApp status text exposes reserve enabled, knockback enabled, current-side reserve total, and last capture destination.
+- Rubik convergence profile enables runtime `ritualTurn` layer actions.
+- `Chess3D_RotateLayer` can rotate the projected board and whole CoreCell stacks for Rubik convergence, then recompute fusion, anchors, implosion progress, and compatible victory.
+- Asgard/classic/single-side profiles keep ritual layer turns disabled and fail cleanly without mutating board/stack/fusion/reserve state.
+- Reserve counts are unaffected by layer turns.
+- Chess3DApp status text exposes layer-turn enabled state and last layer-turn result.
 
 ## Draft
 
@@ -116,7 +128,7 @@ Portable outputs:
 - Final Asgard/Meru fusion physics are not implemented yet; P2F provides descriptor/progress state but not destructive transformation, visual effects, or full victory variants.
 - Runtime board projection remains one integer piece per cell for compatibility, while stack data exists as a Forbidden Core overlay.
 - Reserve restore action, reserve inventory UI, and reserve notation are not implemented yet.
-- Rubik layer turns as legal chess actions are specified as `ritualTurn` but not implemented yet.
+- Rubik layer turns are implemented as runtimePartial ritual actions for Rubik convergence, but animation, notation/replay, online serialization, AI/search generation, and GPU stack snapshots are still draft.
 - 3D relay/web-platform contract is a documented client-side foundation, not a hosted production service.
 - Rubik arbitrary-state solving beyond trusted move history remains future work.
 - UI smoke tests are still manual.

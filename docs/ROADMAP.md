@@ -82,9 +82,13 @@
 
 ### P2H - Rubik Turns Moving Pieces And Stacks
 
-- Implement `layerTurnProfile.type = ritualTurn`.
-- Enforce axes, layers, quarter turns, action cost, and turn order.
-- Define interaction with king safety, anchors, CoreCell stacks, fusion descriptors, reserve counts, notation, and replay.
+- Completed: `layerTurnProfile.type = ritualTurn` runtime for Rubik convergence.
+- Completed: projected board rotation for ABI axes `0=Z`, `1=Y`, `2=X`.
+- Completed: whole CoreCell stack relocation during layer turns.
+- Completed: fusion, anchors, implosion progress, and compatible victory recompute after turns.
+- Completed: reserve counts remain unaffected by turns.
+- Completed: append-only layer-turn ABI, C# wrapper/status, JSON/schema updates, and contract tests.
+- Deferred: king-safety hardening after rotations, notation/replay, online serialization, AI/search generation, UI animation, and GPU stack snapshots.
 
 ### P2I - Reserve Restore Action And UI Inventory
 
@@ -92,10 +96,11 @@
 - Add reserve inventory UI and notation.
 - Decide whether restored pieces return to home, edge entry gates, or profile-defined drop zones.
 
-### P2J - Stack And Fusion UI
+### P2J - Layer-Turn / Stack / Fusion UI
 
 - Visualize multiple stack entries in one core cell.
 - Display fusion/contested/royal/implosion state in the board view.
+- Add layer-turn controls, animation, and optional notation/replay display.
 - Add safe editor workflows for stack inspection without changing fusion descriptors manually.
 
 ### P3 - Full Six-Side Gameplay And Hybrid Victory

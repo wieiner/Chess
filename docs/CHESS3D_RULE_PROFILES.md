@@ -49,7 +49,7 @@ The native engine now has two loader paths:
 - `Chess3D_LoadRulesJson`: legacy draft rules loader.
 - `Chess3D_LoadRuleProfileJson`: strict RuleProfile loader.
 
-P2D stores profile summary fields, exposes append-only ABI getters, derives CoreCube target slots, and computes simple centerAssembly anchor/victory projection. P2E implements runtime CoreCell stacks for `coreStack` / `asgardCorePhysics` profiles and makes anchors stack-aware. P2F evaluates fusion descriptors and implosion progress for stack-enabled Asgard/Rubik profiles. P2G implements runtimePartial knockback/reserve capture routing for Asgard/Rubik profiles.
+P2D stores profile summary fields, exposes append-only ABI getters, derives CoreCube target slots, and computes simple centerAssembly anchor/victory projection. P2E implements runtime CoreCell stacks for `coreStack` / `asgardCorePhysics` profiles and makes anchors stack-aware. P2F evaluates fusion descriptors and implosion progress for stack-enabled Asgard/Rubik profiles. P2G implements runtimePartial knockback/reserve capture routing for Asgard/Rubik profiles. P2H implements runtimePartial `ritualTurn` layer actions for Rubik convergence.
 
 Profile files are copied to:
 
@@ -66,5 +66,5 @@ Profiles keep the game from becoming a pile of hardcoded branches:
 - movement can stay reusable;
 - goals can vary between checkmate, center assembly, hybrid, and sandbox;
 - capture behavior can differ by mode;
-- Rubik layer turns can be disabled, sandbox-only, or legal actions;
+- Rubik layer turns can be disabled, sandbox-only, or legal actions. In P2H, `rubik-convergence-3d-8x8x8-v0.1` rotates the projected board and whole CoreCell stacks, recomputes fusion/anchors, and leaves reserve counts unaffected;
 - myth/narrative can change without breaking headless engine tests.

@@ -8,6 +8,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -56,6 +57,18 @@ enum KnockbackDestination
     KnockbackClassicRemoved = 3
 };
 
+enum LayerTurnResult
+{
+    LayerTurnNone = 0,
+    LayerTurnSuccess = 1,
+    LayerTurnDisabled = 2,
+    LayerTurnInvalidAxis = 3,
+    LayerTurnInvalidLayer = 4,
+    LayerTurnInvalidQuarterTurns = 5,
+    LayerTurnStackMoveFailed = 6,
+    LayerTurnInternalError = 7
+};
+
 struct Vec3
 {
     int x = 0;
@@ -91,6 +104,11 @@ struct Rules
     std::string fusionProfileType = "none";
     std::string corePhysicsProfileType = "none";
     std::string layerTurnProfileType = "disabled";
+    bool layerTurnMovesProjectedBoard = false;
+    bool layerTurnMovesCoreStacks = false;
+    bool layerTurnRecomputesFusion = false;
+    bool layerTurnRecomputesAnchors = false;
+    std::string layerTurnActionCost = "none";
     std::string victoryProfileType = "sandbox";
     std::string implosionProfileType = "none";
     std::string implosionProfileMode = "none";
@@ -162,6 +180,10 @@ struct Game
     int lastKnockbackHomeX = -1;
     int lastKnockbackHomeY = -1;
     int lastKnockbackHomeZ = -1;
+    int lastLayerTurnAxis = -1;
+    int lastLayerTurnLayer = -1;
+    int lastLayerTurnQuarterTurns = 0;
+    int lastLayerTurnResultCode = LayerTurnNone;
     bool gameOver = false;
     int winnerSide = 0;
     std::string lastProfileLoadError;
@@ -261,6 +283,62 @@ bool isKnockbackEnabled(const Rules& rules)
     return rules.captureProfileType == "knockbackCapture" &&
         rules.knockbackProfileType == "homeOrReserve" &&
         isReserveEnabled(rules);
+}
+
+bool isLayerTurnEnabled(const Rules& rules)
+{
+    return rules.layerTurnProfileType == "ritualTurn";
+}
+
+bool isLegacyDebugLayerTurnAllowed(const Rules& rules)
+{
+    return rules.rulesetId == "cube-chess-8x8x8-draft" && !isCoreStackEnabled(rules);
+}
+
+bool isValidLayerTurnAxis(int axis)
+{
+    return axis >= 0 && axis <= 2;
+}
+
+bool isValidLayerTurnLayer(int layer)
+{
+    return layer >= 0 && layer < BoardSize;
+}
+
+bool isValidLayerTurnQuarterTurns(int quarterTurns)
+{
+    return quarterTurns == -1 || quarterTurns == 1;
+}
+
+int normalizedTurns(int quarterTurns)
+{
+    int turns = quarterTurns % 4;
+    if (turns < 0)
+    {
+        turns += 4;
+    }
+    return turns;
+}
+
+char layerTurnAxisName(int axis)
+{
+    return axis == 0 ? 'Z' : axis == 1 ? 'Y' : 'X';
+}
+
+std::string layerTurnResultName(int resultCode)
+{
+    switch (resultCode)
+    {
+    case LayerTurnNone: return "none";
+    case LayerTurnSuccess: return "success";
+    case LayerTurnDisabled: return "disabled";
+    case LayerTurnInvalidAxis: return "invalidAxis";
+    case LayerTurnInvalidLayer: return "invalidLayer";
+    case LayerTurnInvalidQuarterTurns: return "invalidQuarterTurns";
+    case LayerTurnStackMoveFailed: return "stackMoveFailed";
+    case LayerTurnInternalError: return "internalError";
+    default: return "unknown";
+    }
 }
 
 std::string fusionKindName(int fusionKind)
@@ -638,6 +716,13 @@ bool parseRuleProfileMetadata(Rules& rules, std::string& error)
     rules.fusionProfileType = profileTypeOrFallback(json, "fusionProfile", "");
     rules.corePhysicsProfileType = profileTypeOrFallback(json, "corePhysicsProfile", "none");
     rules.layerTurnProfileType = profileTypeOrFallback(json, "layerTurnProfile", "");
+    const std::string layerTurnProfile = extractObject(json, "layerTurnProfile");
+    const bool defaultLayerTurnRuntime = rules.layerTurnProfileType == "ritualTurn";
+    rules.layerTurnMovesProjectedBoard = extractBool(layerTurnProfile, "movesProjectedBoard", defaultLayerTurnRuntime);
+    rules.layerTurnMovesCoreStacks = extractBool(layerTurnProfile, "movesCoreStacks", defaultLayerTurnRuntime);
+    rules.layerTurnRecomputesFusion = extractBool(layerTurnProfile, "recomputesFusion", defaultLayerTurnRuntime);
+    rules.layerTurnRecomputesAnchors = extractBool(layerTurnProfile, "recomputesAnchors", defaultLayerTurnRuntime);
+    rules.layerTurnActionCost = extractString(layerTurnProfile, "actionCost", defaultLayerTurnRuntime ? "oneTurn" : "none");
     rules.victoryProfileType = profileTypeOrFallback(json, "victoryProfile", "sandbox");
     rules.implosionProfileType = profileTypeOrFallback(json, "implosionProfile", "none");
     rules.implosionProfileMode = extractString(extractObject(json, "implosionProfile"), "mode", "none");
@@ -886,12 +971,21 @@ void clearLastCaptureState(Game& game)
     game.lastKnockbackHomeZ = -1;
 }
 
+void clearLastLayerTurnState(Game& game)
+{
+    game.lastLayerTurnAxis = -1;
+    game.lastLayerTurnLayer = -1;
+    game.lastLayerTurnQuarterTurns = 0;
+    game.lastLayerTurnResultCode = LayerTurnNone;
+}
+
 void clearGamePosition(Game& game)
 {
     clear(game.pos);
     clearCoreStacks(game);
     clearFusionStates(game);
     clearReserveState(game);
+    clearLastLayerTurnState(game);
 }
 
 bool setCoreStackSingle(Game& game, int index, int pieceCode)
@@ -1765,6 +1859,119 @@ void rotateLayer(Position& pos, int axis, int layer, int turns)
         }
     }
     pos.lastMove = Move{};
+}
+
+bool isCellInLayer(int axis, int layer, int x, int y, int z)
+{
+    return (axis == 0 && z == layer) || (axis == 1 && y == layer) || (axis == 2 && x == layer);
+}
+
+void syncAllProjectedCoreCells(Game& game)
+{
+    if (!isCoreStackEnabled(game.rules))
+    {
+        return;
+    }
+    for (int index = 0; index < CellCount; ++index)
+    {
+        if (isInsideCore(game.rules, index))
+        {
+            syncProjectedPiece(game, index);
+        }
+    }
+}
+
+bool canRotateCoreStacksLayer(const Game& game, int axis, int layer, int turns)
+{
+    if (!isCoreStackEnabled(game.rules))
+    {
+        return true;
+    }
+    for (int z = 0; z < BoardSize; ++z)
+    {
+        for (int y = 0; y < BoardSize; ++y)
+        {
+            for (int x = 0; x < BoardSize; ++x)
+            {
+                if (!isCellInLayer(axis, layer, x, y, z))
+                {
+                    continue;
+                }
+                const int from = indexOf(x, y, z);
+                const auto& stack = game.coreStacks[static_cast<std::size_t>(from)];
+                if (stack.empty())
+                {
+                    continue;
+                }
+                const Vec3 to = rotateLayerSquare(axis, layer, turns, x, y, z);
+                const int toIndex = indexOf(to.x, to.y, to.z);
+                if (!isInsideCore(game.rules, from) || !isInsideCore(game.rules, toIndex))
+                {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+bool rotateCoreStacksLayer(Game& game, int axis, int layer, int turns)
+{
+    if (!isCoreStackEnabled(game.rules))
+    {
+        return true;
+    }
+
+    const auto before = game.coreStacks;
+    auto after = before;
+    for (int z = 0; z < BoardSize; ++z)
+    {
+        for (int y = 0; y < BoardSize; ++y)
+        {
+            for (int x = 0; x < BoardSize; ++x)
+            {
+                if (isCellInLayer(axis, layer, x, y, z))
+                {
+                    after[static_cast<std::size_t>(indexOf(x, y, z))].clear();
+                }
+            }
+        }
+    }
+
+    for (int z = 0; z < BoardSize; ++z)
+    {
+        for (int y = 0; y < BoardSize; ++y)
+        {
+            for (int x = 0; x < BoardSize; ++x)
+            {
+                if (!isCellInLayer(axis, layer, x, y, z))
+                {
+                    continue;
+                }
+                const int from = indexOf(x, y, z);
+                const auto& stack = before[static_cast<std::size_t>(from)];
+                if (stack.empty())
+                {
+                    continue;
+                }
+                if (!isInsideCore(game.rules, from))
+                {
+                    return false;
+                }
+                const Vec3 to = rotateLayerSquare(axis, layer, turns, x, y, z);
+                const int toIndex = indexOf(to.x, to.y, to.z);
+                if (!isInsideCore(game.rules, toIndex))
+                {
+                    return false;
+                }
+                after[static_cast<std::size_t>(toIndex)] = stack;
+            }
+        }
+    }
+
+    game.coreStacks = std::move(after);
+    syncAllProjectedCoreCells(game);
+    return true;
 }
 
 int evaluateForSide(const Position& pos, int side)
@@ -2689,34 +2896,135 @@ CHESS3D_API int Chess3D_MakeBestMove(void* handle, int depth, Chess3DMoveDto* pl
 CHESS3D_API int Chess3D_RotateLayer(void* handle, int axis, int layer, int quarterTurns)
 {
     auto* game = asGame(handle);
-    if (game == nullptr || axis < 0 || axis > 2 || layer < 0 || layer >= BoardSize)
+    if (game == nullptr)
     {
         return 0;
     }
-    if (isCoreStackEnabled(game->rules))
+    game->lastLayerTurnAxis = axis;
+    game->lastLayerTurnLayer = layer;
+    game->lastLayerTurnQuarterTurns = quarterTurns;
+
+    if (!isValidLayerTurnAxis(axis))
     {
-        game->lastInfo = "3D Rubik rotation with CoreCell stacks is deferred.";
+        game->lastLayerTurnResultCode = LayerTurnInvalidAxis;
+        game->lastInfo = "3D Rubik layer turn rejected: invalid axis.";
+        return 0;
+    }
+    if (!isValidLayerTurnLayer(layer))
+    {
+        game->lastLayerTurnResultCode = LayerTurnInvalidLayer;
+        game->lastInfo = "3D Rubik layer turn rejected: invalid layer.";
         return 0;
     }
 
-    int turns = quarterTurns % 4;
-    if (turns < 0)
+    const bool ritualEnabled = isLayerTurnEnabled(game->rules);
+    const bool legacyDebug = isLegacyDebugLayerTurnAllowed(game->rules);
+    if (!ritualEnabled && !legacyDebug)
     {
-        turns += 4;
+        game->lastLayerTurnResultCode = LayerTurnDisabled;
+        game->lastInfo = "3D Rubik layer turn rejected: layer turns disabled for this profile.";
+        return 0;
     }
+    if (ritualEnabled && !isValidLayerTurnQuarterTurns(quarterTurns))
+    {
+        game->lastLayerTurnResultCode = LayerTurnInvalidQuarterTurns;
+        game->lastInfo = "3D Rubik layer turn rejected: quarterTurns must be -1 or +1.";
+        return 0;
+    }
+
+    const int turns = normalizedTurns(quarterTurns);
     if (turns == 0)
     {
+        game->lastLayerTurnResultCode = LayerTurnSuccess;
         game->lastInfo = "3D Rubik rotation skipped.";
         return 1;
     }
+    if (ritualEnabled && game->rules.layerTurnMovesCoreStacks && !canRotateCoreStacksLayer(*game, axis, layer, turns))
+    {
+        game->lastLayerTurnResultCode = LayerTurnStackMoveFailed;
+        game->lastInfo = "3D Rubik layer turn rejected: core stack relocation failed.";
+        return 0;
+    }
 
     rotateLayer(game->pos, axis, layer, turns);
+    if (ritualEnabled && game->rules.layerTurnMovesCoreStacks)
+    {
+        if (!rotateCoreStacksLayer(*game, axis, layer, turns))
+        {
+            game->lastLayerTurnResultCode = LayerTurnStackMoveFailed;
+            game->lastInfo = "3D Rubik layer turn rejected: core stack relocation failed.";
+            return 0;
+        }
+    }
+    else if (isCoreStackEnabled(game->rules))
+    {
+        syncAllProjectedCoreCells(*game);
+    }
+
+    if (ritualEnabled && game->rules.layerTurnActionCost == "oneTurn")
+    {
+        game->pos.sideToMove = nextSide(game->rules, game->pos.sideToMove);
+    }
     recomputeAnchors(*game);
+    game->lastLayerTurnResultCode = LayerTurnSuccess;
     std::ostringstream info;
-    const char axisName = axis == 0 ? 'Z' : axis == 1 ? 'Y' : 'X';
+    const char axisName = layerTurnAxisName(axis);
     info << "3D Rubik rotate " << axisName << (layer + 1) << " x" << turns;
     game->lastInfo = info.str();
     return 1;
+}
+
+CHESS3D_API int Chess3D_IsLayerTurnEnabled(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr && isLayerTurnEnabled(game->rules) ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_CanRotateLayer(void* handle, int axis, int layer, int quarterTurns)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !isLayerTurnEnabled(game->rules))
+    {
+        return 0;
+    }
+    return isValidLayerTurnAxis(axis) && isValidLayerTurnLayer(layer) && isValidLayerTurnQuarterTurns(quarterTurns) ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_GetLastLayerTurnInfo(void* handle, int* axis, int* layer, int* quarterTurns, int* resultCode)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || axis == nullptr || layer == nullptr || quarterTurns == nullptr || resultCode == nullptr)
+    {
+        return 0;
+    }
+    *axis = game->lastLayerTurnAxis;
+    *layer = game->lastLayerTurnLayer;
+    *quarterTurns = game->lastLayerTurnQuarterTurns;
+    *resultCode = game->lastLayerTurnResultCode;
+    return 1;
+}
+
+CHESS3D_API int Chess3D_GetLayerTurnProfileSummary(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    std::ostringstream summary;
+    summary << "type=" << game->rules.layerTurnProfileType
+        << "; enabled=" << (isLayerTurnEnabled(game->rules) ? "true" : "false")
+        << "; projectedBoard=" << (game->rules.layerTurnMovesProjectedBoard ? "true" : "false")
+        << "; coreStacks=" << (game->rules.layerTurnMovesCoreStacks ? "true" : "false")
+        << "; recomputeFusion=" << (game->rules.layerTurnRecomputesFusion ? "true" : "false")
+        << "; recomputeAnchors=" << (game->rules.layerTurnRecomputesAnchors ? "true" : "false")
+        << "; actionCost=" << game->rules.layerTurnActionCost;
+    return copyString(summary.str(), buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_GetLayerTurnResultName(int resultCode, char* buffer, int capacity)
+{
+    return copyString(layerTurnResultName(resultCode), buffer, capacity);
 }
 
 CHESS3D_API int Chess3D_GetPositionText(void* handle, char* buffer, int capacity)

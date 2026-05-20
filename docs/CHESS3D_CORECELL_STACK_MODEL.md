@@ -105,7 +105,7 @@ Invalid coordinates, outside-core pushes, disabled-stack pushes, invalid indices
 
 Classic and single-side profiles use `occupancyProfile.type = exclusive`. Their stack APIs report disabled behavior and do not produce centerAssembly victories.
 
-Asgard and Rubik convergence profiles enable stacks, but Rubik layer turns still do not move stacks in P2E.
+Asgard and Rubik convergence profiles enable stacks. P2H moves whole stacks during Rubik convergence ritual layer turns and then resynchronizes the projected board from the moved stack tops.
 
 ## 8. Fusion Descriptor Overlay
 

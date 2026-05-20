@@ -236,10 +236,23 @@ public partial class Chess3DWindow : Window
         var fusionText = $", side fusion {_engine.GetSideFusionCount(state.SideToMove)}, implosion {_engine.GetSideImplosionProgress(state.SideToMove)}";
         var knockback = _engine.GetLastKnockbackInfo();
         var reserveText = $", reserve {(_engine.IsReserveEnabled() ? "on" : "off")} total {_engine.GetReserveTotal(state.SideToMove)}, knockback {(_engine.IsKnockbackEnabled() ? "on" : "off")} last {KnockbackDestinationName(knockback.DestinationKind)} captured {LabelForPiece(knockback.CapturedPieceCode)}";
+        var layerTurn = _engine.GetLastLayerTurnInfo();
+        var layerTurnText = $", layerTurn {(_engine.IsLayerTurnEnabled() ? "on" : "off")} last {AxisName(layerTurn.Axis)}{(layerTurn.Layer >= 0 ? layerTurn.Layer + 1 : 0)} {layerTurn.QuarterTurns:+0;-0;0} {_engine.GetLayerTurnResultName(layerTurn.ResultCode)}";
         HeaderStatus.Text = $"Side {state.SideToMove}, pieces {state.PieceCount}, moves {state.LegalMoveCount}";
-        RulesText.Text = $"Board {rules.Width}x{rules.Height}x{rules.Depth}, sides {rules.ActiveSideCount}, profile {(rules.MovementProfile == 0 ? "setup-only" : "draft3d")}, max {rules.MaxPiecesPerSide}/side, view {SelectedAxis()} {(IsAllLayersView() ? "all" : "slice")}, grid {SelectedGridMode()}\nRuleset {_engine.GetCurrentRulesetId()}, goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}, layer {_engine.GetLayerTurnProfileType()}, anchors {anchorCount}/{requiredAnchors}{fusionText}{reserveText}{gameOverText}{stackText}";
+        RulesText.Text = $"Board {rules.Width}x{rules.Height}x{rules.Depth}, sides {rules.ActiveSideCount}, profile {(rules.MovementProfile == 0 ? "setup-only" : "draft3d")}, max {rules.MaxPiecesPerSide}/side, view {SelectedAxis()} {(IsAllLayersView() ? "all" : "slice")}, grid {SelectedGridMode()}\nRuleset {_engine.GetCurrentRulesetId()}, goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}, layer {_engine.GetLayerTurnProfileType()}, anchors {anchorCount}/{requiredAnchors}{fusionText}{reserveText}{layerTurnText}{gameOverText}{stackText}";
         InfoText.Text = _engine.GetLastInfo();
         PositionText.Text = $"Models: {SelectedModelSetName()}, OBJ {_lastObjModels}, fallback {_lastFallbackModels}, hints {selectedMoves.Length}\n{_engine.GetPositionText()}";
+    }
+
+    private static string AxisName(int axis)
+    {
+        return axis switch
+        {
+            0 => "Z",
+            1 => "Y",
+            2 => "X",
+            _ => "-"
+        };
     }
 
     private static string KnockbackDestinationName(int destinationKind)
