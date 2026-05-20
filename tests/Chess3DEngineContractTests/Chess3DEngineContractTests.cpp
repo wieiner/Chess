@@ -32,6 +32,10 @@ constexpr int FusionFlagContested = 1;
 constexpr int FusionFlagRoyalPair = 2;
 constexpr int FusionFlagAnchoredFusion = 4;
 constexpr int FusionFlagImplosionSeed = 8;
+constexpr int KnockbackNone = 0;
+constexpr int KnockbackHome = 1;
+constexpr int KnockbackReserve = 2;
+constexpr int KnockbackClassicRemoved = 3;
 
 std::string ReadTextFile(const std::string& path)
 {
@@ -628,6 +632,31 @@ std::vector<TargetCell> TargetCellsForSide(int side)
     }
     return cells;
 }
+
+std::vector<TargetCell> HomeCellsForSide(int side)
+{
+    std::vector<TargetCell> cells;
+    for (int localV = 0; localV < 4; ++localV)
+    {
+        for (int localU = 0; localU < 4; ++localU)
+        {
+            const int u = 2 + localU;
+            const int v = 2 + localV;
+            const int type = TargetTypeForLocal(localU, localV);
+            switch (side)
+            {
+            case 1: cells.push_back({ u, v, 0, type }); break;
+            case 2: cells.push_back({ 7 - u, 7 - v, 7, type }); break;
+            case 3: cells.push_back({ u, 0, v, type }); break;
+            case 4: cells.push_back({ 7 - u, 7, 7 - v, type }); break;
+            case 5: cells.push_back({ 0, u, v, type }); break;
+            case 6: cells.push_back({ 7, 7 - u, 7 - v, type }); break;
+            default: break;
+            }
+        }
+    }
+    return cells;
+}
 }
 
 int main()
@@ -905,6 +934,10 @@ int main()
         "classic six-side goalProfile is classicCheckmate");
     test.Check(ExtractStringValue(ExtractObject(classicProfile, "captureProfile"), "type") == "classicCapture",
         "classic six-side captureProfile is classicCapture");
+    test.Check(ExtractStringValue(ExtractObject(classicProfile, "knockbackProfile"), "type") == "none",
+        "classic six-side knockbackProfile is none");
+    test.Check(ExtractStringValue(ExtractObject(classicProfile, "reserveProfile"), "type") == "none",
+        "classic six-side reserveProfile is none");
     test.Check(ExtractStringValue(ExtractObject(classicProfile, "occupancyProfile"), "type") == "exclusive",
         "classic six-side occupancyProfile is exclusive");
     test.Check(ExtractStringValue(ExtractObject(classicProfile, "fusionProfile"), "type") == "none",
@@ -920,12 +953,31 @@ int main()
         "single-side occupancyProfile is exclusive");
     test.Check(ExtractStringValue(ExtractObject(singleProfile, "fusionProfile"), "type") == "none",
         "single-side fusionProfile is none");
+    test.Check(ExtractStringValue(ExtractObject(singleProfile, "knockbackProfile"), "type") == "none",
+        "single-side knockbackProfile is none");
+    test.Check(ExtractStringValue(ExtractObject(singleProfile, "reserveProfile"), "type") == "none",
+        "single-side reserveProfile is none");
 
     test.Check(ExtractStringValue(ExtractObject(asgardProfile, "goalProfile"), "type") == "centerAssembly",
         "asgard convergence goalProfile is centerAssembly");
     test.Check(ValidateCoreCube(asgardProfile, 2, 5), "asgard convergence coreCube is x/y/z 2..5");
     test.Check(ExtractStringValue(ExtractObject(asgardProfile, "captureProfile"), "type") == "knockbackCapture",
         "asgard convergence captureProfile is knockbackCapture");
+    const std::string asgardKnockback = ExtractObject(asgardProfile, "knockbackProfile");
+    test.Check(ExtractStringValue(asgardKnockback, "type") == "homeOrReserve",
+        "asgard convergence knockbackProfile is homeOrReserve");
+    test.Check(ExtractStringValue(asgardKnockback, "homeSlotPolicy") == "firstMatchingFreeHomeSlot" &&
+        ExtractStringValue(asgardKnockback, "fallback") == "reserve" &&
+        ExtractStringValue(asgardKnockback, "appliesTo") == "outerFieldCaptures",
+        "asgard convergence knockbackProfile routes outer-field captures home or reserve");
+    bool destructiveCoreCapture = true;
+    test.Check(ExtractBoolValue(asgardKnockback, "destructiveCoreCapture", destructiveCoreCapture) && !destructiveCoreCapture,
+        "asgard convergence disables destructive core capture");
+    const std::string asgardReserve = ExtractObject(asgardProfile, "reserveProfile");
+    test.Check(ExtractStringValue(asgardReserve, "type") == "sidePieceTypeCounts" &&
+        ExtractStringValue(asgardReserve, "restoreAction") == "deferred" &&
+        ExtractStringValue(asgardReserve, "status") == "runtimePartial",
+        "asgard convergence reserveProfile is runtimePartial side/type counts");
     const std::string asgardOccupancy = ExtractObject(asgardProfile, "occupancyProfile");
     test.Check(ExtractStringValue(asgardOccupancy, "type") == "coreStack",
         "asgard convergence occupancyProfile is coreStack");
@@ -973,6 +1025,10 @@ int main()
         "rubik convergence occupancyProfile is coreStack");
     test.Check(ExtractStringValue(ExtractObject(rubikProfile, "fusionProfile"), "type") == "stackFusion",
         "rubik convergence fusionProfile is stackFusion");
+    test.Check(ExtractStringValue(ExtractObject(rubikProfile, "knockbackProfile"), "type") == "homeOrReserve",
+        "rubik convergence knockbackProfile is homeOrReserve");
+    test.Check(ExtractStringValue(ExtractObject(rubikProfile, "reserveProfile"), "type") == "sidePieceTypeCounts",
+        "rubik convergence reserveProfile is sidePieceTypeCounts");
     test.Check(ExtractStringValue(ExtractObject(rubikProfile, "implosionProfile"), "mode") == "progressState",
         "rubik convergence implosion is progress state");
     const std::string rubikLayerTurn = ExtractObject(rubikProfile, "layerTurnProfile");
@@ -1018,9 +1074,28 @@ int main()
         "runtime exposes classic fusion profile");
     test.Check(ReadAbiString(game, Chess3D_GetLayerTurnProfileType) == "disabled",
         "runtime exposes classic layer profile");
+    test.Check(Chess3D_IsReserveEnabled(game) == 0 && Chess3D_IsKnockbackEnabled(game) == 0,
+        "classic profile keeps reserve and knockback disabled");
+    Chess3D_Clear(game);
+    test.Check(Chess3D_SetPiece(game, 0, 0, 0, 1, Rook) == 1 &&
+        Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn) == 1 &&
+        Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 3, 0, &played) == 1,
+        "classic profile preserves old outer capture behavior");
+    int lastCaptured = 0;
+    int lastDestination = -1;
+    int lastX = -1;
+    int lastY = -1;
+    int lastZ = -1;
+    test.Check(Chess3D_GetPiece(game, 0, 0, 3) == PieceCode(1, Rook) &&
+        Chess3D_GetLastKnockbackInfo(game, &lastCaptured, &lastDestination, &lastX, &lastY, &lastZ) == 1 &&
+        lastCaptured == PieceCode(2, Pawn) && lastDestination == KnockbackClassicRemoved &&
+        Chess3D_GetReserveTotal(game, 2) == 0,
+        "classic capture removes captured piece without reserve");
 
     test.Check(Chess3D_LoadRuleProfileJson(game, singleProfile.c_str()) == 1, "runtime loads single-side profile");
     test.Check(Chess3D_IsFusionEnabled(game) == 0, "single-side profile keeps fusion disabled");
+    test.Check(Chess3D_IsReserveEnabled(game) == 0 && Chess3D_IsKnockbackEnabled(game) == 0,
+        "single-side profile keeps reserve and knockback disabled");
     test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "single-side-3d-8x8x8-v0.1",
         "runtime exposes single-side ruleset id");
     test.Check(ReadAbiString(game, Chess3D_GetGoalProfileType) == "sandbox",
@@ -1029,6 +1104,8 @@ int main()
     test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime loads asgard convergence profile");
     test.Check(Chess3D_IsCoreStackEnabled(game) == 1, "asgard profile enables core stacks");
     test.Check(Chess3D_IsFusionEnabled(game) == 1, "asgard profile enables fusion descriptors");
+    test.Check(Chess3D_IsReserveEnabled(game) == 1 && Chess3D_IsKnockbackEnabled(game) == 1,
+        "asgard profile enables reserve and knockback");
     Chess3D_Clear(game);
     test.Check(Chess3D_GetCoreStackCount(game, 2, 2, 2) == 0, "asgard clear leaves target stack empty");
     test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 1, "asgard push first core stack piece succeeds");
@@ -1233,6 +1310,92 @@ int main()
         Chess3D_GetPiece(game, 2, 2, 1) == PieceCode(1, Rook),
         "leaving core removes top entry and places it outside");
 
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for knockback home test");
+    Chess3D_Clear(game);
+    test.Check(Chess3D_SetPiece(game, 0, 0, 0, 1, Rook) == 1 &&
+        Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn) == 1 &&
+        Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 3, 0, &played) == 1,
+        "asgard outside-to-outside enemy capture succeeds");
+    test.Check(Chess3D_GetLastKnockbackInfo(game, &lastCaptured, &lastDestination, &lastX, &lastY, &lastZ) == 1 &&
+        lastCaptured == PieceCode(2, Pawn) &&
+        lastDestination == KnockbackHome &&
+        Chess3D_GetPiece(game, 0, 0, 3) == PieceCode(1, Rook) &&
+        Chess3D_GetPiece(game, lastX, lastY, lastZ) == PieceCode(2, Pawn) &&
+        Chess3D_GetReserveCount(game, 2, Pawn) == 0,
+        "asgard capture returns captured piece to first free matching home slot");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for reserve fallback test");
+    Chess3D_Clear(game);
+    for (const TargetCell& home : HomeCellsForSide(2))
+    {
+        if (home.type == Pawn)
+        {
+            Chess3D_SetPiece(game, home.x, home.y, home.z, 2, Pawn);
+        }
+    }
+    test.Check(Chess3D_SetPiece(game, 0, 0, 0, 1, Rook) == 1 &&
+        Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn) == 1 &&
+        Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 3, 0, &played) == 1,
+        "asgard capture succeeds when captured home slots are blocked");
+    test.Check(Chess3D_GetLastKnockbackInfo(game, &lastCaptured, &lastDestination, &lastX, &lastY, &lastZ) == 1 &&
+        lastCaptured == PieceCode(2, Pawn) &&
+        lastDestination == KnockbackReserve &&
+        Chess3D_GetReserveCount(game, 2, Pawn) == 1 &&
+        Chess3D_GetReserveTotal(game, 2) == 1,
+        "asgard capture falls back to reserve when matching home slots are blocked");
+    test.Check(Chess3D_ClearReserve(game, 2) == 1 && Chess3D_GetReserveTotal(game, 2) == 0,
+        "reserve can be cleared for a side through ABI");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for own-destination capture test");
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 0, 0, 0, 1, Rook);
+    Chess3D_SetPiece(game, 0, 0, 3, 1, Pawn);
+    test.Check(Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 3, 0, &played) == 0 &&
+        Chess3D_GetReserveTotal(game, 1) == 0,
+        "own-piece outside destination is rejected and reserve remains unchanged");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for outside-to-core reserve isolation test");
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(2, Pawn));
+    Chess3D_SetPiece(game, 2, 2, 1, 1, Rook);
+    test.Check(Chess3D_TryMakeMove(game, 2, 2, 1, 2, 2, 2, 0, &played) == 1 &&
+        Chess3D_GetCoreStackCount(game, 2, 2, 2) == 2 &&
+        Chess3D_IsCoreCellContested(game, 2, 2, 2) == 1 &&
+        Chess3D_GetReserveTotal(game, 2) == 0 &&
+        Chess3D_GetLastCapturedPieceReserveDestination(game) == KnockbackNone,
+        "outside-to-core entry preserves occupants and does not knock back");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for core-to-outside capture test");
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn));
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Rook));
+    Chess3D_SetPiece(game, 2, 2, 1, 2, Pawn);
+    test.Check(Chess3D_TryMakeMove(game, 2, 2, 2, 2, 2, 1, 0, &played) == 1 &&
+        Chess3D_GetPiece(game, 2, 2, 1) == PieceCode(1, Rook) &&
+        Chess3D_GetCoreStackCount(game, 2, 2, 2) == 1 &&
+        Chess3D_GetLastKnockbackInfo(game, &lastCaptured, &lastDestination, &lastX, &lastY, &lastZ) == 1 &&
+        lastCaptured == PieceCode(2, Pawn) &&
+        (lastDestination == KnockbackHome || lastDestination == KnockbackReserve),
+        "core-to-outside enemy capture routes captured piece through knockback");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for reserve reset test");
+    Chess3D_Clear(game);
+    for (const TargetCell& home : HomeCellsForSide(2))
+    {
+        if (home.type == Pawn)
+        {
+            Chess3D_SetPiece(game, home.x, home.y, home.z, 2, Pawn);
+        }
+    }
+    Chess3D_SetPiece(game, 0, 0, 0, 1, Rook);
+    Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn);
+    Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 3, 0, &played);
+    test.Check(Chess3D_GetReserveCount(game, 2, Pawn) == 1, "reserve increments before reset");
+    Chess3D_Reset(game);
+    test.Check(Chess3D_GetReserveTotal(game, 2) == 0 &&
+        Chess3D_GetLastCapturedPieceReserveDestination(game) == KnockbackNone,
+        "reset clears reserve and last knockback state");
+
     test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for anchor stack test");
     Chess3D_Clear(game);
     for (const TargetCell& cell : TargetCellsForSide(1))
@@ -1317,6 +1480,8 @@ int main()
         "runtime exposes rubik coreStack occupancy profile");
     test.Check(ReadAbiString(game, Chess3D_GetFusionProfileType) == "stackFusion",
         "runtime exposes rubik stackFusion profile");
+    test.Check(Chess3D_IsReserveEnabled(game) == 1 && Chess3D_IsKnockbackEnabled(game) == 1,
+        "rubik convergence loads reserve and knockback runtime profiles");
     Chess3D_Clear(game);
     test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 1 &&
         Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Rook)) == 1 &&

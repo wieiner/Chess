@@ -269,6 +269,50 @@ internal sealed class NativeChess3DEngine : IDisposable
         return ReadString((buffer, capacity) => Chess3D_GetFusionKindName(fusionKind, buffer, capacity));
     }
 
+    public bool IsReserveEnabled()
+    {
+        ThrowIfDisposed();
+        return Chess3D_IsReserveEnabled(_handle) != 0;
+    }
+
+    public bool IsKnockbackEnabled()
+    {
+        ThrowIfDisposed();
+        return Chess3D_IsKnockbackEnabled(_handle) != 0;
+    }
+
+    public int GetReserveCount(int side, int pieceType)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetReserveCount(_handle, side, pieceType);
+    }
+
+    public int GetReserveTotal(int side)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetReserveTotal(_handle, side);
+    }
+
+    public int GetLastCapturedPieceCode()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetLastCapturedPieceCode(_handle);
+    }
+
+    public int GetLastCapturedPieceReserveDestination()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetLastCapturedPieceReserveDestination(_handle);
+    }
+
+    public (int CapturedPieceCode, int DestinationKind, int X, int Y, int Z) GetLastKnockbackInfo()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetLastKnockbackInfo(_handle, out var captured, out var destination, out var x, out var y, out var z) != 0
+            ? (captured, destination, x, y, z)
+            : (0, 0, -1, -1, -1);
+    }
+
     public void Dispose()
     {
         if (_handle != IntPtr.Zero)
@@ -408,6 +452,27 @@ internal sealed class NativeChess3DEngine : IDisposable
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_GetFusionKindName(int fusionKind, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_IsReserveEnabled(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_IsKnockbackEnabled(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetReserveCount(IntPtr handle, int side, int pieceType);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetReserveTotal(IntPtr handle, int side);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastCapturedPieceCode(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastCapturedPieceReserveDestination(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastKnockbackInfo(IntPtr handle, out int capturedPieceCode, out int destinationKind, out int x, out int y, out int z);
 }
 
 [StructLayout(LayoutKind.Sequential)]

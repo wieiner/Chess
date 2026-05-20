@@ -11,6 +11,25 @@ P2B adds profile JSON files under `assets/rules/profiles`. P2D makes those profi
 | `asgard_convergence_3d_v0_1.json` | `asgard-convergence-3d-8x8x8-v0.1` | `centerAssembly` | `knockbackCapture` | `disabled` |
 | `rubik_convergence_3d_v0_1.json` | `rubik-convergence-3d-8x8x8-v0.1` | `centerAssembly` | `knockbackCapture` | `ritualTurn` |
 
+## Capture / Reserve Fields
+
+P2G extends profiles with:
+
+- `knockbackProfile`: `none` or `homeOrReserve`.
+- `reserveProfile`: `none`, `disabled`, or `sidePieceTypeCounts`.
+
+Classic and single-side profiles keep `classicCapture`, `knockbackProfile: none`, and `reserveProfile: none`.
+
+Asgard and Rubik convergence profiles use:
+
+```text
+captureProfile.type = knockbackCapture
+knockbackProfile.type = homeOrReserve
+reserveProfile.type = sidePieceTypeCounts
+```
+
+At runtime, ordinary outer-field captures return the captured piece to a matching free home slot when possible. If no matching home slot is free, the captured piece increments reserve count for its side and type. Core captures remain non-destructive stack co-occupancy.
+
 ## Core Physics Fields
 
 P2C extends profiles with:
@@ -30,7 +49,7 @@ The native engine now has two loader paths:
 - `Chess3D_LoadRulesJson`: legacy draft rules loader.
 - `Chess3D_LoadRuleProfileJson`: strict RuleProfile loader.
 
-P2D stores profile summary fields, exposes append-only ABI getters, derives CoreCube target slots, and computes simple centerAssembly anchor/victory projection. P2E implements runtime CoreCell stacks for `coreStack` / `asgardCorePhysics` profiles and makes anchors stack-aware. P2F evaluates fusion descriptors and implosion progress for stack-enabled Asgard/Rubik profiles.
+P2D stores profile summary fields, exposes append-only ABI getters, derives CoreCube target slots, and computes simple centerAssembly anchor/victory projection. P2E implements runtime CoreCell stacks for `coreStack` / `asgardCorePhysics` profiles and makes anchors stack-aware. P2F evaluates fusion descriptors and implosion progress for stack-enabled Asgard/Rubik profiles. P2G implements runtimePartial knockback/reserve capture routing for Asgard/Rubik profiles.
 
 Profile files are copied to:
 

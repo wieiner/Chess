@@ -30,7 +30,16 @@
   },
   "captureProfile": {
     "type": "classicCapture",
-    "capturedPiece": "removedFromBoard"
+    "capturedPiece": "removedFromBoard",
+    "status": "implementedByCurrentBoardModel"
+  },
+  "knockbackProfile": {
+    "type": "none",
+    "status": "implementedByCurrentBoardModel"
+  },
+  "reserveProfile": {
+    "type": "none",
+    "status": "implementedByCurrentBoardModel"
   },
   "goalProfile": {
     "type": "sandbox",

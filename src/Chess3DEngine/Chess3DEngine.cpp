@@ -48,6 +48,14 @@ constexpr int FusionFlagAnchoredFusion = 4;
 constexpr int FusionFlagImplosionSeed = 8;
 constexpr int FusionFlagImplosionReady = 16;
 
+enum KnockbackDestination
+{
+    KnockbackNone = 0,
+    KnockbackHome = 1,
+    KnockbackReserve = 2,
+    KnockbackClassicRemoved = 3
+};
+
 struct Vec3
 {
     int x = 0;
@@ -77,6 +85,8 @@ struct Rules
     std::string rulesetDisplayName = "Cube Chess 8x8x8 Draft";
     std::string goalProfileType = "sandbox";
     std::string captureProfileType = "classicCapture";
+    std::string knockbackProfileType = "none";
+    std::string reserveProfileType = "none";
     std::string occupancyProfileType = "exclusive";
     std::string fusionProfileType = "none";
     std::string corePhysicsProfileType = "none";
@@ -145,6 +155,13 @@ struct Game
     std::array<int, 7> sideRoyalPairCounts{};
     std::array<int, 7> sideContestedCounts{};
     std::array<int, 7> sideImplosionProgress{};
+    std::array<std::array<int, 7>, 7> reserveCounts{};
+    bool lastCaptureWasKnockback = false;
+    int lastCapturedPieceCode = 0;
+    int lastKnockbackDestination = KnockbackNone;
+    int lastKnockbackHomeX = -1;
+    int lastKnockbackHomeY = -1;
+    int lastKnockbackHomeZ = -1;
     bool gameOver = false;
     int winnerSide = 0;
     std::string lastProfileLoadError;
@@ -232,6 +249,18 @@ bool isCoreStackEnabled(const Rules& rules)
 bool isFusionEnabled(const Rules& rules)
 {
     return isCoreStackEnabled(rules) && rules.fusionProfileType != "none";
+}
+
+bool isReserveEnabled(const Rules& rules)
+{
+    return rules.reserveProfileType == "sidePieceTypeCounts";
+}
+
+bool isKnockbackEnabled(const Rules& rules)
+{
+    return rules.captureProfileType == "knockbackCapture" &&
+        rules.knockbackProfileType == "homeOrReserve" &&
+        isReserveEnabled(rules);
 }
 
 std::string fusionKindName(int fusionKind)
@@ -603,6 +632,8 @@ bool parseRuleProfileMetadata(Rules& rules, std::string& error)
     rules.rulesetDisplayName = extractString(json, "displayName", rules.rulesetId);
     rules.goalProfileType = profileTypeOrFallback(json, "goalProfile", "");
     rules.captureProfileType = profileTypeOrFallback(json, "captureProfile", "");
+    rules.knockbackProfileType = profileTypeOrFallback(json, "knockbackProfile", "none");
+    rules.reserveProfileType = profileTypeOrFallback(json, "reserveProfile", "none");
     rules.occupancyProfileType = profileTypeOrFallback(json, "occupancyProfile", "");
     rules.fusionProfileType = profileTypeOrFallback(json, "fusionProfile", "");
     rules.corePhysicsProfileType = profileTypeOrFallback(json, "corePhysicsProfile", "none");
@@ -621,6 +652,16 @@ bool parseRuleProfileMetadata(Rules& rules, std::string& error)
     if (!stringInSet(rules.captureProfileType, { "classicCapture", "knockbackCapture" }))
     {
         error = "RuleProfile rejected: unsupported captureProfile.type.";
+        return false;
+    }
+    if (!stringInSet(rules.knockbackProfileType, { "none", "homeOrReserve" }))
+    {
+        error = "RuleProfile rejected: unsupported knockbackProfile.type.";
+        return false;
+    }
+    if (!stringInSet(rules.reserveProfileType, { "none", "disabled", "sidePieceTypeCounts" }))
+    {
+        error = "RuleProfile rejected: unsupported reserveProfile.type.";
         return false;
     }
     if (!stringInSet(rules.occupancyProfileType, { "exclusive", "coreStack", "quantumCore" }))
@@ -821,11 +862,36 @@ void clearFusionStates(Game& game)
     game.sideImplosionProgress.fill(0);
 }
 
+void clearReserveState(Game& game)
+{
+    for (auto& sideCounts : game.reserveCounts)
+    {
+        sideCounts.fill(0);
+    }
+    game.lastCaptureWasKnockback = false;
+    game.lastCapturedPieceCode = 0;
+    game.lastKnockbackDestination = KnockbackNone;
+    game.lastKnockbackHomeX = -1;
+    game.lastKnockbackHomeY = -1;
+    game.lastKnockbackHomeZ = -1;
+}
+
+void clearLastCaptureState(Game& game)
+{
+    game.lastCaptureWasKnockback = false;
+    game.lastCapturedPieceCode = 0;
+    game.lastKnockbackDestination = KnockbackNone;
+    game.lastKnockbackHomeX = -1;
+    game.lastKnockbackHomeY = -1;
+    game.lastKnockbackHomeZ = -1;
+}
+
 void clearGamePosition(Game& game)
 {
     clear(game.pos);
     clearCoreStacks(game);
     clearFusionStates(game);
+    clearReserveState(game);
 }
 
 bool setCoreStackSingle(Game& game, int index, int pieceCode)
@@ -978,6 +1044,75 @@ int targetSlotType(const Rules& rules, int side, int x, int y, int z)
         return Empty;
     }
     return central4x4TargetType(localU, localV);
+}
+
+bool findFreeHomeSlot(const Game& game, int pieceCode, int excludedIndex, int& homeIndex)
+{
+    const int side = pieceSide(pieceCode);
+    const int type = pieceType(pieceCode);
+    if (side < 1 || side > 6 || type < Pawn || type > King)
+    {
+        return false;
+    }
+
+    for (int localV = 0; localV < 4; ++localV)
+    {
+        for (int localU = 0; localU < 4; ++localU)
+        {
+            if (central4x4TargetType(localU, localV) != type)
+            {
+                continue;
+            }
+            const Vec3 home = faceCenterSquare(side, localU, localV);
+            const int index = indexOf(home.x, home.y, home.z);
+            if (index == excludedIndex)
+            {
+                continue;
+            }
+            if (game.pos.board[static_cast<std::size_t>(index)] == Empty)
+            {
+                homeIndex = index;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void routeCapturedPiece(Game& game, int capturedPiece, int destinationIndex)
+{
+    clearLastCaptureState(game);
+    if (!isValidPieceCode(capturedPiece) || capturedPiece == Empty)
+    {
+        return;
+    }
+
+    game.lastCapturedPieceCode = capturedPiece;
+    if (!isKnockbackEnabled(game.rules))
+    {
+        game.lastKnockbackDestination = KnockbackClassicRemoved;
+        return;
+    }
+
+    game.lastCaptureWasKnockback = true;
+    int homeIndex = -1;
+    if (findFreeHomeSlot(game, capturedPiece, destinationIndex, homeIndex))
+    {
+        game.pos.board[static_cast<std::size_t>(homeIndex)] = capturedPiece;
+        game.lastKnockbackDestination = KnockbackHome;
+        game.lastKnockbackHomeX = xOf(homeIndex);
+        game.lastKnockbackHomeY = yOf(homeIndex);
+        game.lastKnockbackHomeZ = zOf(homeIndex);
+        return;
+    }
+
+    const int side = pieceSide(capturedPiece);
+    const int type = pieceType(capturedPiece);
+    if (side >= 1 && side <= 6 && type >= Pawn && type <= King)
+    {
+        ++game.reserveCounts[side][type];
+    }
+    game.lastKnockbackDestination = KnockbackReserve;
 }
 
 bool stackHasTypeForSide(const std::vector<CoreStackEntry>& stack, int side, int type)
@@ -1547,6 +1682,15 @@ void applyMove(Game& game, Move move)
     else
     {
         game.pos.board[static_cast<std::size_t>(move.from)] = Empty;
+    }
+
+    if (!toCore && move.captured != Empty)
+    {
+        routeCapturedPiece(game, move.captured, move.to);
+    }
+    else
+    {
+        clearLastCaptureState(game);
     }
 
     if (toCore)
@@ -2191,6 +2335,106 @@ CHESS3D_API int Chess3D_GetFusionKindName(int fusionKind, char* buffer, int capa
     return copyString(fusionKindName(fusionKind), buffer, capacity);
 }
 
+CHESS3D_API int Chess3D_IsReserveEnabled(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr && isReserveEnabled(game->rules) ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_IsKnockbackEnabled(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr && isKnockbackEnabled(game->rules) ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_GetReserveCount(void* handle, int side, int pieceTypeIn)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || side < 1 || side > 6 || pieceTypeIn < Pawn || pieceTypeIn > King || !isReserveEnabled(game->rules))
+    {
+        return 0;
+    }
+    return game->reserveCounts[side][pieceTypeIn];
+}
+
+CHESS3D_API int Chess3D_GetReserveTotal(void* handle, int side)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || side < 1 || side > 6 || !isReserveEnabled(game->rules))
+    {
+        return 0;
+    }
+    int total = 0;
+    for (int type = Pawn; type <= King; ++type)
+    {
+        total += game->reserveCounts[side][type];
+    }
+    return total;
+}
+
+CHESS3D_API int Chess3D_ClearReserve(void* handle, int side)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || side < 1 || side > 6 || !isReserveEnabled(game->rules))
+    {
+        return 0;
+    }
+    game->reserveCounts[side].fill(0);
+    game->lastInfo = "3D reserve cleared for side.";
+    return 1;
+}
+
+CHESS3D_API int Chess3D_GetLastCaptureWasKnockback(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr && game->lastCaptureWasKnockback ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_GetLastCapturedPieceCode(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? game->lastCapturedPieceCode : 0;
+}
+
+CHESS3D_API int Chess3D_GetLastCapturedPieceReserveDestination(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? game->lastKnockbackDestination : KnockbackNone;
+}
+
+CHESS3D_API int Chess3D_GetLastKnockbackHomeX(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? game->lastKnockbackHomeX : -1;
+}
+
+CHESS3D_API int Chess3D_GetLastKnockbackHomeY(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? game->lastKnockbackHomeY : -1;
+}
+
+CHESS3D_API int Chess3D_GetLastKnockbackHomeZ(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? game->lastKnockbackHomeZ : -1;
+}
+
+CHESS3D_API int Chess3D_GetLastKnockbackInfo(void* handle, int* capturedPieceCode, int* destinationKind, int* x, int* y, int* z)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || capturedPieceCode == nullptr || destinationKind == nullptr || x == nullptr || y == nullptr || z == nullptr)
+    {
+        return 0;
+    }
+    *capturedPieceCode = game->lastCapturedPieceCode;
+    *destinationKind = game->lastKnockbackDestination;
+    *x = game->lastKnockbackHomeX;
+    *y = game->lastKnockbackHomeY;
+    *z = game->lastKnockbackHomeZ;
+    return 1;
+}
+
 CHESS3D_API int Chess3D_GetRulesInfo(void* handle, Chess3DRulesInfoDto* info)
 {
     auto* game = asGame(handle);
@@ -2267,6 +2511,7 @@ CHESS3D_API int Chess3D_SetBoard(void* handle, const int* pieces512, int sideToM
         }
     }
     clearCoreStacks(*game);
+    clearReserveState(*game);
     std::copy(pieces512, pieces512 + CellCount, game->pos.board.begin());
     if (isCoreStackEnabled(game->rules))
     {

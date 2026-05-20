@@ -25,6 +25,8 @@ Gameplay comes from these profiles:
 - `goalProfile.type = centerAssembly`;
 - `coreProfile.type = asgardMeruCore`;
 - `captureProfile.type = knockbackCapture`;
+- `knockbackProfile.type = homeOrReserve`;
+- `reserveProfile.type = sidePieceTypeCounts`;
 - `occupancyProfile.type = coreStack`;
 - `fusionProfile.type = stackFusion`;
 - `corePhysicsProfile.type = asgardCorePhysics`;
@@ -93,11 +95,11 @@ P2E makes anchors stack-aware. A target slot is anchored when any entry in that 
 
 Convergence uses `knockbackCapture`:
 
-- captured piece returns to its home slot if that slot is free;
+- captured piece returns to the first matching free home slot if possible;
 - otherwise it goes to reserve;
 - reserve restore is deferred.
 
-Runtime knockback/reserve is not implemented yet.
+P2G implements runtimePartial knockback/reserve for ordinary outer-field captures and core-to-outside captures. Entering the Forbidden Core does not knock back occupants; it creates stack co-occupancy and possible contested fusion state.
 
 ## Implemented Now
 
@@ -113,11 +115,12 @@ Implemented now:
 - stack-aware anchor count and centerAssembly victory;
 - fusion descriptors for single, friendlyPair, friendlyStack, royalPair, and contested cells;
 - implosion progress state;
+- knockback/home-or-reserve capture routing for ordinary outer-field captures;
 - P2A movement/setup contracts remain executable through `Chess3DEngineContractTests`.
 
 Deferred:
 
 - destructive fusion/implosion event model;
 - contested anchor scoring/dislodging;
-- knockback/reserve behavior;
+- reserve restore action and inventory UI;
 - checkmate/hybrid hardening.

@@ -44,7 +44,32 @@
       "type": "object",
       "required": ["type"],
       "properties": {
-        "type": { "enum": ["classicCapture", "knockbackCapture"] }
+        "type": { "enum": ["classicCapture", "knockbackCapture"] },
+        "capturedPiece": { "type": "string" },
+        "fallback": { "type": "string" },
+        "reserveRestoreAction": { "type": "string" },
+        "status": { "enum": ["implementedByCurrentBoardModel", "runtimePartial", "specOnly", "draft", "future"] }
+      }
+    },
+    "knockbackProfile": {
+      "type": "object",
+      "properties": {
+        "type": { "enum": ["none", "homeOrReserve"] },
+        "homeSlotPolicy": { "type": "string" },
+        "fallback": { "type": "string" },
+        "appliesTo": { "type": "string" },
+        "coreCapturePolicy": { "type": "string" },
+        "destructiveCoreCapture": { "type": "boolean" },
+        "status": { "enum": ["implementedByCurrentBoardModel", "runtimePartial", "specOnly", "draft", "future"] }
+      }
+    },
+    "reserveProfile": {
+      "type": "object",
+      "properties": {
+        "type": { "enum": ["none", "disabled", "sidePieceTypeCounts"] },
+        "restoreAction": { "type": "string" },
+        "maxByPieceType": { "type": ["string", "integer"] },
+        "status": { "enum": ["implementedByCurrentBoardModel", "runtimePartial", "specOnly", "draft", "future"] }
       }
     },
     "goalProfile": {

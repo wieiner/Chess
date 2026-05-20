@@ -32,7 +32,7 @@ This separation allows classic six-side chess and Asgard/Meru convergence to exi
 
 `Chess3D_RotateLayer` transforms the projected board for non-stack draft profiles and is used by the UI and network messages. P2D can load the Rubik convergence profile and expose `layerTurnProfile.type = ritualTurn` through profile summary ABI.
 
-P2E adds CoreCell stacks to the Forbidden Core. P2F adds fusion descriptors over those stacks. To avoid corrupting stacked cells or stale fusion descriptors, `Chess3D_RotateLayer` now fails cleanly when core stacks are enabled. Ritual layer turns are still profile data, not legal chess actions.
+P2E adds CoreCell stacks to the Forbidden Core. P2F adds fusion descriptors over those stacks. P2G adds reserve counts for knockback captures. To avoid corrupting stacked cells, stale fusion descriptors, or reserve ownership, `Chess3D_RotateLayer` now fails cleanly when core stacks are enabled. Ritual layer turns are still profile data, not legal chess actions.
 
 Deferred:
 
@@ -40,7 +40,7 @@ Deferred:
 - turn-cost enforcement;
 - king-safety after layer rotation;
 - anchor interaction after layer rotation;
-- stack/fusion movement when a layer contains CoreCell stacks;
+- stack/fusion/reserve movement when a layer contains CoreCell stacks;
 - notation and replay semantics.
 
-These belong to P2H on top of the P2E CoreCell stack model and P2F fusion descriptors.
+These belong to P2H on top of the P2E CoreCell stack model, P2F fusion descriptors, and P2G reserve state.

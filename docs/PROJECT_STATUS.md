@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P2F Asgard fusion and implosion runtime descriptors.
+Last audited locally for P2G Asgard knockback/reserve capture semantics.
 
 ## Exists
 
@@ -42,6 +42,11 @@ Last audited locally for P2F Asgard fusion and implosion runtime descriptors.
 - `docs/CHESS3D_FUSION_ABI.md`: append-only fusion ABI contract.
 - `docs/CHESS3D_IMPLOSION_PROGRESS.md`: progress-state implosion notes.
 - `docs/CHESS3D_FUSION_AND_ANCHORS.md`: relationship between target-slot anchors and fusion descriptors.
+- `docs/CHESS3D_P2G_KNOCKBACK_RESERVE_AUDIT.md`: capture/stack/fusion boundary audit before P2G.
+- `docs/CHESS3D_KNOCKBACK_RESERVE_MODEL.md`: home-or-reserve runtime model.
+- `docs/CHESS3D_KNOCKBACK_RESERVE_ABI.md`: append-only reserve/knockback ABI contract.
+- `docs/CHESS3D_CAPTURE_SEMANTICS.md`: classic vs Asgard/Rubik capture behavior.
+- `docs/CHESS3D_P2G_KNOCKBACK_RESERVE_RUNTIME.md`: P2G implementation notes.
 
 ## Build-Verified
 
@@ -58,6 +63,7 @@ Last audited locally for P2F Asgard fusion and implosion runtime descriptors.
 - Chess3D contract tests now load P2D RuleProfiles at runtime, check profile summary ABI getters, target slots, simple anchor progress, profile isolation, and centerAssembly victory projection.
 - Chess3D contract tests now cover P2E CoreCell stacks, stack ABI, stack projection, stack-aware anchors, and basic entering/core-to-core/leaving-core moves.
 - Chess3D contract tests now cover P2F fusion descriptors: disabled profile isolation, single/friendly/royal/contested states, fusion recompute, move integration, implosion progress, and Rubik deferred layer-turn stability.
+- Chess3D contract tests now cover P2G knockback/reserve: classic isolation, Asgard home-slot return, reserve fallback, own-piece rejection, outside-to-core no-knockback behavior, core-to-outside capture routing, reset clearing, and Rubik profile loading.
 - `scripts/verify.ps1` checks that representative RuleProfile JSON files are copied into Chess3D development output and `ProductionOutput`.
 
 ## User Executables
@@ -99,6 +105,9 @@ Portable outputs:
 - CenterAssembly anchors are stack-aware for stack-enabled profiles.
 - Fusion descriptors report `single`, `friendlyPair`, `friendlyStack`, `royalPair`, and `contested` state over core stacks without destroying stack entries.
 - Implosion progress is exposed as progress state for Asgard/Rubik profiles and remains non-destructive.
+- Asgard/Rubik convergence profiles route ordinary outer-field captures through knockback/home-or-reserve semantics.
+- Reserve is stored as side/type counts without unique piece ids.
+- Chess3DApp status text exposes reserve enabled, knockback enabled, current-side reserve total, and last capture destination.
 
 ## Draft
 
@@ -106,7 +115,7 @@ Portable outputs:
 - 3D king safety, check, mate, and stalemate remain draft after P2A.
 - Final Asgard/Meru fusion physics are not implemented yet; P2F provides descriptor/progress state but not destructive transformation, visual effects, or full victory variants.
 - Runtime board projection remains one integer piece per cell for compatibility, while stack data exists as a Forbidden Core overlay.
-- Knockback/reserve captures are specified but not implemented yet.
+- Reserve restore action, reserve inventory UI, and reserve notation are not implemented yet.
 - Rubik layer turns as legal chess actions are specified as `ritualTurn` but not implemented yet.
 - 3D relay/web-platform contract is a documented client-side foundation, not a hosted production service.
 - Rubik arbitrary-state solving beyond trusted move history remains future work.
@@ -122,4 +131,4 @@ Portable outputs:
 - Full UI automation tests are not present yet.
 - GPU parity/performance needs more benchmark baselines on real target hardware.
 - The project currently relies on local Visual Studio/MSBuild and vcpkg environment availability.
-- Recommended next stage is P2G: knockback / reserve.
+- Recommended next stage is P2H: Rubik layer turns moving projected board, core stacks, fusion descriptors, and reserve state safely.

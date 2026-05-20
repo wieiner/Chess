@@ -8,7 +8,7 @@ assets/rules/profiles/chess3d_rule_profile.schema.json
 
 The local contract tests also perform manual validation, because the repository baseline must not require an external JSON-schema validator.
 
-P2D also uses the same profile shape at runtime through `Chess3D_LoadRuleProfileJson`. P2F reads the fusion and implosion profile fields needed for runtime descriptors. The runtime parser is intentionally narrower than a full JSON-schema implementation: it reads known fields, ignores unknown optional metadata, and fails cleanly when required profile fields are missing or unsupported.
+P2D also uses the same profile shape at runtime through `Chess3D_LoadRuleProfileJson`. P2F reads the fusion and implosion profile fields needed for runtime descriptors. P2G reads knockback/reserve profile types needed for runtime capture routing. The runtime parser is intentionally narrower than a full JSON-schema implementation: it reads known fields, ignores unknown optional metadata, and fails cleanly when required profile fields are missing or unsupported.
 
 Minimum validation:
 
@@ -16,6 +16,8 @@ Minimum validation:
 - `boardProfile.width`, `boardProfile.height`, and `boardProfile.depth` are all `8`;
 - `goalProfile.type` is one of `classicCheckmate`, `centerAssembly`, `hybrid`, `sandbox`, `centerAssemblyTraining`;
 - `captureProfile.type` is one of `classicCapture`, `knockbackCapture`;
+- `knockbackProfile.type` is one of `none`, `homeOrReserve`;
+- `reserveProfile.type` is one of `none`, `disabled`, `sidePieceTypeCounts`;
 - `occupancyProfile.type` is one of `exclusive`, `coreStack`, `quantumCore`;
 - `fusionProfile.type` is one of `none`, `anchorOnly`, `pairFusion`, `stackFusion`, `colorPermutation`, `volumeSurface216`;
 - `corePhysicsProfile.type` is optional and can declare `asgardCorePhysics`;

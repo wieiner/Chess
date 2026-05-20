@@ -1,6 +1,6 @@
 # Chess3D Asgard Core Physics
 
-P2C defines a richer center model for Asgard/Meru Convergence. P2D adds a small runtime bridge. P2E adds the first runtime CoreCell stack overlay inside the Forbidden Core while preserving the old projected board. P2F adds non-destructive fusion and implosion-progress descriptors over those stacks.
+P2C defines a richer center model for Asgard/Meru Convergence. P2D adds a small runtime bridge. P2E adds the first runtime CoreCell stack overlay inside the Forbidden Core while preserving the old projected board. P2F adds non-destructive fusion and implosion-progress descriptors over those stacks. P2G adds home-or-reserve capture routing for ordinary outer-field captures.
 
 ## 1. Two-Zone Physics
 
@@ -110,13 +110,13 @@ The engine should not assume a fusion entity always has a single classic piece t
 
 Possible rules:
 
-- outside core: ordinary capture or knockback;
+- outside core: ordinary capture or P2G knockback/home-or-reserve routing;
 - entering core: capture may be disabled;
 - in core: enemy and friendly pieces may coexist;
 - enemy co-occupancy may create contested fusion;
 - friendly co-occupancy may create assembly/fusion progress.
 
-P2F detects contested co-occupancy and exposes it through fusion ABI. Scoring/dislodging for contested anchors remains deferred.
+P2F detects contested co-occupancy and exposes it through fusion ABI. P2G intentionally does not knock back occupants when a piece enters the Forbidden Core. Scoring/dislodging for contested anchors remains deferred.
 
 ## 7. Victory
 
@@ -141,4 +141,6 @@ Stage 3: board model supports `CoreCell` stacks without breaking old ABI. Comple
 
 Stage 4: fusion descriptors and implosion progress. Completed in P2F.
 
-Stage 5: UI visualization for stacks, resonance, color/permutation, and implosion/fusion states.
+Stage 5: knockback/reserve for ordinary outer-field captures. Completed in P2G.
+
+Stage 6: UI visualization for stacks, reserve, resonance, color/permutation, and implosion/fusion states.

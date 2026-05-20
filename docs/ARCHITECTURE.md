@@ -5,7 +5,7 @@ The repository is split into separate native DLLs and separate user-facing appli
 ## Native Layers
 
 - `ChessEngine.dll`: ordinary 8x8 chess rules, legal move generation, FEN, draw rules, search, evaluation, and search telemetry.
-- `Chess3DEngine.dll`: 8x8x8 cube board state, P2A single-side movement/capture contracts, P2B/P2C profile data contracts, P2D runtime RuleProfile loading, P2E Forbidden Core stack overlay, P2F fusion/implosion descriptors, stack-aware centerAssembly anchors, draft six-side setup, and Rubik-style layer rotations for cube chess.
+- `Chess3DEngine.dll`: 8x8x8 cube board state, P2A single-side movement/capture contracts, P2B/P2C profile data contracts, P2D runtime RuleProfile loading, P2E Forbidden Core stack overlay, P2F fusion/implosion descriptors, P2G knockback/reserve capture routing, stack-aware centerAssembly anchors, draft six-side setup, and Rubik-style layer rotations for cube chess.
 - `RubikEngine.dll`: N x N x N Rubik state, layer rotations, scramble/history, and trusted reverse playback.
 - `ChessGpuBackend.dll`: stable GPU ABI boundary. It routes work to CUDA when available, otherwise Direct3D/CPU fallback paths.
 - `ChessCudaBackend.dll`: optional CUDA backend built from `.cu` kernels. It is dynamically loaded and is not required for the default solution build.
@@ -50,7 +50,9 @@ P2E adds CoreCell stacks inside the Forbidden Core while preserving the old 512-
 
 P2F adds non-destructive `CoreFusionState` descriptors over those stacks. The engine can report friendly pair, friendly stack, royal pair, and contested core state, plus side-level fusion counts and implosion progress. Stack entries remain the source of truth.
 
-This is still not final Asgard fusion physics. Destructive implosion, color/permutation state, knockback/reserve, online serialization, GPU stack snapshots, and Rubik turns moving stacks/fusion remain later stages.
+P2G adds profile-gated capture routing. Classic profiles still remove captured pieces. Asgard/Rubik convergence profiles route ordinary outer-field captures through `knockbackCapture`: captured pieces first try to return to a matching free home slot and otherwise enter side/type reserve counts. Forbidden Core entries are not knocked back on core entry; they coexist as stacks and fusion descriptors.
+
+This is still not final Asgard fusion physics. Reserve restore actions, destructive implosion, color/permutation state, online serialization, GPU stack snapshots, and Rubik turns moving stacks/fusion remain later stages.
 
 The engine still reserves side ids `1..6`. Six-sided chess should be built by mapping this local rule core to each cube face through coordinate transforms, rather than inventing six unrelated movement systems. Rubik-style layer rotation remains a board transform until P2H implements `layerTurnProfile.type = ritualTurn` as a legal chess action that moves stacks and fusion descriptors safely.
 

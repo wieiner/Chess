@@ -74,17 +74,25 @@
 
 ### P2G - Knockback And Reserve
 
-- Implement knockbackCapture.
-- Return captured pieces to home slot when possible.
-- Add reserve state and reserve restore action.
+- Completed: `knockbackCapture` runtime for Asgard/Rubik profiles.
+- Completed: captured outer-field pieces return to first matching free home slot when possible.
+- Completed: fallback reserve counts by side/type when home slots are blocked.
+- Completed: append-only reserve/knockback ABI, C# status wrapper, and contract tests.
+- Deferred: reserve restore action, reserve inventory UI, notation, and online serialization.
 
 ### P2H - Rubik Turns Moving Pieces And Stacks
 
 - Implement `layerTurnProfile.type = ritualTurn`.
 - Enforce axes, layers, quarter turns, action cost, and turn order.
-- Define interaction with king safety, anchors, CoreCell stacks, fusion descriptors, notation, and replay.
+- Define interaction with king safety, anchors, CoreCell stacks, fusion descriptors, reserve counts, notation, and replay.
 
-### P2I - Stack And Fusion UI
+### P2I - Reserve Restore Action And UI Inventory
+
+- Add legal restore-from-reserve action if profile enables it.
+- Add reserve inventory UI and notation.
+- Decide whether restored pieces return to home, edge entry gates, or profile-defined drop zones.
+
+### P2J - Stack And Fusion UI
 
 - Visualize multiple stack entries in one core cell.
 - Display fusion/contested/royal/implosion state in the board view.

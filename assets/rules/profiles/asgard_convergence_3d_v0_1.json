@@ -31,7 +31,23 @@
     "type": "knockbackCapture",
     "capturedPiece": "returnToHomeSlotIfFree",
     "fallback": "reserve",
-    "reserveRestoreAction": "deferred"
+    "reserveRestoreAction": "deferred",
+    "status": "runtimePartial"
+  },
+  "knockbackProfile": {
+    "type": "homeOrReserve",
+    "homeSlotPolicy": "firstMatchingFreeHomeSlot",
+    "fallback": "reserve",
+    "appliesTo": "outerFieldCaptures",
+    "coreCapturePolicy": "coOccupancyContested",
+    "destructiveCoreCapture": false,
+    "status": "runtimePartial"
+  },
+  "reserveProfile": {
+    "type": "sidePieceTypeCounts",
+    "restoreAction": "deferred",
+    "maxByPieceType": "draft",
+    "status": "runtimePartial"
   },
   "goalProfile": {
     "type": "centerAssembly",
@@ -114,6 +130,7 @@
   },
   "knownLimitations": [
     "Reserve restore is not implemented.",
+    "P2G knockback/reserve runtime stores reserve as side/type counts without unique piece ids.",
     "Six-side target projection uses P2E CoreCell stack-aware anchors but remains fusion-limited.",
     "Checkmate is optional and not hardened for this profile.",
     "Contested cells are visible as runtime fusion descriptors, but contested anchor scoring remains deferred.",

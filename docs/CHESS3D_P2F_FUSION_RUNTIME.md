@@ -29,4 +29,4 @@ The descriptor layer never destroys stack entries. A contested cell remains a st
 
 ## Current Limits
 
-No knockback/reserve, Rubik stack rotations, visual effects, online serialization, GPU stack snapshots, or Volume-Surface 216 victory are implemented in P2F.
+P2F itself does not implement knockback/reserve. P2G adds home-or-reserve capture routing on top of the same stack/fusion descriptors. Rubik stack rotations, visual effects, online serialization, GPU stack snapshots, and Volume-Surface 216 victory remain future work.

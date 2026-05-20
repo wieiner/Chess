@@ -55,12 +55,12 @@ P2F still does not implement:
 - destructive fusion entities;
 - destructive implosion/resonance/color-permutation;
 - contested anchors;
-- knockback/reserve;
+- reserve restore and dislodging;
 - dislodging anchored pieces;
 - Rubik layer turns as legal turn actions;
 - Volume-Surface 216 victory.
 
-Those remain staged work for P2G and later.
+P2G implements home-or-reserve capture routing, while restore/dislodging remain staged work.
 
 ## 96 pieces vs 64 core cells
 

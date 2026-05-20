@@ -47,3 +47,9 @@ P2F implosion is progress state only. It marks that assembly is developing, but 
 ## 216 Principle
 
 The Volume-Surface 216 Principle remains future/disabled metadata. P2F does not use it for victory.
+
+## P2G Capture Interaction
+
+P2G does not make fusion destructive.
+
+When a piece enters the Forbidden Core, existing occupants remain in the stack. If entries from different sides share the cell, fusion reports contested state. Knockback applies only to ordinary outside destinations, including core-to-outside captures against an enemy outside piece.

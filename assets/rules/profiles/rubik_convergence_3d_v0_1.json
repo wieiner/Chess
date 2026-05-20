@@ -32,7 +32,23 @@
     "type": "knockbackCapture",
     "capturedPiece": "returnToHomeSlotIfFree",
     "fallback": "reserve",
-    "reserveRestoreAction": "deferred"
+    "reserveRestoreAction": "deferred",
+    "status": "runtimePartial"
+  },
+  "knockbackProfile": {
+    "type": "homeOrReserve",
+    "homeSlotPolicy": "firstMatchingFreeHomeSlot",
+    "fallback": "reserve",
+    "appliesTo": "outerFieldCaptures",
+    "coreCapturePolicy": "coOccupancyContested",
+    "destructiveCoreCapture": false,
+    "status": "runtimePartial"
+  },
+  "reserveProfile": {
+    "type": "sidePieceTypeCounts",
+    "restoreAction": "deferred",
+    "maxByPieceType": "draft",
+    "status": "runtimePartial"
   },
   "goalProfile": {
     "type": "centerAssembly"
@@ -126,6 +142,7 @@
     "Stack/layer interaction is deferred.",
     "P2E CoreCell stacks are implemented for the Forbidden Core, but Rubik layer turns do not move stacks yet.",
     "Stack fusion is evaluated after the current board/stack state; Rubik layer turns do not move stacks yet.",
+    "P2G knockback/reserve is evaluated for ordinary outer-field captures; layer turns do not move reserve.",
     "P2F centerAssembly victory remains compatible and exposes fusion/implosion as progress descriptors.",
     "Runtime ritualTurn legality is deferred to P2H."
   ]

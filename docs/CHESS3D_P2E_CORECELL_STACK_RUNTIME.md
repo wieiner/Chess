@@ -50,7 +50,7 @@ Anchor recomputation is now stack-aware:
 P2E does not implement:
 
 - contested anchor resolution;
-- knockback/reserve;
+- reserve restore / dislodging;
 - dislodging;
 - Volume-Surface 216 victory;
 - Rubik rotations moving stacks.

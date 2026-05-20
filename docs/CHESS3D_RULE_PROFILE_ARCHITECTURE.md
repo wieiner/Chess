@@ -16,6 +16,8 @@ A rule profile is a JSON `RuleSet` with these top-level fields:
 - `setupProfile`: initial army placement and randomization hooks.
 - `movementProfile`: piece movement family.
 - `captureProfile`: capture semantics.
+- `knockbackProfile`: optional home-or-reserve routing for captured pieces.
+- `reserveProfile`: optional reserve storage and future restore-action policy.
 - `goalProfile`: what the game is trying to achieve.
 - `coreProfile`: central-core target and anchoring data.
 - `occupancyProfile`: board-cell occupancy semantics.
@@ -88,7 +90,31 @@ Supported contract values:
 - `classicCapture`: captured piece is removed from the board.
 - `knockbackCapture`: captured piece returns to its home slot if free; otherwise it goes to reserve.
 
-Reserve restore is deferred. P2B only defines the data contract.
+P2G implements the runtimePartial home-or-reserve subset for ordinary outer-field captures.
+
+## knockbackProfile
+
+Supported contract values:
+
+- `none`: no knockback behavior.
+- `homeOrReserve`: captured outer-field pieces first try a matching free home slot, otherwise reserve.
+
+Current runtime fields:
+
+- `homeSlotPolicy = firstMatchingFreeHomeSlot`;
+- `fallback = reserve`;
+- `appliesTo = outerFieldCaptures`;
+- `coreCapturePolicy = coOccupancyContested`;
+- `destructiveCoreCapture = false`.
+
+## reserveProfile
+
+Supported contract values:
+
+- `none` / `disabled`: no reserve.
+- `sidePieceTypeCounts`: reserve stores counts by side and piece type.
+
+P2G implements side/type counts and last-capture telemetry. Restore actions remain deferred.
 
 ## goalProfile
 
@@ -225,7 +251,7 @@ P2E replaces the purely single-cell anchor scan with a CoreCell stack overlay:
 - stack-enabled core cells can store multiple side/type entries;
 - a target is anchored when any stack entry has the matching side and piece type;
 - overlapping target regions can now share a physical core cell at runtime;
-- destructive fusion/implosion events, knockback/reserve, and ritual Rubik turns moving stacks remain later runtime work.
+- destructive fusion/implosion events, reserve restore actions, and ritual Rubik turns moving stacks remain later runtime work.
 
 ## P2F Runtime Fusion
 
@@ -236,3 +262,13 @@ P2F adds `CoreFusionState` descriptors over CoreCell stacks:
 - multi-side stacks report `contested`;
 - side implosion progress is `anchorCount + friendlyFusionCount + royalPairBonusCount`;
 - default `allPiecesAnchored` victory remains compatible and is not replaced by fusion victory.
+
+## P2G Runtime Knockback / Reserve
+
+P2G adds profile-gated capture routing:
+
+- classic and single-side profiles keep reserve/knockback disabled;
+- Asgard and Rubik convergence profiles enable `knockbackCapture`;
+- outer-field enemy captures route the captured piece to home or reserve;
+- entering the Forbidden Core appends to stacks and does not knock back occupants;
+- core-to-outside captures route the outside captured piece through the same home-or-reserve policy.
