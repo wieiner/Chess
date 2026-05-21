@@ -41,7 +41,8 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - P2G Chess3D runtime tests validate classic capture isolation, Asgard/Rubik reserve and knockback enablement, home-slot return, reserve fallback, own-piece rejection, outside-to-core no-knockback stack entry, core-to-outside capture routing, reserve clearing, reset clearing, and Rubik profile safety.
 - P2H Chess3D runtime tests validate Rubik profile layer-turn enablement, Asgard/classic/single-side disabled isolation, projected board rotation for Z/Y/X engine conventions, four-turn identity, CoreCell stack relocation, fusion recompute, fixed-world target-slot anchor recompute, reserve invariance, and last-result telemetry.
 - P2I Chess3D runtime tests validate action-history reset behavior, failed-action isolation, move/capture/layer-turn records, deterministic notation, reserve restore, auto-restore, reserve count mutation, profile isolation, and string ABI safety.
-- `scripts/verify.ps1` checks that Asgard and Rubik convergence profiles are copied into `Chess3DApp` output and `ProductionOutput/Chess3D`.
+- P2J Chess3D runtime tests validate Hodge Projection Duel profile metadata, projection isolation for older profiles, macro-player grouping, side-to-side face-frame transforms, all-or-nothing projected composite moves, capture recording, and deterministic `HPD` notation.
+- `scripts/verify.ps1` checks that Asgard, Rubik convergence, and Hodge Projection Duel profiles are copied into `Chess3DApp` output and `ProductionOutput/Chess3D`.
 - Rubik size, state, rotation, scramble, reverse-history solve, and manual-state ABI calls still work.
 - GPU backend CPU/Auto paths work without CUDA, and Direct3D/CUDA absence is handled as non-fatal where appropriate.
 
@@ -51,8 +52,8 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - They do not prove search strength or GPU performance.
 - They do not validate final six-sided 3D chess laws; P2A validates only the single-side local rule core.
 - They do not prove full 3D king safety, checkmate, or stalemate yet.
-- They prove P2E CoreCell stack storage, P2F non-destructive fusion descriptors, P2G home-or-reserve capture routing, P2H runtimePartial Rubik layer turns for projected board plus whole CoreCell stacks, and P2I action-history/reserve-restore contracts. They do not prove destructive implosion behavior, contested anchor scoring, or full six-side king safety.
-- They do not implement or prove color/permutation, destructive transformation, final Volume-Surface 216 mechanics, full replay/import/export, online serialization, AI/search generation for layer turns, or GPU stack snapshots.
+- They prove P2E CoreCell stack storage, P2F non-destructive fusion descriptors, P2G home-or-reserve capture routing, P2H runtimePartial Rubik layer turns for projected board plus whole CoreCell stacks, P2I action-history/reserve-restore contracts, and P2J Hodge projected composite move contracts. They do not prove destructive implosion behavior, contested anchor scoring, or full six-side king safety.
+- They do not implement or prove color/permutation, destructive transformation, final Volume-Surface 216 mechanics, full replay/import/export, online serialization, AI/search generation for layer turns or Hodge composite turns, GPU stack snapshots, or final Hodge mathematical formalism.
 - They do not automate WPF UI behavior yet.
 - They do not require or validate `rude-resource/`.
 
@@ -62,7 +63,7 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 
 CUDA is optional. Contract tests must pass without `ChessCudaBackend.dll`. If CUDA is built and placed next to `ChessGpuBackend.dll`, the GPU backend may use it, but absence of CUDA is not a test failure.
 
-The next recommended testing milestone is P2J/P2K: UI smoke checks for layer-turn/stack/fusion/reserve visualization and replay/export/import tests over P2I action history.
+The next recommended testing milestone is P2K/P2L: UI smoke checks for layer-turn/stack/fusion/reserve/projection visualization and replay/export/import tests over P2I/P2J action history.
 
 ## UI Smoke Tests
 

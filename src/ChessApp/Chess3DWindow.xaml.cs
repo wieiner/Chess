@@ -238,12 +238,15 @@ public partial class Chess3DWindow : Window
         var reserveText = $", reserve {(_engine.IsReserveEnabled() ? "on" : "off")} total {_engine.GetReserveTotal(state.SideToMove)}, knockback {(_engine.IsKnockbackEnabled() ? "on" : "off")} last {KnockbackDestinationName(knockback.DestinationKind)} captured {LabelForPiece(knockback.CapturedPieceCode)}";
         var layerTurn = _engine.GetLastLayerTurnInfo();
         var layerTurnText = $", layerTurn {(_engine.IsLayerTurnEnabled() ? "on" : "off")} last {AxisName(layerTurn.Axis)}{(layerTurn.Layer >= 0 ? layerTurn.Layer + 1 : 0)} {layerTurn.QuarterTurns:+0;-0;0} {_engine.GetLayerTurnResultName(layerTurn.ResultCode)}";
+        var projectionText = $", projection {(_engine.IsProjectionModeEnabled() ? "on" : "off")} macro {_engine.GetMacroPlayerForSide(state.SideToMove)}/{_engine.GetProjectionMacroPlayerCount()}";
+        var projectionError = _engine.GetLastProjectionError();
+        var projectionErrorText = string.IsNullOrWhiteSpace(projectionError) ? string.Empty : $", projectionError {projectionError}";
         var lastAction = _engine.GetLastActionNotation();
         var actionText = $", actions {_engine.GetActionCount()}{(string.IsNullOrWhiteSpace(lastAction) ? string.Empty : $" last {lastAction}")}";
         var restoreInfo = _engine.GetLastReserveRestoreInfo();
         var restoreText = string.IsNullOrWhiteSpace(restoreInfo) ? string.Empty : $", restore {restoreInfo}";
         HeaderStatus.Text = $"Side {state.SideToMove}, pieces {state.PieceCount}, moves {state.LegalMoveCount}";
-        RulesText.Text = $"Board {rules.Width}x{rules.Height}x{rules.Depth}, sides {rules.ActiveSideCount}, profile {(rules.MovementProfile == 0 ? "setup-only" : "draft3d")}, max {rules.MaxPiecesPerSide}/side, view {SelectedAxis()} {(IsAllLayersView() ? "all" : "slice")}, grid {SelectedGridMode()}\nRuleset {_engine.GetCurrentRulesetId()}, goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}, layer {_engine.GetLayerTurnProfileType()}, anchors {anchorCount}/{requiredAnchors}{fusionText}{reserveText}{layerTurnText}{actionText}{restoreText}{gameOverText}{stackText}";
+        RulesText.Text = $"Board {rules.Width}x{rules.Height}x{rules.Depth}, sides {rules.ActiveSideCount}, profile {(rules.MovementProfile == 0 ? "setup-only" : "draft3d")}, max {rules.MaxPiecesPerSide}/side, view {SelectedAxis()} {(IsAllLayersView() ? "all" : "slice")}, grid {SelectedGridMode()}\nRuleset {_engine.GetCurrentRulesetId()}, goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}, layer {_engine.GetLayerTurnProfileType()}, anchors {anchorCount}/{requiredAnchors}{fusionText}{reserveText}{layerTurnText}{projectionText}{actionText}{restoreText}{projectionErrorText}{gameOverText}{stackText}";
         InfoText.Text = _engine.GetLastInfo();
         PositionText.Text = $"Models: {SelectedModelSetName()}, OBJ {_lastObjModels}, fallback {_lastFallbackModels}, hints {selectedMoves.Length}\n{_engine.GetPositionText()}";
     }

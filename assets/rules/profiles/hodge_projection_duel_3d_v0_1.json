@@ -1,0 +1,115 @@
+{
+  "rulesetId": "hodge-projection-duel-3d-8x8x8-v0.1",
+  "version": "0.1",
+  "displayName": "Hodge Projection Duel 3D v0.1",
+  "description": "Two-player triune projection duel on an 8x8x8 cube. Each macro-player controls three cube-face projections; one primary move is mirrored through the other two projections as an all-or-nothing composite turn.",
+  "tags": ["chess3d", "projection", "hodge-inspired", "two-player", "triune", "classic"],
+  "boardProfile": {
+    "width": 8,
+    "height": 8,
+    "depth": 8,
+    "coordinateSystem": "x,y,z in 0..7"
+  },
+  "mythProfile": {
+    "theme": "none",
+    "centerName": "Center",
+    "sideNames": ["Z+", "Z-", "Y+", "Y-", "X+", "X-"],
+    "lore": "Hodge Projection Duel is a mathematical gameplay metaphor, not an Asgard/Meru convergence mode."
+  },
+  "setupProfile": {
+    "type": "sixSideProjectedFromSingleSide",
+    "baseSetup": "central4x4",
+    "homeFaces": ["Z0", "Z7", "Y0", "Y7", "X0", "X7"],
+    "piecesPerSide": 16,
+    "randomizationProfile": "none"
+  },
+  "movementProfile": {
+    "type": "classic3d",
+    "pieces": ["rook3d", "bishop3d", "queen3d", "king3d", "knight3d", "pawn3d"]
+  },
+  "captureProfile": {
+    "type": "classicCapture",
+    "capturedPiece": "removedFromBoard",
+    "status": "implementedByCurrentBoardModel"
+  },
+  "knockbackProfile": {
+    "type": "none",
+    "status": "implementedByCurrentBoardModel"
+  },
+  "reserveProfile": {
+    "type": "none",
+    "status": "implementedByCurrentBoardModel"
+  },
+  "goalProfile": {
+    "type": "sandbox",
+    "checkmateImplementation": "draft",
+    "notes": "Classic checkmate hardening is deferred; this profile focuses on projected composite turns."
+  },
+  "coreProfile": {
+    "type": "none"
+  },
+  "occupancyProfile": {
+    "type": "exclusive",
+    "status": "implementedByCurrentBoardModel"
+  },
+  "fusionProfile": {
+    "type": "none",
+    "status": "implementedByCurrentBoardModel"
+  },
+  "implosionProfile": {
+    "type": "none"
+  },
+  "corePhysicsProfile": {
+    "type": "none"
+  },
+  "layerTurnProfile": {
+    "type": "disabled",
+    "status": "implementedByCurrentBoardModel",
+    "notes": "Hodge Projection Duel does not enable Rubik-like layer turns by default."
+  },
+  "projectionProfile": {
+    "type": "hodgeTriuneProjection",
+    "enabled": true,
+    "macroPlayerCount": 2,
+    "projectionCountPerMacroPlayer": 3,
+    "grouping": "positiveAxisFacesVsNegativeAxisFaces",
+    "mirrorPolicy": "allOrNothing",
+    "actionHistoryMode": "compositeTurnWithChildren",
+    "transformProfile": {
+      "type": "cubeFaceLocalFrame",
+      "source": "engineSideFaceMapping",
+      "requireBijectiveTransforms": true
+    },
+    "groups": [
+      {
+        "macroPlayer": 1,
+        "name": "Positive Triad",
+        "sideIds": [1, 3, 5]
+      },
+      {
+        "macroPlayer": 2,
+        "name": "Negative Triad",
+        "sideIds": [2, 4, 6]
+      }
+    ],
+    "status": "runtimePartial"
+  },
+  "turnProfile": {
+    "type": "macroAlternatingProjection",
+    "macroTurnOrder": [1, 2],
+    "sideOrder": [1, 2, 3, 4, 5, 6]
+  },
+  "victoryProfile": {
+    "type": "sandbox"
+  },
+  "randomizationProfile": {
+    "type": "none"
+  },
+  "knownLimitations": [
+    "Full six-side checkmate and king-safety are draft.",
+    "The Hodge-star relationship is used as a gameplay metaphor, not as a formal algebraic-geometry implementation.",
+    "Composite turns use all-or-nothing validation; partial projected moves are rejected.",
+    "UI visualization, replay import/export, online serialization, and AI integration are deferred.",
+    "Asgard Forbidden Core, fusion, implosion, reserve, knockback, and Rubik layer turns are intentionally disabled in this profile."
+  ]
+}

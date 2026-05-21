@@ -75,7 +75,8 @@ enum ActionKind
     ActionMove = 1,
     ActionLayerTurn = 2,
     ActionReserveRestore = 3,
-    ActionManualEdit = 4
+    ActionManualEdit = 4,
+    ActionProjectionCompositeMove = 5
 };
 
 enum CaptureDestination
@@ -96,6 +97,7 @@ constexpr int ActionFlagWasReserveRestore = 32;
 constexpr int ActionFlagChangedFusion = 64;
 constexpr int ActionFlagChangedAnchors = 128;
 constexpr int ActionFlagGameOverAfterAction = 256;
+constexpr int ActionFlagWasProjection = 512;
 
 struct Vec3
 {
@@ -137,6 +139,14 @@ struct Rules
     bool layerTurnRecomputesFusion = false;
     bool layerTurnRecomputesAnchors = false;
     std::string layerTurnActionCost = "none";
+    std::string projectionProfileType = "none";
+    bool projectionProfileEnabled = false;
+    int projectionMacroPlayerCount = 0;
+    int projectionCountPerMacroPlayer = 0;
+    std::string projectionMirrorPolicy = "allOrNothing";
+    std::string projectionActionHistoryMode = "none";
+    std::array<std::array<int, 3>, 3> projectionGroups{};
+    std::array<int, 7> projectionMacroBySide{};
     std::string victoryProfileType = "sandbox";
     std::string implosionProfileType = "none";
     std::string implosionProfileMode = "none";
@@ -213,6 +223,7 @@ struct ActionRecord
     int reserveDelta = 0;
     int resultCode = 0;
     int flags = 0;
+    std::string customNotation;
     std::string notation;
     std::string info;
 };
@@ -241,6 +252,7 @@ struct Game
     int lastLayerTurnResultCode = LayerTurnNone;
     std::vector<ActionRecord> actionHistory;
     std::string lastReserveRestoreInfo;
+    std::string lastProjectionError;
     bool gameOver = false;
     int winnerSide = 0;
     std::string lastProfileLoadError;
@@ -410,6 +422,7 @@ std::string actionKindName(int actionKind)
     case ActionLayerTurn: return "layerTurn";
     case ActionReserveRestore: return "reserveRestore";
     case ActionManualEdit: return "manualEdit";
+    case ActionProjectionCompositeMove: return "projectionCompositeMove";
     default: return "unknown";
     }
 }
@@ -767,6 +780,126 @@ std::string profileTypeOrFallback(const std::string& json, const std::string& ob
     return extractString(object, "type", fallback);
 }
 
+bool parseIntArrayValues(const std::string& arrayText, std::vector<int>& values)
+{
+    values.clear();
+    const auto open = arrayText.find('[');
+    const auto close = arrayText.rfind(']');
+    if (open == std::string::npos || close == std::string::npos || close <= open)
+    {
+        return false;
+    }
+
+    std::size_t pos = open + 1;
+    while (pos < close)
+    {
+        while (pos < close && (std::isspace(static_cast<unsigned char>(arrayText[pos])) || arrayText[pos] == ','))
+        {
+            ++pos;
+        }
+        if (pos >= close)
+        {
+            break;
+        }
+        int value = 0;
+        if (!parseIntAt(arrayText, pos, value))
+        {
+            return false;
+        }
+        values.push_back(value);
+    }
+    return true;
+}
+
+void setDefaultProjectionGroups(Rules& rules)
+{
+    rules.projectionMacroPlayerCount = 2;
+    rules.projectionCountPerMacroPlayer = 3;
+    rules.projectionGroups = {};
+    rules.projectionGroups[1] = { 1, 3, 5 };
+    rules.projectionGroups[2] = { 2, 4, 6 };
+    rules.projectionMacroBySide = {};
+    for (int macro = 1; macro <= rules.projectionMacroPlayerCount; ++macro)
+    {
+        for (int side : rules.projectionGroups[macro])
+        {
+            if (side >= 1 && side <= 6)
+            {
+                rules.projectionMacroBySide[side] = macro;
+            }
+        }
+    }
+}
+
+bool parseProjectionGroups(const std::string& projectionProfile, Rules& rules)
+{
+    setDefaultProjectionGroups(rules);
+    const std::string groups = extractArray(projectionProfile, "groups");
+    if (groups.empty())
+    {
+        return true;
+    }
+
+    std::array<std::array<int, 3>, 3> parsedGroups{};
+    std::array<int, 7> macroBySide{};
+    std::size_t pos = 0;
+    int parsedCount = 0;
+    while ((pos = groups.find("\"macroPlayer\"", pos)) != std::string::npos)
+    {
+        const auto colon = groups.find(':', pos);
+        if (colon == std::string::npos)
+        {
+            return false;
+        }
+        std::size_t valuePos = colon + 1;
+        int macro = 0;
+        if (!parseIntAt(groups, valuePos, macro) || macro < 1 || macro > 2)
+        {
+            return false;
+        }
+
+        const auto nextMacro = groups.find("\"macroPlayer\"", valuePos);
+        const std::string groupText = groups.substr(pos, nextMacro == std::string::npos ? std::string::npos : nextMacro - pos);
+        std::vector<int> sideIds;
+        if (!parseIntArrayValues(extractArray(groupText, "sideIds"), sideIds) || sideIds.size() != 3)
+        {
+            return false;
+        }
+        for (int side : sideIds)
+        {
+            if (side < 1 || side > 6 || macroBySide[side] != 0)
+            {
+                return false;
+            }
+        }
+        for (std::size_t i = 0; i < sideIds.size(); ++i)
+        {
+            parsedGroups[macro][i] = sideIds[i];
+            macroBySide[sideIds[i]] = macro;
+        }
+        ++parsedCount;
+        pos = nextMacro == std::string::npos ? groups.size() : nextMacro;
+    }
+
+    if (parsedCount != 2)
+    {
+        return false;
+    }
+    for (int side = 1; side <= 6; ++side)
+    {
+        if (macroBySide[side] == 0)
+        {
+            return false;
+        }
+    }
+
+    rules.projectionMacroPlayerCount = 2;
+    rules.projectionCountPerMacroPlayer = 3;
+    rules.projectionGroups = parsedGroups;
+    rules.projectionMacroBySide = macroBySide;
+    return true;
+}
+
 bool extractCoreCube(const std::string& json, Rules& rules)
 {
     const std::string coreProfile = extractObject(json, "coreProfile");
@@ -826,6 +959,16 @@ bool parseRuleProfileMetadata(Rules& rules, std::string& error)
     rules.layerTurnRecomputesFusion = extractBool(layerTurnProfile, "recomputesFusion", defaultLayerTurnRuntime);
     rules.layerTurnRecomputesAnchors = extractBool(layerTurnProfile, "recomputesAnchors", defaultLayerTurnRuntime);
     rules.layerTurnActionCost = extractString(layerTurnProfile, "actionCost", defaultLayerTurnRuntime ? "oneTurn" : "none");
+    const std::string projectionProfile = extractObject(json, "projectionProfile");
+    rules.projectionProfileType = profileTypeOrFallback(json, "projectionProfile", "none");
+    rules.projectionProfileEnabled = rules.projectionProfileType == "hodgeTriuneProjection" &&
+        extractBool(projectionProfile, "enabled", true);
+    rules.projectionMirrorPolicy = extractString(projectionProfile, "mirrorPolicy", "allOrNothing");
+    rules.projectionActionHistoryMode = extractString(projectionProfile, "actionHistoryMode", "none");
+    rules.projectionMacroPlayerCount = 0;
+    rules.projectionCountPerMacroPlayer = 0;
+    rules.projectionGroups = {};
+    rules.projectionMacroBySide = {};
     rules.victoryProfileType = profileTypeOrFallback(json, "victoryProfile", "sandbox");
     rules.implosionProfileType = profileTypeOrFallback(json, "implosionProfile", "none");
     rules.implosionProfileMode = extractString(extractObject(json, "implosionProfile"), "mode", "none");
@@ -872,6 +1015,21 @@ bool parseRuleProfileMetadata(Rules& rules, std::string& error)
         error = "RuleProfile rejected: unsupported layerTurnProfile.type.";
         return false;
     }
+    if (!stringInSet(rules.projectionProfileType, { "none", "hodgeTriuneProjection" }))
+    {
+        error = "RuleProfile rejected: unsupported projectionProfile.type.";
+        return false;
+    }
+    if (!stringInSet(rules.projectionMirrorPolicy, { "allOrNothing", "skipInvalidFuture", "primaryOnlyFuture" }))
+    {
+        error = "RuleProfile rejected: unsupported projectionProfile.mirrorPolicy.";
+        return false;
+    }
+    if (!stringInSet(rules.projectionActionHistoryMode, { "none", "compositeTurnWithChildren" }))
+    {
+        error = "RuleProfile rejected: unsupported projectionProfile.actionHistoryMode.";
+        return false;
+    }
     if (!stringInSet(rules.victoryProfileType, { "sandbox", "checkmate", "allPiecesAnchored", "requiredPieceCount", "kingOnly", "percentageThreshold", "hybrid" }))
     {
         error = "RuleProfile rejected: unsupported victoryProfile.type.";
@@ -887,6 +1045,11 @@ bool parseRuleProfileMetadata(Rules& rules, std::string& error)
         error = "RuleProfile rejected: coreCube bounds are invalid.";
         return false;
     }
+    if (rules.projectionProfileEnabled && !parseProjectionGroups(projectionProfile, rules))
+    {
+        error = "RuleProfile rejected: projectionProfile.groups must contain two disjoint 3-side macro players.";
+        return false;
+    }
 
     const std::string setup = extractObject(json, "setupProfile");
     const std::string setupType = extractString(setup, "type", "");
@@ -898,6 +1061,10 @@ bool parseRuleProfileMetadata(Rules& rules, std::string& error)
     else if (rules.rulesetId.find("single-side") != std::string::npos || setupType.find("single") != std::string::npos)
     {
         rules.activeSideCount = 1;
+    }
+    if (rules.projectionProfileEnabled)
+    {
+        rules.activeSideCount = 6;
     }
 
     return true;
@@ -1086,6 +1253,7 @@ void clearActionHistory(Game& game)
 {
     game.actionHistory.clear();
     game.lastReserveRestoreInfo.clear();
+    game.lastProjectionError.clear();
 }
 
 void clearGamePosition(Game& game)
@@ -1164,6 +1332,78 @@ Vec3 faceCenterSquare(int side, int localU, int localV)
     case 6: return { 7, 7 - u, 7 - v };
     default: return { u, v, 0 };
     }
+}
+
+bool globalToSideLocal(int side, Vec3 global, Vec3& local)
+{
+    if (!inside(global.x, global.y, global.z) || side < 1 || side > 6)
+    {
+        return false;
+    }
+    switch (side)
+    {
+    case 1:
+        local = { global.x, global.y, global.z };
+        return true;
+    case 2:
+        local = { 7 - global.x, 7 - global.y, 7 - global.z };
+        return true;
+    case 3:
+        local = { global.x, global.z, global.y };
+        return true;
+    case 4:
+        local = { 7 - global.x, 7 - global.z, 7 - global.y };
+        return true;
+    case 5:
+        local = { global.y, global.z, global.x };
+        return true;
+    case 6:
+        local = { 7 - global.y, 7 - global.z, 7 - global.x };
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool sideLocalToGlobal(int side, Vec3 local, Vec3& global)
+{
+    if (!inside(local.x, local.y, local.z) || side < 1 || side > 6)
+    {
+        return false;
+    }
+    switch (side)
+    {
+    case 1:
+        global = { local.x, local.y, local.z };
+        return true;
+    case 2:
+        global = { 7 - local.x, 7 - local.y, 7 - local.z };
+        return true;
+    case 3:
+        global = { local.x, local.z, local.y };
+        return true;
+    case 4:
+        global = { 7 - local.x, 7 - local.z, 7 - local.y };
+        return true;
+    case 5:
+        global = { local.z, local.x, local.y };
+        return true;
+    case 6:
+        global = { 7 - local.z, 7 - local.x, 7 - local.y };
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool transformMoveBetweenSides(int sourceSide, int targetSide, Vec3 from, Vec3 to, Vec3& outFrom, Vec3& outTo)
+{
+    Vec3 localFrom{};
+    Vec3 localTo{};
+    return globalToSideLocal(sourceSide, from, localFrom) &&
+        globalToSideLocal(sourceSide, to, localTo) &&
+        sideLocalToGlobal(targetSide, localFrom, outFrom) &&
+        sideLocalToGlobal(targetSide, localTo, outTo);
 }
 
 void placeFaceCenter(Position& pos, int side)
@@ -1409,7 +1649,11 @@ void finalizeActionNotation(ActionRecord& action)
 {
     std::ostringstream text;
     text << "#" << action.actionIndex << " ";
-    if (action.actionKind == ActionMove)
+    if (!action.customNotation.empty())
+    {
+        text << action.customNotation;
+    }
+    else if (action.actionKind == ActionMove)
     {
         text << "S" << action.side << " MOVE " << pieceName(action.pieceCode) << " "
             << coordText(action.fromX, action.fromY, action.fromZ)
@@ -1438,6 +1682,12 @@ void finalizeActionNotation(ActionRecord& action)
     {
         text << "S" << action.side << " RESTORE " << pieceName(action.pieceCode)
             << " reserve->" << coordText(action.toX, action.toY, action.toZ);
+    }
+    else if (action.actionKind == ActionProjectionCompositeMove)
+    {
+        text << "M" << action.side << " HPD " << pieceName(action.pieceCode) << " "
+            << coordText(action.fromX, action.fromY, action.fromZ) << "->"
+            << coordText(action.toX, action.toY, action.toZ);
     }
     else
     {
@@ -2131,6 +2381,78 @@ ActionRecord makeMoveAction(const Game& game, const Move& move, bool targetCoreH
     }
     action.flags |= ActionFlagChangedAnchors;
     return action;
+}
+
+bool isProjectionModeEnabled(const Rules& rules)
+{
+    return rules.projectionProfileEnabled && rules.projectionProfileType == "hodgeTriuneProjection";
+}
+
+int macroPlayerForSide(const Rules& rules, int side)
+{
+    if (!isProjectionModeEnabled(rules) || side < 1 || side > 6)
+    {
+        return 0;
+    }
+    return rules.projectionMacroBySide[side];
+}
+
+bool findLegalMoveForSide(const Game& game, int side, int from, int to, int promotionType, Move& out)
+{
+    if (side < 1 || side > game.rules.activeSideCount || from < 0 || from >= CellCount || to < 0 || to >= CellCount)
+    {
+        return false;
+    }
+    Position scoped = game.pos;
+    scoped.sideToMove = side;
+    const auto moves = generateMoves(game, scoped);
+    for (Move move : moves)
+    {
+        if (move.from == from && move.to == to)
+        {
+            if (promotionType >= Knight && promotionType <= Queen)
+            {
+                move.promotionType = promotionType;
+            }
+            out = move;
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string projectionActionNotation(int macroPlayer, int primarySide, const std::array<Move, 3>& moves, int moveCount)
+{
+    std::ostringstream text;
+    text << "M" << macroPlayer << " HPD primary=S" << primarySide << " ";
+    for (int i = 0; i < moveCount; ++i)
+    {
+        const Move& move = moves[static_cast<std::size_t>(i)];
+        if (i == 0)
+        {
+            text << pieceName(move.piece) << " " << coordText(xOf(move.from), yOf(move.from), zOf(move.from))
+                << "->" << coordText(xOf(move.to), yOf(move.to), zOf(move.to));
+        }
+        else
+        {
+            if (i == 1)
+            {
+                text << "; mirrors=[";
+            }
+            else
+            {
+                text << ", ";
+            }
+            text << "S" << pieceSide(move.piece) << " " << pieceName(move.piece) << " "
+                << coordText(xOf(move.from), yOf(move.from), zOf(move.from))
+                << "->" << coordText(xOf(move.to), yOf(move.to), zOf(move.to));
+        }
+    }
+    if (moveCount > 1)
+    {
+        text << "]";
+    }
+    return text.str();
 }
 
 Vec3 rotateLayerSquare(int axis, int layer, int turns, int x, int y, int z)
@@ -3386,6 +3708,121 @@ CHESS3D_API int Chess3D_TryMakeMove(void* handle, int fromX, int fromY, int from
     return 0;
 }
 
+CHESS3D_API int Chess3D_TryMakeProjectedMove(void* handle, int primarySide, int fromX, int fromY, int fromZ, int toX, int toY, int toZ, int promotionType, Chess3DMoveDto* playedMove)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !isProjectionModeEnabled(game->rules))
+    {
+        return 0;
+    }
+    if (!inside(fromX, fromY, fromZ) || !inside(toX, toY, toZ))
+    {
+        game->lastProjectionError = "Projection move rejected: coordinates out of bounds.";
+        return 0;
+    }
+
+    const int macroPlayer = macroPlayerForSide(game->rules, primarySide);
+    const int currentMacro = macroPlayerForSide(game->rules, game->pos.sideToMove);
+    if (macroPlayer == 0 || (currentMacro != 0 && currentMacro != macroPlayer))
+    {
+        game->lastProjectionError = "Projection move rejected: primary side is not the side to move macro-player.";
+        return 0;
+    }
+
+    std::array<int, 3> sides = game->rules.projectionGroups[macroPlayer];
+    auto primaryIt = std::find(sides.begin(), sides.end(), primarySide);
+    if (primaryIt == sides.end())
+    {
+        game->lastProjectionError = "Projection move rejected: primary side is not in its projection group.";
+        return 0;
+    }
+    std::rotate(sides.begin(), primaryIt, sides.end());
+
+    std::array<Move, 3> moves{};
+    std::array<int, 3> fromIndices{};
+    std::array<int, 3> toIndices{};
+    const Vec3 primaryFrom{ fromX, fromY, fromZ };
+    const Vec3 primaryTo{ toX, toY, toZ };
+    for (int i = 0; i < 3; ++i)
+    {
+        Vec3 childFrom = primaryFrom;
+        Vec3 childTo = primaryTo;
+        if (sides[i] != primarySide &&
+            !transformMoveBetweenSides(primarySide, sides[i], primaryFrom, primaryTo, childFrom, childTo))
+        {
+            game->lastProjectionError = "Projection move rejected: mirror transform failed.";
+            return 0;
+        }
+        const int from = indexOf(childFrom.x, childFrom.y, childFrom.z);
+        const int to = indexOf(childTo.x, childTo.y, childTo.z);
+        fromIndices[i] = from;
+        toIndices[i] = to;
+        if (!findLegalMoveForSide(*game, sides[i], from, to, promotionType, moves[i]))
+        {
+            std::ostringstream error;
+            error << "Projection move rejected: S" << sides[i] << " mirror move is not legal.";
+            game->lastProjectionError = error.str();
+            return 0;
+        }
+    }
+
+    for (int i = 0; i < 3; ++i)
+    {
+        for (int j = i + 1; j < 3; ++j)
+        {
+            if (toIndices[i] == toIndices[j] || fromIndices[i] == toIndices[j] || fromIndices[j] == toIndices[i])
+            {
+                game->lastProjectionError = "Projection move rejected: child moves collide.";
+                return 0;
+            }
+        }
+    }
+
+    for (Move move : moves)
+    {
+        game->pos.sideToMove = pieceSide(move.piece);
+        applyMove(*game, move);
+    }
+    const int nextMacro = macroPlayer == 1 ? 2 : 1;
+    game->pos.sideToMove = game->rules.projectionGroups[nextMacro][0];
+    recomputeAnchors(*game);
+
+    ActionRecord action{};
+    action.actionKind = ActionProjectionCompositeMove;
+    action.side = macroPlayer;
+    action.pieceCode = moves[0].piece;
+    action.pieceType = pieceType(moves[0].piece);
+    action.fromX = xOf(moves[0].from);
+    action.fromY = yOf(moves[0].from);
+    action.fromZ = zOf(moves[0].from);
+    action.toX = xOf(moves[0].to);
+    action.toY = yOf(moves[0].to);
+    action.toZ = zOf(moves[0].to);
+    action.resultCode = 1;
+    action.flags = ActionFlagWasProjection | ActionFlagChangedAnchors;
+    for (const Move& move : moves)
+    {
+        if ((move.flags & MoveCapture) != 0 || move.captured != Empty)
+        {
+            action.flags |= ActionFlagWasCapture;
+            if (action.capturedPieceCode == Empty)
+            {
+                action.capturedPieceCode = move.captured;
+                action.captureDestination = CaptureDestinationRemoved;
+            }
+        }
+    }
+    action.customNotation = projectionActionNotation(macroPlayer, primarySide, moves, 3);
+    appendAction(*game, action);
+    game->lastProjectionError.clear();
+    game->lastInfo = "3D Hodge projection composite move played.";
+    if (playedMove != nullptr)
+    {
+        *playedMove = toDto(moves[0]);
+    }
+    return 1;
+}
+
 CHESS3D_API int Chess3D_MakeBestMove(void* handle, int depth, Chess3DMoveDto* playedMove)
 {
     auto* game = asGame(handle);
@@ -3577,6 +4014,94 @@ CHESS3D_API int Chess3D_GetLayerTurnProfileSummary(void* handle, char* buffer, i
 CHESS3D_API int Chess3D_GetLayerTurnResultName(int resultCode, char* buffer, int capacity)
 {
     return copyString(layerTurnResultName(resultCode), buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_IsProjectionModeEnabled(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr && isProjectionModeEnabled(game->rules) ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_GetProjectionMacroPlayerCount(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr && isProjectionModeEnabled(game->rules) ? game->rules.projectionMacroPlayerCount : 0;
+}
+
+CHESS3D_API int Chess3D_GetProjectionCountForMacroPlayer(void* handle, int macroPlayer)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !isProjectionModeEnabled(game->rules) || macroPlayer < 1 || macroPlayer > game->rules.projectionMacroPlayerCount)
+    {
+        return 0;
+    }
+    return game->rules.projectionCountPerMacroPlayer;
+}
+
+CHESS3D_API int Chess3D_GetProjectionSide(void* handle, int macroPlayer, int projectionIndex)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || !isProjectionModeEnabled(game->rules) ||
+        macroPlayer < 1 || macroPlayer > game->rules.projectionMacroPlayerCount ||
+        projectionIndex < 0 || projectionIndex >= game->rules.projectionCountPerMacroPlayer)
+    {
+        return 0;
+    }
+    return game->rules.projectionGroups[macroPlayer][projectionIndex];
+}
+
+CHESS3D_API int Chess3D_GetMacroPlayerForSide(void* handle, int side)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? macroPlayerForSide(game->rules, side) : 0;
+}
+
+CHESS3D_API int Chess3D_GetProjectionProfileSummary(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    std::ostringstream summary;
+    summary << "type=" << game->rules.projectionProfileType
+        << "; enabled=" << (isProjectionModeEnabled(game->rules) ? "true" : "false")
+        << "; macros=" << game->rules.projectionMacroPlayerCount
+        << "; projectionsPerMacro=" << game->rules.projectionCountPerMacroPlayer
+        << "; mirrorPolicy=" << game->rules.projectionMirrorPolicy
+        << "; actionHistory=" << game->rules.projectionActionHistoryMode;
+    return copyString(summary.str(), buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_GetLastProjectionError(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->lastProjectionError, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_TransformMoveBetweenSides(void* handle, int sourceSide, int targetSide,
+    int fromX, int fromY, int fromZ, int toX, int toY, int toZ,
+    int* outFromX, int* outFromY, int* outFromZ, int* outToX, int* outToY, int* outToZ)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || outFromX == nullptr || outFromY == nullptr || outFromZ == nullptr ||
+        outToX == nullptr || outToY == nullptr || outToZ == nullptr)
+    {
+        return 0;
+    }
+    Vec3 outFrom{};
+    Vec3 outTo{};
+    if (!transformMoveBetweenSides(sourceSide, targetSide, Vec3{ fromX, fromY, fromZ }, Vec3{ toX, toY, toZ }, outFrom, outTo))
+    {
+        return 0;
+    }
+    *outFromX = outFrom.x;
+    *outFromY = outFrom.y;
+    *outFromZ = outFrom.z;
+    *outToX = outTo.x;
+    *outToY = outTo.y;
+    *outToZ = outTo.z;
+    return 1;
 }
 
 CHESS3D_API int Chess3D_GetPositionText(void* handle, char* buffer, int capacity)

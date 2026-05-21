@@ -131,6 +131,12 @@ internal sealed class NativeChess3DEngine : IDisposable
         return Chess3D_TryMakeMove(_handle, fromX, fromY, fromZ, toX, toY, toZ, promotionType, out move) != 0;
     }
 
+    public bool TryMakeProjectedMove(int primarySide, int fromX, int fromY, int fromZ, int toX, int toY, int toZ, int promotionType, out Chess3DMoveDto move)
+    {
+        ThrowIfDisposed();
+        return Chess3D_TryMakeProjectedMove(_handle, primarySide, fromX, fromY, fromZ, toX, toY, toZ, promotionType, out move) != 0;
+    }
+
     public bool MakeBestMove(int depth, out Chess3DMoveDto move)
     {
         ThrowIfDisposed();
@@ -173,6 +179,59 @@ internal sealed class NativeChess3DEngine : IDisposable
     {
         ThrowIfDisposed();
         return ReadString((buffer, capacity) => Chess3D_GetLayerTurnResultName(resultCode, buffer, capacity));
+    }
+
+    public bool IsProjectionModeEnabled()
+    {
+        ThrowIfDisposed();
+        return Chess3D_IsProjectionModeEnabled(_handle) != 0;
+    }
+
+    public int GetProjectionMacroPlayerCount()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetProjectionMacroPlayerCount(_handle);
+    }
+
+    public int GetProjectionCountForMacroPlayer(int macroPlayer)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetProjectionCountForMacroPlayer(_handle, macroPlayer);
+    }
+
+    public int GetProjectionSide(int macroPlayer, int projectionIndex)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetProjectionSide(_handle, macroPlayer, projectionIndex);
+    }
+
+    public int GetMacroPlayerForSide(int side)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetMacroPlayerForSide(_handle, side);
+    }
+
+    public string GetProjectionProfileSummary()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetProjectionProfileSummary(_handle, buffer, capacity));
+    }
+
+    public string GetLastProjectionError()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetLastProjectionError(_handle, buffer, capacity));
+    }
+
+    public bool TransformMoveBetweenSides(int sourceSide, int targetSide, int fromX, int fromY, int fromZ, int toX, int toY, int toZ,
+        out (int X, int Y, int Z) transformedFrom, out (int X, int Y, int Z) transformedTo)
+    {
+        ThrowIfDisposed();
+        var ok = Chess3D_TransformMoveBetweenSides(_handle, sourceSide, targetSide, fromX, fromY, fromZ, toX, toY, toZ,
+            out var outFromX, out var outFromY, out var outFromZ, out var outToX, out var outToY, out var outToZ) != 0;
+        transformedFrom = (outFromX, outFromY, outFromZ);
+        transformedTo = (outToX, outToY, outToZ);
+        return ok;
     }
 
     public string GetPositionText()
@@ -459,6 +518,9 @@ internal sealed class NativeChess3DEngine : IDisposable
     private static extern int Chess3D_TryMakeMove(IntPtr handle, int fromX, int fromY, int fromZ, int toX, int toY, int toZ, int promotionType, out Chess3DMoveDto playedMove);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_TryMakeProjectedMove(IntPtr handle, int primarySide, int fromX, int fromY, int fromZ, int toX, int toY, int toZ, int promotionType, out Chess3DMoveDto playedMove);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Chess3D_MakeBestMove(IntPtr handle, int depth, out Chess3DMoveDto playedMove);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -478,6 +540,30 @@ internal sealed class NativeChess3DEngine : IDisposable
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_GetLayerTurnResultName(int resultCode, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_IsProjectionModeEnabled(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetProjectionMacroPlayerCount(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetProjectionCountForMacroPlayer(IntPtr handle, int macroPlayer);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetProjectionSide(IntPtr handle, int macroPlayer, int projectionIndex);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetMacroPlayerForSide(IntPtr handle, int side);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetProjectionProfileSummary(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastProjectionError(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_TransformMoveBetweenSides(IntPtr handle, int sourceSide, int targetSide, int fromX, int fromY, int fromZ, int toX, int toY, int toZ, out int outFromX, out int outFromY, out int outFromZ, out int outToX, out int outToY, out int outToZ);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_GetPositionText(IntPtr handle, StringBuilder buffer, int capacity);

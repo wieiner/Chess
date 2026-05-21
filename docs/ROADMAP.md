@@ -100,14 +100,25 @@
 - Completed: GitHub Actions now uploads `ProductionOutput` as a short-retention workflow artifact after successful verification.
 - Deferred: full replay/export/import, undo, online serialization, drag/drop reserve inventory, and notation standardization.
 
-### P2J - UI Visualization For Stacks, Fusion, Reserve, And Layer Turns
+### P2J - Hodge Projection Duel
+
+- Completed: separate `hodge-projection-duel-3d-8x8x8-v0.1` RuleProfile.
+- Completed: `projectionProfile` schema/data contract.
+- Completed: side/face local-frame documentation and Hodge transform ABI.
+- Completed: runtime all-or-nothing projected composite move for two macro-players with three projections each.
+- Completed: action history/notation for `HPD` composite moves.
+- Completed: C# status wrapper for projection mode and last projection error.
+- Deferred: projection-specific UI controls, replay/import/export, online serialization, AI/search integration, and full 3D checkmate hardening.
+
+### P2K - UI Visualization For Stacks, Fusion, Reserve, Layer Turns, And Projection
 
 - Visualize multiple stack entries in one core cell.
 - Display fusion/contested/royal/implosion state in the board view.
 - Add layer-turn controls, animation, and optional notation/replay display.
+- Add Hodge projection group visualization and projected child-move previews.
 - Add safe editor workflows for stack inspection without changing fusion descriptors manually.
 
-### P2K - Replay / Export / Import / Savegame
+### P2L - Replay / Export / Import / Savegame
 
 - Build replay/export/import over the P2I action record.
 - Decide savegame format for profiles, board, stacks, fusion descriptors, reserve counts, and history.

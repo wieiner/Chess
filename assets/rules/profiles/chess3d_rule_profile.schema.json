@@ -15,6 +15,7 @@
     "occupancyProfile",
     "fusionProfile",
     "layerTurnProfile",
+    "projectionProfile",
     "turnProfile",
     "victoryProfile",
     "randomizationProfile",
@@ -148,6 +149,36 @@
         "recomputesFusion": { "type": "boolean" },
         "recomputesAnchors": { "type": "boolean" },
         "reserveInteraction": { "enum": ["unaffected", "future", "none"] },
+        "status": { "enum": ["implementedByCurrentBoardModel", "runtimePartial", "specOnly", "draft", "future"] },
+        "notes": { "type": "string" }
+      }
+    },
+    "projectionProfile": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["none", "hodgeTriuneProjection"] },
+        "enabled": { "type": "boolean" },
+        "macroPlayerCount": { "type": "integer", "minimum": 0, "maximum": 6 },
+        "projectionCountPerMacroPlayer": { "type": "integer", "minimum": 0, "maximum": 6 },
+        "grouping": { "type": "string" },
+        "mirrorPolicy": { "enum": ["allOrNothing", "skipInvalidFuture", "primaryOnlyFuture"] },
+        "actionHistoryMode": { "enum": ["none", "compositeTurnWithChildren"] },
+        "transformProfile": { "type": "object" },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "macroPlayer": { "type": "integer", "minimum": 1, "maximum": 6 },
+              "name": { "type": "string" },
+              "sideIds": {
+                "type": "array",
+                "items": { "type": "integer", "minimum": 1, "maximum": 6 }
+              }
+            }
+          }
+        },
         "status": { "enum": ["implementedByCurrentBoardModel", "runtimePartial", "specOnly", "draft", "future"] },
         "notes": { "type": "string" }
       }

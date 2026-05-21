@@ -44,6 +44,7 @@ constexpr int LayerTurnInvalidQuarterTurns = 5;
 constexpr int ActionMove = 1;
 constexpr int ActionLayerTurn = 2;
 constexpr int ActionReserveRestore = 3;
+constexpr int ActionProjectionCompositeMove = 5;
 constexpr int CaptureDestinationRemoved = 1;
 constexpr int CaptureDestinationHome = 2;
 constexpr int CaptureDestinationReserve = 3;
@@ -54,6 +55,7 @@ constexpr int ActionFlagEnteredCore = 4;
 constexpr int ActionFlagLeftCore = 8;
 constexpr int ActionFlagWasLayerTurn = 16;
 constexpr int ActionFlagWasReserveRestore = 32;
+constexpr int ActionFlagWasProjection = 512;
 
 std::string ReadTextFile(const std::string& path)
 {
@@ -554,6 +556,7 @@ bool ValidateCommonRuleProfile(const std::string& json)
     const std::string occupancy = ExtractStringValue(ExtractObject(json, "occupancyProfile"), "type");
     const std::string fusion = ExtractStringValue(ExtractObject(json, "fusionProfile"), "type");
     const std::string layerTurn = ExtractStringValue(ExtractObject(json, "layerTurnProfile"), "type");
+    const std::string projection = ExtractStringValue(ExtractObject(json, "projectionProfile"), "type");
     return JsonParser(json).Parse() &&
         !rulesetId.empty() &&
         ValidateBoardProfile(json) &&
@@ -561,7 +564,8 @@ bool ValidateCommonRuleProfile(const std::string& json)
         IsAllowed(capture, { "classicCapture", "knockbackCapture" }) &&
         IsAllowed(occupancy, { "exclusive", "coreStack", "quantumCore" }) &&
         IsAllowed(fusion, { "none", "anchorOnly", "pairFusion", "stackFusion", "colorPermutation", "volumeSurface216" }) &&
-        IsAllowed(layerTurn, { "disabled", "ritualTurn", "globalEvent", "sandbox" });
+        IsAllowed(layerTurn, { "disabled", "ritualTurn", "globalEvent", "sandbox" }) &&
+        IsAllowed(projection, { "none", "hodgeTriuneProjection" });
 }
 
 bool ValidateCoreCube(const std::string& json, int expectedMin, int expectedMax)
@@ -1040,15 +1044,18 @@ int main()
     const std::string singleProfile = ReadTextFile("assets\\rules\\profiles\\single_side_3d_v0_1.json");
     const std::string asgardProfile = ReadTextFile("assets\\rules\\profiles\\asgard_convergence_3d_v0_1.json");
     const std::string rubikProfile = ReadTextFile("assets\\rules\\profiles\\rubik_convergence_3d_v0_1.json");
+    const std::string hodgeProfile = ReadTextFile("assets\\rules\\profiles\\hodge_projection_duel_3d_v0_1.json");
     test.Check(!classicProfile.empty(), "classic six-side profile exists");
     test.Check(!singleProfile.empty(), "single-side profile exists");
     test.Check(!asgardProfile.empty(), "asgard convergence profile exists");
     test.Check(!rubikProfile.empty(), "rubik convergence profile exists");
+    test.Check(!hodgeProfile.empty(), "hodge projection duel profile exists");
 
     test.Check(ValidateCommonRuleProfile(classicProfile), "classic six-side profile passes common validation");
     test.Check(ValidateCommonRuleProfile(singleProfile), "single-side profile passes common validation");
     test.Check(ValidateCommonRuleProfile(asgardProfile), "asgard convergence profile passes common validation");
     test.Check(ValidateCommonRuleProfile(rubikProfile), "rubik convergence profile passes common validation");
+    test.Check(ValidateCommonRuleProfile(hodgeProfile), "hodge projection duel profile passes common validation");
 
     test.Check(ExtractStringValue(classicProfile, "rulesetId") == "classic-six-side-3d-8x8x8-v0.1",
         "classic six-side ruleset id matches");
@@ -1058,6 +1065,8 @@ int main()
         "asgard convergence ruleset id matches");
     test.Check(ExtractStringValue(rubikProfile, "rulesetId") == "rubik-convergence-3d-8x8x8-v0.1",
         "rubik convergence ruleset id matches");
+    test.Check(ExtractStringValue(hodgeProfile, "rulesetId") == "hodge-projection-duel-3d-8x8x8-v0.1",
+        "hodge projection duel ruleset id matches");
 
     test.Check(ExtractStringValue(ExtractObject(classicProfile, "goalProfile"), "type") == "classicCheckmate",
         "classic six-side goalProfile is classicCheckmate");
@@ -1073,6 +1082,8 @@ int main()
         "classic six-side fusionProfile is none");
     test.Check(ExtractStringValue(ExtractObject(classicProfile, "layerTurnProfile"), "type") == "disabled",
         "classic six-side layerTurnProfile is disabled");
+    test.Check(ExtractStringValue(ExtractObject(classicProfile, "projectionProfile"), "type") == "none",
+        "classic six-side projectionProfile is none");
 
     test.Check(ExtractStringValue(ExtractObject(singleProfile, "setupProfile"), "baseSetup") == "central4x4",
         "single-side profile references central4x4 setup");
@@ -1086,6 +1097,8 @@ int main()
         "single-side knockbackProfile is none");
     test.Check(ExtractStringValue(ExtractObject(singleProfile, "reserveProfile"), "type") == "none",
         "single-side reserveProfile is none");
+    test.Check(ExtractStringValue(ExtractObject(singleProfile, "projectionProfile"), "type") == "none",
+        "single-side projectionProfile is none");
 
     test.Check(ExtractStringValue(ExtractObject(asgardProfile, "goalProfile"), "type") == "centerAssembly",
         "asgard convergence goalProfile is centerAssembly");
@@ -1145,6 +1158,8 @@ int main()
         "asgard convergence volumeSurface216Principle exists and is disabled");
     test.Check(ExtractStringValue(ExtractObject(asgardProfile, "layerTurnProfile"), "type") == "disabled",
         "asgard convergence layerTurnProfile is disabled");
+    test.Check(ExtractStringValue(ExtractObject(asgardProfile, "projectionProfile"), "type") == "none",
+        "asgard convergence projectionProfile is none");
     test.Check(asgardProfile.find("Forbidden Core / Asgard / Meru") != std::string::npos,
         "asgard convergence mythProfile names the forbidden core");
 
@@ -1192,6 +1207,25 @@ int main()
         "rubik convergence volumeSurface216Principle is disabled");
     test.Check(rubikProfile.find("P2H layer turns move the projected board and whole CoreCell stacks") != std::string::npos,
         "rubik convergence knownLimitations mention P2H runtime stack layer turns");
+
+    const std::string hodgeProjection = ExtractObject(hodgeProfile, "projectionProfile");
+    test.Check(ExtractStringValue(hodgeProjection, "type") == "hodgeTriuneProjection",
+        "hodge projection duel projectionProfile is hodgeTriuneProjection");
+    bool hodgeEnabled = false;
+    test.Check(ExtractBoolValue(hodgeProjection, "enabled", hodgeEnabled) && hodgeEnabled,
+        "hodge projection duel enables projectionProfile");
+    test.Check(ExtractStringValue(hodgeProjection, "mirrorPolicy") == "allOrNothing" &&
+        ExtractStringValue(hodgeProjection, "actionHistoryMode") == "compositeTurnWithChildren",
+        "hodge projection duel declares all-or-nothing composite action history");
+    test.Check(hodgeProjection.find("\"sideIds\": [1, 3, 5]") != std::string::npos &&
+        hodgeProjection.find("\"sideIds\": [2, 4, 6]") != std::string::npos,
+        "hodge projection duel groups positive and negative triads");
+    test.Check(ExtractStringValue(ExtractObject(hodgeProfile, "goalProfile"), "type") == "sandbox" &&
+        ExtractStringValue(ExtractObject(hodgeProfile, "captureProfile"), "type") == "classicCapture" &&
+        ExtractStringValue(ExtractObject(hodgeProfile, "occupancyProfile"), "type") == "exclusive" &&
+        ExtractStringValue(ExtractObject(hodgeProfile, "fusionProfile"), "type") == "none" &&
+        ExtractStringValue(ExtractObject(hodgeProfile, "layerTurnProfile"), "type") == "disabled",
+        "hodge projection duel stays classic/exclusive/no-fusion/no-layer-turn by default");
 
     test.Check(Chess3D_LoadRuleProfileJson(game, classicProfile.c_str()) == 1, "runtime loads classic six-side profile");
     test.Check(Chess3D_IsCoreStackEnabled(game) == 0, "classic profile keeps core stacks disabled");
@@ -1768,6 +1802,104 @@ int main()
         Chess3D_GetLastLayerTurnInfo(game, &lastAxis, &lastLayer, &lastQuarterTurns, &lastLayerResult) == 1 &&
         lastLayerResult == LayerTurnInvalidQuarterTurns,
         "invalid quarter turn reports invalidQuarterTurns result code");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, classicProfile.c_str()) == 1 &&
+        Chess3D_IsProjectionModeEnabled(game) == 0,
+        "classic profile keeps Hodge projection mode disabled");
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1 &&
+        Chess3D_IsProjectionModeEnabled(game) == 0,
+        "asgard profile keeps Hodge projection mode disabled");
+    test.Check(Chess3D_LoadRuleProfileJson(game, rubikProfile.c_str()) == 1 &&
+        Chess3D_IsProjectionModeEnabled(game) == 0,
+        "rubik profile keeps Hodge projection mode disabled");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, hodgeProfile.c_str()) == 1, "runtime loads hodge projection duel profile");
+    test.Check(Chess3D_IsProjectionModeEnabled(game) == 1 &&
+        Chess3D_GetProjectionMacroPlayerCount(game) == 2 &&
+        Chess3D_GetProjectionCountForMacroPlayer(game, 1) == 3 &&
+        Chess3D_GetProjectionCountForMacroPlayer(game, 2) == 3,
+        "hodge runtime exposes two triune macro players");
+    std::set<int> hodgeSides;
+    for (int macro = 1; macro <= 2; ++macro)
+    {
+        for (int i = 0; i < 3; ++i)
+        {
+            hodgeSides.insert(Chess3D_GetProjectionSide(game, macro, i));
+        }
+    }
+    test.Check(hodgeSides == std::set<int>({ 1, 2, 3, 4, 5, 6 }) &&
+        Chess3D_GetMacroPlayerForSide(game, 1) == 1 &&
+        Chess3D_GetMacroPlayerForSide(game, 3) == 1 &&
+        Chess3D_GetMacroPlayerForSide(game, 5) == 1 &&
+        Chess3D_GetMacroPlayerForSide(game, 2) == 2 &&
+        Chess3D_GetMacroPlayerForSide(game, 4) == 2 &&
+        Chess3D_GetMacroPlayerForSide(game, 6) == 2,
+        "hodge macro-player groups cover all six sides exactly once");
+    test.Check(ReadAbiString(game, Chess3D_GetProjectionProfileSummary).find("hodgeTriuneProjection") != std::string::npos,
+        "hodge projection summary names hodgeTriuneProjection");
+
+    int tfX = -1;
+    int tfY = -1;
+    int tfZ = -1;
+    int ttX = -1;
+    int ttY = -1;
+    int ttZ = -1;
+    test.Check(Chess3D_TransformMoveBetweenSides(game, 1, 3, 3, 3, 0, 3, 3, 1, &tfX, &tfY, &tfZ, &ttX, &ttY, &ttZ) == 1 &&
+        tfX == 3 && tfY == 0 && tfZ == 3 &&
+        ttX == 3 && ttY == 1 && ttZ == 3,
+        "hodge transform maps side 1 forward move into side 3 local frame");
+    int roundFromX = -1;
+    int roundFromY = -1;
+    int roundFromZ = -1;
+    int roundToX = -1;
+    int roundToY = -1;
+    int roundToZ = -1;
+    test.Check(Chess3D_TransformMoveBetweenSides(game, 3, 1, tfX, tfY, tfZ, ttX, ttY, ttZ, &roundFromX, &roundFromY, &roundFromZ, &roundToX, &roundToY, &roundToZ) == 1 &&
+        roundFromX == 3 && roundFromY == 3 && roundFromZ == 0 &&
+        roundToX == 3 && roundToY == 3 && roundToZ == 1,
+        "hodge transform round-trips between side 1 and side 3");
+
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 3, 3, 0, 1, Pawn);
+    Chess3D_SetPiece(game, 3, 0, 3, 3, Pawn);
+    Chess3D_SetPiece(game, 0, 3, 3, 5, Pawn);
+    test.Check(Chess3D_TryMakeProjectedMove(game, 1, 3, 3, 0, 3, 3, 1, 0, &played) == 1 &&
+        Chess3D_GetPiece(game, 3, 3, 1) == PieceCode(1, Pawn) &&
+        Chess3D_GetPiece(game, 3, 1, 3) == PieceCode(3, Pawn) &&
+        Chess3D_GetPiece(game, 1, 3, 3) == PieceCode(5, Pawn) &&
+        Chess3D_GetActionCount(game) == 1 &&
+        Chess3D_GetActionKind(game, 1) == ActionProjectionCompositeMove &&
+        (Chess3D_GetActionFlags(game, 1) & ActionFlagWasProjection) != 0 &&
+        ReadActionNotation(game, 1).find("HPD") != std::string::npos,
+        "hodge projected move applies primary and two mirror moves as one composite action");
+
+    Chess3D_LoadRuleProfileJson(game, hodgeProfile.c_str());
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 3, 3, 0, 1, Pawn);
+    Chess3D_SetPiece(game, 3, 0, 3, 3, Pawn);
+    Chess3D_SetPiece(game, 3, 1, 3, 3, Knight);
+    Chess3D_SetPiece(game, 0, 3, 3, 5, Pawn);
+    const auto hodgeBlockedBefore = BoardSnapshot(game);
+    const int hodgeActionBefore = Chess3D_GetActionCount(game);
+    test.Check(Chess3D_TryMakeProjectedMove(game, 1, 3, 3, 0, 3, 3, 1, 0, &played) == 0 &&
+        BoardSnapshot(game) == hodgeBlockedBefore &&
+        Chess3D_GetActionCount(game) == hodgeActionBefore &&
+        !ReadAbiString(game, Chess3D_GetLastProjectionError).empty(),
+        "hodge all-or-nothing projected move rejects blocked mirror without mutation");
+
+    Chess3D_LoadRuleProfileJson(game, hodgeProfile.c_str());
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 2, 2, 0, 1, Rook);
+    Chess3D_SetPiece(game, 2, 2, 1, 2, Pawn);
+    Chess3D_SetPiece(game, 2, 0, 2, 3, Rook);
+    Chess3D_SetPiece(game, 0, 2, 2, 5, Rook);
+    test.Check(Chess3D_TryMakeProjectedMove(game, 1, 2, 2, 0, 2, 2, 1, 0, &played) == 1 &&
+        Chess3D_GetPiece(game, 2, 2, 1) == PieceCode(1, Rook) &&
+        Chess3D_GetActionKind(game, 1) == ActionProjectionCompositeMove &&
+        Chess3D_GetActionCapturedPieceCode(game, 1) == PieceCode(2, Pawn) &&
+        Chess3D_GetActionCaptureDestination(game, 1) == CaptureDestinationRemoved &&
+        (Chess3D_GetActionFlags(game, 1) & ActionFlagWasCapture) != 0,
+        "hodge projected composite action records classic capture without knockback");
 
     test.Check(Chess3D_LoadRuleProfileJson(game, singleProfile.c_str()) == 1, "action history test loads single-side profile");
     Chess3D_Reset(game);

@@ -5,7 +5,7 @@ The repository is split into separate native DLLs and separate user-facing appli
 ## Native Layers
 
 - `ChessEngine.dll`: ordinary 8x8 chess rules, legal move generation, FEN, draw rules, search, evaluation, and search telemetry.
-- `Chess3DEngine.dll`: 8x8x8 cube board state, P2A single-side movement/capture contracts, P2B/P2C profile data contracts, P2D runtime RuleProfile loading, P2E Forbidden Core stack overlay, P2F fusion/implosion descriptors, P2G knockback/reserve capture routing, P2H Rubik layer turns, P2I action history/notation/reserve restore, stack-aware centerAssembly anchors, draft six-side setup, and Rubik-style layer rotations for cube chess.
+- `Chess3DEngine.dll`: 8x8x8 cube board state, P2A single-side movement/capture contracts, P2B/P2C profile data contracts, P2D runtime RuleProfile loading, P2E Forbidden Core stack overlay, P2F fusion/implosion descriptors, P2G knockback/reserve capture routing, P2H Rubik layer turns, P2I action history/notation/reserve restore, P2J Hodge projection composite turns, stack-aware centerAssembly anchors, draft six-side setup, and Rubik-style layer rotations for cube chess.
 - `RubikEngine.dll`: N x N x N Rubik state, layer rotations, scramble/history, and trusted reverse playback.
 - `ChessGpuBackend.dll`: stable GPU ABI boundary. It routes work to CUDA when available, otherwise Direct3D/CPU fallback paths.
 - `ChessCudaBackend.dll`: optional CUDA backend built from `.cu` kernels. It is dynamically loaded and is not required for the default solution build.
@@ -56,9 +56,11 @@ P2H adds profile-gated Rubik layer turns for `rubik_convergence_3d_v0_1`. The pr
 
 P2I adds a unified action-history layer over successful moves, Rubik layer turns, and reserve restores. It also adds deterministic notation v0.1 and a legal reserve restore action to matching free home slots for reserve-enabled profiles. Reset/profile load/setup helpers remain outside turn history.
 
+P2J adds a separate Hodge Projection Duel profile. This is a two-macro-player mode where each macro-player has three cube-face projections. A successful projected action validates one primary move plus two mirror moves through documented face-coordinate transforms, then records one `HPD` composite action. The profile defaults to exclusive occupancy, classic capture, no core physics, no fusion, no reserve/knockback, and no Rubik layer turns.
+
 This is still not final Asgard fusion physics. Destructive implosion, color/permutation state, online serialization, AI/search generation for layer turns, UI animation, full replay/import/export, and GPU stack snapshots remain later stages.
 
-The engine still reserves side ids `1..6`. Six-sided chess should be built by mapping this local rule core to each cube face through coordinate transforms, rather than inventing six unrelated movement systems. Rubik-style ritual turns are now runtimePartial board/stack transforms for Rubik convergence; P2I notation is a replay foundation, while full online sync and search integration remain separate boundaries.
+The engine still reserves side ids `1..6`. Six-sided chess should be built by mapping this local rule core to each cube face through coordinate transforms, rather than inventing six unrelated movement systems. Hodge Projection Duel now uses those same face-frame transforms for triune mirror moves. Rubik-style ritual turns are runtimePartial board/stack transforms for Rubik convergence; P2I/P2J notation is a replay foundation, while full online sync and search integration remain separate boundaries.
 
 ### Online/Integration Boundary
 

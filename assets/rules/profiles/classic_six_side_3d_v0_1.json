@@ -63,6 +63,11 @@
     "status": "implementedByCurrentBoardModel",
     "notes": "Classic six-side gameplay does not allow ritual Rubik layer turns."
   },
+  "projectionProfile": {
+    "type": "none",
+    "enabled": false,
+    "status": "implementedByCurrentBoardModel"
+  },
   "turnProfile": {
     "type": "roundRobin",
     "sideOrder": [1, 2, 3, 4, 5, 6]

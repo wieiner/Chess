@@ -1,6 +1,6 @@
 # Chess3D Action ABI
 
-P2I adds append-only exports to `Chess3DEngine.dll`.
+P2I adds append-only action/history exports to `Chess3DEngine.dll`. P2J adds Hodge projection query/action exports without changing the existing action-history ABI.
 
 ## History
 
@@ -34,10 +34,24 @@ Action indexes are one-based in the C ABI. Invalid indexes return safe default v
 - `Chess3D_AutoRestoreReservePiece`
 - `Chess3D_GetLastReserveRestoreInfo`
 
+## Hodge Projection
+
+- `Chess3D_IsProjectionModeEnabled`
+- `Chess3D_GetProjectionMacroPlayerCount`
+- `Chess3D_GetProjectionCountForMacroPlayer`
+- `Chess3D_GetProjectionSide`
+- `Chess3D_GetMacroPlayerForSide`
+- `Chess3D_GetProjectionProfileSummary`
+- `Chess3D_GetLastProjectionError`
+- `Chess3D_TransformMoveBetweenSides`
+- `Chess3D_TryMakeProjectedMove`
+
+Successful projected moves are recorded as `ActionProjectionCompositeMove = 5` and set `ActionFlagWasProjection = 512`.
+
 ## String Rules
 
 String exports accept `char* buffer` and `capacity`. They do not write past capacity and use the same ABI pattern as the existing profile/fusion/layer-turn string getters.
 
 ## Compatibility
 
-No existing export signature changed. C# wrappers in `NativeChess3DEngine.cs` expose the new history and restore calls for status/UI use.
+No existing export signature changed. C# wrappers in `NativeChess3DEngine.cs` expose the new history, restore, and projection calls for status/UI use.

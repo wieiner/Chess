@@ -117,6 +117,12 @@
     "status": "implementedByCurrentBoardModel",
     "notes": "Asgard convergence does not allow Rubik-like layer turns; use rubik_convergence_3d_v0_1 for ritual turns."
   },
+  "projectionProfile": {
+    "type": "none",
+    "enabled": false,
+    "status": "implementedByCurrentBoardModel",
+    "notes": "Asgard uses center/core convergence, not Hodge triune projection."
+  },
   "turnProfile": {
     "type": "roundRobin",
     "sideOrder": [1, 2, 3, 4, 5, 6]

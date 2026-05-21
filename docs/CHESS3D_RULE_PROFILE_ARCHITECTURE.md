@@ -25,6 +25,7 @@ A rule profile is a JSON `RuleSet` with these top-level fields:
 - `corePhysicsProfile`: binding between core zone, occupancy, fusion, anchor, and symbolic laws.
 - `implosionProfile`: optional non-destructive or future destructive completion behavior.
 - `layerTurnProfile`: Rubik-like layer-turn behavior.
+- `projectionProfile`: optional Hodge-style multi-face projection behavior.
 - `turnProfile`: side order and action model.
 - `victoryProfile`: concrete victory detection rule.
 - `randomizationProfile`: seed-based variation controls.
@@ -198,6 +199,24 @@ Supported contract values:
 - `disabled`: no Rubik layer turns.
 - `ritualTurn`: `rotateLayer` is a legal action instead of a normal move.
 - `globalEvent`: automatic layer rotations later.
+
+## projectionProfile
+
+Supported contract values:
+
+- `none`: normal side/player behavior.
+- `hodgeTriuneProjection`: two macro-players, each represented by three cube-face projections.
+
+P2J implements the first runtime subset for `hodgeTriuneProjection`:
+
+- `macroPlayerCount = 2`;
+- `projectionCountPerMacroPlayer = 3`;
+- `mirrorPolicy = allOrNothing`;
+- `actionHistoryMode = compositeTurnWithChildren`;
+- macro-player 1 uses sides `[1,3,5]`;
+- macro-player 2 uses sides `[2,4,6]`.
+
+The projection transform is based on the engine's side/face local frames. Hodge Projection Duel is intentionally separate from Asgard/Meru convergence: its default profile uses exclusive occupancy, classic capture, no core physics, no fusion, no reserve/knockback, and no Rubik layer turns.
 - `sandbox`: UI/debug may rotate layers without normal turn semantics.
 
 For ritual turns:

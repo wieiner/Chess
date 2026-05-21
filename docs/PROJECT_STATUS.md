@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P2I Chess3D action history, notation, and reserve restore runtime.
+Last audited locally for P2J Chess3D Hodge Projection Duel / Triune Mirror runtime.
 
 ## Exists
 
@@ -21,7 +21,7 @@ Last audited locally for P2I Chess3D action history, notation, and reserve resto
 - `docs/CHESS3D_SINGLE_SIDE_AUDIT.md`: factual audit of the current 3D engine before six-side generalization.
 - `docs/CHESS3D_SINGLE_SIDE_RULES_SPEC.md`: formal P2A single-side 8x8x8 ruleset specification.
 - `src/ChessApp/Assets/Rules3D/single_side_3d_chess_8x8x8_v0_1.json`: machine-readable P2A rules asset.
-- `assets/rules/profiles`: P2B profile JSON assets for classic six-side, single-side, Asgard/Meru convergence, and Rubik convergence modes.
+- `assets/rules/profiles`: profile JSON assets for classic six-side, single-side, Asgard/Meru convergence, Rubik convergence, and Hodge Projection Duel modes.
 - `docs/CHESS3D_RULE_PROFILE_ARCHITECTURE.md`: configurable rule-profile architecture.
 - `docs/CHESS3D_ASGARD_CONVERGENCE.md`: Asgard/Meru centerAssembly design.
 - `docs/CHESS3D_RUBIK_LAYER_TURNS.md`: Rubik layer-turn profile contract.
@@ -59,6 +59,13 @@ Last audited locally for P2I Chess3D action history, notation, and reserve resto
 - `docs/CHESS3D_RESERVE_RESTORE_MODEL.md`: legal reserve restore behavior.
 - `docs/CHESS3D_P2I_ACTION_RUNTIME.md`: runtime integration notes.
 - `docs/CHESS3D_ACTION_ABI.md`: append-only action/history/restore ABI.
+- `docs/CHESS3D_P2J_HODGE_PROJECTION_AUDIT.md`: audit of side/face/action boundaries before Hodge projection.
+- `docs/CHESS3D_HODGE_PROJECTION_DUEL.md`: game design specification for the separate Hodge Projection Duel mode.
+- `docs/CHESS3D_FACE_COORDINATE_FRAMES.md`: canonical cube-face local frames.
+- `docs/CHESS3D_HODGE_PROJECTION_TRANSFORMS.md`: transform semantics for mirror moves.
+- `docs/CHESS3D_HODGE_PROJECTION_RUNTIME.md`: runtime behavior for projected composite moves.
+- `docs/CHESS3D_HODGE_PROJECTION_ABI.md`: append-only Hodge projection ABI.
+- `docs/CHESS3D_HODGE_PROJECTION_NOTATION.md`: notation v0.1 for `HPD` composite turns.
 
 ## Build-Verified
 
@@ -78,6 +85,7 @@ Last audited locally for P2I Chess3D action history, notation, and reserve resto
 - Chess3D contract tests now cover P2G knockback/reserve: classic isolation, Asgard home-slot return, reserve fallback, own-piece rejection, outside-to-core no-knockback behavior, core-to-outside capture routing, reset clearing, and Rubik profile loading.
 - Chess3D contract tests now cover P2H Rubik layer turns: profile gating, projected board rotation for X/Y/Z conventions, CoreCell stack relocation, fusion recompute, anchor/victory recompute, reserve invariance, four-turn identity, and last-result telemetry.
 - Chess3D contract tests now cover P2I action history, deterministic notation, move/capture/layer-turn records, reserve restore, auto-restore, failure no-mutation behavior, and string ABI safety.
+- Chess3D contract tests now cover P2J Hodge Projection Duel: JSON/profile validation, profile isolation, macro-player group coverage, face-frame transforms, projected composite moves, all-or-nothing rejection, and classic capture recording.
 - `scripts/verify.ps1` checks that representative RuleProfile JSON files are copied into Chess3D development output and `ProductionOutput`.
 
 ## User Executables
@@ -111,6 +119,7 @@ Portable outputs:
 - `Chess2DBenchmark --quick` is part of the contract-test runner when the benchmark executable exists.
 - Single-side 3D ruleset `single-side-3d-chess-8x8x8-v0.1` is documented and covered by ABI-level contract tests.
 - Rule profile assets define classic six-side, single-side sandbox, Asgard/Meru convergence, and Rubik convergence modes as data contracts.
+- Rule profile assets also define Hodge Projection Duel as a separate two-player triune-projection mode; it is explicitly not Asgard and defaults to exclusive occupancy, classic capture, no fusion, no core physics, and no Rubik layer turns.
 - Asgard/Rubik convergence profiles define `coreStack`, `stackFusion`, and `asgardCorePhysics`; P2E implements stack storage and P2F implements runtimePartial fusion descriptors.
 - `Chess3DEngine.dll` can load strict RuleProfile JSON through an append-only ABI.
 - `Chess3DApp.exe` can load profile-shaped JSON files and shows a compact profile/anchor summary in the status area.
@@ -131,6 +140,8 @@ Portable outputs:
 - Chess3D exposes deterministic notation v0.1 through append-only ABI and C# status wrappers.
 - Reserve restore is implemented for reserve-enabled profiles: a piece may return from side/type reserve to a matching free home slot.
 - Auto-restore finds the first matching free home slot and fails cleanly if none exists.
+- Hodge Projection Duel runtime can transform one primary face move to two mirror projections and apply all three moves as one all-or-nothing composite action.
+- Hodge projected composite moves append `HPD` notation and expose projection profile/status through append-only ABI and C# status text.
 - GitHub Actions uploads the generated `ProductionOutput` folder as `Chess-ProductionOutput-windows-x64` after successful verification.
 
 ## Draft
@@ -155,4 +166,4 @@ Portable outputs:
 - Full UI automation tests are not present yet.
 - GPU parity/performance needs more benchmark baselines on real target hardware.
 - The project currently relies on local Visual Studio/MSBuild and vcpkg environment availability.
-- Recommended next stage is P2J/P2K: UI visualization for stack/fusion/reserve/layer-turn state, then replay/export/import over P2I action history.
+- Recommended next stage is P2K/P2L: UI visualization for stack/fusion/reserve/layer-turn/projection state, then replay/export/import over P2I/P2J action history.

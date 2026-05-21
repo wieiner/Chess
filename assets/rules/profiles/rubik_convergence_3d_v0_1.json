@@ -126,6 +126,12 @@
     "reserveInteraction": "unaffected",
     "status": "runtimePartial"
   },
+  "projectionProfile": {
+    "type": "none",
+    "enabled": false,
+    "status": "implementedByCurrentBoardModel",
+    "notes": "Rubik convergence combines Asgard core physics with layer turns, not Hodge triune projection."
+  },
   "turnProfile": {
     "type": "roundRobinWithLayerActions",
     "sideOrder": [1, 2, 3, 4, 5, 6]
