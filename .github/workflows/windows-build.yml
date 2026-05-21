@@ -30,3 +30,10 @@ jobs:
       - name: Verify build, package, and contract tests
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
+
+      - name: Upload portable ProductionOutput
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chess-ProductionOutput-windows-x64
+          path: ProductionOutput
+          retention-days: 3

@@ -41,6 +41,7 @@ P2H implements `ritualTurn` for `rubik-convergence-3d-8x8x8-v0.1`.
 - recomputes anchors, implosion progress, and compatible centerAssembly victory;
 - leaves reserve counts untouched;
 - records last layer-turn telemetry through append-only ABI.
+- P2I records successful ritual turns in unified action history with notation such as `#4 LAYER Z[2]+`.
 
 Asgard convergence, classic six-side, and single-side profiles keep layer turns disabled and clean-fail. The legacy draft profile keeps non-stack debug rotation for compatibility.
 
@@ -48,7 +49,7 @@ Deferred:
 
 - king-safety after layer rotation;
 - animated UI controls;
-- notation and replay semantics.
+- full replay/import/export semantics;
 - online serialization;
 - AI/search generation of layer-turn actions;
 - GPU stack snapshots.

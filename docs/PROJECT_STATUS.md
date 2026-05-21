@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P2H Rubik layer-turn runtime.
+Last audited locally for P2I Chess3D action history, notation, and reserve restore runtime.
 
 ## Exists
 
@@ -53,6 +53,12 @@ Last audited locally for P2H Rubik layer-turn runtime.
 - `docs/CHESS3D_RUBIK_LAYER_TURN_ABI.md`: append-only layer-turn ABI contract.
 - `docs/CHESS3D_RUBIK_LAYER_TURN_COORDINATES.md`: axis-code and invariant notes.
 - `docs/CHESS3D_RUBIK_STACK_ROTATION.md`: whole-stack relocation model.
+- `docs/CHESS3D_P2I_ACTION_SYSTEM_AUDIT.md`: audit of move/capture/stack/layer-turn action boundaries.
+- `docs/CHESS3D_ACTION_SYSTEM.md`: unified Chess3D action record model.
+- `docs/CHESS3D_ACTION_HISTORY_AND_NOTATION.md`: notation v0.1 and replay foundation.
+- `docs/CHESS3D_RESERVE_RESTORE_MODEL.md`: legal reserve restore behavior.
+- `docs/CHESS3D_P2I_ACTION_RUNTIME.md`: runtime integration notes.
+- `docs/CHESS3D_ACTION_ABI.md`: append-only action/history/restore ABI.
 
 ## Build-Verified
 
@@ -71,6 +77,7 @@ Last audited locally for P2H Rubik layer-turn runtime.
 - Chess3D contract tests now cover P2F fusion descriptors: disabled profile isolation, single/friendly/royal/contested states, fusion recompute, move integration, implosion progress, and Rubik deferred layer-turn stability.
 - Chess3D contract tests now cover P2G knockback/reserve: classic isolation, Asgard home-slot return, reserve fallback, own-piece rejection, outside-to-core no-knockback behavior, core-to-outside capture routing, reset clearing, and Rubik profile loading.
 - Chess3D contract tests now cover P2H Rubik layer turns: profile gating, projected board rotation for X/Y/Z conventions, CoreCell stack relocation, fusion recompute, anchor/victory recompute, reserve invariance, four-turn identity, and last-result telemetry.
+- Chess3D contract tests now cover P2I action history, deterministic notation, move/capture/layer-turn records, reserve restore, auto-restore, failure no-mutation behavior, and string ABI safety.
 - `scripts/verify.ps1` checks that representative RuleProfile JSON files are copied into Chess3D development output and `ProductionOutput`.
 
 ## User Executables
@@ -120,6 +127,11 @@ Portable outputs:
 - Asgard/classic/single-side profiles keep ritual layer turns disabled and fail cleanly without mutating board/stack/fusion/reserve state.
 - Reserve counts are unaffected by layer turns.
 - Chess3DApp status text exposes layer-turn enabled state and last layer-turn result.
+- Chess3D maintains an action history for successful moves, Rubik layer turns, and reserve restores.
+- Chess3D exposes deterministic notation v0.1 through append-only ABI and C# status wrappers.
+- Reserve restore is implemented for reserve-enabled profiles: a piece may return from side/type reserve to a matching free home slot.
+- Auto-restore finds the first matching free home slot and fails cleanly if none exists.
+- GitHub Actions uploads the generated `ProductionOutput` folder as `Chess-ProductionOutput-windows-x64` after successful verification.
 
 ## Draft
 
@@ -127,8 +139,8 @@ Portable outputs:
 - 3D king safety, check, mate, and stalemate remain draft after P2A.
 - Final Asgard/Meru fusion physics are not implemented yet; P2F provides descriptor/progress state but not destructive transformation, visual effects, or full victory variants.
 - Runtime board projection remains one integer piece per cell for compatibility, while stack data exists as a Forbidden Core overlay.
-- Reserve restore action, reserve inventory UI, and reserve notation are not implemented yet.
-- Rubik layer turns are implemented as runtimePartial ritual actions for Rubik convergence, but animation, notation/replay, online serialization, AI/search generation, and GPU stack snapshots are still draft.
+- Full reserve inventory UI, drag/drop restore, restore into core, and restore captures are not implemented yet.
+- Rubik layer turns are implemented as runtimePartial ritual actions for Rubik convergence, but animation, replay/import/export, online serialization, AI/search generation, and GPU stack snapshots are still draft.
 - 3D relay/web-platform contract is a documented client-side foundation, not a hosted production service.
 - Rubik arbitrary-state solving beyond trusted move history remains future work.
 - UI smoke tests are still manual.
@@ -143,4 +155,4 @@ Portable outputs:
 - Full UI automation tests are not present yet.
 - GPU parity/performance needs more benchmark baselines on real target hardware.
 - The project currently relies on local Visual Studio/MSBuild and vcpkg environment availability.
-- Recommended next stage is P2H: Rubik layer turns moving projected board, core stacks, fusion descriptors, and reserve state safely.
+- Recommended next stage is P2J/P2K: UI visualization for stack/fusion/reserve/layer-turn state, then replay/export/import over P2I action history.

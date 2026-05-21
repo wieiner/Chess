@@ -112,6 +112,8 @@ CI verifies:
 - `Chess2DBenchmark --quick`;
 - baseline without CUDA.
 
+After successful verification, CI uploads `ProductionOutput` as the short-retention artifact `Chess-ProductionOutput-windows-x64`. This is a convenience artifact for inspection/testing, not a GitHub Release.
+
 `rude-resource/` is a local ignored resource archive and is absent on CI. `scripts\verify.ps1` checks the ignore rule through the probe path `rude-resource/.verify-ignore-probe`, without creating that file.
 
-CUDA remains optional in CI and in the default local build. After P2H, the same verification pipeline also covers Rubik convergence layer turns that rotate the projected board, move CoreCell stacks, recompute fusion/anchors, and preserve reserve counts.
+CUDA remains optional in CI and in the default local build. After P2I, the same verification pipeline also covers Rubik convergence layer turns, action history, deterministic notation, and reserve restore contracts.

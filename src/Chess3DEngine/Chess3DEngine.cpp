@@ -69,6 +69,34 @@ enum LayerTurnResult
     LayerTurnInternalError = 7
 };
 
+enum ActionKind
+{
+    ActionNone = 0,
+    ActionMove = 1,
+    ActionLayerTurn = 2,
+    ActionReserveRestore = 3,
+    ActionManualEdit = 4
+};
+
+enum CaptureDestination
+{
+    CaptureDestinationNone = 0,
+    CaptureDestinationRemoved = 1,
+    CaptureDestinationHome = 2,
+    CaptureDestinationReserve = 3,
+    CaptureDestinationCoreCoOccupancy = 4
+};
+
+constexpr int ActionFlagWasCapture = 1;
+constexpr int ActionFlagWasKnockback = 2;
+constexpr int ActionFlagEnteredCore = 4;
+constexpr int ActionFlagLeftCore = 8;
+constexpr int ActionFlagWasLayerTurn = 16;
+constexpr int ActionFlagWasReserveRestore = 32;
+constexpr int ActionFlagChangedFusion = 64;
+constexpr int ActionFlagChangedAnchors = 128;
+constexpr int ActionFlagGameOverAfterAction = 256;
+
 struct Vec3
 {
     int x = 0;
@@ -162,6 +190,33 @@ struct CoreFusionState
     int implosionStage = 0;
 };
 
+struct ActionRecord
+{
+    int actionIndex = 0;
+    int actionKind = ActionNone;
+    int side = 0;
+    int pieceCode = 0;
+    int pieceType = 0;
+    int fromX = -1;
+    int fromY = -1;
+    int fromZ = -1;
+    int toX = -1;
+    int toY = -1;
+    int toZ = -1;
+    int axis = -1;
+    int layer = -1;
+    int quarterTurns = 0;
+    int capturedPieceCode = 0;
+    int captureDestination = CaptureDestinationNone;
+    int reserveSide = 0;
+    int reservePieceType = 0;
+    int reserveDelta = 0;
+    int resultCode = 0;
+    int flags = 0;
+    std::string notation;
+    std::string info;
+};
+
 struct Game
 {
     Rules rules;
@@ -184,11 +239,16 @@ struct Game
     int lastLayerTurnLayer = -1;
     int lastLayerTurnQuarterTurns = 0;
     int lastLayerTurnResultCode = LayerTurnNone;
+    std::vector<ActionRecord> actionHistory;
+    std::string lastReserveRestoreInfo;
     bool gameOver = false;
     int winnerSide = 0;
     std::string lastProfileLoadError;
     std::string lastInfo = "3D module ready.";
 };
+
+int nextSide(const Rules& rules, int side);
+void recomputeAnchors(Game& game);
 
 bool inside(int x, int y, int z)
 {
@@ -339,6 +399,49 @@ std::string layerTurnResultName(int resultCode)
     case LayerTurnInternalError: return "internalError";
     default: return "unknown";
     }
+}
+
+std::string actionKindName(int actionKind)
+{
+    switch (actionKind)
+    {
+    case ActionNone: return "none";
+    case ActionMove: return "move";
+    case ActionLayerTurn: return "layerTurn";
+    case ActionReserveRestore: return "reserveRestore";
+    case ActionManualEdit: return "manualEdit";
+    default: return "unknown";
+    }
+}
+
+std::string captureDestinationName(int destination)
+{
+    switch (destination)
+    {
+    case CaptureDestinationNone: return "none";
+    case CaptureDestinationRemoved: return "removed";
+    case CaptureDestinationHome: return "home";
+    case CaptureDestinationReserve: return "reserve";
+    case CaptureDestinationCoreCoOccupancy: return "coreCoOccupancy";
+    default: return "unknown";
+    }
+}
+
+char layerTurnSign(int quarterTurns)
+{
+    return quarterTurns < 0 ? '-' : '+';
+}
+
+std::string coordText(int x, int y, int z)
+{
+    std::ostringstream text;
+    text << "(" << x << "," << y << "," << z << ")";
+    return text.str();
+}
+
+std::string coordTextFromIndex(int index)
+{
+    return index >= 0 ? coordText(xOf(index), yOf(index), zOf(index)) : "(-,-,-)";
 }
 
 std::string fusionKindName(int fusionKind)
@@ -979,6 +1082,12 @@ void clearLastLayerTurnState(Game& game)
     game.lastLayerTurnResultCode = LayerTurnNone;
 }
 
+void clearActionHistory(Game& game)
+{
+    game.actionHistory.clear();
+    game.lastReserveRestoreInfo.clear();
+}
+
 void clearGamePosition(Game& game)
 {
     clear(game.pos);
@@ -986,6 +1095,7 @@ void clearGamePosition(Game& game)
     clearFusionStates(game);
     clearReserveState(game);
     clearLastLayerTurnState(game);
+    clearActionHistory(game);
 }
 
 bool setCoreStackSingle(Game& game, int index, int pieceCode)
@@ -1173,6 +1283,70 @@ bool findFreeHomeSlot(const Game& game, int pieceCode, int excludedIndex, int& h
     return false;
 }
 
+bool isMatchingHomeSlot(int side, int type, int x, int y, int z)
+{
+    if (side < 1 || side > 6 || type < Pawn || type > King)
+    {
+        return false;
+    }
+    for (int localV = 0; localV < 4; ++localV)
+    {
+        for (int localU = 0; localU < 4; ++localU)
+        {
+            if (central4x4TargetType(localU, localV) != type)
+            {
+                continue;
+            }
+            const Vec3 home = faceCenterSquare(side, localU, localV);
+            if (home.x == x && home.y == y && home.z == z)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool canRestoreReservePiece(const Game& game, int side, int type, int x, int y, int z)
+{
+    if (!isReserveEnabled(game.rules) ||
+        side < 1 || side > 6 ||
+        type < Pawn || type > King ||
+        !inside(x, y, z) ||
+        game.reserveCounts[side][type] <= 0 ||
+        !isMatchingHomeSlot(side, type, x, y, z) ||
+        isInsideCore(game.rules, x, y, z))
+    {
+        return false;
+    }
+    return game.pos.board[static_cast<std::size_t>(indexOf(x, y, z))] == Empty;
+}
+
+bool findAutoRestoreSlot(const Game& game, int side, int type, Vec3& slot)
+{
+    if (!isReserveEnabled(game.rules) || side < 1 || side > 6 || type < Pawn || type > King)
+    {
+        return false;
+    }
+    for (int localV = 0; localV < 4; ++localV)
+    {
+        for (int localU = 0; localU < 4; ++localU)
+        {
+            if (central4x4TargetType(localU, localV) != type)
+            {
+                continue;
+            }
+            const Vec3 home = faceCenterSquare(side, localU, localV);
+            if (canRestoreReservePiece(game, side, type, home.x, home.y, home.z))
+            {
+                slot = home;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 void routeCapturedPiece(Game& game, int capturedPiece, int destinationIndex)
 {
     clearLastCaptureState(game);
@@ -1207,6 +1381,119 @@ void routeCapturedPiece(Game& game, int capturedPiece, int destinationIndex)
         ++game.reserveCounts[side][type];
     }
     game.lastKnockbackDestination = KnockbackReserve;
+}
+
+int captureDestinationFromLastCapture(const Game& game)
+{
+    switch (game.lastKnockbackDestination)
+    {
+    case KnockbackHome: return CaptureDestinationHome;
+    case KnockbackReserve: return CaptureDestinationReserve;
+    case KnockbackClassicRemoved: return CaptureDestinationRemoved;
+    default: return CaptureDestinationNone;
+    }
+}
+
+std::string pieceName(int pieceCode)
+{
+    if (pieceCode == Empty)
+    {
+        return ".";
+    }
+    std::string text;
+    text.push_back(typeChar(pieceType(pieceCode)));
+    return text;
+}
+
+void finalizeActionNotation(ActionRecord& action)
+{
+    std::ostringstream text;
+    text << "#" << action.actionIndex << " ";
+    if (action.actionKind == ActionMove)
+    {
+        text << "S" << action.side << " MOVE " << pieceName(action.pieceCode) << " "
+            << coordText(action.fromX, action.fromY, action.fromZ)
+            << ((action.flags & ActionFlagWasCapture) != 0 ? "x" : "->")
+            << coordText(action.toX, action.toY, action.toZ);
+        if (action.capturedPieceCode != Empty)
+        {
+            text << " captured=" << pieceName(action.capturedPieceCode)
+                << " capture=" << captureDestinationName(action.captureDestination);
+        }
+        if ((action.flags & ActionFlagEnteredCore) != 0)
+        {
+            text << " enteredCore";
+        }
+        if ((action.flags & ActionFlagLeftCore) != 0)
+        {
+            text << " leftCore";
+        }
+    }
+    else if (action.actionKind == ActionLayerTurn)
+    {
+        text << "LAYER " << layerTurnAxisName(action.axis) << "[" << action.layer << "]"
+            << layerTurnSign(action.quarterTurns);
+    }
+    else if (action.actionKind == ActionReserveRestore)
+    {
+        text << "S" << action.side << " RESTORE " << pieceName(action.pieceCode)
+            << " reserve->" << coordText(action.toX, action.toY, action.toZ);
+    }
+    else
+    {
+        text << actionKindName(action.actionKind);
+    }
+    if ((action.flags & ActionFlagGameOverAfterAction) != 0)
+    {
+        text << " gameOver";
+    }
+    action.notation = text.str();
+    action.info = actionKindName(action.actionKind) + ": " + action.notation;
+}
+
+void appendAction(Game& game, ActionRecord action)
+{
+    action.actionIndex = static_cast<int>(game.actionHistory.size()) + 1;
+    if (game.gameOver)
+    {
+        action.flags |= ActionFlagGameOverAfterAction;
+    }
+    finalizeActionNotation(action);
+    game.actionHistory.push_back(std::move(action));
+}
+
+bool restoreReservePiece(Game& game, int side, int type, int x, int y, int z)
+{
+    if (!canRestoreReservePiece(game, side, type, x, y, z))
+    {
+        game.lastReserveRestoreInfo = "Reserve restore rejected.";
+        return false;
+    }
+    const int piece = makePiece(side, type);
+    const int target = indexOf(x, y, z);
+    --game.reserveCounts[side][type];
+    game.pos.board[static_cast<std::size_t>(target)] = piece;
+    game.pos.lastMove = Move{};
+    game.pos.sideToMove = nextSide(game.rules, side);
+    recomputeAnchors(game);
+
+    ActionRecord action{};
+    action.actionKind = ActionReserveRestore;
+    action.side = side;
+    action.pieceCode = piece;
+    action.pieceType = type;
+    action.toX = x;
+    action.toY = y;
+    action.toZ = z;
+    action.reserveSide = side;
+    action.reservePieceType = type;
+    action.reserveDelta = -1;
+    action.resultCode = 1;
+    action.flags = ActionFlagWasReserveRestore | ActionFlagChangedAnchors;
+    appendAction(game, action);
+    game.lastReserveRestoreInfo = game.actionHistory.empty() ? "Reserve restore played." : game.actionHistory.back().notation;
+    game.lastInfo = "3D reserve restore played.";
+    return true;
 }
 
 bool stackHasTypeForSide(const std::vector<CoreStackEntry>& stack, int side, int type)
@@ -1798,6 +2085,52 @@ void applyMove(Game& game, Move move)
 
     game.pos.lastMove = move;
     game.pos.sideToMove = nextSide(game.rules, game.pos.sideToMove);
+}
+
+ActionRecord makeMoveAction(const Game& game, const Move& move, bool targetCoreHadOccupants)
+{
+    ActionRecord action{};
+    action.actionKind = ActionMove;
+    action.side = pieceSide(move.piece);
+    action.pieceCode = move.piece;
+    action.pieceType = pieceType(move.piece);
+    action.fromX = xOf(move.from);
+    action.fromY = yOf(move.from);
+    action.fromZ = zOf(move.from);
+    action.toX = xOf(move.to);
+    action.toY = yOf(move.to);
+    action.toZ = zOf(move.to);
+    action.capturedPieceCode = move.captured;
+    action.captureDestination = captureDestinationFromLastCapture(game);
+    action.resultCode = 1;
+    const bool fromCore = isCoreStackEnabled(game.rules) && isInsideCore(game.rules, move.from);
+    const bool toCore = isCoreStackEnabled(game.rules) && isInsideCore(game.rules, move.to);
+    if ((move.flags & MoveCapture) != 0 || move.captured != Empty)
+    {
+        action.flags |= ActionFlagWasCapture;
+    }
+    if (game.lastCaptureWasKnockback)
+    {
+        action.flags |= ActionFlagWasKnockback;
+    }
+    if (!fromCore && toCore)
+    {
+        action.flags |= ActionFlagEnteredCore;
+        if (targetCoreHadOccupants)
+        {
+            action.captureDestination = CaptureDestinationCoreCoOccupancy;
+        }
+    }
+    if (fromCore && !toCore)
+    {
+        action.flags |= ActionFlagLeftCore;
+    }
+    if (fromCore || toCore)
+    {
+        action.flags |= ActionFlagChangedFusion;
+    }
+    action.flags |= ActionFlagChangedAnchors;
+    return action;
 }
 
 Vec3 rotateLayerSquare(int axis, int layer, int turns, int x, int y, int z)
@@ -2642,6 +2975,204 @@ CHESS3D_API int Chess3D_GetLastKnockbackInfo(void* handle, int* capturedPieceCod
     return 1;
 }
 
+const ActionRecord* actionAt(const Game* game, int actionIndex)
+{
+    if (game == nullptr || actionIndex < 1 || actionIndex > static_cast<int>(game->actionHistory.size()))
+    {
+        return nullptr;
+    }
+    return &game->actionHistory[static_cast<std::size_t>(actionIndex - 1)];
+}
+
+CHESS3D_API int Chess3D_GetActionCount(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? static_cast<int>(game->actionHistory.size()) : 0;
+}
+
+CHESS3D_API int Chess3D_ClearActionHistory(void* handle)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    clearActionHistory(*game);
+    return 1;
+}
+
+CHESS3D_API int Chess3D_GetActionKind(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->actionKind : ActionNone;
+}
+
+CHESS3D_API int Chess3D_GetActionSide(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->side : 0;
+}
+
+CHESS3D_API int Chess3D_GetActionPieceCode(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->pieceCode : 0;
+}
+
+CHESS3D_API int Chess3D_GetActionPieceType(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->pieceType : 0;
+}
+
+CHESS3D_API int Chess3D_GetActionFromX(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->fromX : -1;
+}
+
+CHESS3D_API int Chess3D_GetActionFromY(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->fromY : -1;
+}
+
+CHESS3D_API int Chess3D_GetActionFromZ(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->fromZ : -1;
+}
+
+CHESS3D_API int Chess3D_GetActionToX(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->toX : -1;
+}
+
+CHESS3D_API int Chess3D_GetActionToY(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->toY : -1;
+}
+
+CHESS3D_API int Chess3D_GetActionToZ(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->toZ : -1;
+}
+
+CHESS3D_API int Chess3D_GetActionAxis(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->axis : -1;
+}
+
+CHESS3D_API int Chess3D_GetActionLayer(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->layer : -1;
+}
+
+CHESS3D_API int Chess3D_GetActionQuarterTurns(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->quarterTurns : 0;
+}
+
+CHESS3D_API int Chess3D_GetActionCapturedPieceCode(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->capturedPieceCode : 0;
+}
+
+CHESS3D_API int Chess3D_GetActionCaptureDestination(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->captureDestination : CaptureDestinationNone;
+}
+
+CHESS3D_API int Chess3D_GetActionResultCode(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->resultCode : 0;
+}
+
+CHESS3D_API int Chess3D_GetActionFlags(void* handle, int actionIndex)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? action->flags : 0;
+}
+
+CHESS3D_API int Chess3D_GetActionNotation(void* handle, int actionIndex, char* buffer, int capacity)
+{
+    const ActionRecord* action = actionAt(asGame(handle), actionIndex);
+    return action != nullptr ? copyString(action->notation, buffer, capacity) : copyString("", buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_GetLastActionNotation(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || game->actionHistory.empty())
+    {
+        return copyString("", buffer, capacity);
+    }
+    return copyString(game->actionHistory.back().notation, buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_GetLastActionInfo(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || game->actionHistory.empty())
+    {
+        return copyString("", buffer, capacity);
+    }
+    return copyString(game->actionHistory.back().info, buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_GetActionKindName(int actionKind, char* buffer, int capacity)
+{
+    return copyString(actionKindName(actionKind), buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_GetCaptureDestinationName(int destination, char* buffer, int capacity)
+{
+    return copyString(captureDestinationName(destination), buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_CanRestoreReservePiece(void* handle, int side, int pieceTypeValue, int x, int y, int z)
+{
+    auto* game = asGame(handle);
+    return game != nullptr && canRestoreReservePiece(*game, side, pieceTypeValue, x, y, z) ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_RestoreReservePiece(void* handle, int side, int pieceTypeValue, int x, int y, int z)
+{
+    auto* game = asGame(handle);
+    return game != nullptr && restoreReservePiece(*game, side, pieceTypeValue, x, y, z) ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_AutoRestoreReservePiece(void* handle, int side, int pieceTypeValue)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    Vec3 slot{};
+    if (!findAutoRestoreSlot(*game, side, pieceTypeValue, slot))
+    {
+        game->lastReserveRestoreInfo = "Reserve auto-restore rejected: no free matching home slot.";
+        return 0;
+    }
+    return restoreReservePiece(*game, side, pieceTypeValue, slot.x, slot.y, slot.z) ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_GetLastReserveRestoreInfo(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->lastReserveRestoreInfo, buffer, capacity) : copyString("", buffer, capacity);
+}
+
 CHESS3D_API int Chess3D_GetRulesInfo(void* handle, Chess3DRulesInfoDto* info)
 {
     auto* game = asGame(handle);
@@ -2719,6 +3250,7 @@ CHESS3D_API int Chess3D_SetBoard(void* handle, const int* pieces512, int sideToM
     }
     clearCoreStacks(*game);
     clearReserveState(*game);
+    clearActionHistory(*game);
     std::copy(pieces512, pieces512 + CellCount, game->pos.board.begin());
     if (isCoreStackEnabled(game->rules))
     {
@@ -2837,8 +3369,12 @@ CHESS3D_API int Chess3D_TryMakeMove(void* handle, int fromX, int fromY, int from
             {
                 move.promotionType = promotionType;
             }
+            const bool targetCoreHadOccupants = isCoreStackEnabled(game->rules) &&
+                isInsideCore(game->rules, move.to) &&
+                !game->coreStacks[static_cast<std::size_t>(move.to)].empty();
             applyMove(*game, move);
             recomputeAnchors(*game);
+            appendAction(*game, makeMoveAction(*game, move, targetCoreHadOccupants));
             game->lastInfo = "3D move played.";
             if (playedMove != nullptr)
             {
@@ -2879,8 +3415,12 @@ CHESS3D_API int Chess3D_MakeBestMove(void* handle, int depth, Chess3DMoveDto* pl
         }
     }
     best.score = bestScore;
+    const bool targetCoreHadOccupants = isCoreStackEnabled(game->rules) &&
+        isInsideCore(game->rules, best.to) &&
+        !game->coreStacks[static_cast<std::size_t>(best.to)].empty();
     applyMove(*game, best);
     recomputeAnchors(*game);
+    appendAction(*game, makeMoveAction(*game, best, targetCoreHadOccupants));
     if (playedMove != nullptr)
     {
         *playedMove = toDto(best);
@@ -2967,6 +3507,18 @@ CHESS3D_API int Chess3D_RotateLayer(void* handle, int axis, int layer, int quart
     }
     recomputeAnchors(*game);
     game->lastLayerTurnResultCode = LayerTurnSuccess;
+    if (ritualEnabled)
+    {
+        ActionRecord action{};
+        action.actionKind = ActionLayerTurn;
+        action.side = game->pos.sideToMove == 1 ? game->rules.activeSideCount : game->pos.sideToMove - 1;
+        action.axis = axis;
+        action.layer = layer;
+        action.quarterTurns = quarterTurns < 0 ? -1 : 1;
+        action.resultCode = LayerTurnSuccess;
+        action.flags = ActionFlagWasLayerTurn | ActionFlagChangedFusion | ActionFlagChangedAnchors;
+        appendAction(*game, action);
+    }
     std::ostringstream info;
     const char axisName = layerTurnAxisName(axis);
     info << "3D Rubik rotate " << axisName << (layer + 1) << " x" << turns;

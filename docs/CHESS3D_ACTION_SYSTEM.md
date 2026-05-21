@@ -1,0 +1,41 @@
+# Chess3D Action System
+
+P2I introduces a unified runtime action layer for Chess3D. It is intentionally small: it records successful turn-level actions without rewriting the move engine.
+
+## ActionKind
+
+- `None = 0`
+- `Move = 1`
+- `LayerTurn = 2`
+- `ReserveRestore = 3`
+- `ManualEdit = 4` reserved for future tooling; P2I does not write manual edits to history.
+
+## Recorded Actions
+
+- Successful `Chess3D_TryMakeMove`.
+- Successful `Chess3D_MakeBestMove`.
+- Successful Rubik `Chess3D_RotateLayer` when the active profile permits `ritualTurn`.
+- Successful `Chess3D_RestoreReservePiece` or `Chess3D_AutoRestoreReservePiece`.
+
+## Not Recorded
+
+- `Reset`, `Clear`, profile/rules loading, and board synchronization.
+- Debug/setup helpers such as `SetPiece`, `PushCoreStackPiece`, `ClearCoreStack`, and `RemoveCoreStackEntry`.
+- Failed moves, failed layer turns, and failed reserve restores.
+
+## ActionRecord Fields
+
+The runtime record stores action index, kind, side, piece code/type, from/to coordinates, layer-turn axis/layer/quarter turns, captured piece, capture destination, reserve side/type/delta, result code, flags, notation, and a short info string.
+
+The structure is internal. Public access is through append-only C ABI getters.
+
+## Recompute Contract
+
+After successful actions, the engine keeps these layers consistent:
+
+- projected board;
+- CoreCell stacks;
+- fusion descriptors;
+- anchors and implosion progress;
+- victory state;
+- action history and last-action notation.

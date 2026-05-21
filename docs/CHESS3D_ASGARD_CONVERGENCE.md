@@ -98,9 +98,9 @@ Convergence uses `knockbackCapture`:
 
 - captured piece returns to the first matching free home slot if possible;
 - otherwise it goes to reserve;
-- reserve restore is deferred.
+- P2I can restore reserve pieces to matching free home slots.
 
-P2G implements runtimePartial knockback/reserve for ordinary outer-field captures and core-to-outside captures. Entering the Forbidden Core does not knock back occupants; it creates stack co-occupancy and possible contested fusion state.
+P2G implements runtimePartial knockback/reserve for ordinary outer-field captures and core-to-outside captures. Entering the Forbidden Core does not knock back occupants; it creates stack co-occupancy and possible contested fusion state. P2I records these actions in unified action history and adds reserve restore notation.
 
 ## Implemented Now
 
@@ -117,12 +117,14 @@ Implemented now:
 - fusion descriptors for single, friendlyPair, friendlyStack, royalPair, and contested cells;
 - implosion progress state;
 - knockback/home-or-reserve capture routing for ordinary outer-field captures;
+- action history and deterministic notation for moves, captures, layer turns, and reserve restores;
+- reserve restore action to matching free home slots;
 - P2A movement/setup contracts remain executable through `Chess3DEngineContractTests`.
 
 Deferred:
 
 - destructive fusion/implosion event model;
 - contested anchor scoring/dislodging;
-- reserve restore action and inventory UI;
-- Rubik layer-turn animation/notation/online serialization;
+- reserve inventory UI, restore into core, and restore captures;
+- Rubik layer-turn animation/full replay/online serialization;
 - checkmate/hybrid hardening.

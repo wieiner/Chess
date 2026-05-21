@@ -90,18 +90,28 @@
 - Completed: append-only layer-turn ABI, C# wrapper/status, JSON/schema updates, and contract tests.
 - Deferred: king-safety hardening after rotations, notation/replay, online serialization, AI/search generation, UI animation, and GPU stack snapshots.
 
-### P2I - Reserve Restore Action And UI Inventory
+### P2I - Action History, Notation, And Reserve Restore
 
-- Add legal restore-from-reserve action if profile enables it.
-- Add reserve inventory UI and notation.
-- Decide whether restored pieces return to home, edge entry gates, or profile-defined drop zones.
+- Completed: unified action history for successful moves, Rubik layer turns, and reserve restores.
+- Completed: deterministic notation v0.1 for `MOVE`, `LAYER`, and `RESTORE` actions.
+- Completed: append-only action-history ABI and C# wrapper/status visibility.
+- Completed: legal reserve restore action to matching free home slots for reserve-enabled profiles.
+- Completed: auto-restore helper and contract tests for failure/no-mutation cases.
+- Completed: GitHub Actions now uploads `ProductionOutput` as a short-retention workflow artifact after successful verification.
+- Deferred: full replay/export/import, undo, online serialization, drag/drop reserve inventory, and notation standardization.
 
-### P2J - Layer-Turn / Stack / Fusion UI
+### P2J - UI Visualization For Stacks, Fusion, Reserve, And Layer Turns
 
 - Visualize multiple stack entries in one core cell.
 - Display fusion/contested/royal/implosion state in the board view.
 - Add layer-turn controls, animation, and optional notation/replay display.
 - Add safe editor workflows for stack inspection without changing fusion descriptors manually.
+
+### P2K - Replay / Export / Import / Savegame
+
+- Build replay/export/import over the P2I action record.
+- Decide savegame format for profiles, board, stacks, fusion descriptors, reserve counts, and history.
+- Add notation file export/import once syntax stabilizes beyond v0.1.
 
 ### P3 - Full Six-Side Gameplay And Hybrid Victory
 

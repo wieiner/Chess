@@ -40,7 +40,7 @@ Reserve is stored as counts:
 reserveCounts[side][pieceType]
 ```
 
-This intentionally avoids unique piece ids. A future stage can add restore actions and notation once piece identity and UI inventory are designed.
+This intentionally avoids unique piece ids. P2I adds the first restore action without changing that model: a side/type count can return one compatible piece to a matching free home slot.
 
 ## Runtime Status
 
@@ -52,11 +52,14 @@ Implemented in P2G:
 - reserve fallback;
 - last knockback telemetry;
 - C ABI and C# status access.
+- P2I restore-from-reserve to matching free home slots;
+- P2I deterministic restore notation and action-history records.
 
 Deferred:
 
-- restoring pieces from reserve;
 - visual reserve inventory;
+- restore into Forbidden Core;
+- restore captures;
 - online serialization;
 - moving reserve during Rubik layer turns.
 

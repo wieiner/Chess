@@ -345,6 +345,48 @@ internal sealed class NativeChess3DEngine : IDisposable
             : (0, 0, -1, -1, -1);
     }
 
+    public int GetActionCount()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetActionCount(_handle);
+    }
+
+    public string GetActionNotation(int actionIndex)
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetActionNotation(_handle, actionIndex, buffer, capacity));
+    }
+
+    public string GetLastActionNotation()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetLastActionNotation(_handle, buffer, capacity));
+    }
+
+    public bool CanRestoreReservePiece(int side, int pieceType, int x, int y, int z)
+    {
+        ThrowIfDisposed();
+        return Chess3D_CanRestoreReservePiece(_handle, side, pieceType, x, y, z) != 0;
+    }
+
+    public bool RestoreReservePiece(int side, int pieceType, int x, int y, int z)
+    {
+        ThrowIfDisposed();
+        return Chess3D_RestoreReservePiece(_handle, side, pieceType, x, y, z) != 0;
+    }
+
+    public bool AutoRestoreReservePiece(int side, int pieceType)
+    {
+        ThrowIfDisposed();
+        return Chess3D_AutoRestoreReservePiece(_handle, side, pieceType) != 0;
+    }
+
+    public string GetLastReserveRestoreInfo()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetLastReserveRestoreInfo(_handle, buffer, capacity));
+    }
+
     public void Dispose()
     {
         if (_handle != IntPtr.Zero)
@@ -520,6 +562,27 @@ internal sealed class NativeChess3DEngine : IDisposable
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Chess3D_GetLastKnockbackInfo(IntPtr handle, out int capturedPieceCode, out int destinationKind, out int x, out int y, out int z);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetActionCount(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetActionNotation(IntPtr handle, int actionIndex, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastActionNotation(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_CanRestoreReservePiece(IntPtr handle, int side, int pieceType, int x, int y, int z);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_RestoreReservePiece(IntPtr handle, int side, int pieceType, int x, int y, int z);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_AutoRestoreReservePiece(IntPtr handle, int side, int pieceType);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastReserveRestoreInfo(IntPtr handle, StringBuilder buffer, int capacity);
 }
 
 [StructLayout(LayoutKind.Sequential)]

@@ -41,6 +41,19 @@ constexpr int LayerTurnDisabled = 2;
 constexpr int LayerTurnInvalidAxis = 3;
 constexpr int LayerTurnInvalidLayer = 4;
 constexpr int LayerTurnInvalidQuarterTurns = 5;
+constexpr int ActionMove = 1;
+constexpr int ActionLayerTurn = 2;
+constexpr int ActionReserveRestore = 3;
+constexpr int CaptureDestinationRemoved = 1;
+constexpr int CaptureDestinationHome = 2;
+constexpr int CaptureDestinationReserve = 3;
+constexpr int CaptureDestinationCoreCoOccupancy = 4;
+constexpr int ActionFlagWasCapture = 1;
+constexpr int ActionFlagWasKnockback = 2;
+constexpr int ActionFlagEnteredCore = 4;
+constexpr int ActionFlagLeftCore = 8;
+constexpr int ActionFlagWasLayerTurn = 16;
+constexpr int ActionFlagWasReserveRestore = 32;
 
 std::string ReadTextFile(const std::string& path)
 {
@@ -576,6 +589,17 @@ std::string ReadAbiString(void* game, int (*reader)(void*, char*, int))
 {
     char buffer[512] = {};
     const int needed = reader(game, buffer, static_cast<int>(sizeof(buffer)));
+    if (needed <= 0)
+    {
+        return {};
+    }
+    return std::string(buffer);
+}
+
+std::string ReadActionNotation(void* game, int actionIndex)
+{
+    char buffer[512] = {};
+    const int needed = Chess3D_GetActionNotation(game, actionIndex, buffer, static_cast<int>(sizeof(buffer)));
     if (needed <= 0)
     {
         return {};
@@ -1744,6 +1768,155 @@ int main()
         Chess3D_GetLastLayerTurnInfo(game, &lastAxis, &lastLayer, &lastQuarterTurns, &lastLayerResult) == 1 &&
         lastLayerResult == LayerTurnInvalidQuarterTurns,
         "invalid quarter turn reports invalidQuarterTurns result code");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, singleProfile.c_str()) == 1, "action history test loads single-side profile");
+    Chess3D_Reset(game);
+    test.Check(Chess3D_GetActionCount(game) == 0, "Reset clears action history");
+    test.Check(Chess3D_TryMakeMove(game, 0, 0, 0, 7, 7, 7, 0, &played) == 0 &&
+        Chess3D_GetActionCount(game) == 0,
+        "invalid move does not append action history");
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 3, 3, 0, 1, Pawn);
+    test.Check(Chess3D_TryMakeMove(game, 3, 3, 0, 3, 3, 1, 0, &played) == 1 &&
+        Chess3D_GetActionCount(game) == 1 &&
+        Chess3D_GetActionKind(game, 1) == ActionMove &&
+        Chess3D_GetActionPieceCode(game, 1) == PieceCode(1, Pawn) &&
+        Chess3D_GetActionFromX(game, 1) == 3 &&
+        Chess3D_GetActionToZ(game, 1) == 1 &&
+        ReadActionNotation(game, 1).find("#1 S1 MOVE P (3,3,0)->(3,3,1)") != std::string::npos &&
+        ReadAbiString(game, Chess3D_GetLastActionNotation).find("MOVE") != std::string::npos,
+        "successful move records deterministic action history and notation");
+    char tinyNotation[4] = {};
+    test.Check(Chess3D_GetActionNotation(game, 1, tinyNotation, static_cast<int>(sizeof(tinyNotation))) > 0,
+        "action notation ABI is safe for small buffers");
+    tinyNotation[0] = 'x';
+    test.Check(Chess3D_GetActionNotation(game, 99, tinyNotation, static_cast<int>(sizeof(tinyNotation))) > 0 &&
+        tinyNotation[0] == '\0',
+        "invalid action notation index returns a safe empty string");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, classicProfile.c_str()) == 1, "action history classic capture test loads classic profile");
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 0, 0, 0, 1, Rook);
+    Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn);
+    test.Check(Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 3, 0, &played) == 1 &&
+        Chess3D_GetActionCount(game) == 1 &&
+        Chess3D_GetActionKind(game, 1) == ActionMove &&
+        Chess3D_GetActionCapturedPieceCode(game, 1) == PieceCode(2, Pawn) &&
+        Chess3D_GetActionCaptureDestination(game, 1) == CaptureDestinationRemoved &&
+        (Chess3D_GetActionFlags(game, 1) & ActionFlagWasCapture) != 0,
+        "classic capture records removed capture destination in action history");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "action history asgard capture test loads asgard profile");
+    Chess3D_Clear(game);
+    for (const TargetCell& home : HomeCellsForSide(2))
+    {
+        if (home.type == Pawn)
+        {
+            Chess3D_SetPiece(game, home.x, home.y, home.z, 2, Pawn);
+        }
+    }
+    Chess3D_SetPiece(game, 0, 0, 0, 1, Rook);
+    Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn);
+    test.Check(Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 3, 0, &played) == 1 &&
+        Chess3D_GetActionCount(game) == 1 &&
+        Chess3D_GetActionCapturedPieceCode(game, 1) == PieceCode(2, Pawn) &&
+        Chess3D_GetActionCaptureDestination(game, 1) == CaptureDestinationReserve &&
+        (Chess3D_GetActionFlags(game, 1) & ActionFlagWasKnockback) != 0,
+        "asgard knockback reserve capture is recorded in action history");
+    const int countBeforeInvalidRestore = Chess3D_GetActionCount(game);
+    test.Check(Chess3D_RestoreReservePiece(game, 2, Pawn, 0, 0, 0) == 0 &&
+        Chess3D_GetReserveCount(game, 2, Pawn) == 1 &&
+        Chess3D_GetActionCount(game) == countBeforeInvalidRestore,
+        "invalid reserve restore does not mutate reserve or action history");
+    TargetCell freePawnHome{};
+    bool foundPawnHome = false;
+    for (const TargetCell& home : HomeCellsForSide(2))
+    {
+        if (home.type == Pawn)
+        {
+            freePawnHome = home;
+            foundPawnHome = true;
+            break;
+        }
+    }
+    test.Check(foundPawnHome, "side 2 has a pawn home slot for reserve restore tests");
+    Chess3D_SetPiece(game, freePawnHome.x, freePawnHome.y, freePawnHome.z, 0, 0);
+    test.Check(Chess3D_CanRestoreReservePiece(game, 2, Pawn, freePawnHome.x, freePawnHome.y, freePawnHome.z) == 1 &&
+        Chess3D_RestoreReservePiece(game, 2, Pawn, freePawnHome.x, freePawnHome.y, freePawnHome.z) == 1 &&
+        Chess3D_GetReserveCount(game, 2, Pawn) == 0 &&
+        Chess3D_GetPiece(game, freePawnHome.x, freePawnHome.y, freePawnHome.z) == PieceCode(2, Pawn) &&
+        Chess3D_GetActionCount(game) == countBeforeInvalidRestore + 1 &&
+        Chess3D_GetActionKind(game, countBeforeInvalidRestore + 1) == ActionReserveRestore &&
+        (Chess3D_GetActionFlags(game, countBeforeInvalidRestore + 1) & ActionFlagWasReserveRestore) != 0 &&
+        ReadActionNotation(game, countBeforeInvalidRestore + 1).find("RESTORE") != std::string::npos &&
+        !ReadAbiString(game, Chess3D_GetLastReserveRestoreInfo).empty(),
+        "reserve restore action decrements reserve, restores piece, and records notation");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "auto restore test reloads asgard profile");
+    Chess3D_Clear(game);
+    for (const TargetCell& home : HomeCellsForSide(2))
+    {
+        if (home.type == Pawn)
+        {
+            Chess3D_SetPiece(game, home.x, home.y, home.z, 2, Pawn);
+        }
+    }
+    Chess3D_SetPiece(game, 0, 0, 0, 1, Rook);
+    Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn);
+    Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 3, 0, &played);
+    Chess3D_SetPiece(game, freePawnHome.x, freePawnHome.y, freePawnHome.z, 0, 0);
+    test.Check(Chess3D_AutoRestoreReservePiece(game, 2, Pawn) == 1 &&
+        Chess3D_GetReserveCount(game, 2, Pawn) == 0 &&
+        Chess3D_GetPiece(game, freePawnHome.x, freePawnHome.y, freePawnHome.z) == PieceCode(2, Pawn),
+        "auto reserve restore uses first free matching home slot");
+    test.Check(Chess3D_AutoRestoreReservePiece(game, 2, Pawn) == 0,
+        "auto reserve restore clean-fails when reserve is empty");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "action history core move tests reload asgard profile");
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(2, Pawn));
+    Chess3D_SetPiece(game, 2, 2, 1, 1, Rook);
+    test.Check(Chess3D_TryMakeMove(game, 2, 2, 1, 2, 2, 2, 0, &played) == 1 &&
+        (Chess3D_GetActionFlags(game, 1) & ActionFlagEnteredCore) != 0 &&
+        Chess3D_GetActionCaptureDestination(game, 1) == CaptureDestinationCoreCoOccupancy,
+        "outside-to-core move records enteredCore and core co-occupancy destination");
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn));
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Rook));
+    test.Check(Chess3D_TryMakeMove(game, 2, 2, 2, 3, 2, 2, 0, &played) == 1 &&
+        Chess3D_GetActionCount(game) == 1 &&
+        Chess3D_GetActionKind(game, 1) == ActionMove,
+        "core-to-core move records a move action");
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 3, 2, 2, PieceCode(1, Pawn));
+    Chess3D_PushCoreStackPiece(game, 3, 2, 2, PieceCode(1, Rook));
+    test.Check(Chess3D_TryMakeMove(game, 3, 2, 2, 3, 2, 1, 0, &played) == 1 &&
+        Chess3D_GetActionCount(game) == 1 &&
+        (Chess3D_GetActionFlags(game, 1) & ActionFlagLeftCore) != 0,
+        "core-to-outside move records leftCore flag");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "disabled layer turn action history test reloads asgard profile");
+    Chess3D_Clear(game);
+    test.Check(Chess3D_RotateLayer(game, 0, 2, 1) == 0 &&
+        Chess3D_GetActionCount(game) == 0,
+        "disabled layer turn does not append action history");
+    test.Check(Chess3D_LoadRuleProfileJson(game, rubikProfile.c_str()) == 1, "layer turn action history test loads rubik profile");
+    Chess3D_Clear(game);
+    test.Check(Chess3D_RotateLayer(game, 0, 2, 1) == 1 &&
+        Chess3D_GetActionCount(game) == 1 &&
+        Chess3D_GetActionKind(game, 1) == ActionLayerTurn &&
+        Chess3D_GetActionAxis(game, 1) == 0 &&
+        Chess3D_GetActionLayer(game, 1) == 2 &&
+        Chess3D_GetActionQuarterTurns(game, 1) == 1 &&
+        (Chess3D_GetActionFlags(game, 1) & ActionFlagWasLayerTurn) != 0 &&
+        ReadActionNotation(game, 1).find("#1 LAYER Z[2]+") != std::string::npos,
+        "successful rubik layer turn records layer action notation");
+    char nameBuffer[64] = {};
+    test.Check(Chess3D_GetActionKindName(ActionReserveRestore, nameBuffer, static_cast<int>(sizeof(nameBuffer))) > 0 &&
+        std::string(nameBuffer) == "reserveRestore" &&
+        Chess3D_GetCaptureDestinationName(CaptureDestinationReserve, nameBuffer, static_cast<int>(sizeof(nameBuffer))) > 0 &&
+        std::string(nameBuffer) == "reserve",
+        "action and capture destination name helpers are exposed");
 
     Chess3D_Destroy(game);
     return test.Finish("Chess3DEngineContractTests");
