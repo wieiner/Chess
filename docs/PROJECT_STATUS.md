@@ -142,6 +142,9 @@ Portable outputs:
 - Auto-restore finds the first matching free home slot and fails cleanly if none exists.
 - Hodge Projection Duel runtime can transform one primary face move to two mirror projections and apply all three moves as one all-or-nothing composite action.
 - Hodge projected composite moves append `HPD` notation and expose projection profile/status through append-only ABI and C# status text.
+- `Chess3DApp.exe` now has a playable control center: RuleProfile selector, capability summary, mode-aware Asgard/Rubik/Hodge panels, and visible action log controls.
+- Chess3D action logs can be copied or saved as `.ch3dlog` text with a `rulesetId` header.
+- Chess3D scenario smoke descriptors exist for classic, Asgard, Rubik, and Hodge profiles and are copied to development output and `ProductionOutput`.
 - GitHub Actions uploads the generated `ProductionOutput` folder as `Chess-ProductionOutput-windows-x64` after successful verification.
 
 ## Draft
@@ -151,7 +154,7 @@ Portable outputs:
 - Final Asgard/Meru fusion physics are not implemented yet; P2F provides descriptor/progress state but not destructive transformation, visual effects, or full victory variants.
 - Runtime board projection remains one integer piece per cell for compatibility, while stack data exists as a Forbidden Core overlay.
 - Full reserve inventory UI, drag/drop restore, restore into core, and restore captures are not implemented yet.
-- Rubik layer turns are implemented as runtimePartial ritual actions for Rubik convergence, but animation, replay/import/export, online serialization, AI/search generation, and GPU stack snapshots are still draft.
+- Rubik layer turns are implemented as runtimePartial ritual actions for Rubik convergence, and P2K exposes basic controls. Animation, replay/import/export, online serialization, AI/search generation, and GPU stack snapshots are still draft.
 - 3D relay/web-platform contract is a documented client-side foundation, not a hosted production service.
 - Rubik arbitrary-state solving beyond trusted move history remains future work.
 - UI smoke tests are still manual.
@@ -166,4 +169,4 @@ Portable outputs:
 - Full UI automation tests are not present yet.
 - GPU parity/performance needs more benchmark baselines on real target hardware.
 - The project currently relies on local Visual Studio/MSBuild and vcpkg environment availability.
-- Recommended next stage is P2K/P2L: UI visualization for stack/fusion/reserve/layer-turn/projection state, then replay/export/import over P2I/P2J action history.
+- Recommended next stage is P2L/P2M: replay/export/import over P2I/P2J/P2K action history, then richer visualization/animation for stack/fusion/reserve/layer-turn/projection state.

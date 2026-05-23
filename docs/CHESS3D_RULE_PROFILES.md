@@ -71,6 +71,8 @@ The native engine now has two loader paths:
 
 P2D stores profile summary fields, exposes append-only ABI getters, derives CoreCube target slots, and computes simple centerAssembly anchor/victory projection. P2E implements runtime CoreCell stacks for `coreStack` / `asgardCorePhysics` profiles and makes anchors stack-aware. P2F evaluates fusion descriptors and implosion progress for stack-enabled Asgard/Rubik profiles. P2G implements runtimePartial knockback/reserve capture routing for Asgard/Rubik profiles. P2H implements runtimePartial `ritualTurn` layer actions for Rubik convergence. P2J implements runtimePartial `hodgeTriuneProjection` composite turns for Hodge Projection Duel.
 
+P2K adds a WPF RuleProfile selector that discovers runtime profile files and loads them through `Chess3D_LoadRuleProfileJson`. It also shows a capability matrix in the app, so Classic, Single-side, Asgard, Rubik, and Hodge remain explicit separate modes.
+
 Profile files are copied to:
 
 ```text
@@ -78,6 +80,14 @@ Assets/Rules3D/Profiles
 ```
 
 inside Chess3D development and portable output.
+
+P2K scenario smoke descriptors are copied to:
+
+```text
+Assets/Rules3D/Scenarios
+```
+
+They are metadata for manual QA and contract-test parsing, not replay files.
 
 ## Why Profiles
 

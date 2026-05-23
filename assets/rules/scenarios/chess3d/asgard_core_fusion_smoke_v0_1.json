@@ -1,0 +1,22 @@
+{
+  "scenarioId": "asgard-core-fusion-smoke-v0.1",
+  "displayName": "Asgard Core Fusion Smoke",
+  "rulesetId": "asgard-convergence-3d-8x8x8-v0.1",
+  "purpose": "Manual smoke descriptor for Forbidden Core stacks, fusion descriptors, anchors, reserve totals, and knockback capture visibility.",
+  "expectedCapabilities": {
+    "coreStack": true,
+    "fusion": true,
+    "reserve": true,
+    "layerTurn": false,
+    "projection": false,
+    "actionLog": true
+  },
+  "sampleActions": [
+    "#1 S1 MOVE R (2,2,1)->(2,2,2) capture=coreCoOccupancy",
+    "#2 S2 RESTORE P reserve->(3,3,7)"
+  ],
+  "knownLimitations": [
+    "Fusion is a runtime descriptor and does not destructively merge stack entries.",
+    "Animated core visualization is deferred to a later UI stage."
+  ]
+}

@@ -110,19 +110,28 @@
 - Completed: C# status wrapper for projection mode and last projection error.
 - Deferred: projection-specific UI controls, replay/import/export, online serialization, AI/search integration, and full 3D checkmate hardening.
 
-### P2K - UI Visualization For Stacks, Fusion, Reserve, Layer Turns, And Projection
+### P2K - Playable Control Center
 
-- Visualize multiple stack entries in one core cell.
-- Display fusion/contested/royal/implosion state in the board view.
-- Add layer-turn controls, animation, and optional notation/replay display.
-- Add Hodge projection group visualization and projected child-move previews.
-- Add safe editor workflows for stack inspection without changing fusion descriptors manually.
+- Completed: Chess3D RuleProfile selector from runtime `Assets/Rules3D/Profiles`.
+- Completed: capability summary that keeps Classic, Single-side, Asgard, Rubik, and Hodge visibly separate.
+- Completed: mode-aware Common, Asgard/Core, Rubik Layer Turn, and Hodge Projection panels.
+- Completed: action-log UI with refresh, copy, and `.ch3dlog` save.
+- Completed: scenario smoke descriptors for classic, Asgard, Rubik, and Hodge profiles.
+- Deferred: animated layer turns, stack-entry visualization in the 3D board, rich reserve inventory, and replay import.
 
 ### P2L - Replay / Export / Import / Savegame
 
 - Build replay/export/import over the P2I action record.
 - Decide savegame format for profiles, board, stacks, fusion descriptors, reserve counts, and history.
 - Add notation file export/import once syntax stabilizes beyond v0.1.
+
+### P2M - Rich Visualization And Animation
+
+- Visualize multiple stack entries in one core cell.
+- Display fusion/contested/royal/implosion state directly in the board view.
+- Add animated Rubik layer turns.
+- Add Hodge projection group overlays and child-move paths.
+- Add safe editor workflows for stack inspection without changing fusion descriptors manually.
 
 ### P3 - Full Six-Side Gameplay And Hybrid Victory
 

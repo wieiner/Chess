@@ -1045,11 +1045,36 @@ int main()
     const std::string asgardProfile = ReadTextFile("assets\\rules\\profiles\\asgard_convergence_3d_v0_1.json");
     const std::string rubikProfile = ReadTextFile("assets\\rules\\profiles\\rubik_convergence_3d_v0_1.json");
     const std::string hodgeProfile = ReadTextFile("assets\\rules\\profiles\\hodge_projection_duel_3d_v0_1.json");
+    const std::string classicScenario = ReadTextFile("assets\\rules\\scenarios\\chess3d\\classic_six_side_smoke_v0_1.json");
+    const std::string asgardScenario = ReadTextFile("assets\\rules\\scenarios\\chess3d\\asgard_core_fusion_smoke_v0_1.json");
+    const std::string rubikScenario = ReadTextFile("assets\\rules\\scenarios\\chess3d\\rubik_layer_turn_smoke_v0_1.json");
+    const std::string hodgeScenario = ReadTextFile("assets\\rules\\scenarios\\chess3d\\hodge_projection_smoke_v0_1.json");
     test.Check(!classicProfile.empty(), "classic six-side profile exists");
     test.Check(!singleProfile.empty(), "single-side profile exists");
     test.Check(!asgardProfile.empty(), "asgard convergence profile exists");
     test.Check(!rubikProfile.empty(), "rubik convergence profile exists");
     test.Check(!hodgeProfile.empty(), "hodge projection duel profile exists");
+    test.Check(!classicScenario.empty() && JsonParser(classicScenario).Parse(), "classic six-side scenario smoke JSON exists and parses");
+    test.Check(!asgardScenario.empty() && JsonParser(asgardScenario).Parse(), "asgard scenario smoke JSON exists and parses");
+    test.Check(!rubikScenario.empty() && JsonParser(rubikScenario).Parse(), "rubik layer-turn scenario smoke JSON exists and parses");
+    test.Check(!hodgeScenario.empty() && JsonParser(hodgeScenario).Parse(), "hodge projection scenario smoke JSON exists and parses");
+    test.Check(ExtractStringValue(classicScenario, "rulesetId") == "classic-six-side-3d-8x8x8-v0.1" &&
+        classicScenario.find("\"layerTurn\": false") != std::string::npos &&
+        classicScenario.find("\"projection\": false") != std::string::npos,
+        "classic scenario declares classic capabilities");
+    test.Check(ExtractStringValue(asgardScenario, "rulesetId") == "asgard-convergence-3d-8x8x8-v0.1" &&
+        asgardScenario.find("\"coreStack\": true") != std::string::npos &&
+        asgardScenario.find("\"fusion\": true") != std::string::npos &&
+        asgardScenario.find("\"reserve\": true") != std::string::npos,
+        "asgard scenario declares core, fusion, and reserve capabilities");
+    test.Check(ExtractStringValue(rubikScenario, "rulesetId") == "rubik-convergence-3d-8x8x8-v0.1" &&
+        rubikScenario.find("\"layerTurn\": true") != std::string::npos &&
+        rubikScenario.find("LAYER") != std::string::npos,
+        "rubik scenario declares layer-turn capabilities");
+    test.Check(ExtractStringValue(hodgeScenario, "rulesetId") == "hodge-projection-duel-3d-8x8x8-v0.1" &&
+        hodgeScenario.find("\"projection\": true") != std::string::npos &&
+        hodgeScenario.find("HPD") != std::string::npos,
+        "hodge scenario declares projection capabilities");
 
     test.Check(ValidateCommonRuleProfile(classicProfile), "classic six-side profile passes common validation");
     test.Check(ValidateCommonRuleProfile(singleProfile), "single-side profile passes common validation");
@@ -1806,6 +1831,12 @@ int main()
     test.Check(Chess3D_LoadRuleProfileJson(game, classicProfile.c_str()) == 1 &&
         Chess3D_IsProjectionModeEnabled(game) == 0,
         "classic profile keeps Hodge projection mode disabled");
+    const auto classicProjectionBefore = BoardSnapshot(game);
+    const int classicProjectionActionBefore = Chess3D_GetActionCount(game);
+    test.Check(Chess3D_TryMakeProjectedMove(game, 1, 3, 3, 0, 3, 3, 1, 0, &played) == 0 &&
+        BoardSnapshot(game) == classicProjectionBefore &&
+        Chess3D_GetActionCount(game) == classicProjectionActionBefore,
+        "non-Hodge profile rejects projected move without mutation");
     test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1 &&
         Chess3D_IsProjectionModeEnabled(game) == 0,
         "asgard profile keeps Hodge projection mode disabled");

@@ -1,0 +1,22 @@
+{
+  "scenarioId": "rubik-layer-turn-smoke-v0.1",
+  "displayName": "Rubik Layer Turn Smoke",
+  "rulesetId": "rubik-convergence-3d-8x8x8-v0.1",
+  "purpose": "Manual smoke descriptor for profile-gated Rubik layer turns that rotate the projected board and move whole CoreCell stacks.",
+  "expectedCapabilities": {
+    "coreStack": true,
+    "fusion": true,
+    "reserve": true,
+    "layerTurn": true,
+    "projection": false,
+    "actionLog": true
+  },
+  "sampleActions": [
+    "#1 LAYER Z[2]+",
+    "#2 LAYER X[5]-"
+  ],
+  "knownLimitations": [
+    "No animated layer-turn UI in P2K.",
+    "Reserve counts are intentionally unaffected by layer turns."
+  ]
+}

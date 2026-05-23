@@ -18,12 +18,14 @@ P2I introduces a unified runtime action layer for Chess3D. It is intentionally s
 - Successful Rubik `Chess3D_RotateLayer` when the active profile permits `ritualTurn`.
 - Successful `Chess3D_RestoreReservePiece` or `Chess3D_AutoRestoreReservePiece`.
 - Successful `Chess3D_TryMakeProjectedMove` when the active profile permits `hodgeTriuneProjection`.
+- P2K does not add new engine action kinds; it exposes the existing action history in the Chess3D control center.
 
 ## Not Recorded
 
 - `Reset`, `Clear`, profile/rules loading, and board synchronization.
 - Debug/setup helpers such as `SetPiece`, `PushCoreStackPiece`, `ClearCoreStack`, and `RemoveCoreStackEntry`.
 - Failed moves, failed layer turns, failed reserve restores, and rejected Hodge composite turns.
+- UI refresh, profile selection, scenario selection, action-log copy/save, and mirror preview.
 
 ## ActionRecord Fields
 

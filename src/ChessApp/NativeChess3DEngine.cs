@@ -252,6 +252,12 @@ internal sealed class NativeChess3DEngine : IDisposable
         return ReadString((buffer, capacity) => Chess3D_GetCurrentRulesetId(_handle, buffer, capacity));
     }
 
+    public string GetCurrentRulesetDisplayName()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetCurrentRulesetDisplayName(_handle, buffer, capacity));
+    }
+
     public string GetGoalProfileType()
     {
         ThrowIfDisposed();
@@ -276,10 +282,28 @@ internal sealed class NativeChess3DEngine : IDisposable
         return ReadString((buffer, capacity) => Chess3D_GetFusionProfileType(_handle, buffer, capacity));
     }
 
+    public string GetCorePhysicsProfileType()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetCorePhysicsProfileType(_handle, buffer, capacity));
+    }
+
     public string GetLayerTurnProfileType()
     {
         ThrowIfDisposed();
         return ReadString((buffer, capacity) => Chess3D_GetLayerTurnProfileType(_handle, buffer, capacity));
+    }
+
+    public string GetVictoryProfileType()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetVictoryProfileType(_handle, buffer, capacity));
+    }
+
+    public string GetLastProfileError()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetLastProfileError(_handle, buffer, capacity));
     }
 
     public int GetAnchorCount(int side)
@@ -328,6 +352,12 @@ internal sealed class NativeChess3DEngine : IDisposable
     {
         ThrowIfDisposed();
         return Chess3D_IsFusionEnabled(_handle) != 0;
+    }
+
+    public bool RecomputeFusion()
+    {
+        ThrowIfDisposed();
+        return Chess3D_RecomputeFusion(_handle) != 0;
     }
 
     public int GetCoreFusionKind(int x, int y, int z)
@@ -575,6 +605,9 @@ internal sealed class NativeChess3DEngine : IDisposable
     private static extern int Chess3D_GetCurrentRulesetId(IntPtr handle, StringBuilder buffer, int capacity);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetCurrentRulesetDisplayName(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_GetGoalProfileType(IntPtr handle, StringBuilder buffer, int capacity);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
@@ -587,7 +620,16 @@ internal sealed class NativeChess3DEngine : IDisposable
     private static extern int Chess3D_GetFusionProfileType(IntPtr handle, StringBuilder buffer, int capacity);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetCorePhysicsProfileType(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_GetLayerTurnProfileType(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetVictoryProfileType(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastProfileError(IntPtr handle, StringBuilder buffer, int capacity);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Chess3D_GetAnchorCount(IntPtr handle, int side);
@@ -612,6 +654,9 @@ internal sealed class NativeChess3DEngine : IDisposable
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Chess3D_IsFusionEnabled(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_RecomputeFusion(IntPtr handle);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Chess3D_GetCoreFusionKind(IntPtr handle, int x, int y, int z);

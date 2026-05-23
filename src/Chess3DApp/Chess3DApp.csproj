@@ -38,6 +38,9 @@
     <Content Include="..\..\assets\rules\profiles\**\*.*" Link="Assets\Rules3D\Profiles\%(RecursiveDir)%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\..\assets\rules\scenarios\chess3d\**\*.*" Link="Assets\Rules3D\Scenarios\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <Target Name="CopyNative3DEngine" AfterTargets="Build">

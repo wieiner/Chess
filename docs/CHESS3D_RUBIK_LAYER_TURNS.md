@@ -42,6 +42,7 @@ P2H implements `ritualTurn` for `rubik-convergence-3d-8x8x8-v0.1`.
 - leaves reserve counts untouched;
 - records last layer-turn telemetry through append-only ABI.
 - P2I records successful ritual turns in unified action history with notation such as `#4 LAYER Z[2]+`.
+- P2K exposes basic layer-turn controls in Chess3DApp: axis, layer, quarter turn, capability check, last result, and action-log visibility.
 
 Asgard convergence, classic six-side, and single-side profiles keep layer turns disabled and clean-fail. The legacy draft profile keeps non-stack debug rotation for compatibility.
 

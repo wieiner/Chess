@@ -71,7 +71,13 @@ The Chess3D portable folder includes runtime profiles under:
 ProductionOutput\Chess3D\Assets\Rules3D\Profiles
 ```
 
-`scripts\verify.ps1` checks representative Asgard, Rubik convergence, and Hodge Projection Duel profiles in both development and portable output.
+The Chess3D portable folder also includes P2K smoke descriptors under:
+
+```text
+ProductionOutput\Chess3D\Assets\Rules3D\Scenarios
+```
+
+`scripts\verify.ps1` checks representative Asgard, Rubik convergence, and Hodge Projection Duel profiles plus all P2K scenario descriptors in both development and portable output.
 
 ## Root Scripts
 
@@ -118,4 +124,4 @@ After successful verification, CI uploads `ProductionOutput` as the short-retent
 
 `rude-resource/` is a local ignored resource archive and is absent on CI. `scripts\verify.ps1` checks the ignore rule through the probe path `rude-resource/.verify-ignore-probe`, without creating that file.
 
-CUDA remains optional in CI and in the default local build. After P2J, the same verification pipeline also covers Rubik convergence layer turns, action history, deterministic notation, reserve restore contracts, and Hodge Projection Duel composite-turn contracts.
+CUDA remains optional in CI and in the default local build. After P2K, the same verification pipeline also covers Rubik convergence layer turns, action history, deterministic notation, reserve restore contracts, Hodge Projection Duel composite-turn contracts, scenario smoke descriptors, and packaging of the Chess3D control-center assets.

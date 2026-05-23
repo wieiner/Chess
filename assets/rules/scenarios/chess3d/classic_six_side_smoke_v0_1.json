@@ -1,0 +1,22 @@
+{
+  "scenarioId": "classic-six-side-smoke-v0.1",
+  "displayName": "Classic Six-Side Smoke",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "Manual smoke descriptor for classic 3D chess capabilities without Asgard, Rubik, reserve, fusion, or Hodge projection mechanics.",
+  "expectedCapabilities": {
+    "coreStack": false,
+    "fusion": false,
+    "reserve": false,
+    "layerTurn": false,
+    "projection": false,
+    "actionLog": true
+  },
+  "sampleActions": [
+    "#1 S1 MOVE P (3,3,0)->(3,3,1)",
+    "#2 S2 MOVE P (4,4,7)->(4,4,6)"
+  ],
+  "knownLimitations": [
+    "Full six-side checkmate hardening remains future work.",
+    "This descriptor is parsed by tests and shown in the control center; it is not a replay file."
+  ]
+}

@@ -1,9 +1,11 @@
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using Microsoft.Win32;
 
 namespace ChessApp;
 
@@ -34,6 +36,14 @@ public partial class Chess3DWindow : Window
     private int _lastObjModels;
     private int _lastFallbackModels;
     private bool _applyingNetworkMessage;
+    private readonly List<RuleProfileItem> _ruleProfiles = new();
+    private readonly List<ScenarioItem> _scenarios = new();
+    private const int Pawn = NativeChess3DEngine.Pawn;
+    private const int Knight = NativeChess3DEngine.Knight;
+    private const int Bishop = NativeChess3DEngine.Bishop;
+    private const int Rook = NativeChess3DEngine.Rook;
+    private const int Queen = NativeChess3DEngine.Queen;
+    private const int King = NativeChess3DEngine.King;
 
     public Chess3DWindow()
     {
@@ -49,6 +59,9 @@ public partial class Chess3DWindow : Window
             }
         });
         LoadModelSets();
+        BuildModeChoiceControls();
+        LoadProfileList();
+        LoadScenarioList();
         BuildLayerChoices();
         BuildLayerGrid();
         BuildPalette();
@@ -144,6 +157,111 @@ public partial class Chess3DWindow : Window
         }
     }
 
+    private void BuildModeChoiceControls()
+    {
+        ReservePieceTypeBox.Items.Clear();
+        foreach (var type in new[] { Pawn, Knight, Bishop, Rook, Queen, King })
+        {
+            ReservePieceTypeBox.Items.Add(new ComboBoxItem { Content = TypeName(type), Tag = type });
+        }
+        ReservePieceTypeBox.SelectedIndex = 0;
+
+        LayerTurnLayerBox.Items.Clear();
+        for (var layer = 0; layer < 8; ++layer)
+        {
+            LayerTurnLayerBox.Items.Add(new ComboBoxItem { Content = layer.ToString(), Tag = layer });
+        }
+        LayerTurnLayerBox.SelectedIndex = 0;
+
+        ProjectionPrimarySideBox.Items.Clear();
+        for (var side = 1; side <= 6; ++side)
+        {
+            ProjectionPrimarySideBox.Items.Add(new ComboBoxItem { Content = $"Side {side}", Tag = side });
+        }
+        ProjectionPrimarySideBox.SelectedIndex = 0;
+    }
+
+    private void LoadProfileList()
+    {
+        _ruleProfiles.Clear();
+        ProfileComboBox.ItemsSource = null;
+        var dir = ResolveAssetDirectory(Path.Combine("Assets", "Rules3D", "Profiles"), Path.Combine("assets", "rules", "profiles"));
+        if (Directory.Exists(dir))
+        {
+            foreach (var path in Directory.EnumerateFiles(dir, "*.json").OrderBy(Path.GetFileName))
+            {
+                if (Path.GetFileName(path).Equals("chess3d_rule_profile.schema.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                var json = File.ReadAllText(path);
+                var rulesetId = TryReadJsonString(json, "rulesetId");
+                if (string.IsNullOrWhiteSpace(rulesetId))
+                {
+                    continue;
+                }
+                var displayName = TryReadJsonString(json, "displayName");
+                _ruleProfiles.Add(new RuleProfileItem(path, rulesetId, string.IsNullOrWhiteSpace(displayName) ? rulesetId : displayName));
+            }
+        }
+
+        ProfileComboBox.ItemsSource = _ruleProfiles;
+        if (_ruleProfiles.Count > 0)
+        {
+            var current = _engine.GetCurrentRulesetId();
+            ProfileComboBox.SelectedItem = _ruleProfiles.FirstOrDefault(p => p.RulesetId == current) ?? _ruleProfiles[0];
+            ProfileStatusText.Text = $"{_ruleProfiles.Count} profiles from {dir}";
+        }
+        else
+        {
+            ProfileStatusText.Text = $"No profiles found under {dir}";
+        }
+    }
+
+    private void LoadScenarioList()
+    {
+        _scenarios.Clear();
+        ScenarioComboBox.ItemsSource = null;
+        var dir = ResolveAssetDirectory(Path.Combine("Assets", "Rules3D", "Scenarios"), Path.Combine("assets", "rules", "scenarios", "chess3d"));
+        if (Directory.Exists(dir))
+        {
+            foreach (var path in Directory.EnumerateFiles(dir, "*.json").OrderBy(Path.GetFileName))
+            {
+                var json = File.ReadAllText(path);
+                var scenarioId = TryReadJsonString(json, "scenarioId");
+                if (string.IsNullOrWhiteSpace(scenarioId))
+                {
+                    continue;
+                }
+                var displayName = TryReadJsonString(json, "displayName");
+                var rulesetId = TryReadJsonString(json, "rulesetId");
+                var purpose = TryReadJsonString(json, "purpose");
+                _scenarios.Add(new ScenarioItem(path, scenarioId, string.IsNullOrWhiteSpace(displayName) ? scenarioId : displayName, rulesetId, purpose));
+            }
+        }
+        ScenarioComboBox.ItemsSource = _scenarios;
+        if (_scenarios.Count > 0)
+        {
+            ScenarioComboBox.SelectedIndex = 0;
+            UpdateScenarioText();
+        }
+        else
+        {
+            ScenarioText.Text = $"No scenario smoke descriptors found under {dir}";
+        }
+        ScenarioComboBox.SelectionChanged += (_, _) => UpdateScenarioText();
+    }
+
+    private void UpdateScenarioText()
+    {
+        if (ScenarioComboBox.SelectedItem is not ScenarioItem scenario)
+        {
+            ScenarioText.Text = string.Empty;
+            return;
+        }
+        ScenarioText.Text = $"{scenario.ScenarioId}\nRuleset: {scenario.RulesetId}\n{scenario.Purpose}";
+    }
+
     private void LoadRulesFromDefaultPath()
     {
         var path = ResolveAppPath(RulesPathBox.Text);
@@ -176,6 +294,31 @@ public partial class Chess3DWindow : Window
             return output;
         }
         return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", path));
+    }
+
+    private static string ResolveAssetDirectory(string outputRelative, string repoRelative)
+    {
+        var output = Path.Combine(AppContext.BaseDirectory, outputRelative);
+        if (Directory.Exists(output))
+        {
+            return output;
+        }
+        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", repoRelative));
+    }
+
+    private static string TryReadJsonString(string json, string property)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
+                ? value.GetString() ?? string.Empty
+                : string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
     private void RefreshAll()
@@ -249,6 +392,65 @@ public partial class Chess3DWindow : Window
         RulesText.Text = $"Board {rules.Width}x{rules.Height}x{rules.Depth}, sides {rules.ActiveSideCount}, profile {(rules.MovementProfile == 0 ? "setup-only" : "draft3d")}, max {rules.MaxPiecesPerSide}/side, view {SelectedAxis()} {(IsAllLayersView() ? "all" : "slice")}, grid {SelectedGridMode()}\nRuleset {_engine.GetCurrentRulesetId()}, goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}, layer {_engine.GetLayerTurnProfileType()}, anchors {anchorCount}/{requiredAnchors}{fusionText}{reserveText}{layerTurnText}{projectionText}{actionText}{restoreText}{projectionErrorText}{gameOverText}{stackText}";
         InfoText.Text = _engine.GetLastInfo();
         PositionText.Text = $"Models: {SelectedModelSetName()}, OBJ {_lastObjModels}, fallback {_lastFallbackModels}, hints {selectedMoves.Length}\n{_engine.GetPositionText()}";
+        RefreshControlCenterStatus(state, selectedMoves.Length, anchorCount, requiredAnchors, knockback, layerTurn, restoreInfo);
+        RefreshActionLog();
+    }
+
+    private void RefreshControlCenterStatus(Chess3DStateDto state, int selectedMoveCount, int anchorCount, int requiredAnchors,
+        (int CapturedPieceCode, int DestinationKind, int X, int Y, int Z) knockback,
+        (int Axis, int Layer, int QuarterTurns, int ResultCode) layerTurn,
+        string restoreInfo)
+    {
+        var rulesetId = _engine.GetCurrentRulesetId();
+        var displayName = _engine.GetCurrentRulesetDisplayName();
+        var lastProfileError = _engine.GetLastProfileError();
+        ProfileStatusText.Text = $"{(string.IsNullOrWhiteSpace(displayName) ? rulesetId : displayName)}";
+        ProfileCapabilitiesText.Text =
+            $"ruleset {rulesetId}\n" +
+            $"goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}\n" +
+            $"core {_engine.GetCorePhysicsProfileType()}, layer {_engine.GetLayerTurnProfileType()}, victory {_engine.GetVictoryProfileType()}, projection {(_engine.IsProjectionModeEnabled() ? "hodgeTriuneProjection" : "none")}" +
+            (string.IsNullOrWhiteSpace(lastProfileError) ? string.Empty : $"\nlast profile error: {lastProfileError}");
+
+        var selectedText = _selectedSquare is { } square
+            ? $"{square.X},{square.Y},{square.Z} piece {LabelForPiece(_engine.GetPiece(square.X, square.Y, square.Z))}"
+            : "none";
+        CommonPanelText.Text =
+            $"Selected: {selectedText}\n" +
+            $"Active side: {state.SideToMove}, legal moves from selected: {selectedMoveCount}\n" +
+            $"Actions: {_engine.GetActionCount()}, last: {_engine.GetLastActionNotation()}";
+
+        var inCore = _selectedSquare is { } selected && selected.X is >= 2 and <= 5 && selected.Y is >= 2 and <= 5 && selected.Z is >= 2 and <= 5;
+        var selectedStack = _selectedSquare is { } stackSquare ? _engine.GetCoreStackCount(stackSquare.X, stackSquare.Y, stackSquare.Z) : 0;
+        var selectedProjected = _selectedSquare is { } projectedSquare ? LabelForPiece(_engine.GetProjectedPiece(projectedSquare.X, projectedSquare.Y, projectedSquare.Z)) : string.Empty;
+        var selectedFusion = _selectedSquare is { } fusionSquare && _engine.IsFusionEnabled()
+            ? _engine.GetFusionKindName(_engine.GetCoreFusionKind(fusionSquare.X, fusionSquare.Y, fusionSquare.Z))
+            : "off";
+        var selectedContested = _selectedSquare is { } contestedSquare && _engine.IsCoreCellContested(contestedSquare.X, contestedSquare.Y, contestedSquare.Z);
+        AsgardPanel.IsEnabled = _engine.IsCoreStackEnabled() || _engine.IsFusionEnabled() || _engine.IsReserveEnabled() || _engine.GetGoalProfileType().Contains("centerAssembly", StringComparison.OrdinalIgnoreCase);
+        AsgardPanelText.Text =
+            $"Core selected: {(inCore ? "yes" : "no")}, stack: {selectedStack}, projected: {selectedProjected}\n" +
+            $"Fusion: {(_engine.IsFusionEnabled() ? "on" : "off")} {selectedFusion}, contested: {(selectedContested ? "yes" : "no")}\n" +
+            $"Side fusion: {_engine.GetSideFusionCount(state.SideToMove)}, implosion: {_engine.GetSideImplosionProgress(state.SideToMove)}\n" +
+            $"Anchors: {anchorCount}/{requiredAnchors}, reserve total: {_engine.GetReserveTotal(state.SideToMove)}\n" +
+            $"Last capture: {KnockbackDestinationName(knockback.DestinationKind)} {LabelForPiece(knockback.CapturedPieceCode)} {FormatCoordinate(knockback.X, knockback.Y, knockback.Z)}\n" +
+            $"Restore: {(string.IsNullOrWhiteSpace(restoreInfo) ? "-" : restoreInfo)}";
+
+        RubikPanel.IsEnabled = _engine.IsLayerTurnEnabled();
+        var uiAxis = SelectedLayerTurnAxis();
+        var uiLayer = SelectedLayerTurnLayer();
+        var uiQuarter = SelectedLayerTurnQuarterTurns();
+        RubikPanelText.Text =
+            $"Enabled: {(_engine.IsLayerTurnEnabled() ? "yes" : "no")}, can rotate selected: {(_engine.CanRotateLayer(uiAxis, uiLayer, uiQuarter) ? "yes" : "no")}\n" +
+            $"Profile: {_engine.GetLayerTurnProfileSummary()}\n" +
+            $"Last: {AxisName(layerTurn.Axis)}[{layerTurn.Layer}] {layerTurn.QuarterTurns:+0;-0;0} {_engine.GetLayerTurnResultName(layerTurn.ResultCode)}";
+
+        HodgePanel.IsEnabled = _engine.IsProjectionModeEnabled();
+        HodgePanelText.Text =
+            $"Enabled: {(_engine.IsProjectionModeEnabled() ? "yes" : "no")}, macro players: {_engine.GetProjectionMacroPlayerCount()}\n" +
+            $"Macro 1: {ProjectionSidesText(1)}\nMacro 2: {ProjectionSidesText(2)}\n" +
+            $"Current side macro: {_engine.GetMacroPlayerForSide(state.SideToMove)}\n" +
+            $"Profile: {_engine.GetProjectionProfileSummary()}\n" +
+            $"Last error: {_engine.GetLastProjectionError()}";
     }
 
     private static string AxisName(int axis)
@@ -610,6 +812,134 @@ public partial class Chess3DWindow : Window
         RefreshAll();
     }
 
+    private void LoadProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (ProfileComboBox.SelectedItem is not RuleProfileItem profile)
+        {
+            MessageBox.Show(this, "Select a rule profile first.", "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var json = File.ReadAllText(profile.Path);
+            if (!_engine.LoadRuleProfileJson(json))
+            {
+                MessageBox.Show(this, $"Profile load failed: {_engine.GetLastProfileError()}", "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Warning);
+                RefreshAll();
+                return;
+            }
+            _selectedSquare = null;
+            RulesPathBox.Text = Path.GetRelativePath(AppContext.BaseDirectory, profile.Path);
+            _ = BroadcastBoard3DAsync();
+            RefreshAll();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void RefreshProfiles_Click(object sender, RoutedEventArgs e)
+    {
+        LoadProfileList();
+        LoadScenarioList();
+        RefreshAll();
+    }
+
+    private void RecomputeFusion_Click(object sender, RoutedEventArgs e)
+    {
+        _engine.RecomputeFusion();
+        RefreshAll();
+    }
+
+    private void RefreshUi_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshAll();
+    }
+
+    private void ClearSelection_Click(object sender, RoutedEventArgs e)
+    {
+        _selectedSquare = null;
+        RefreshAll();
+    }
+
+    private void AutoRestoreReserve_Click(object sender, RoutedEventArgs e)
+    {
+        var state = _engine.GetState();
+        var pieceType = SelectedReservePieceType();
+        if (!_engine.AutoRestoreReservePiece(state.SideToMove, pieceType))
+        {
+            MessageBox.Show(this, $"Auto restore failed: {_engine.GetLastReserveRestoreInfo()}", "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        _selectedSquare = null;
+        RefreshAll();
+    }
+
+    private void RotateLayerTurn_Click(object sender, RoutedEventArgs e)
+    {
+        var axis = SelectedLayerTurnAxis();
+        var layer = SelectedLayerTurnLayer();
+        var quarterTurns = SelectedLayerTurnQuarterTurns();
+        if (!_engine.RotateLayer(axis, layer, quarterTurns))
+        {
+            var last = _engine.GetLastLayerTurnInfo();
+            MessageBox.Show(this, $"Layer turn failed: {_engine.GetLayerTurnResultName(last.ResultCode)}", "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        _selectedSquare = null;
+        RefreshAll();
+    }
+
+    private void PreviewProjection_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryReadProjectionMove(out var primarySide, out var from, out var to))
+        {
+            return;
+        }
+        HodgePanelText.Text = BuildProjectionPreview(primarySide, from, to);
+    }
+
+    private void ApplyProjectedMove_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryReadProjectionMove(out var primarySide, out var from, out var to))
+        {
+            return;
+        }
+        if (!_engine.TryMakeProjectedMove(primarySide, from.X, from.Y, from.Z, to.X, to.Y, to.Z, NativeChess3DEngine.Queen, out _))
+        {
+            MessageBox.Show(this, $"Projected move rejected: {_engine.GetLastProjectionError()}", "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        _selectedSquare = null;
+        RefreshAll();
+    }
+
+    private void RefreshActionLog_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshActionLog();
+    }
+
+    private void CopyActionLog_Click(object sender, RoutedEventArgs e)
+    {
+        var text = BuildActionLogText();
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            Clipboard.SetText(text);
+        }
+    }
+
+    private void SaveActionLog_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Chess3D log (*.ch3dlog)|*.ch3dlog|Text files (*.txt)|*.txt|All files (*.*)|*.*",
+            FileName = $"{SanitizeFileName(_engine.GetCurrentRulesetId())}.ch3dlog"
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            File.WriteAllText(dialog.FileName, BuildActionLogText());
+        }
+    }
+
     private void RubikRotate_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button || !int.TryParse(button.Tag?.ToString(), out var turns))
@@ -858,6 +1188,113 @@ public partial class Chess3DWindow : Window
         return Math.Clamp(LayerBox.SelectedIndex, 0, 7);
     }
 
+    private void RefreshActionLog()
+    {
+        if (ActionLogList == null)
+        {
+            return;
+        }
+        var count = _engine.GetActionCount();
+        var first = Math.Max(1, count - 49);
+        var rows = new List<string>();
+        for (var index = first; index <= count; ++index)
+        {
+            var notation = _engine.GetActionNotation(index);
+            if (!string.IsNullOrWhiteSpace(notation))
+            {
+                rows.Add(notation);
+            }
+        }
+        ActionLogList.ItemsSource = rows;
+    }
+
+    private string BuildActionLogText()
+    {
+        var lines = new List<string> { $"rulesetId: {_engine.GetCurrentRulesetId()}" };
+        var count = _engine.GetActionCount();
+        for (var index = 1; index <= count; ++index)
+        {
+            var notation = _engine.GetActionNotation(index);
+            if (!string.IsNullOrWhiteSpace(notation))
+            {
+                lines.Add(notation);
+            }
+        }
+        return string.Join(Environment.NewLine, lines) + Environment.NewLine;
+    }
+
+    private static string FormatCoordinate(int x, int y, int z)
+    {
+        return x >= 0 && y >= 0 && z >= 0 ? $"({x},{y},{z})" : string.Empty;
+    }
+
+    private string ProjectionSidesText(int macroPlayer)
+    {
+        var count = _engine.GetProjectionCountForMacroPlayer(macroPlayer);
+        if (count <= 0)
+        {
+            return "-";
+        }
+        return string.Join(", ", Enumerable.Range(0, count).Select(i => $"S{_engine.GetProjectionSide(macroPlayer, i)}"));
+    }
+
+    private string BuildProjectionPreview(int primarySide, Square3D from, Square3D to)
+    {
+        var macro = _engine.GetMacroPlayerForSide(primarySide);
+        if (macro <= 0)
+        {
+            return $"Primary side {primarySide} is not in a projection macro-player. {_engine.GetLastProjectionError()}";
+        }
+        var lines = new List<string> { $"Primary S{primarySide}: {FormatCoordinate(from.X, from.Y, from.Z)} -> {FormatCoordinate(to.X, to.Y, to.Z)}" };
+        var count = _engine.GetProjectionCountForMacroPlayer(macro);
+        for (var i = 0; i < count; ++i)
+        {
+            var side = _engine.GetProjectionSide(macro, i);
+            if (side == primarySide)
+            {
+                continue;
+            }
+            if (_engine.TransformMoveBetweenSides(primarySide, side, from.X, from.Y, from.Z, to.X, to.Y, to.Z, out var mirrorFrom, out var mirrorTo))
+            {
+                lines.Add($"Mirror S{side}: {FormatCoordinate(mirrorFrom.X, mirrorFrom.Y, mirrorFrom.Z)} -> {FormatCoordinate(mirrorTo.X, mirrorTo.Y, mirrorTo.Z)}");
+            }
+            else
+            {
+                lines.Add($"Mirror S{side}: transform failed");
+            }
+        }
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private bool TryReadProjectionMove(out int primarySide, out Square3D from, out Square3D to)
+    {
+        primarySide = SelectedProjectionPrimarySide();
+        from = default;
+        to = default;
+        if (!TryReadCoordinate(ProjectionFromXBox, ProjectionFromYBox, ProjectionFromZBox, out from) ||
+            !TryReadCoordinate(ProjectionToXBox, ProjectionToYBox, ProjectionToZBox, out to))
+        {
+            MessageBox.Show(this, "Projection coordinates must be integers from 0 to 7.", "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Information);
+            return false;
+        }
+        return true;
+    }
+
+    private static bool TryReadCoordinate(TextBox xBox, TextBox yBox, TextBox zBox, out Square3D square)
+    {
+        square = default;
+        if (!int.TryParse(xBox.Text, out var x) || !int.TryParse(yBox.Text, out var y) || !int.TryParse(zBox.Text, out var z))
+        {
+            return false;
+        }
+        if (x is < 0 or > 7 || y is < 0 or > 7 || z is < 0 or > 7)
+        {
+            return false;
+        }
+        square = new Square3D(x, y, z);
+        return true;
+    }
+
     private SliceAxis SelectedAxis()
     {
         return AxisBox?.SelectedIndex switch
@@ -1076,6 +1513,48 @@ public partial class Chess3DWindow : Window
         };
     }
 
+    private int SelectedLayerTurnAxis()
+    {
+        return LayerTurnAxisBox?.SelectedIndex switch
+        {
+            2 => 2,
+            1 => 1,
+            _ => 0
+        };
+    }
+
+    private int SelectedLayerTurnLayer()
+    {
+        if (LayerTurnLayerBox?.SelectedItem is ComboBoxItem item && int.TryParse(item.Tag?.ToString(), out var layer))
+        {
+            return Math.Clamp(layer, 0, 7);
+        }
+        return Math.Clamp(LayerTurnLayerBox?.SelectedIndex ?? 0, 0, 7);
+    }
+
+    private int SelectedLayerTurnQuarterTurns()
+    {
+        return LayerTurnQuarterBox?.SelectedIndex == 0 ? -1 : 1;
+    }
+
+    private int SelectedReservePieceType()
+    {
+        if (ReservePieceTypeBox?.SelectedItem is ComboBoxItem item && int.TryParse(item.Tag?.ToString(), out var type))
+        {
+            return Math.Clamp(type, Pawn, King);
+        }
+        return Pawn;
+    }
+
+    private int SelectedProjectionPrimarySide()
+    {
+        if (ProjectionPrimarySideBox?.SelectedItem is ComboBoxItem item && int.TryParse(item.Tag?.ToString(), out var side))
+        {
+            return Math.Clamp(side, 1, 6);
+        }
+        return Math.Clamp(ProjectionPrimarySideBox?.SelectedIndex + 1 ?? 1, 1, 6);
+    }
+
     private int SelectedNetworkPort()
     {
         return int.TryParse(NetworkPortBox.Text, out var port) ? Math.Clamp(port, 1, 65535) : 5308;
@@ -1182,6 +1661,14 @@ public partial class Chess3DWindow : Window
         };
     }
 
+    private static string SanitizeFileName(string text)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var chars = text.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray();
+        var result = new string(chars).Trim();
+        return string.IsNullOrWhiteSpace(result) ? "chess3d" : result;
+    }
+
     private static SolidColorBrush BrushForPiece(int piece)
     {
         var side = piece / 10;
@@ -1259,4 +1746,8 @@ public partial class Chess3DWindow : Window
         Orbit,
         Pan
     }
+
+    private sealed record RuleProfileItem(string Path, string RulesetId, string DisplayName);
+
+    private sealed record ScenarioItem(string Path, string ScenarioId, string DisplayName, string RulesetId, string Purpose);
 }

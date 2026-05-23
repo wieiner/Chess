@@ -119,12 +119,13 @@ Implemented now:
 - knockback/home-or-reserve capture routing for ordinary outer-field captures;
 - action history and deterministic notation for moves, captures, layer turns, and reserve restores;
 - reserve restore action to matching free home slots;
+- P2K Chess3D control-center visibility for selected core cell, stack count, projected piece, fusion kind, contested state, anchor count, reserve total, last capture destination, and auto restore;
 - P2A movement/setup contracts remain executable through `Chess3DEngineContractTests`.
 
 Deferred:
 
 - destructive fusion/implosion event model;
 - contested anchor scoring/dislodging;
-- reserve inventory UI, restore into core, and restore captures;
+- rich reserve inventory UI, restore into core, and restore captures;
 - Rubik layer-turn animation/full replay/online serialization;
 - checkmate/hybrid hardening.

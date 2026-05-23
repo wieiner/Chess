@@ -47,3 +47,17 @@ Example notation:
 - UI visualization of the projection groups is minimal.
 - Replay/import/export, online serialization, AI/search integration, and notation standardization are later stages.
 - Hodge v0.1 intentionally disables Asgard core stacks, fusion, implosion, reserve/knockback, and Rubik layer turns.
+
+## P2K UI
+
+`Chess3DApp` now exposes Hodge Projection Duel through a mode-aware panel:
+
+- projection enabled/off;
+- macro-player groups;
+- primary-side selector;
+- from/to coordinate inputs;
+- mirror preview using the transform ABI;
+- all-or-nothing apply through `Chess3D_TryMakeProjectedMove`;
+- last projection error and last action notation.
+
+This is still not a full Hodge editor, replay system, or AI/search integration.

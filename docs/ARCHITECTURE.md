@@ -34,6 +34,7 @@ C# apps call native DLLs through narrow P/Invoke wrappers. Native state and rule
 - `src/.../Assets` contains runtime assets used by apps and copied during build.
 - `src/ChessApp/Assets/Rules3D` contains runtime 3D rules JSON assets, including the P2A `single_side_3d_chess_8x8x8_v0_1.json` ruleset.
 - `assets/rules/profiles` contains machine-readable profile contracts. `Chess3DApp` copies them to `Assets/Rules3D/Profiles`, and `ProductionOutput/Chess3D` carries the same runtime profile assets.
+- `assets/rules/scenarios/chess3d` contains P2K smoke descriptors. `Chess3DApp` copies them to `Assets/Rules3D/Scenarios`, and `ProductionOutput/Chess3D` carries them for manual QA.
 - `ProductionOutput/` is generated portable output and is ignored.
 
 ### 3D Rules Boundary
@@ -57,6 +58,8 @@ P2H adds profile-gated Rubik layer turns for `rubik_convergence_3d_v0_1`. The pr
 P2I adds a unified action-history layer over successful moves, Rubik layer turns, and reserve restores. It also adds deterministic notation v0.1 and a legal reserve restore action to matching free home slots for reserve-enabled profiles. Reset/profile load/setup helpers remain outside turn history.
 
 P2J adds a separate Hodge Projection Duel profile. This is a two-macro-player mode where each macro-player has three cube-face projections. A successful projected action validates one primary move plus two mirror moves through documented face-coordinate transforms, then records one `HPD` composite action. The profile defaults to exclusive occupancy, classic capture, no core physics, no fusion, no reserve/knockback, and no Rubik layer turns.
+
+P2K adds the playable Chess3D control center in the WPF app. It does not move rule logic into UI; it exposes the existing native profile/action ABI through a profile selector, mode-aware status/action panels, action-log controls, and scenario smoke-pack listing.
 
 This is still not final Asgard fusion physics. Destructive implosion, color/permutation state, online serialization, AI/search generation for layer turns, UI animation, full replay/import/export, and GPU stack snapshots remain later stages.
 

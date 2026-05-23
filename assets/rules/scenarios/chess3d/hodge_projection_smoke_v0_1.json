@@ -1,0 +1,21 @@
+{
+  "scenarioId": "hodge-projection-smoke-v0.1",
+  "displayName": "Hodge Projection Smoke",
+  "rulesetId": "hodge-projection-duel-3d-8x8x8-v0.1",
+  "purpose": "Manual smoke descriptor for two macro-players with three mirrored cube-face projections each.",
+  "expectedCapabilities": {
+    "coreStack": false,
+    "fusion": false,
+    "reserve": false,
+    "layerTurn": false,
+    "projection": true,
+    "actionLog": true
+  },
+  "sampleActions": [
+    "#1 M1 HPD primary=S1 P (3,3,0)->(3,3,1); mirrors=[S3 P (3,0,3)->(3,1,3), S5 P (0,3,3)->(1,3,3)]"
+  ],
+  "knownLimitations": [
+    "Hodge Projection Duel is not Asgard and does not enable core/fusion mechanics by default.",
+    "Replay import/export is deferred to P2L."
+  ]
+}

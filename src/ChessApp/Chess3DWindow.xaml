@@ -213,15 +213,141 @@
             <Border x:Name="ToolsPanel" Grid.Column="0" Background="{StaticResource PanelBrush}" Padding="14" Margin="0,0,14,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
-                    <TextBlock Text="Rules JSON" Foreground="{StaticResource MutedTextBrush}" />
-                    <DockPanel Margin="0,6,0,12">
-                        <Button Content="Load" DockPanel.Dock="Right" Click="LoadRules_Click" Margin="8,0,0,0" />
-                        <TextBox x:Name="RulesPathBox" Text="Assets\Rules3D\cube8x8x8_draft.json"
-                                 Background="#1D2228" Foreground="{StaticResource TextBrush}" BorderBrush="#46505C" />
+                    <TextBlock Text="Rule Profile" Foreground="{StaticResource MutedTextBrush}" />
+                    <Grid Margin="0,6,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="ProfileComboBox" DisplayMemberPath="DisplayName" />
+                        <Button Grid.Column="1" Content="Load Profile" Click="LoadProfile_Click" Margin="8,0,0,0" />
+                    </Grid>
+                    <DockPanel Margin="0,0,0,10">
+                        <Button Content="Refresh Profiles" Click="RefreshProfiles_Click" />
+                        <TextBlock x:Name="ProfileStatusText" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="8,6,0,0" />
                     </DockPanel>
+                    <TextBlock x:Name="ProfileCapabilitiesText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+                    <Expander Header="Raw rules JSON" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
+                        <StackPanel Margin="0,8,0,0">
+                            <DockPanel>
+                                <Button Content="Load JSON" DockPanel.Dock="Right" Click="LoadRules_Click" Margin="8,0,0,0" />
+                                <TextBox x:Name="RulesPathBox" Text="Assets\Rules3D\cube8x8x8_draft.json"
+                                         Background="#1D2228" Foreground="{StaticResource TextBrush}" BorderBrush="#46505C" />
+                            </DockPanel>
+                        </StackPanel>
+                    </Expander>
 
                     <TextBlock x:Name="RulesText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
                     <TextBlock x:Name="InfoText" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+                    <Expander Header="Common" IsExpanded="True" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
+                        <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CommandBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
+                            <StackPanel>
+                                <TextBlock x:Name="CommonPanelText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
+                    <Expander x:Name="AsgardPanel" Header="Asgard / Core" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
+                        <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CommandBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
+                            <StackPanel>
+                                <TextBlock x:Name="AsgardPanelText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                                <WrapPanel>
+                                    <Button Content="Recompute Fusion" Click="RecomputeFusion_Click" />
+                                    <Button Content="Refresh" Click="RefreshUi_Click" />
+                                    <Button Content="Clear Selection" Click="ClearSelection_Click" />
+                                </WrapPanel>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="72" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Restore" Style="{StaticResource CommandLabelStyle}" />
+                                    <ComboBox x:Name="ReservePieceTypeBox" Grid.Column="1" />
+                                    <Button Grid.Column="2" Content="Auto" Click="AutoRestoreReserve_Click" Margin="8,0,0,0" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
+                    <Expander x:Name="RubikPanel" Header="Rubik Layer Turn" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
+                        <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CommandBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
+                            <StackPanel>
+                                <UniformGrid Columns="3" Margin="0,0,0,8">
+                                    <ComboBox x:Name="LayerTurnAxisBox" SelectedIndex="0" Margin="0,0,6,0">
+                                        <ComboBoxItem Content="Z" />
+                                        <ComboBoxItem Content="Y" />
+                                        <ComboBoxItem Content="X" />
+                                    </ComboBox>
+                                    <ComboBox x:Name="LayerTurnLayerBox" SelectedIndex="0" Margin="0,0,6,0" />
+                                    <ComboBox x:Name="LayerTurnQuarterBox" SelectedIndex="1">
+                                        <ComboBoxItem Content="-1" />
+                                        <ComboBoxItem Content="+1" />
+                                    </ComboBox>
+                                </UniformGrid>
+                                <WrapPanel>
+                                    <Button Content="Rotate Layer" Click="RotateLayerTurn_Click" />
+                                    <Button Content="Check" Click="RefreshUi_Click" />
+                                </WrapPanel>
+                                <TextBlock x:Name="RubikPanelText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
+                    <Expander x:Name="HodgePanel" Header="Hodge Projection" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
+                        <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CommandBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="92" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Primary" Style="{StaticResource CommandLabelStyle}" />
+                                    <ComboBox x:Name="ProjectionPrimarySideBox" Grid.Column="1" />
+                                </Grid>
+                                <UniformGrid Columns="3" Margin="0,0,0,6">
+                                    <TextBox x:Name="ProjectionFromXBox" Text="3" Margin="0,0,6,0" />
+                                    <TextBox x:Name="ProjectionFromYBox" Text="3" Margin="0,0,6,0" />
+                                    <TextBox x:Name="ProjectionFromZBox" Text="0" />
+                                </UniformGrid>
+                                <UniformGrid Columns="3" Margin="0,0,0,8">
+                                    <TextBox x:Name="ProjectionToXBox" Text="3" Margin="0,0,6,0" />
+                                    <TextBox x:Name="ProjectionToYBox" Text="3" Margin="0,0,6,0" />
+                                    <TextBox x:Name="ProjectionToZBox" Text="1" />
+                                </UniformGrid>
+                                <WrapPanel>
+                                    <Button Content="Preview Mirrors" Click="PreviewProjection_Click" />
+                                    <Button Content="Apply Projected Move" Click="ApplyProjectedMove_Click" />
+                                </WrapPanel>
+                                <TextBlock x:Name="HodgePanelText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
+                    <Expander Header="Action Log" IsExpanded="True" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
+                        <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CommandBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
+                            <StackPanel>
+                                <ListBox x:Name="ActionLogList" Height="150" Background="#1D2228" Foreground="{StaticResource TextBrush}" BorderBrush="#46505C" />
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button Content="Refresh" Click="RefreshActionLog_Click" />
+                                    <Button Content="Copy" Click="CopyActionLog_Click" />
+                                    <Button Content="Save" Click="SaveActionLog_Click" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
+                    <Expander Header="Scenario Smoke Pack" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
+                        <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CommandBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
+                            <StackPanel>
+                                <ComboBox x:Name="ScenarioComboBox" DisplayMemberPath="DisplayName" />
+                                <TextBlock x:Name="ScenarioText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
                     <TextBlock Text="3D Network" Foreground="{StaticResource MutedTextBrush}" />
                     <Grid Margin="0,6,0,8">
                         <Grid.ColumnDefinitions>
