@@ -129,3 +129,6 @@ Deferred:
 - rich reserve inventory UI, restore into core, and restore captures;
 - Rubik layer-turn animation/full replay/online serialization;
 - checkmate/hybrid hardening.
+## P2L Playability Note
+
+Asgard remains one profile, not the default meaning of all Chess3D. In P2L the UI exposes Asgard-specific core stack, fusion, anchor, reserve, and invalid-reason state only when the active RuleProfile enables those capabilities. Classic, Single-Side, Rubik, and Hodge remain separate modes.

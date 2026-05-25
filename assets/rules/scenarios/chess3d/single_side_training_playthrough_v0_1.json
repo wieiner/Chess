@@ -1,0 +1,30 @@
+{
+  "scenarioId": "single-side-training-playthrough-v0.1",
+  "displayName": "Single-Side Training Playthrough v0.1",
+  "profileFile": "single_side_3d_v0_1.json",
+  "rulesetId": "single-side-3d-8x8x8-v0.1",
+  "purpose": "Headless smoke playthrough for one-side movement preview and sandbox training.",
+  "initialExpectedCapabilities": {
+    "normalMoves": true,
+    "classicCapture": true,
+    "coreStack": false,
+    "fusion": false,
+    "reserve": false,
+    "layerTurn": false,
+    "projection": false
+  },
+  "sequenceOfActions": [
+    "SET S1 P (3,3,0)",
+    "PREVIEW (3,3,0)",
+    "MOVE S1 P (3,3,0)->(3,3,1)"
+  ],
+  "expectedActionHistoryCount": 1,
+  "expectedNotationFragments": ["MOVE", "(3,3,0)->(3,3,1)"],
+  "expectedFinalState": {
+    "pieceAt": { "x": 3, "y": 3, "z": 1, "pieceCode": 11 },
+    "gameOver": false
+  },
+  "knownLimitations": [
+    "This is a training/sandbox profile, not a complete competitive game."
+  ]
+}

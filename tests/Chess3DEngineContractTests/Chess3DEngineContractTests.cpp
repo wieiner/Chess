@@ -5,6 +5,7 @@
 #include <array>
 #include <cctype>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <map>
@@ -56,6 +57,24 @@ constexpr int ActionFlagLeftCore = 8;
 constexpr int ActionFlagWasLayerTurn = 16;
 constexpr int ActionFlagWasReserveRestore = 32;
 constexpr int ActionFlagWasProjection = 512;
+constexpr int PreviewActionMove = 1;
+constexpr int PreviewActionCapture = 2;
+constexpr int PreviewActionReserveRestore = 3;
+constexpr int PreviewActionLayerTurn = 4;
+constexpr int PreviewActionProjectionComposite = 5;
+constexpr int PreviewFlagCapture = 1;
+constexpr int PreviewFlagKnockback = 2;
+constexpr int PreviewFlagEntersCore = 4;
+constexpr int PreviewFlagAnchorCandidate = 32;
+constexpr int PreviewFlagFusionCandidate = 64;
+constexpr int PreviewFlagLayerTurn = 128;
+constexpr int PreviewFlagProjectionComposite = 256;
+constexpr int AllowedActionReserveRestore = 4;
+constexpr int AllowedActionLayerTurn = 8;
+constexpr int AllowedActionProjection = 16;
+constexpr int AllowedActionCoreStack = 32;
+constexpr int AllowedActionFusion = 64;
+constexpr int AllowedActionCenterAssembly = 128;
 
 std::string ReadTextFile(const std::string& path)
 {
@@ -611,6 +630,36 @@ std::string ReadActionNotation(void* game, int actionIndex)
     return std::string(buffer);
 }
 
+std::string ReadPreviewReason(void* game, int previewIndex)
+{
+    char buffer[512] = {};
+    const int needed = Chess3D_GetPreviewEntryReason(game, previewIndex, buffer, static_cast<int>(sizeof(buffer)));
+    if (needed <= 0)
+    {
+        return {};
+    }
+    return std::string(buffer);
+}
+
+int CountRuleProfileFiles()
+{
+    int count = 0;
+    const std::filesystem::path dir("assets\\rules\\profiles");
+    for (const auto& entry : std::filesystem::directory_iterator(dir))
+    {
+        if (!entry.is_regular_file() || entry.path().extension() != ".json")
+        {
+            continue;
+        }
+        if (entry.path().filename().string() == "chess3d_rule_profile.schema.json")
+        {
+            continue;
+        }
+        ++count;
+    }
+    return count;
+}
+
 std::string ReadFusionKindName(int fusionKind)
 {
     char buffer[128] = {};
@@ -1049,15 +1098,26 @@ int main()
     const std::string asgardScenario = ReadTextFile("assets\\rules\\scenarios\\chess3d\\asgard_core_fusion_smoke_v0_1.json");
     const std::string rubikScenario = ReadTextFile("assets\\rules\\scenarios\\chess3d\\rubik_layer_turn_smoke_v0_1.json");
     const std::string hodgeScenario = ReadTextFile("assets\\rules\\scenarios\\chess3d\\hodge_projection_smoke_v0_1.json");
+    const std::string classicPlaythrough = ReadTextFile("assets\\rules\\scenarios\\chess3d\\classic_six_side_playthrough_v0_1.json");
+    const std::string singlePlaythrough = ReadTextFile("assets\\rules\\scenarios\\chess3d\\single_side_training_playthrough_v0_1.json");
+    const std::string asgardPlaythrough = ReadTextFile("assets\\rules\\scenarios\\chess3d\\asgard_core_playthrough_v0_1.json");
+    const std::string rubikPlaythrough = ReadTextFile("assets\\rules\\scenarios\\chess3d\\rubik_layer_playthrough_v0_1.json");
+    const std::string hodgePlaythrough = ReadTextFile("assets\\rules\\scenarios\\chess3d\\hodge_projection_playthrough_v0_1.json");
     test.Check(!classicProfile.empty(), "classic six-side profile exists");
     test.Check(!singleProfile.empty(), "single-side profile exists");
     test.Check(!asgardProfile.empty(), "asgard convergence profile exists");
     test.Check(!rubikProfile.empty(), "rubik convergence profile exists");
     test.Check(!hodgeProfile.empty(), "hodge projection duel profile exists");
+    test.Check(CountRuleProfileFiles() == 5, "exactly five real Chess3D rule profiles exist");
     test.Check(!classicScenario.empty() && JsonParser(classicScenario).Parse(), "classic six-side scenario smoke JSON exists and parses");
     test.Check(!asgardScenario.empty() && JsonParser(asgardScenario).Parse(), "asgard scenario smoke JSON exists and parses");
     test.Check(!rubikScenario.empty() && JsonParser(rubikScenario).Parse(), "rubik layer-turn scenario smoke JSON exists and parses");
     test.Check(!hodgeScenario.empty() && JsonParser(hodgeScenario).Parse(), "hodge projection scenario smoke JSON exists and parses");
+    test.Check(!classicPlaythrough.empty() && JsonParser(classicPlaythrough).Parse(), "classic playthrough scenario JSON exists and parses");
+    test.Check(!singlePlaythrough.empty() && JsonParser(singlePlaythrough).Parse(), "single-side playthrough scenario JSON exists and parses");
+    test.Check(!asgardPlaythrough.empty() && JsonParser(asgardPlaythrough).Parse(), "asgard playthrough scenario JSON exists and parses");
+    test.Check(!rubikPlaythrough.empty() && JsonParser(rubikPlaythrough).Parse(), "rubik playthrough scenario JSON exists and parses");
+    test.Check(!hodgePlaythrough.empty() && JsonParser(hodgePlaythrough).Parse(), "hodge playthrough scenario JSON exists and parses");
     test.Check(ExtractStringValue(classicScenario, "rulesetId") == "classic-six-side-3d-8x8x8-v0.1" &&
         classicScenario.find("\"layerTurn\": false") != std::string::npos &&
         classicScenario.find("\"projection\": false") != std::string::npos,
@@ -1273,6 +1333,13 @@ int main()
         "runtime exposes classic layer profile");
     test.Check(Chess3D_IsReserveEnabled(game) == 0 && Chess3D_IsKnockbackEnabled(game) == 0,
         "classic profile keeps reserve and knockback disabled");
+    int classicMask = Chess3D_GetAllowedActionMask(game);
+    test.Check((classicMask & (AllowedActionCoreStack | AllowedActionFusion | AllowedActionReserveRestore | AllowedActionLayerTurn | AllowedActionProjection | AllowedActionCenterAssembly)) == 0,
+        "classic allowed action mask excludes Asgard/Rubik/Hodge capabilities");
+    test.Check(Chess3D_GetCurrentSide(game) == 1 && Chess3D_GetCurrentMacroPlayer(game) == 0,
+        "classic turn controller exposes side without macro-player");
+    test.Check(ReadAbiString(game, Chess3D_GetTurnSummary).find("classic") != std::string::npos,
+        "classic turn summary names classic mode");
     Chess3D_Clear(game);
     test.Check(Chess3D_SetPiece(game, 0, 0, 0, 1, Rook) == 1 &&
         Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn) == 1 &&
@@ -1288,11 +1355,40 @@ int main()
         lastCaptured == PieceCode(2, Pawn) && lastDestination == KnockbackClassicRemoved &&
         Chess3D_GetReserveTotal(game, 2) == 0,
         "classic capture removes captured piece without reserve");
+    const int historyBeforePreview = Chess3D_GetActionCount(game);
+    int boardBeforePreview[512] = {};
+    Chess3D_GetBoard(game, boardBeforePreview);
+    test.Check(Chess3D_BuildLegalActionPreviewForCell(game, 0, 0, 3, 1) > 0,
+        "classic preview builds legal actions for selected piece");
+    test.Check(Chess3D_GetActionCount(game) == historyBeforePreview,
+        "preview does not append action history");
+    int boardAfterPreview[512] = {};
+    Chess3D_GetBoard(game, boardAfterPreview);
+    test.Check(std::equal(std::begin(boardBeforePreview), std::end(boardBeforePreview), std::begin(boardAfterPreview)),
+        "preview does not mutate projected board");
+    Chess3DLegalActionPreviewEntryDto previewEntry{};
+    bool foundClassicMovePreview = false;
+    for (int i = 0; i < Chess3D_GetLegalActionPreviewCount(game); ++i)
+    {
+        Chess3D_GetLegalActionPreviewEntry(game, i, &previewEntry);
+        if (previewEntry.kind == PreviewActionMove && previewEntry.pieceCode == PieceCode(1, Rook))
+        {
+            foundClassicMovePreview = true;
+            test.Check(!ReadPreviewReason(game, i).empty(), "preview entry exposes a readable reason");
+            break;
+        }
+    }
+    test.Check(foundClassicMovePreview, "classic preview contains normal move entry");
+    test.Check(Chess3D_TryMakeMove(game, 7, 7, 7, 7, 7, 6, 0, &played) == 0 &&
+        !ReadAbiString(game, Chess3D_GetLastInvalidActionReason).empty(),
+        "invalid move exposes reason text");
 
     test.Check(Chess3D_LoadRuleProfileJson(game, singleProfile.c_str()) == 1, "runtime loads single-side profile");
     test.Check(Chess3D_IsFusionEnabled(game) == 0, "single-side profile keeps fusion disabled");
     test.Check(Chess3D_IsReserveEnabled(game) == 0 && Chess3D_IsKnockbackEnabled(game) == 0,
         "single-side profile keeps reserve and knockback disabled");
+    test.Check((Chess3D_GetAllowedActionMask(game) & (AllowedActionLayerTurn | AllowedActionProjection | AllowedActionCoreStack | AllowedActionFusion | AllowedActionReserveRestore)) == 0,
+        "single-side mask excludes special capabilities");
     test.Check(ReadAbiString(game, Chess3D_GetCurrentRulesetId) == "single-side-3d-8x8x8-v0.1",
         "runtime exposes single-side ruleset id");
     test.Check(ReadAbiString(game, Chess3D_GetGoalProfileType) == "sandbox",
@@ -1303,6 +1399,14 @@ int main()
     test.Check(Chess3D_IsFusionEnabled(game) == 1, "asgard profile enables fusion descriptors");
     test.Check(Chess3D_IsReserveEnabled(game) == 1 && Chess3D_IsKnockbackEnabled(game) == 1,
         "asgard profile enables reserve and knockback");
+    int asgardMask = Chess3D_GetAllowedActionMask(game);
+    test.Check((asgardMask & AllowedActionCoreStack) != 0 &&
+        (asgardMask & AllowedActionFusion) != 0 &&
+        (asgardMask & AllowedActionReserveRestore) != 0 &&
+        (asgardMask & AllowedActionCenterAssembly) != 0 &&
+        (asgardMask & AllowedActionLayerTurn) == 0 &&
+        (asgardMask & AllowedActionProjection) == 0,
+        "asgard capability mask exposes core/fusion/reserve/center but not layer/projection");
     Chess3D_Clear(game);
     test.Check(Chess3D_GetCoreStackCount(game, 2, 2, 2) == 0, "asgard clear leaves target stack empty");
     test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 1, "asgard push first core stack piece succeeds");
@@ -1484,6 +1588,19 @@ int main()
     test.Check(played.captured == 0 && (played.flags & MoveCapture) == 0, "entering core does not ordinary-capture previous occupant");
     test.Check(Chess3D_GetCoreFusionKind(game, 2, 2, 2) == FusionFriendlyPair,
         "entering occupied core updates fusion state automatically");
+    test.Check(Chess3D_BuildLegalActionPreviewForCell(game, 2, 2, 2, 1) > 0,
+        "asgard preview builds actions for projected core piece");
+    bool asgardCorePreviewFound = false;
+    for (int i = 0; i < Chess3D_GetLegalActionPreviewCount(game); ++i)
+    {
+        Chess3D_GetLegalActionPreviewEntry(game, i, &previewEntry);
+        if ((previewEntry.flags & (PreviewFlagAnchorCandidate | PreviewFlagFusionCandidate | PreviewFlagEntersCore)) != 0)
+        {
+            asgardCorePreviewFound = true;
+            break;
+        }
+    }
+    test.Check(asgardCorePreviewFound, "asgard preview marks core/anchor/fusion-related candidates");
 
     test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "runtime reloads asgard profile for core-to-core move test");
     Chess3D_Clear(game);
@@ -1735,6 +1852,28 @@ int main()
         "rubik convergence validates axes, layers, and quarter turns");
     test.Check(ReadAbiString(game, Chess3D_GetLayerTurnProfileSummary).find("coreStacks=true") != std::string::npos,
         "rubik convergence layer-turn summary reports core stack movement");
+    int rubikMask = Chess3D_GetAllowedActionMask(game);
+    test.Check((rubikMask & AllowedActionLayerTurn) != 0 &&
+        (rubikMask & AllowedActionCoreStack) != 0 &&
+        (rubikMask & AllowedActionFusion) != 0 &&
+        (rubikMask & AllowedActionProjection) == 0,
+        "rubik capability mask exposes layer/core/fusion and excludes Hodge projection");
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 2, 2, 1, 1, Rook);
+    test.Check(Chess3D_BuildLegalActionPreviewForCell(game, 2, 2, 1, 1) > 0,
+        "rubik preview builds actions for selected piece");
+    bool layerPreviewFound = false;
+    for (int i = 0; i < Chess3D_GetLegalActionPreviewCount(game); ++i)
+    {
+        Chess3D_GetLegalActionPreviewEntry(game, i, &previewEntry);
+        if (previewEntry.kind == PreviewActionLayerTurn && (previewEntry.flags & PreviewFlagLayerTurn) != 0)
+        {
+            layerPreviewFound = true;
+            break;
+        }
+    }
+    test.Check(layerPreviewFound && Chess3D_CanRotateLayer(game, 0, 1, 1) == 1,
+        "rubik preview and CanRotateLayer agree that layer turns are available");
 
     Chess3D_Clear(game);
     Chess3D_SetPiece(game, 0, 0, 0, 1, Pawn);
@@ -1868,6 +2007,13 @@ int main()
         "hodge macro-player groups cover all six sides exactly once");
     test.Check(ReadAbiString(game, Chess3D_GetProjectionProfileSummary).find("hodgeTriuneProjection") != std::string::npos,
         "hodge projection summary names hodgeTriuneProjection");
+    int hodgeMask = Chess3D_GetAllowedActionMask(game);
+    test.Check((hodgeMask & AllowedActionProjection) != 0 &&
+        (hodgeMask & (AllowedActionCoreStack | AllowedActionFusion | AllowedActionReserveRestore | AllowedActionLayerTurn | AllowedActionCenterAssembly)) == 0,
+        "hodge capability mask exposes projection and excludes Asgard/Rubik capabilities");
+    test.Check(Chess3D_GetCurrentMacroPlayer(game) == 1 &&
+        ReadAbiString(game, Chess3D_GetTurnSummary).find("hodgeProjection") != std::string::npos,
+        "hodge turn controller exposes current macro-player");
 
     int tfX = -1;
     int tfY = -1;
@@ -1894,6 +2040,20 @@ int main()
     Chess3D_SetPiece(game, 3, 3, 0, 1, Pawn);
     Chess3D_SetPiece(game, 3, 0, 3, 3, Pawn);
     Chess3D_SetPiece(game, 0, 3, 3, 5, Pawn);
+    test.Check(Chess3D_BuildLegalActionPreviewForCell(game, 3, 3, 0, 1) > 0,
+        "hodge preview builds primary and projection entries");
+    bool hodgeProjectionPreviewFound = false;
+    for (int i = 0; i < Chess3D_GetLegalActionPreviewCount(game); ++i)
+    {
+        Chess3D_GetLegalActionPreviewEntry(game, i, &previewEntry);
+        if (previewEntry.kind == PreviewActionProjectionComposite &&
+            (previewEntry.flags & PreviewFlagProjectionComposite) != 0)
+        {
+            hodgeProjectionPreviewFound = true;
+            break;
+        }
+    }
+    test.Check(hodgeProjectionPreviewFound, "hodge preview marks projected composite candidates");
     test.Check(Chess3D_TryMakeProjectedMove(game, 1, 3, 3, 0, 3, 3, 1, 0, &played) == 1 &&
         Chess3D_GetPiece(game, 3, 3, 1) == PieceCode(1, Pawn) &&
         Chess3D_GetPiece(game, 3, 1, 3) == PieceCode(3, Pawn) &&

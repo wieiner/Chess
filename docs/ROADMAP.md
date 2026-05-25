@@ -119,19 +119,36 @@
 - Completed: scenario smoke descriptors for classic, Asgard, Rubik, and Hodge profiles.
 - Deferred: animated layer turns, stack-entry visualization in the 3D board, rich reserve inventory, and replay import.
 
-### P2L - Replay / Export / Import / Savegame
+### P2L - Playability Closure And Legal Action Preview
+
+- Completed: append-only legal action preview ABI and invalid-action reason ABI.
+- Completed: current turn kind, current side/macro-player, allowed action mask, and turn summary ABI.
+- Completed: UI legal action list, target highlighting from preview entries, invalid-reason text, and mode-specific panel visibility.
+- Completed: playability audit and matrix for all five real Chess3D profiles.
+- Completed: explicit documentation that no sixth Chess3D RuleProfile exists at P2L.
+- Completed: playthrough scenario descriptors for Classic, Single-Side, Asgard, Rubik, and Hodge.
+
+### P2M - Replay / Export / Import / Savegame
 
 - Build replay/export/import over the P2I action record.
 - Decide savegame format for profiles, board, stacks, fusion descriptors, reserve counts, and history.
 - Add notation file export/import once syntax stabilizes beyond v0.1.
 
-### P2M - Rich Visualization And Animation
+### P2N - Rich Visualization And Animation
 
 - Visualize multiple stack entries in one core cell.
 - Display fusion/contested/royal/implosion state directly in the board view.
 - Add animated Rubik layer turns.
 - Add Hodge projection group overlays and child-move paths.
 - Add safe editor workflows for stack inspection without changing fusion descriptors manually.
+
+### P3A - Full 3D King Safety / Check / Mate / Stalemate
+
+- Harden Classic Six-Side king safety, check, mate, and stalemate.
+
+### P3B - AI/Search Integration Per Profile
+
+- Integrate AI/search with normal moves, reserve restore, Rubik layer turns, and Hodge projected composite actions.
 
 ### P3 - Full Six-Side Gameplay And Hybrid Victory
 

@@ -476,6 +476,70 @@ internal sealed class NativeChess3DEngine : IDisposable
         return ReadString((buffer, capacity) => Chess3D_GetLastReserveRestoreInfo(_handle, buffer, capacity));
     }
 
+    public int BuildLegalActionPreviewForCell(int x, int y, int z, int side)
+    {
+        ThrowIfDisposed();
+        return Chess3D_BuildLegalActionPreviewForCell(_handle, x, y, z, side);
+    }
+
+    public Chess3DLegalActionPreviewEntryDto[] GetLegalActionPreview()
+    {
+        ThrowIfDisposed();
+        var count = Chess3D_GetLegalActionPreviewCount(_handle);
+        if (count <= 0)
+        {
+            return Array.Empty<Chess3DLegalActionPreviewEntryDto>();
+        }
+        var entries = new Chess3DLegalActionPreviewEntryDto[count];
+        for (var i = 0; i < count; ++i)
+        {
+            Chess3D_GetLegalActionPreviewEntry(_handle, i, out entries[i]);
+        }
+        return entries;
+    }
+
+    public string GetPreviewEntryReason(int previewIndex)
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetPreviewEntryReason(_handle, previewIndex, buffer, capacity));
+    }
+
+    public string GetLastInvalidActionReason()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetLastInvalidActionReason(_handle, buffer, capacity));
+    }
+
+    public int GetCurrentTurnKind()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetCurrentTurnKind(_handle);
+    }
+
+    public int GetCurrentSide()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetCurrentSide(_handle);
+    }
+
+    public int GetCurrentMacroPlayer()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetCurrentMacroPlayer(_handle);
+    }
+
+    public int GetAllowedActionMask()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetAllowedActionMask(_handle);
+    }
+
+    public string GetTurnSummary()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetTurnSummary(_handle, buffer, capacity));
+    }
+
     public void Dispose()
     {
         if (_handle != IntPtr.Zero)
@@ -714,6 +778,36 @@ internal sealed class NativeChess3DEngine : IDisposable
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_GetLastReserveRestoreInfo(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_BuildLegalActionPreviewForCell(IntPtr handle, int x, int y, int z, int side);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetLegalActionPreviewCount(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetLegalActionPreviewEntry(IntPtr handle, int previewIndex, out Chess3DLegalActionPreviewEntryDto entry);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetPreviewEntryReason(IntPtr handle, int previewIndex, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastInvalidActionReason(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetCurrentTurnKind(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetCurrentSide(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetCurrentMacroPlayer(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetAllowedActionMask(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetTurnSummary(IntPtr handle, StringBuilder buffer, int capacity);
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -762,4 +856,21 @@ internal struct Chess3DRulesInfoDto
     public int MovementProfile;
     public int KingSafetyEnabled;
     public int MaxPiecesPerSide;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct Chess3DLegalActionPreviewEntryDto
+{
+    public int Kind;
+    public int FromX;
+    public int FromY;
+    public int FromZ;
+    public int ToX;
+    public int ToY;
+    public int ToZ;
+    public int Flags;
+    public int PieceCode;
+    public int CapturedPieceCode;
+    public int Side;
+    public int ReasonCode;
 }

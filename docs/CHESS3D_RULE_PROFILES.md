@@ -99,3 +99,14 @@ Profiles keep the game from becoming a pile of hardcoded branches:
 - Rubik layer turns can be disabled, sandbox-only, or legal actions. In P2H, `rubik-convergence-3d-8x8x8-v0.1` rotates the projected board and whole CoreCell stacks, recomputes fusion/anchors, and leaves reserve counts unaffected;
 - Hodge projection can be disabled or enabled as a separate profile-gated composite-turn system;
 - myth/narrative can change without breaking headless engine tests.
+## P2L Playability Status
+
+There are exactly five real Chess3D RuleProfiles at P2L:
+
+- Classic Six-Side
+- Single-Side Training
+- Asgard / Meru Convergence
+- Rubik Convergence
+- Hodge Projection Duel
+
+Scenario smoke and playthrough files are not RuleProfiles. The playability status of each profile is tracked in `docs/CHESS3D_RULE_PROFILE_PLAYABILITY_MATRIX.md`.

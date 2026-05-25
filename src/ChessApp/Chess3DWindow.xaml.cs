@@ -38,12 +38,23 @@ public partial class Chess3DWindow : Window
     private bool _applyingNetworkMessage;
     private readonly List<RuleProfileItem> _ruleProfiles = new();
     private readonly List<ScenarioItem> _scenarios = new();
+    private string _lastUiInvalidReason = string.Empty;
     private const int Pawn = NativeChess3DEngine.Pawn;
     private const int Knight = NativeChess3DEngine.Knight;
     private const int Bishop = NativeChess3DEngine.Bishop;
     private const int Rook = NativeChess3DEngine.Rook;
     private const int Queen = NativeChess3DEngine.Queen;
     private const int King = NativeChess3DEngine.King;
+    private const int PreviewFlagCapture = 1;
+    private const int PreviewFlagKnockback = 2;
+    private const int PreviewFlagEntersCore = 4;
+    private const int PreviewFlagLeavesCore = 8;
+    private const int PreviewFlagCoreToCore = 16;
+    private const int PreviewFlagAnchorCandidate = 32;
+    private const int PreviewFlagFusionCandidate = 64;
+    private const int PreviewFlagLayerTurn = 128;
+    private const int PreviewFlagProjectionComposite = 256;
+    private const int PreviewFlagWouldEndGame = 2048;
 
     public Chess3DWindow()
     {
@@ -333,7 +344,7 @@ public partial class Chess3DWindow : Window
     {
         var board = _engine.GetBoard();
         var state = _engine.GetState();
-        var selectedMoves = SelectedPieceMoves();
+        var selectedPreview = SelectedPreviewEntries();
         for (var row = 0; row < 8; ++row)
         {
             for (var col = 0; col < 8; ++col)
@@ -351,10 +362,10 @@ public partial class Chess3DWindow : Window
                 {
                     button.Background = _last;
                 }
-                var move = selectedMoves.FirstOrDefault(m => m.ToX == square.X && m.ToY == square.Y && m.ToZ == square.Z);
-                if (MoveHintsEnabled() && move.Piece != 0)
+                var preview = selectedPreview.FirstOrDefault(m => m.ToX == square.X && m.ToY == square.Y && m.ToZ == square.Z);
+                if (MoveHintsEnabled() && preview.PieceCode != 0 && preview.Kind is 1 or 2 or 5)
                 {
-                    button.Background = move.Captured != 0 ? _capture : _target;
+                    button.Background = (preview.Flags & PreviewFlagCapture) != 0 ? _capture : _target;
                 }
                 if (_selectedSquare == square)
                 {
@@ -368,7 +379,8 @@ public partial class Chess3DWindow : Window
     {
         var state = _engine.GetState();
         var rules = _engine.GetRulesInfo();
-        var selectedMoves = SelectedPieceMoves();
+        var selectedPreview = SelectedPreviewEntries();
+        var selectedMoveCount = selectedPreview.Count(e => e.Kind is 1 or 2 or 5);
         var anchorCount = _engine.GetAnchorCount(state.SideToMove);
         var requiredAnchors = _engine.GetRequiredAnchorCount(state.SideToMove);
         var winner = _engine.GetWinnerSide();
@@ -391,15 +403,16 @@ public partial class Chess3DWindow : Window
         HeaderStatus.Text = $"Side {state.SideToMove}, pieces {state.PieceCount}, moves {state.LegalMoveCount}";
         RulesText.Text = $"Board {rules.Width}x{rules.Height}x{rules.Depth}, sides {rules.ActiveSideCount}, profile {(rules.MovementProfile == 0 ? "setup-only" : "draft3d")}, max {rules.MaxPiecesPerSide}/side, view {SelectedAxis()} {(IsAllLayersView() ? "all" : "slice")}, grid {SelectedGridMode()}\nRuleset {_engine.GetCurrentRulesetId()}, goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}, layer {_engine.GetLayerTurnProfileType()}, anchors {anchorCount}/{requiredAnchors}{fusionText}{reserveText}{layerTurnText}{projectionText}{actionText}{restoreText}{projectionErrorText}{gameOverText}{stackText}";
         InfoText.Text = _engine.GetLastInfo();
-        PositionText.Text = $"Models: {SelectedModelSetName()}, OBJ {_lastObjModels}, fallback {_lastFallbackModels}, hints {selectedMoves.Length}\n{_engine.GetPositionText()}";
-        RefreshControlCenterStatus(state, selectedMoves.Length, anchorCount, requiredAnchors, knockback, layerTurn, restoreInfo);
+        PositionText.Text = $"Models: {SelectedModelSetName()}, OBJ {_lastObjModels}, fallback {_lastFallbackModels}, hints {selectedMoveCount}\n{_engine.GetPositionText()}";
+        RefreshControlCenterStatus(state, selectedMoveCount, anchorCount, requiredAnchors, knockback, layerTurn, restoreInfo, selectedPreview);
         RefreshActionLog();
     }
 
     private void RefreshControlCenterStatus(Chess3DStateDto state, int selectedMoveCount, int anchorCount, int requiredAnchors,
         (int CapturedPieceCode, int DestinationKind, int X, int Y, int Z) knockback,
         (int Axis, int Layer, int QuarterTurns, int ResultCode) layerTurn,
-        string restoreInfo)
+        string restoreInfo,
+        IReadOnlyList<Chess3DLegalActionPreviewEntryDto> selectedPreview)
     {
         var rulesetId = _engine.GetCurrentRulesetId();
         var displayName = _engine.GetCurrentRulesetDisplayName();
@@ -418,6 +431,11 @@ public partial class Chess3DWindow : Window
             $"Selected: {selectedText}\n" +
             $"Active side: {state.SideToMove}, legal moves from selected: {selectedMoveCount}\n" +
             $"Actions: {_engine.GetActionCount()}, last: {_engine.GetLastActionNotation()}";
+        TurnSummaryText.Text = _engine.GetTurnSummary();
+        InvalidReasonText.Text = string.IsNullOrWhiteSpace(_lastUiInvalidReason)
+            ? _engine.GetLastInvalidActionReason()
+            : _lastUiInvalidReason;
+        LegalActionsList.ItemsSource = BuildLegalActionRows(selectedPreview);
 
         var inCore = _selectedSquare is { } selected && selected.X is >= 2 and <= 5 && selected.Y is >= 2 and <= 5 && selected.Z is >= 2 and <= 5;
         var selectedStack = _selectedSquare is { } stackSquare ? _engine.GetCoreStackCount(stackSquare.X, stackSquare.Y, stackSquare.Z) : 0;
@@ -427,6 +445,7 @@ public partial class Chess3DWindow : Window
             : "off";
         var selectedContested = _selectedSquare is { } contestedSquare && _engine.IsCoreCellContested(contestedSquare.X, contestedSquare.Y, contestedSquare.Z);
         AsgardPanel.IsEnabled = _engine.IsCoreStackEnabled() || _engine.IsFusionEnabled() || _engine.IsReserveEnabled() || _engine.GetGoalProfileType().Contains("centerAssembly", StringComparison.OrdinalIgnoreCase);
+        AsgardPanel.Visibility = AsgardPanel.IsEnabled ? Visibility.Visible : Visibility.Collapsed;
         AsgardPanelText.Text =
             $"Core selected: {(inCore ? "yes" : "no")}, stack: {selectedStack}, projected: {selectedProjected}\n" +
             $"Fusion: {(_engine.IsFusionEnabled() ? "on" : "off")} {selectedFusion}, contested: {(selectedContested ? "yes" : "no")}\n" +
@@ -436,6 +455,7 @@ public partial class Chess3DWindow : Window
             $"Restore: {(string.IsNullOrWhiteSpace(restoreInfo) ? "-" : restoreInfo)}";
 
         RubikPanel.IsEnabled = _engine.IsLayerTurnEnabled();
+        RubikPanel.Visibility = RubikPanel.IsEnabled ? Visibility.Visible : Visibility.Collapsed;
         var uiAxis = SelectedLayerTurnAxis();
         var uiLayer = SelectedLayerTurnLayer();
         var uiQuarter = SelectedLayerTurnQuarterTurns();
@@ -445,6 +465,7 @@ public partial class Chess3DWindow : Window
             $"Last: {AxisName(layerTurn.Axis)}[{layerTurn.Layer}] {layerTurn.QuarterTurns:+0;-0;0} {_engine.GetLayerTurnResultName(layerTurn.ResultCode)}";
 
         HodgePanel.IsEnabled = _engine.IsProjectionModeEnabled();
+        HodgePanel.Visibility = HodgePanel.IsEnabled ? Visibility.Visible : Visibility.Collapsed;
         HodgePanelText.Text =
             $"Enabled: {(_engine.IsProjectionModeEnabled() ? "yes" : "no")}, macro players: {_engine.GetProjectionMacroPlayerCount()}\n" +
             $"Macro 1: {ProjectionSidesText(1)}\nMacro 2: {ProjectionSidesText(2)}\n" +
@@ -484,7 +505,7 @@ public partial class Chess3DWindow : Window
         _lastFallbackModels = 0;
         _hitSquares.Clear();
         var board = _engine.GetBoard();
-        var selectedMoves = SelectedPieceMoves();
+        var selectedPreview = SelectedPreviewEntries();
         foreach (var square in VisibleBoardSquares(board))
         {
             group.Children.Add(CreateTileModel(square));
@@ -514,14 +535,14 @@ public partial class Chess3DWindow : Window
                 group.Children.Add(CreateSelectionMarker(selected));
             }
 
-            foreach (var move in selectedMoves)
+            foreach (var move in selectedPreview.Where(m => m.Kind is 1 or 2 or 5))
             {
                 var target = new Square3D(move.ToX, move.ToY, move.ToZ);
                 if (!SquareVisibleInCurrentView(target))
                 {
                     continue;
                 }
-                var model = CreateMoveMarker(target, move.Captured != 0);
+                var model = CreateMoveMarker(target, (move.Flags & PreviewFlagCapture) != 0);
                 _hitSquares[model] = target;
                 group.Children.Add(model);
             }
@@ -741,9 +762,13 @@ public partial class Chess3DWindow : Window
             {
                 _ = BroadcastMove3DAsync(from.X, from.Y, from.Z, square.X, square.Y, square.Z, NativeChess3DEngine.Queen);
                 _selectedSquare = null;
+                _lastUiInvalidReason = string.Empty;
                 RefreshAll();
                 return;
             }
+            _lastUiInvalidReason = _engine.GetLastInvalidActionReason();
+            RefreshAll();
+            return;
         }
 
         var selectedType = SelectedPieceType();
@@ -752,11 +777,13 @@ public partial class Chess3DWindow : Window
             _engine.SetPiece(square.X, square.Y, square.Z, selectedType == 0 ? 0 : SelectedSide(), selectedType);
             _ = BroadcastBoard3DAsync();
             _selectedSquare = null;
+            _lastUiInvalidReason = string.Empty;
             RefreshAll();
             return;
         }
 
         _selectedSquare = _engine.GetPiece(square.X, square.Y, square.Z) != 0 ? square : null;
+        _lastUiInvalidReason = string.Empty;
         RefreshAll();
     }
 
@@ -1354,6 +1381,61 @@ public partial class Chess3DWindow : Window
             return Array.Empty<Chess3DMoveDto>();
         }
         return _engine.GetPieceMoves(square.X, square.Y, square.Z);
+    }
+
+    private Chess3DLegalActionPreviewEntryDto[] SelectedPreviewEntries()
+    {
+        if (_selectedSquare is not Square3D square || !MoveHintsEnabled())
+        {
+            return Array.Empty<Chess3DLegalActionPreviewEntryDto>();
+        }
+        var state = _engine.GetState();
+        _engine.BuildLegalActionPreviewForCell(square.X, square.Y, square.Z, state.SideToMove);
+        return _engine.GetLegalActionPreview();
+    }
+
+    private List<string> BuildLegalActionRows(IReadOnlyList<Chess3DLegalActionPreviewEntryDto> preview)
+    {
+        if (preview.Count == 0)
+        {
+            return new List<string> { "Select a piece to preview legal actions." };
+        }
+        var rows = new List<string>();
+        for (var i = 0; i < preview.Count; ++i)
+        {
+            var entry = preview[i];
+            rows.Add($"{PreviewKindName(entry.Kind),-10} S{entry.Side} {LabelForPiece(entry.PieceCode)} {FormatCoordinate(entry.FromX, entry.FromY, entry.FromZ)} -> {FormatCoordinate(entry.ToX, entry.ToY, entry.ToZ)} {PreviewFlagText(entry.Flags)} {_engine.GetPreviewEntryReason(i)}");
+        }
+        return rows;
+    }
+
+    private static string PreviewKindName(int kind)
+    {
+        return kind switch
+        {
+            1 => "Move",
+            2 => "Capture",
+            3 => "Restore",
+            4 => "Layer",
+            5 => "Projection",
+            _ => "Action"
+        };
+    }
+
+    private static string PreviewFlagText(int flags)
+    {
+        var parts = new List<string>();
+        if ((flags & PreviewFlagCapture) != 0) parts.Add("capture");
+        if ((flags & PreviewFlagKnockback) != 0) parts.Add("knockback");
+        if ((flags & PreviewFlagEntersCore) != 0) parts.Add("enterCore");
+        if ((flags & PreviewFlagLeavesCore) != 0) parts.Add("leaveCore");
+        if ((flags & PreviewFlagCoreToCore) != 0) parts.Add("coreMove");
+        if ((flags & PreviewFlagAnchorCandidate) != 0) parts.Add("anchor");
+        if ((flags & PreviewFlagFusionCandidate) != 0) parts.Add("fusion");
+        if ((flags & PreviewFlagLayerTurn) != 0) parts.Add("layer");
+        if ((flags & PreviewFlagProjectionComposite) != 0) parts.Add("projection");
+        if ((flags & PreviewFlagWouldEndGame) != 0) parts.Add("win");
+        return parts.Count == 0 ? string.Empty : $"[{string.Join(", ", parts)}]";
     }
 
     private bool MoveHintsEnabled()

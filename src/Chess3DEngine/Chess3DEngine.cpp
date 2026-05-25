@@ -99,6 +99,50 @@ constexpr int ActionFlagChangedAnchors = 128;
 constexpr int ActionFlagGameOverAfterAction = 256;
 constexpr int ActionFlagWasProjection = 512;
 
+enum PreviewActionKind
+{
+    PreviewActionNone = 0,
+    PreviewActionMove = 1,
+    PreviewActionCapture = 2,
+    PreviewActionReserveRestore = 3,
+    PreviewActionLayerTurn = 4,
+    PreviewActionProjectionComposite = 5
+};
+
+constexpr int PreviewFlagCapture = 1;
+constexpr int PreviewFlagKnockback = 2;
+constexpr int PreviewFlagEntersCore = 4;
+constexpr int PreviewFlagLeavesCore = 8;
+constexpr int PreviewFlagCoreToCore = 16;
+constexpr int PreviewFlagAnchorCandidate = 32;
+constexpr int PreviewFlagFusionCandidate = 64;
+constexpr int PreviewFlagLayerTurn = 128;
+constexpr int PreviewFlagProjectionComposite = 256;
+constexpr int PreviewFlagMirror = 512;
+constexpr int PreviewFlagBlocked = 1024;
+constexpr int PreviewFlagWouldEndGame = 2048;
+
+enum AllowedActionMask
+{
+    AllowedActionNormalMove = 1,
+    AllowedActionCapture = 2,
+    AllowedActionReserveRestore = 4,
+    AllowedActionLayerTurn = 8,
+    AllowedActionProjection = 16,
+    AllowedActionCoreStack = 32,
+    AllowedActionFusion = 64,
+    AllowedActionCenterAssembly = 128
+};
+
+enum TurnKind
+{
+    TurnKindClassic = 1,
+    TurnKindSingleSide = 2,
+    TurnKindAsgard = 3,
+    TurnKindRubik = 4,
+    TurnKindHodge = 5
+};
+
 struct Vec3
 {
     int x = 0;
@@ -228,6 +272,12 @@ struct ActionRecord
     std::string info;
 };
 
+struct LegalActionPreviewEntry
+{
+    Chess3DLegalActionPreviewEntryDto dto{};
+    std::string reason;
+};
+
 struct Game
 {
     Rules rules;
@@ -251,8 +301,10 @@ struct Game
     int lastLayerTurnQuarterTurns = 0;
     int lastLayerTurnResultCode = LayerTurnNone;
     std::vector<ActionRecord> actionHistory;
+    std::vector<LegalActionPreviewEntry> selectionPreview;
     std::string lastReserveRestoreInfo;
     std::string lastProjectionError;
+    std::string lastInvalidActionReason;
     bool gameOver = false;
     int winnerSide = 0;
     std::string lastProfileLoadError;
@@ -261,6 +313,10 @@ struct Game
 
 int nextSide(const Rules& rules, int side);
 void recomputeAnchors(Game& game);
+bool isProjectionModeEnabled(const Rules& rules);
+int macroPlayerForSide(const Rules& rules, int side);
+bool isCenterAssemblyGoal(const Rules& rules);
+void generatePieceMoves(const Game& game, const Position& pos, int from, std::vector<Move>& moves);
 
 bool inside(int x, int y, int z)
 {
@@ -1252,8 +1308,10 @@ void clearLastLayerTurnState(Game& game)
 void clearActionHistory(Game& game)
 {
     game.actionHistory.clear();
+    game.selectionPreview.clear();
     game.lastReserveRestoreInfo.clear();
     game.lastProjectionError.clear();
+    game.lastInvalidActionReason.clear();
 }
 
 void clearGamePosition(Game& game)
@@ -1712,11 +1770,257 @@ void appendAction(Game& game, ActionRecord action)
     game.actionHistory.push_back(std::move(action));
 }
 
+int allowedActionMask(const Game& game)
+{
+    int mask = AllowedActionNormalMove | AllowedActionCapture;
+    if (isReserveEnabled(game.rules))
+    {
+        mask |= AllowedActionReserveRestore;
+    }
+    if (isLayerTurnEnabled(game.rules))
+    {
+        mask |= AllowedActionLayerTurn;
+    }
+    if (isProjectionModeEnabled(game.rules))
+    {
+        mask |= AllowedActionProjection;
+    }
+    if (isCoreStackEnabled(game.rules))
+    {
+        mask |= AllowedActionCoreStack;
+    }
+    if (isFusionEnabled(game.rules))
+    {
+        mask |= AllowedActionFusion;
+    }
+    if (isCenterAssemblyGoal(game.rules))
+    {
+        mask |= AllowedActionCenterAssembly;
+    }
+    return mask;
+}
+
+int currentTurnKind(const Game& game)
+{
+    if (isProjectionModeEnabled(game.rules))
+    {
+        return TurnKindHodge;
+    }
+    if (isLayerTurnEnabled(game.rules))
+    {
+        return TurnKindRubik;
+    }
+    if (isCoreStackEnabled(game.rules) || isFusionEnabled(game.rules) || isReserveEnabled(game.rules) || isCenterAssemblyGoal(game.rules))
+    {
+        return TurnKindAsgard;
+    }
+    if (game.rules.activeSideCount == 1 || game.rules.rulesetId.find("single-side") != std::string::npos)
+    {
+        return TurnKindSingleSide;
+    }
+    return TurnKindClassic;
+}
+
+std::string turnKindName(int kind)
+{
+    switch (kind)
+    {
+    case TurnKindClassic: return "classic";
+    case TurnKindSingleSide: return "singleSideTraining";
+    case TurnKindAsgard: return "asgard";
+    case TurnKindRubik: return "rubik";
+    case TurnKindHodge: return "hodgeProjection";
+    default: return "unknown";
+    }
+}
+
+void clearSelectionPreview(Game& game)
+{
+    game.selectionPreview.clear();
+}
+
+bool wouldAnchorTarget(const Game& game, int side, int pieceCode, int to)
+{
+    if (!isCenterAssemblyGoal(game.rules) || side < 1 || side > 6 || pieceCode == Empty)
+    {
+        return false;
+    }
+    return targetSlotType(game.rules, side, xOf(to), yOf(to), zOf(to)) == pieceType(pieceCode);
+}
+
+void addPreviewEntry(Game& game, int kind, const Move& move, int flags, const std::string& reason)
+{
+    LegalActionPreviewEntry entry{};
+    entry.dto.kind = kind;
+    entry.dto.fromX = move.from >= 0 ? xOf(move.from) : -1;
+    entry.dto.fromY = move.from >= 0 ? yOf(move.from) : -1;
+    entry.dto.fromZ = move.from >= 0 ? zOf(move.from) : -1;
+    entry.dto.toX = move.to >= 0 ? xOf(move.to) : -1;
+    entry.dto.toY = move.to >= 0 ? yOf(move.to) : -1;
+    entry.dto.toZ = move.to >= 0 ? zOf(move.to) : -1;
+    entry.dto.flags = flags;
+    entry.dto.pieceCode = move.piece;
+    entry.dto.capturedPieceCode = move.captured;
+    entry.dto.side = pieceSide(move.piece);
+    entry.dto.reasonCode = 0;
+    entry.reason = reason;
+    game.selectionPreview.push_back(std::move(entry));
+}
+
+void addReservePreviewEntries(Game& game, int side)
+{
+    if (!isReserveEnabled(game.rules) || side < 1 || side > 6)
+    {
+        return;
+    }
+    for (int type = Pawn; type <= King; ++type)
+    {
+        if (game.reserveCounts[side][type] <= 0)
+        {
+            continue;
+        }
+        Vec3 slot{};
+        if (!findAutoRestoreSlot(game, side, type, slot))
+        {
+            continue;
+        }
+        Move restore{};
+        restore.from = -1;
+        restore.to = indexOf(slot.x, slot.y, slot.z);
+        restore.piece = makePiece(side, type);
+        addPreviewEntry(game, PreviewActionReserveRestore, restore, 0, "Reserve restore candidate: free matching home slot.");
+    }
+}
+
+int previewFlagsForMove(const Game& game, const Move& move)
+{
+    int flags = 0;
+    const bool fromCore = isCoreStackEnabled(game.rules) && isInsideCore(game.rules, move.from);
+    const bool toCore = isCoreStackEnabled(game.rules) && isInsideCore(game.rules, move.to);
+    if ((move.flags & MoveCapture) != 0 || move.captured != Empty)
+    {
+        flags |= PreviewFlagCapture;
+        if (isKnockbackEnabled(game.rules) && !toCore)
+        {
+            flags |= PreviewFlagKnockback;
+        }
+    }
+    if (!fromCore && toCore)
+    {
+        flags |= PreviewFlagEntersCore;
+    }
+    if (fromCore && !toCore)
+    {
+        flags |= PreviewFlagLeavesCore;
+    }
+    if (fromCore && toCore)
+    {
+        flags |= PreviewFlagCoreToCore;
+    }
+    if (wouldAnchorTarget(game, pieceSide(move.piece), move.piece, move.to))
+    {
+        flags |= PreviewFlagAnchorCandidate;
+        if (game.anchorCounts[pieceSide(move.piece)] + 1 >= game.rules.requiredAnchorCount)
+        {
+            flags |= PreviewFlagWouldEndGame;
+        }
+    }
+    if (toCore && isFusionEnabled(game.rules))
+    {
+        flags |= PreviewFlagFusionCandidate;
+    }
+    return flags;
+}
+
+int buildLegalActionPreview(Game& game, int x, int y, int z, int side)
+{
+    clearSelectionPreview(game);
+    if (!inside(x, y, z))
+    {
+        game.lastInvalidActionReason = "Preview rejected: selected cell is out of bounds.";
+        return 0;
+    }
+
+    const int from = indexOf(x, y, z);
+    const int piece = game.pos.board[static_cast<std::size_t>(from)];
+    const int previewSide = side >= 1 && side <= 6 ? side : pieceSide(piece);
+    if (piece != Empty && game.rules.movementProfile != 0)
+    {
+        Position scoped = game.pos;
+        scoped.sideToMove = pieceSide(piece);
+        std::vector<Move> moves;
+        generatePieceMoves(game, scoped, from, moves);
+        for (const Move& move : moves)
+        {
+            const int flags = previewFlagsForMove(game, move);
+            const int kind = (flags & PreviewFlagCapture) != 0 ? PreviewActionCapture : PreviewActionMove;
+            std::string reason = "Legal move.";
+            if ((flags & PreviewFlagKnockback) != 0)
+            {
+                reason = "Legal knockback capture: captured piece returns home or reserve.";
+            }
+            else if ((flags & PreviewFlagEntersCore) != 0)
+            {
+                reason = "Legal core entry: occupants coexist in a CoreCell stack.";
+            }
+            else if ((flags & PreviewFlagAnchorCandidate) != 0)
+            {
+                reason = "Legal move and matching centerAssembly target slot.";
+            }
+            addPreviewEntry(game, kind, move, flags, reason);
+        }
+
+        if (isProjectionModeEnabled(game.rules) && previewSide == pieceSide(piece) && macroPlayerForSide(game.rules, previewSide) != 0)
+        {
+            for (const Move& move : moves)
+            {
+                Move projection = move;
+                addPreviewEntry(game, PreviewActionProjectionComposite, projection,
+                    previewFlagsForMove(game, move) | PreviewFlagProjectionComposite,
+                    "Hodge preview: primary move can be tested as an all-or-nothing projected composite action.");
+            }
+        }
+    }
+    else if (piece == Empty)
+    {
+        game.lastInvalidActionReason = "Preview has no piece on the selected cell.";
+    }
+
+    addReservePreviewEntries(game, previewSide);
+
+    if (isLayerTurnEnabled(game.rules))
+    {
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const int layer = axis == 2 ? x : (axis == 1 ? y : z);
+            for (int quarterTurns : { -1, 1 })
+            {
+                if (isValidLayerTurnLayer(layer) && isValidLayerTurnQuarterTurns(quarterTurns))
+                {
+                    Move layerMove{};
+                    layerMove.from = from;
+                    layerMove.to = from;
+                    layerMove.piece = piece;
+                    addPreviewEntry(game, PreviewActionLayerTurn, layerMove, PreviewFlagLayerTurn,
+                        "Rubik profile allows this axis slice as a layer-turn action; use the Rubik panel to choose direction.");
+                }
+            }
+        }
+    }
+
+    if (!game.selectionPreview.empty())
+    {
+        game.lastInvalidActionReason.clear();
+    }
+    return static_cast<int>(game.selectionPreview.size());
+}
+
 bool restoreReservePiece(Game& game, int side, int type, int x, int y, int z)
 {
     if (!canRestoreReservePiece(game, side, type, x, y, z))
     {
         game.lastReserveRestoreInfo = "Reserve restore rejected.";
+        game.lastInvalidActionReason = "Reserve restore rejected: reserve disabled, empty, occupied target, non-home target, or core target.";
         return false;
     }
     const int piece = makePiece(side, type);
@@ -3495,6 +3799,103 @@ CHESS3D_API int Chess3D_GetLastReserveRestoreInfo(void* handle, char* buffer, in
     return game != nullptr ? copyString(game->lastReserveRestoreInfo, buffer, capacity) : copyString("", buffer, capacity);
 }
 
+CHESS3D_API int Chess3D_ClearSelectionPreview(void* handle)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    clearSelectionPreview(*game);
+    return 1;
+}
+
+CHESS3D_API int Chess3D_BuildLegalActionPreviewForCell(void* handle, int x, int y, int z, int side)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    return buildLegalActionPreview(*game, x, y, z, side);
+}
+
+CHESS3D_API int Chess3D_GetLegalActionPreviewCount(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? static_cast<int>(game->selectionPreview.size()) : 0;
+}
+
+CHESS3D_API int Chess3D_GetLegalActionPreviewEntry(void* handle, int previewIndex, Chess3DLegalActionPreviewEntryDto* entry)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || entry == nullptr || previewIndex < 0 || previewIndex >= static_cast<int>(game->selectionPreview.size()))
+    {
+        return 0;
+    }
+    *entry = game->selectionPreview[static_cast<std::size_t>(previewIndex)].dto;
+    return 1;
+}
+
+CHESS3D_API int Chess3D_GetPreviewEntryReason(void* handle, int previewIndex, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || previewIndex < 0 || previewIndex >= static_cast<int>(game->selectionPreview.size()))
+    {
+        return copyString("", buffer, capacity);
+    }
+    return copyString(game->selectionPreview[static_cast<std::size_t>(previewIndex)].reason, buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_GetLastInvalidActionReason(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->lastInvalidActionReason, buffer, capacity) : copyString("", buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_GetCurrentTurnKind(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? currentTurnKind(*game) : 0;
+}
+
+CHESS3D_API int Chess3D_GetCurrentSide(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? game->pos.sideToMove : 0;
+}
+
+CHESS3D_API int Chess3D_GetCurrentMacroPlayer(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? macroPlayerForSide(game->rules, game->pos.sideToMove) : 0;
+}
+
+CHESS3D_API int Chess3D_GetAllowedActionMask(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? allowedActionMask(*game) : 0;
+}
+
+CHESS3D_API int Chess3D_GetTurnSummary(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return copyString("", buffer, capacity);
+    }
+    std::ostringstream summary;
+    summary << "turnKind=" << turnKindName(currentTurnKind(*game))
+        << "; side=" << game->pos.sideToMove;
+    const int macro = macroPlayerForSide(game->rules, game->pos.sideToMove);
+    if (macro != 0)
+    {
+        summary << "; macroPlayer=" << macro;
+    }
+    summary << "; allowedMask=" << allowedActionMask(*game);
+    return copyString(summary.str(), buffer, capacity);
+}
+
 CHESS3D_API int Chess3D_GetRulesInfo(void* handle, Chess3DRulesInfoDto* info)
 {
     auto* game = asGame(handle);
@@ -3678,6 +4079,10 @@ CHESS3D_API int Chess3D_TryMakeMove(void* handle, int fromX, int fromY, int from
     auto* game = asGame(handle);
     if (game == nullptr || !inside(fromX, fromY, fromZ) || !inside(toX, toY, toZ))
     {
+        if (game != nullptr)
+        {
+            game->lastInvalidActionReason = "Move rejected: coordinates are out of bounds.";
+        }
         return 0;
     }
     const int from = indexOf(fromX, fromY, fromZ);
@@ -3698,6 +4103,7 @@ CHESS3D_API int Chess3D_TryMakeMove(void* handle, int fromX, int fromY, int from
             recomputeAnchors(*game);
             appendAction(*game, makeMoveAction(*game, move, targetCoreHadOccupants));
             game->lastInfo = "3D move played.";
+            game->lastInvalidActionReason.clear();
             if (playedMove != nullptr)
             {
                 *playedMove = toDto(move);
@@ -3705,6 +4111,7 @@ CHESS3D_API int Chess3D_TryMakeMove(void* handle, int fromX, int fromY, int from
             return 1;
         }
     }
+    game->lastInvalidActionReason = "Move rejected: no legal move matches the selected source and target.";
     return 0;
 }
 
@@ -3713,11 +4120,16 @@ CHESS3D_API int Chess3D_TryMakeProjectedMove(void* handle, int primarySide, int 
     auto* game = asGame(handle);
     if (game == nullptr || !isProjectionModeEnabled(game->rules))
     {
+        if (game != nullptr)
+        {
+            game->lastInvalidActionReason = "Projection move rejected: projection mode is disabled for this profile.";
+        }
         return 0;
     }
     if (!inside(fromX, fromY, fromZ) || !inside(toX, toY, toZ))
     {
         game->lastProjectionError = "Projection move rejected: coordinates out of bounds.";
+        game->lastInvalidActionReason = game->lastProjectionError;
         return 0;
     }
 
@@ -3726,6 +4138,7 @@ CHESS3D_API int Chess3D_TryMakeProjectedMove(void* handle, int primarySide, int 
     if (macroPlayer == 0 || (currentMacro != 0 && currentMacro != macroPlayer))
     {
         game->lastProjectionError = "Projection move rejected: primary side is not the side to move macro-player.";
+        game->lastInvalidActionReason = game->lastProjectionError;
         return 0;
     }
 
@@ -3734,6 +4147,7 @@ CHESS3D_API int Chess3D_TryMakeProjectedMove(void* handle, int primarySide, int 
     if (primaryIt == sides.end())
     {
         game->lastProjectionError = "Projection move rejected: primary side is not in its projection group.";
+        game->lastInvalidActionReason = game->lastProjectionError;
         return 0;
     }
     std::rotate(sides.begin(), primaryIt, sides.end());
@@ -3751,6 +4165,7 @@ CHESS3D_API int Chess3D_TryMakeProjectedMove(void* handle, int primarySide, int 
             !transformMoveBetweenSides(primarySide, sides[i], primaryFrom, primaryTo, childFrom, childTo))
         {
             game->lastProjectionError = "Projection move rejected: mirror transform failed.";
+            game->lastInvalidActionReason = game->lastProjectionError;
             return 0;
         }
         const int from = indexOf(childFrom.x, childFrom.y, childFrom.z);
@@ -3762,6 +4177,7 @@ CHESS3D_API int Chess3D_TryMakeProjectedMove(void* handle, int primarySide, int 
             std::ostringstream error;
             error << "Projection move rejected: S" << sides[i] << " mirror move is not legal.";
             game->lastProjectionError = error.str();
+            game->lastInvalidActionReason = game->lastProjectionError;
             return 0;
         }
     }
@@ -3773,6 +4189,7 @@ CHESS3D_API int Chess3D_TryMakeProjectedMove(void* handle, int primarySide, int 
             if (toIndices[i] == toIndices[j] || fromIndices[i] == toIndices[j] || fromIndices[j] == toIndices[i])
             {
                 game->lastProjectionError = "Projection move rejected: child moves collide.";
+                game->lastInvalidActionReason = game->lastProjectionError;
                 return 0;
             }
         }
@@ -3815,6 +4232,7 @@ CHESS3D_API int Chess3D_TryMakeProjectedMove(void* handle, int primarySide, int 
     action.customNotation = projectionActionNotation(macroPlayer, primarySide, moves, 3);
     appendAction(*game, action);
     game->lastProjectionError.clear();
+    game->lastInvalidActionReason.clear();
     game->lastInfo = "3D Hodge projection composite move played.";
     if (playedMove != nullptr)
     {
@@ -3885,12 +4303,14 @@ CHESS3D_API int Chess3D_RotateLayer(void* handle, int axis, int layer, int quart
     {
         game->lastLayerTurnResultCode = LayerTurnInvalidAxis;
         game->lastInfo = "3D Rubik layer turn rejected: invalid axis.";
+        game->lastInvalidActionReason = game->lastInfo;
         return 0;
     }
     if (!isValidLayerTurnLayer(layer))
     {
         game->lastLayerTurnResultCode = LayerTurnInvalidLayer;
         game->lastInfo = "3D Rubik layer turn rejected: invalid layer.";
+        game->lastInvalidActionReason = game->lastInfo;
         return 0;
     }
 
@@ -3900,12 +4320,14 @@ CHESS3D_API int Chess3D_RotateLayer(void* handle, int axis, int layer, int quart
     {
         game->lastLayerTurnResultCode = LayerTurnDisabled;
         game->lastInfo = "3D Rubik layer turn rejected: layer turns disabled for this profile.";
+        game->lastInvalidActionReason = game->lastInfo;
         return 0;
     }
     if (ritualEnabled && !isValidLayerTurnQuarterTurns(quarterTurns))
     {
         game->lastLayerTurnResultCode = LayerTurnInvalidQuarterTurns;
         game->lastInfo = "3D Rubik layer turn rejected: quarterTurns must be -1 or +1.";
+        game->lastInvalidActionReason = game->lastInfo;
         return 0;
     }
 
@@ -3920,6 +4342,7 @@ CHESS3D_API int Chess3D_RotateLayer(void* handle, int axis, int layer, int quart
     {
         game->lastLayerTurnResultCode = LayerTurnStackMoveFailed;
         game->lastInfo = "3D Rubik layer turn rejected: core stack relocation failed.";
+        game->lastInvalidActionReason = game->lastInfo;
         return 0;
     }
 
@@ -3930,6 +4353,7 @@ CHESS3D_API int Chess3D_RotateLayer(void* handle, int axis, int layer, int quart
         {
             game->lastLayerTurnResultCode = LayerTurnStackMoveFailed;
             game->lastInfo = "3D Rubik layer turn rejected: core stack relocation failed.";
+            game->lastInvalidActionReason = game->lastInfo;
             return 0;
         }
     }
@@ -3960,6 +4384,7 @@ CHESS3D_API int Chess3D_RotateLayer(void* handle, int axis, int layer, int quart
     const char axisName = layerTurnAxisName(axis);
     info << "3D Rubik rotate " << axisName << (layer + 1) << " x" << turns;
     game->lastInfo = info.str();
+    game->lastInvalidActionReason.clear();
     return 1;
 }
 

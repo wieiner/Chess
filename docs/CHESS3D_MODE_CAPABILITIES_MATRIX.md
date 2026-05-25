@@ -10,3 +10,4 @@
 
 This separation is deliberate. Asgard, Rubik, and Hodge are not variants hidden inside one hardcoded rules branch; each is selected through a RuleProfile.
 
+P2L adds a stricter playability matrix in `docs/CHESS3D_RULE_PROFILE_PLAYABILITY_MATRIX.md` and contract-tests that exactly five real Chess3D profiles exist. Scenario JSON files are smoke/playthrough descriptors, not additional modes.

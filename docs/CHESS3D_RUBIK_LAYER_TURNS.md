@@ -56,3 +56,6 @@ Deferred:
 - GPU stack snapshots.
 
 See also `docs/CHESS3D_RUBIK_LAYER_TURN_SEMANTICS.md` and `docs/CHESS3D_RUBIK_STACK_ROTATION.md`.
+## P2L Playability Note
+
+Rubik layer turns are visible and playable only when `layerTurnProfile.type = ritualTurn`, currently the Rubik Convergence profile. P2L preview and turn-summary ABI expose whether layer turns are allowed before the user attempts the action.

@@ -75,6 +75,22 @@ struct Chess3DCoreFusionStateDto
     int dominantPieceType;
     int flags;
 };
+
+struct Chess3DLegalActionPreviewEntryDto
+{
+    int kind;
+    int fromX;
+    int fromY;
+    int fromZ;
+    int toX;
+    int toY;
+    int toZ;
+    int flags;
+    int pieceCode;
+    int capturedPieceCode;
+    int side;
+    int reasonCode;
+};
 #pragma pack(pop)
 
 CHESS3D_API void* Chess3D_Create();
@@ -160,6 +176,17 @@ CHESS3D_API int Chess3D_CanRestoreReservePiece(void* handle, int side, int piece
 CHESS3D_API int Chess3D_RestoreReservePiece(void* handle, int side, int pieceType, int x, int y, int z);
 CHESS3D_API int Chess3D_AutoRestoreReservePiece(void* handle, int side, int pieceType);
 CHESS3D_API int Chess3D_GetLastReserveRestoreInfo(void* handle, char* buffer, int capacity);
+CHESS3D_API int Chess3D_ClearSelectionPreview(void* handle);
+CHESS3D_API int Chess3D_BuildLegalActionPreviewForCell(void* handle, int x, int y, int z, int side);
+CHESS3D_API int Chess3D_GetLegalActionPreviewCount(void* handle);
+CHESS3D_API int Chess3D_GetLegalActionPreviewEntry(void* handle, int previewIndex, Chess3DLegalActionPreviewEntryDto* entry);
+CHESS3D_API int Chess3D_GetPreviewEntryReason(void* handle, int previewIndex, char* buffer, int capacity);
+CHESS3D_API int Chess3D_GetLastInvalidActionReason(void* handle, char* buffer, int capacity);
+CHESS3D_API int Chess3D_GetCurrentTurnKind(void* handle);
+CHESS3D_API int Chess3D_GetCurrentSide(void* handle);
+CHESS3D_API int Chess3D_GetCurrentMacroPlayer(void* handle);
+CHESS3D_API int Chess3D_GetAllowedActionMask(void* handle);
+CHESS3D_API int Chess3D_GetTurnSummary(void* handle, char* buffer, int capacity);
 CHESS3D_API int Chess3D_GetRulesInfo(void* handle, Chess3DRulesInfoDto* info);
 CHESS3D_API int Chess3D_GetState(void* handle, Chess3DStateDto* state);
 CHESS3D_API int Chess3D_GetBoard(void* handle, int* pieces512);

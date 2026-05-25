@@ -1,0 +1,31 @@
+{
+  "scenarioId": "rubik-layer-playthrough-v0.1",
+  "displayName": "Rubik Layer Playthrough v0.1",
+  "profileFile": "rubik_convergence_3d_v0_1.json",
+  "rulesetId": "rubik-convergence-3d-8x8x8-v0.1",
+  "purpose": "Headless smoke playthrough for legal ritual layer turn, projected board relocation, stack relocation, and action notation.",
+  "initialExpectedCapabilities": {
+    "normalMoves": true,
+    "knockbackCapture": true,
+    "coreStack": true,
+    "fusion": true,
+    "reserve": true,
+    "layerTurn": true,
+    "projection": false
+  },
+  "sequenceOfActions": [
+    "PUSH_CORE S1 P (2,2,2)",
+    "PUSH_CORE S1 R (2,2,2)",
+    "LAYER Z[2]+"
+  ],
+  "expectedActionHistoryCount": 1,
+  "expectedNotationFragments": ["LAYER", "Z[2]+"],
+  "expectedFinalState": {
+    "reserveUnchanged": true,
+    "fusionRecomputed": true,
+    "anchorsRecomputed": true
+  },
+  "knownLimitations": [
+    "Layer-turn animation, notation replay, AI/search, and online serialization are deferred."
+  ]
+}

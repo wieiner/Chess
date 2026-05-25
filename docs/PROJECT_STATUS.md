@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P2J Chess3D Hodge Projection Duel / Triune Mirror runtime.
+Last audited locally for P2L Chess3D playability closure and legal action preview.
 
 ## Exists
 
@@ -66,6 +66,12 @@ Last audited locally for P2J Chess3D Hodge Projection Duel / Triune Mirror runti
 - `docs/CHESS3D_HODGE_PROJECTION_RUNTIME.md`: runtime behavior for projected composite moves.
 - `docs/CHESS3D_HODGE_PROJECTION_ABI.md`: append-only Hodge projection ABI.
 - `docs/CHESS3D_HODGE_PROJECTION_NOTATION.md`: notation v0.1 for `HPD` composite turns.
+- `docs/CHESS3D_P2L_PLAYABILITY_AUDIT.md`: audit of profile count, UI visibility, and playability gaps.
+- `docs/CHESS3D_RULE_PROFILE_PLAYABILITY_MATRIX.md`: status matrix for the five real Chess3D profiles.
+- `docs/CHESS3D_LEGAL_ACTION_PREVIEW.md`: append-only preview ABI.
+- `docs/CHESS3D_TURN_CONTROLLER.md`: mode-aware turn/capability ABI.
+- `docs/CHESS3D_UI_PLAYABILITY_GUIDE.md`: player-facing control-center guide.
+- `docs/CHESS3D_SCENARIO_PLAYTHROUGHS.md`: P2L playthrough descriptors.
 
 ## Build-Verified
 
@@ -86,6 +92,7 @@ Last audited locally for P2J Chess3D Hodge Projection Duel / Triune Mirror runti
 - Chess3D contract tests now cover P2H Rubik layer turns: profile gating, projected board rotation for X/Y/Z conventions, CoreCell stack relocation, fusion recompute, anchor/victory recompute, reserve invariance, four-turn identity, and last-result telemetry.
 - Chess3D contract tests now cover P2I action history, deterministic notation, move/capture/layer-turn records, reserve restore, auto-restore, failure no-mutation behavior, and string ABI safety.
 - Chess3D contract tests now cover P2J Hodge Projection Duel: JSON/profile validation, profile isolation, macro-player group coverage, face-frame transforms, projected composite moves, all-or-nothing rejection, and classic capture recording.
+- Chess3D contract tests now cover P2L playability closure: exactly five real RuleProfiles, non-mutating legal action preview, invalid-action reasons, capability masks, turn summaries, mode isolation, and scenario playthrough JSON parsing.
 - `scripts/verify.ps1` checks that representative RuleProfile JSON files are copied into Chess3D development output and `ProductionOutput`.
 
 ## User Executables
@@ -143,14 +150,17 @@ Portable outputs:
 - Hodge Projection Duel runtime can transform one primary face move to two mirror projections and apply all three moves as one all-or-nothing composite action.
 - Hodge projected composite moves append `HPD` notation and expose projection profile/status through append-only ABI and C# status text.
 - `Chess3DApp.exe` now has a playable control center: RuleProfile selector, capability summary, mode-aware Asgard/Rubik/Hodge panels, and visible action log controls.
+- `Chess3DApp.exe` now lists legal actions for the selected cell, highlights preview targets, exposes invalid-action reasons, and collapses special panels when the active profile does not enable them.
+- There are exactly five real Chess3D RuleProfiles at P2L; scenario smoke/playthrough files are descriptors, not additional modes.
 - Chess3D action logs can be copied or saved as `.ch3dlog` text with a `rulesetId` header.
 - Chess3D scenario smoke descriptors exist for classic, Asgard, Rubik, and Hodge profiles and are copied to development output and `ProductionOutput`.
+- Chess3D scenario playthrough descriptors exist for all five RuleProfiles and are copied to development output and `ProductionOutput`.
 - GitHub Actions uploads the generated `ProductionOutput` folder as `Chess-ProductionOutput-windows-x64` after successful verification.
 
 ## Draft
 
 - Six-sided 3D chess laws are still draft and JSON-driven.
-- 3D king safety, check, mate, and stalemate remain draft after P2A.
+- 3D king safety, check, mate, and stalemate remain draft after P2L and are tracked for P3A.
 - Final Asgard/Meru fusion physics are not implemented yet; P2F provides descriptor/progress state but not destructive transformation, visual effects, or full victory variants.
 - Runtime board projection remains one integer piece per cell for compatibility, while stack data exists as a Forbidden Core overlay.
 - Full reserve inventory UI, drag/drop restore, restore into core, and restore captures are not implemented yet.
@@ -169,4 +179,4 @@ Portable outputs:
 - Full UI automation tests are not present yet.
 - GPU parity/performance needs more benchmark baselines on real target hardware.
 - The project currently relies on local Visual Studio/MSBuild and vcpkg environment availability.
-- Recommended next stage is P2L/P2M: replay/export/import over P2I/P2J/P2K action history, then richer visualization/animation for stack/fusion/reserve/layer-turn/projection state.
+- Recommended next stage is P2M/P2N: replay/export/import over P2I/P2J/P2K/P2L action history and playthrough descriptors, then richer visualization/animation for stack/fusion/reserve/layer-turn/projection state.

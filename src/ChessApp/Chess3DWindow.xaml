@@ -244,7 +244,11 @@
                     <Expander Header="Common" IsExpanded="True" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
                         <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CommandBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
                             <StackPanel>
+                                <TextBlock x:Name="TurnSummaryText" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,0,0,6" />
                                 <TextBlock x:Name="CommonPanelText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
+                                <TextBlock Text="Legal actions" Foreground="{StaticResource MutedTextBrush}" Margin="0,10,0,4" />
+                                <ListBox x:Name="LegalActionsList" Height="126" Background="#1D2228" Foreground="{StaticResource TextBrush}" BorderBrush="#46505C" />
+                                <TextBlock x:Name="InvalidReasonText" Foreground="#F6D365" TextWrapping="Wrap" Margin="0,8,0,0" />
                             </StackPanel>
                         </Border>
                     </Expander>

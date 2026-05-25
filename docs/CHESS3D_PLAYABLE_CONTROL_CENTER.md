@@ -30,3 +30,8 @@ Disabled panels stay visible as capability indicators, but their actions clean-f
 
 P2K adds JSON descriptors under `Assets/Rules3D/Scenarios`. They are not replay files; they are compact manual/testing descriptors that say which profile and capabilities to smoke-check.
 
+## P2L Playability Closure
+
+P2L adds legal action preview to the same control center. Selecting a cell now produces a non-mutating preview list with action kind, target coordinate, flags, and reason text. The UI uses that preview for target highlighting and invalid-action explanations.
+
+Special panels are mode-aware: Classic and Single-Side keep Asgard/Rubik/Hodge panels collapsed, while Asgard, Rubik, and Hodge expose only the panels their active RuleProfile enables.

@@ -61,3 +61,6 @@ Example notation:
 - last projection error and last action notation.
 
 This is still not a full Hodge editor, replay system, or AI/search integration.
+## P2L Playability Note
+
+Hodge Projection Duel remains separate from Asgard. P2L exposes Hodge capability through the turn summary, projection panel, legal action preview, and invalid-action reasons. Hodge defaults to exclusive occupancy, classic capture, no core stacks, no fusion, no reserve, and no Rubik layer turns.

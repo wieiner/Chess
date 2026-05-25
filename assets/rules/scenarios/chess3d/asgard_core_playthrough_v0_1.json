@@ -1,0 +1,33 @@
+{
+  "scenarioId": "asgard-core-playthrough-v0.1",
+  "displayName": "Asgard Core Playthrough v0.1",
+  "profileFile": "asgard_convergence_3d_v0_1.json",
+  "rulesetId": "asgard-convergence-3d-8x8x8-v0.1",
+  "purpose": "Headless smoke playthrough for core entry, stack-aware anchor/fusion visibility, and knockback reserve capability.",
+  "initialExpectedCapabilities": {
+    "normalMoves": true,
+    "knockbackCapture": true,
+    "coreStack": true,
+    "fusion": true,
+    "reserve": true,
+    "layerTurn": false,
+    "projection": false
+  },
+  "sequenceOfActions": [
+    "SET S1 R (2,2,1)",
+    "PUSH_CORE S1 P (2,2,2)",
+    "MOVE S1 R (2,2,1)->(2,2,2)",
+    "RECOMPUTE_FUSION"
+  ],
+  "expectedActionHistoryCount": 1,
+  "expectedNotationFragments": ["MOVE", "enteredCore"],
+  "expectedFinalState": {
+    "coreStackAt": { "x": 2, "y": 2, "z": 2, "minCount": 2 },
+    "fusionKind": "friendlyPair",
+    "reserveUnchanged": true,
+    "gameOver": false
+  },
+  "knownLimitations": [
+    "Contested anchors and destructive implosion remain deferred."
+  ]
+}

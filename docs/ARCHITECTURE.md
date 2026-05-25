@@ -59,6 +59,8 @@ P2I adds a unified action-history layer over successful moves, Rubik layer turns
 
 P2J adds a separate Hodge Projection Duel profile. This is a two-macro-player mode where each macro-player has three cube-face projections. A successful projected action validates one primary move plus two mirror moves through documented face-coordinate transforms, then records one `HPD` composite action. The profile defaults to exclusive occupancy, classic capture, no core physics, no fusion, no reserve/knockback, and no Rubik layer turns.
 
+P2L adds a non-mutating legal action preview layer and a lightweight turn/capability controller. The preview ABI derives selectable move/capture/core/reserve/layer/projection entries from existing runtime state, but it does not replace old `GetPieceMoves`, `TryMakeMove`, layer-turn, reserve-restore, or Hodge projected-move APIs. The WPF app uses this as a control-center contract for highlighting and invalid-action explanations.
+
 P2K adds the playable Chess3D control center in the WPF app. It does not move rule logic into UI; it exposes the existing native profile/action ABI through a profile selector, mode-aware status/action panels, action-log controls, and scenario smoke-pack listing.
 
 This is still not final Asgard fusion physics. Destructive implosion, color/permutation state, online serialization, AI/search generation for layer turns, UI animation, full replay/import/export, and GPU stack snapshots remain later stages.
