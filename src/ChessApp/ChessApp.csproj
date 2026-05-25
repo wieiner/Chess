@@ -30,7 +30,7 @@
     <Content Include="Assets\Figures\TransparentPng\*.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Assets\Models\**\*.*">
+    <Content Include="..\..\assets\models\chess\pieces\**\*.*" Link="Assets\Models\%(RecursiveDir)%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

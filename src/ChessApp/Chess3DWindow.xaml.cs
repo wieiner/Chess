@@ -403,7 +403,9 @@ public partial class Chess3DWindow : Window
         HeaderStatus.Text = $"Side {state.SideToMove}, pieces {state.PieceCount}, moves {state.LegalMoveCount}";
         RulesText.Text = $"Board {rules.Width}x{rules.Height}x{rules.Depth}, sides {rules.ActiveSideCount}, profile {(rules.MovementProfile == 0 ? "setup-only" : "draft3d")}, max {rules.MaxPiecesPerSide}/side, view {SelectedAxis()} {(IsAllLayersView() ? "all" : "slice")}, grid {SelectedGridMode()}\nRuleset {_engine.GetCurrentRulesetId()}, goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}, layer {_engine.GetLayerTurnProfileType()}, anchors {anchorCount}/{requiredAnchors}{fusionText}{reserveText}{layerTurnText}{projectionText}{actionText}{restoreText}{projectionErrorText}{gameOverText}{stackText}";
         InfoText.Text = _engine.GetLastInfo();
+        var visualDiagnostics = $"Piece set: {SelectedModelSetName()}\nOBJ loaded: {_lastObjModels}, fallback primitives: {_lastFallbackModels}\nMaterial: {_models.LastDiagnostics}\nLast invalid/click reason: {(string.IsNullOrWhiteSpace(_lastUiInvalidReason) ? _engine.GetLastInvalidActionReason() : _lastUiInvalidReason)}";
         PositionText.Text = $"Models: {SelectedModelSetName()}, OBJ {_lastObjModels}, fallback {_lastFallbackModels}, hints {selectedMoveCount}\n{_engine.GetPositionText()}";
+        VisualDiagnosticsText.Text = visualDiagnostics;
         RefreshControlCenterStatus(state, selectedMoveCount, anchorCount, requiredAnchors, knockback, layerTurn, restoreInfo, selectedPreview);
         RefreshActionLog();
     }
@@ -499,8 +501,9 @@ public partial class Chess3DWindow : Window
     private void RefreshPreview3D()
     {
         var group = new Model3DGroup();
-        group.Children.Add(new AmbientLight(Color.FromRgb(92, 96, 104)));
-        group.Children.Add(new DirectionalLight(Colors.White, new Vector3D(-3, -5, -4)));
+        group.Children.Add(new AmbientLight(Color.FromRgb(132, 136, 144)));
+        group.Children.Add(new DirectionalLight(Color.FromRgb(246, 244, 236), new Vector3D(-3, -5, -4)));
+        group.Children.Add(new DirectionalLight(Color.FromRgb(150, 174, 214), new Vector3D(3, -1, 3)));
         _lastObjModels = 0;
         _lastFallbackModels = 0;
         _hitSquares.Clear();
@@ -598,7 +601,7 @@ public partial class Chess3DWindow : Window
         var color = (square.X + square.Y + square.Z) % 2 == 0
             ? Color.FromArgb(alpha, 210, 214, 198)
             : Color.FromArgb(alpha, 82, 96, 110);
-        var material = new DiffuseMaterial(new SolidColorBrush(color));
+        var material = ObjModelLibrary.CreateSurfaceMaterial(color);
 
         if (axis == SliceAxis.Z)
         {
@@ -609,6 +612,7 @@ public partial class Chess3DWindow : Window
                 _lastObjModels++;
                 return new GeometryModel3D(mesh, material)
                 {
+                    BackMaterial = material,
                     Transform = new TranslateTransform3D(square.X - 3.5, square.Z - 3.5, square.Y - 3.5)
                 };
             }
@@ -623,6 +627,7 @@ public partial class Chess3DWindow : Window
         };
         return new GeometryModel3D(plate, material)
         {
+            BackMaterial = material,
             Transform = new TranslateTransform3D(square.X - 3.5, square.Z - 3.5, square.Y - 3.5)
         };
     }
@@ -631,15 +636,15 @@ public partial class Chess3DWindow : Window
     {
         var side = piece / 10;
         var type = piece % 10;
-        var mesh = _models.LoadMesh(Path.Combine("Pieces", ObjModelLibrary.ModelFileNameForClassicPiece(type, side % 2 == 1)));
-        var color = ColorForSide(side);
-        color.A = PieceOpacity(square);
-        var material = new DiffuseMaterial(new SolidColorBrush(color));
+        var relativePath = Path.Combine("Pieces", ObjModelLibrary.ModelFileNameForClassicPiece(type, side % 2 == 1));
+        var mesh = _models.LoadMesh(relativePath);
+        var material = _models.CreatePieceMaterial(relativePath, side, type, PieceOpacity(square));
         if (mesh != null)
         {
             _lastObjModels++;
             return new GeometryModel3D(mesh, material)
             {
+                BackMaterial = material,
                 Transform = new TranslateTransform3D(square.X - 3.5, square.Z - 3.43, square.Y - 3.5)
             };
         }
@@ -647,6 +652,7 @@ public partial class Chess3DWindow : Window
         _lastFallbackModels++;
         return new GeometryModel3D(CubeMesh(0.42, 0.42, 0.42), material)
         {
+            BackMaterial = material,
             Transform = new TranslateTransform3D(square.X - 3.5, square.Z - 3.25, square.Y - 3.5)
         };
     }
@@ -758,15 +764,12 @@ public partial class Chess3DWindow : Window
 
         if (_selectedSquare is Square3D from && from != square)
         {
-            if (_engine.TryMakeMove(from.X, from.Y, from.Z, square.X, square.Y, square.Z, NativeChess3DEngine.Queen, out _))
+            if (TryApplySelectedAction(from, square, broadcastNormalMove: true))
             {
-                _ = BroadcastMove3DAsync(from.X, from.Y, from.Z, square.X, square.Y, square.Z, NativeChess3DEngine.Queen);
                 _selectedSquare = null;
-                _lastUiInvalidReason = string.Empty;
                 RefreshAll();
                 return;
             }
-            _lastUiInvalidReason = _engine.GetLastInvalidActionReason();
             RefreshAll();
             return;
         }
@@ -782,8 +785,7 @@ public partial class Chess3DWindow : Window
             return;
         }
 
-        _selectedSquare = _engine.GetPiece(square.X, square.Y, square.Z) != 0 ? square : null;
-        _lastUiInvalidReason = string.Empty;
+        SelectSquareOrExplain(square);
         RefreshAll();
     }
 
@@ -1168,6 +1170,11 @@ public partial class Chess3DWindow : Window
         {
             HandlePickedSquare(square);
         }
+        else if (isClick)
+        {
+            _lastUiInvalidReason = "No board cell was hit. Try clicking the tile top or the visible piece body.";
+            RefreshStatus();
+        }
     }
 
     private void Preview3D_MouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
@@ -1478,17 +1485,113 @@ public partial class Chess3DWindow : Window
     {
         if (_selectedSquare is Square3D from && from != square)
         {
-            if (_engine.TryMakeMove(from.X, from.Y, from.Z, square.X, square.Y, square.Z, NativeChess3DEngine.Queen, out _))
+            if (TryApplySelectedAction(from, square, broadcastNormalMove: true))
             {
-                _ = BroadcastMove3DAsync(from.X, from.Y, from.Z, square.X, square.Y, square.Z, NativeChess3DEngine.Queen);
                 _selectedSquare = null;
                 RefreshAll();
                 return;
             }
+            RefreshAll();
+            return;
         }
 
-        _selectedSquare = _engine.GetPiece(square.X, square.Y, square.Z) != 0 ? square : null;
+        SelectSquareOrExplain(square);
         RefreshAll();
+    }
+
+    private bool TryApplySelectedAction(Square3D from, Square3D to, bool broadcastNormalMove)
+    {
+        var state = _engine.GetState();
+        _engine.BuildLegalActionPreviewForCell(from.X, from.Y, from.Z, state.SideToMove);
+        var preview = _engine.GetLegalActionPreview();
+        var matching = preview.FirstOrDefault(entry =>
+            entry.FromX == from.X && entry.FromY == from.Y && entry.FromZ == from.Z &&
+            entry.ToX == to.X && entry.ToY == to.Y && entry.ToZ == to.Z &&
+            entry.Kind is 1 or 2 or 5);
+
+        if (matching.PieceCode == 0)
+        {
+            _lastUiInvalidReason = BuildRejectedTargetReason(from, to, preview);
+            return false;
+        }
+
+        if (matching.Kind == 5)
+        {
+            if (_engine.TryMakeProjectedMove(matching.Side, from.X, from.Y, from.Z, to.X, to.Y, to.Z, NativeChess3DEngine.Queen, out _))
+            {
+                _lastUiInvalidReason = string.Empty;
+                return true;
+            }
+            _lastUiInvalidReason = $"Projected move rejected: {_engine.GetLastProjectionError()}";
+            return false;
+        }
+
+        if (_engine.TryMakeMove(from.X, from.Y, from.Z, to.X, to.Y, to.Z, NativeChess3DEngine.Queen, out _))
+        {
+            if (broadcastNormalMove)
+            {
+                _ = BroadcastMove3DAsync(from.X, from.Y, from.Z, to.X, to.Y, to.Z, NativeChess3DEngine.Queen);
+            }
+            _lastUiInvalidReason = string.Empty;
+            return true;
+        }
+
+        _lastUiInvalidReason = _engine.GetLastInvalidActionReason();
+        if (string.IsNullOrWhiteSpace(_lastUiInvalidReason))
+        {
+            _lastUiInvalidReason = "Preview matched the target, but the engine rejected the action. Refresh the profile or selection and try again.";
+        }
+        return false;
+    }
+
+    private string BuildRejectedTargetReason(Square3D from, Square3D to, IReadOnlyList<Chess3DLegalActionPreviewEntryDto> preview)
+    {
+        var piece = _engine.GetPiece(from.X, from.Y, from.Z);
+        if (piece == 0)
+        {
+            return $"Selected source {FormatCoordinate(from.X, from.Y, from.Z)} is now empty.";
+        }
+
+        var side = piece / 10;
+        var currentSide = _engine.GetCurrentSide();
+        if (!_engine.IsProjectionModeEnabled() && side != currentSide)
+        {
+            return $"Selected piece belongs to side {side}, but current side is {currentSide}.";
+        }
+
+        var availableTargets = preview
+            .Where(entry => entry.Kind is 1 or 2 or 5)
+            .Select(entry => FormatCoordinate(entry.ToX, entry.ToY, entry.ToZ))
+            .Distinct()
+            .Take(8)
+            .ToArray();
+        var suffix = availableTargets.Length == 0
+            ? "No legal target is available for this selection."
+            : $"Legal targets include: {string.Join(", ", availableTargets)}.";
+        return $"Target {FormatCoordinate(to.X, to.Y, to.Z)} is not a legal preview action for the selected piece. {suffix}";
+    }
+
+    private void SelectSquareOrExplain(Square3D square)
+    {
+        var piece = _engine.GetPiece(square.X, square.Y, square.Z);
+        if (piece == 0)
+        {
+            _selectedSquare = null;
+            _lastUiInvalidReason = $"Cell {FormatCoordinate(square.X, square.Y, square.Z)} is empty.";
+            return;
+        }
+
+        _selectedSquare = square;
+        var side = piece / 10;
+        var currentSide = _engine.GetCurrentSide();
+        if (!_engine.IsProjectionModeEnabled() && side != currentSide)
+        {
+            _lastUiInvalidReason = $"Selected side {side}; current turn is side {currentSide}. Movement will be rejected until the turn changes.";
+        }
+        else
+        {
+            _lastUiInvalidReason = string.Empty;
+        }
     }
 
     private void Network_MessageReceived(Chess3DNetworkMessage message)

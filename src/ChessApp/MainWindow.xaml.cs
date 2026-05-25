@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     private double _orbitPitch = 58;
     private double _orbitDistance = 10.5;
     private string? _selectedModelSetPath;
+    private readonly ObjModelLibrary _models = new();
     private readonly Dictionary<string, MeshGeometry3D?> _meshCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<Model3D, Square> _hitSquares3D = new();
     private int _lastLoaded3DModels;
@@ -254,7 +255,7 @@ public partial class MainWindow : Window
         var tablebase = _engine.GetTablebaseInfo();
         var tbLine = $"TB: built-in {(tablebase.BuiltInEndgameTables != 0 ? "on" : "off")}, Syzygy WDL {tablebase.SyzygyWdlFiles}, DTZ {tablebase.SyzygyDtzFiles}, max {tablebase.MaxPieces}";
         var modelsLine = Mode3DBox.IsChecked == true
-            ? $"3D: set {ModelSetBox.Text}, loaded {_lastLoaded3DModels}, fallback {_lastMissing3DModels}"
+            ? $"3D: set {ModelSetBox.Text}, loaded {_lastLoaded3DModels}, fallback {_lastMissing3DModels}, {_models.LastDiagnostics}"
             : "3D: off";
         SearchText.Text = $"{_engine.GetLastSearchInfo()}\n{searchLine}\n{gpuLine}\n{tbLine}\n{modelsLine}";
         FenBox.Text = IsSetupMode() ? BuildSetupFen() : _engine.GetFen();
@@ -868,17 +869,9 @@ public partial class MainWindow : Window
         }
 
         ModelSetBox.Items.Clear();
-        var roots = GetModelRoots().Distinct(StringComparer.OrdinalIgnoreCase).Where(Directory.Exists).ToArray();
-        if (roots.Length == 0)
-        {
-            Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "Assets", "Models"));
-            roots = new[] { Path.Combine(AppContext.BaseDirectory, "Assets", "Models") };
-        }
-
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var dir in roots.SelectMany(Directory.GetDirectories).OrderBy(Path.GetFileName))
+        foreach (var (name, path) in ObjModelLibrary.DiscoverSets())
         {
-            var name = Path.GetFileName(dir);
             if (!seen.Add(name))
             {
                 continue;
@@ -886,7 +879,7 @@ public partial class MainWindow : Window
             ModelSetBox.Items.Add(new ComboBoxItem
             {
                 Content = name,
-                Tag = dir
+                Tag = path
             });
         }
 
@@ -896,6 +889,7 @@ public partial class MainWindow : Window
         }
         ModelSetBox.SelectedIndex = 0;
         _selectedModelSetPath = (ModelSetBox.SelectedItem as ComboBoxItem)?.Tag as string;
+        _models.SelectedSetPath = _selectedModelSetPath;
     }
 
     private static IEnumerable<string> GetModelRoots()
@@ -907,7 +901,8 @@ public partial class MainWindow : Window
     private void ModelSetBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _selectedModelSetPath = (ModelSetBox.SelectedItem as ComboBoxItem)?.Tag as string;
-        _meshCache.Clear();
+        _models.SelectedSetPath = _selectedModelSetPath;
+        _models.ClearCache();
         Refresh3DScene();
         RefreshStatus();
     }
@@ -1022,8 +1017,9 @@ public partial class MainWindow : Window
             ? Array.Empty<ChessMoveDto>()
             : _legalMoves.Where(m => m.FromFile == _selected.Value.File && m.FromRank == _selected.Value.Rank).ToArray();
         var group = new Model3DGroup();
-        group.Children.Add(new AmbientLight(Color.FromRgb(80, 84, 90)));
-        group.Children.Add(new DirectionalLight(Colors.White, new Vector3D(-2, -4, -3)));
+        group.Children.Add(new AmbientLight(Color.FromRgb(128, 132, 140)));
+        group.Children.Add(new DirectionalLight(Color.FromRgb(245, 244, 235), new Vector3D(-2.4, -4.2, -3.1)));
+        group.Children.Add(new DirectionalLight(Color.FromRgb(142, 166, 205), new Vector3D(2.0, -1.1, 2.8)));
         _lastLoaded3DModels = 0;
         _lastMissing3DModels = 0;
         _hitSquares3D.Clear();
@@ -1087,8 +1083,10 @@ public partial class MainWindow : Window
         if (mesh != null)
         {
             _lastLoaded3DModels++;
-            return new GeometryModel3D(mesh, new DiffuseMaterial(brush))
+            var material = ObjModelLibrary.CreateSurfaceMaterial(brush);
+            return new GeometryModel3D(mesh, material)
             {
+                BackMaterial = material,
                 Transform = new TranslateTransform3D(file - 3.5, 0, rank - 3.5)
             };
         }
@@ -1100,13 +1098,13 @@ public partial class MainWindow : Window
     {
         var mesh = LoadModelMesh(Path.Combine("Pieces", ModelFileName(piece)));
         var type = Math.Abs(piece);
-        var color = piece > 0 ? Color.FromRgb(244, 242, 226) : Color.FromRgb(36, 38, 42);
-        var brush = new SolidColorBrush(color);
+        var material = _models.CreatePieceMaterial(Path.Combine("Pieces", ModelFileName(piece)), piece > 0 ? 1 : 2, type);
         if (mesh != null)
         {
             _lastLoaded3DModels++;
-            return new GeometryModel3D(mesh, new DiffuseMaterial(brush))
+            return new GeometryModel3D(mesh, material)
             {
+                BackMaterial = material,
                 Transform = new TranslateTransform3D(x, 0.02, z)
             };
         }
@@ -1132,25 +1130,12 @@ public partial class MainWindow : Window
             NativeChessEngine.King => 1.05,
             _ => 0.6
         };
-        return CreateCylinder(x, 0.0, z, radius, height, 28, brush);
+        return CreateCylinder(x, 0.0, z, radius, height, 28, new SolidColorBrush(ObjModelLibrary.PieceColor(piece > 0 ? 1 : 2)));
     }
 
     private MeshGeometry3D? LoadModelMesh(string relativePath)
     {
-        if (string.IsNullOrWhiteSpace(_selectedModelSetPath))
-        {
-            return null;
-        }
-
-        var fullPath = Path.Combine(_selectedModelSetPath, relativePath);
-        if (_meshCache.TryGetValue(fullPath, out var cached))
-        {
-            return cached;
-        }
-
-        var mesh = File.Exists(fullPath) ? LoadObjMesh(fullPath) : null;
-        _meshCache[fullPath] = mesh;
-        return mesh;
+        return _models.LoadMesh(relativePath);
     }
 
     private static string ModelFileName(int piece)

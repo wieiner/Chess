@@ -128,13 +128,21 @@
 - Completed: explicit documentation that no sixth Chess3D RuleProfile exists at P2L.
 - Completed: playthrough scenario descriptors for Classic, Single-Side, Asgard, Rubik, and Hodge.
 
-### P2M - Replay / Export / Import / Savegame
+### P2M - Visual Assets, Materials, Lighting, And Click Reliability
+
+- Completed: canonical OBJ/MTL piece asset catalog under `assets/models/chess/pieces`.
+- Completed: shared WPF material resolver with readable fallback materials and best-effort MTL/texture support.
+- Completed: lighter black-piece fallback material, neutral Chess3D background, and stronger scene lighting.
+- Completed: preview-aware click-to-move dispatch and clearer invalid target reasons in Chess3D.
+- Completed: packaging/verify checks for model manifests and representative OBJ/MTL assets.
+
+### P2N - Save / Load / Replay / Export / Import
 
 - Build replay/export/import over the P2I action record.
-- Decide savegame format for profiles, board, stacks, fusion descriptors, reserve counts, and history.
+- Decide savegame format for profiles, board, stacks, fusion descriptors, reserve counts, visual asset set id, and history.
 - Add notation file export/import once syntax stabilizes beyond v0.1.
 
-### P2N - Rich Visualization And Animation
+### P2O - Rich Visualization And Animation
 
 - Visualize multiple stack entries in one core cell.
 - Display fusion/contested/royal/implosion state directly in the board view.
@@ -164,9 +172,9 @@
 
 ## P5 - Asset Pipeline
 
-- Keep OBJ loading now.
+- Keep P2M OBJ/MTL catalog validation healthy.
 - Add future glTF/GLB support.
-- Add manifests, validation, scale/origin checks, and missing-asset reports.
+- Add deeper scale/origin checks, texture QA, and missing-asset reports.
 
 ## P6 - GPU Benchmark, Parity, Frontier Evaluation
 

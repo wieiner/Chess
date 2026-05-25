@@ -35,7 +35,14 @@ C# apps call native DLLs through narrow P/Invoke wrappers. Native state and rule
 - `src/ChessApp/Assets/Rules3D` contains runtime 3D rules JSON assets, including the P2A `single_side_3d_chess_8x8x8_v0_1.json` ruleset.
 - `assets/rules/profiles` contains machine-readable profile contracts. `Chess3DApp` copies them to `Assets/Rules3D/Profiles`, and `ProductionOutput/Chess3D` carries the same runtime profile assets.
 - `assets/rules/scenarios/chess3d` contains P2K smoke descriptors. `Chess3DApp` copies them to `Assets/Rules3D/Scenarios`, and `ProductionOutput/Chess3D` carries them for manual QA.
+- `assets/models/chess/pieces` contains the canonical P2M OBJ/MTL model catalog for Chess2D 3D-model mode and Chess3D. Both WPF apps copy it to `Assets/Models`; production packaging carries the same catalog into `ProductionOutput/Chess2D` and `ProductionOutput/Chess3D`.
 - `ProductionOutput/` is generated portable output and is ignored.
+
+### Visual Rendering Boundary
+
+P2M keeps rendering inside WPF `Media3D`. `ObjModelLibrary` owns OBJ mesh loading, best-effort MTL/texture material resolution, readable fallback materials, and model diagnostics. Chess2D and Chess3D can share the same model catalog without moving game rules into the visual layer.
+
+The visual pipeline intentionally does not implement full PBR. Diffuse `map_Kd` textures are used when they exist locally; missing external textures, normal maps, roughness maps, and PBR metadata fall back safely to the readable palette.
 
 ### 3D Rules Boundary
 
@@ -62,6 +69,8 @@ P2J adds a separate Hodge Projection Duel profile. This is a two-macro-player mo
 P2L adds a non-mutating legal action preview layer and a lightweight turn/capability controller. The preview ABI derives selectable move/capture/core/reserve/layer/projection entries from existing runtime state, but it does not replace old `GetPieceMoves`, `TryMakeMove`, layer-turn, reserve-restore, or Hodge projected-move APIs. The WPF app uses this as a control-center contract for highlighting and invalid-action explanations.
 
 P2K adds the playable Chess3D control center in the WPF app. It does not move rule logic into UI; it exposes the existing native profile/action ABI through a profile selector, mode-aware status/action panels, action-log controls, and scenario smoke-pack listing.
+
+P2M hardens the WPF side of that boundary. Chess3D target clicks now match exact legal-preview entries before dispatching an action. Normal moves still call `TryMakeMove`; Hodge projected target clicks call the projected-move ABI; Rubik layer turns and reserve restore remain panel-driven actions.
 
 This is still not final Asgard fusion physics. Destructive implosion, color/permutation state, online serialization, AI/search generation for layer turns, UI animation, full replay/import/export, and GPU stack snapshots remain later stages.
 

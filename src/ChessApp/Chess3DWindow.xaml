@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Cube Chess 8x8x8" Width="1500" Height="920" MinWidth="900" MinHeight="680"
-        Background="#20252B">
+        Background="#2D333A">
     <Window.Resources>
         <SolidColorBrush x:Key="PanelBrush" Color="#2B3138" />
         <SolidColorBrush x:Key="PanelAltBrush" Color="#242A31" />
@@ -241,11 +241,13 @@
                     <TextBlock x:Name="RulesText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
                     <TextBlock x:Name="InfoText" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
 
-                    <Expander Header="Common" IsExpanded="True" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
-                        <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CommandBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
-                            <StackPanel>
-                                <TextBlock x:Name="TurnSummaryText" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,0,0,6" />
-                                <TextBlock x:Name="CommonPanelText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
+                     <Expander Header="Common" IsExpanded="True" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
+                         <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CommandBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
+                             <StackPanel>
+                                <TextBlock Text="How to move: select a current-side piece, inspect legal targets, then click a highlighted target. Use Hodge Projected Move for triune mirrors and Rubik Layer Turn for layer actions."
+                                           Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                                 <TextBlock x:Name="TurnSummaryText" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,0,0,6" />
+                                 <TextBlock x:Name="CommonPanelText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
                                 <TextBlock Text="Legal actions" Foreground="{StaticResource MutedTextBrush}" Margin="0,10,0,4" />
                                 <ListBox x:Name="LegalActionsList" Height="126" Background="#1D2228" Foreground="{StaticResource TextBrush}" BorderBrush="#46505C" />
                                 <TextBlock x:Name="InvalidReasonText" Foreground="#F6D365" TextWrapping="Wrap" Margin="0,8,0,0" />
@@ -388,6 +390,9 @@
                     <UniformGrid x:Name="PaletteGrid" Rows="2" Columns="4" Margin="0,6,0,12" />
                     <TextBox x:Name="PositionText" MinHeight="170" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
                              Background="#1D2228" Foreground="{StaticResource TextBrush}" BorderBrush="#46505C" />
+                    <Expander Header="Visual diagnostics" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,8,0,0">
+                        <TextBlock x:Name="VisualDiagnosticsText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                    </Expander>
                 </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -398,7 +403,7 @@
                 </Grid>
             </Viewbox>
 
-            <Border x:Name="PreviewHost" Grid.Column="2" Background="#111418" BorderBrush="#48515D" BorderThickness="1"
+            <Border x:Name="PreviewHost" Grid.Column="2" Background="#3A4047" BorderBrush="#59636F" BorderThickness="1"
                     MouseDown="Preview3D_MouseDown"
                     MouseMove="Preview3D_MouseMove"
                     MouseUp="Preview3D_MouseUp"

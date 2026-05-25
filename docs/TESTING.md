@@ -44,7 +44,9 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - P2J Chess3D runtime tests validate Hodge Projection Duel profile metadata, projection isolation for older profiles, macro-player grouping, side-to-side face-frame transforms, all-or-nothing projected composite moves, capture recording, and deterministic `HPD` notation.
 - P2K Chess3D tests validate scenario smoke descriptor JSON for classic, Asgard, Rubik, and Hodge, plus non-Hodge projected-move clean failure/no mutation.
 - P2L Chess3D tests validate exactly five real RuleProfiles, legal action preview non-mutation, invalid-action reasons, profile capability masks, turn summaries, mode isolation, and playthrough scenario JSON parsing.
+- P2M Chess3D tests validate the canonical visual piece-set manifest, readable black-piece fallback metadata, required OBJ/MTL files for all standard piece types, and default board tile OBJ assets.
 - `scripts/verify.ps1` checks that representative Asgard, Rubik convergence, and Hodge Projection Duel profiles plus all P2K smoke and P2L playthrough scenario descriptors are copied into `Chess3DApp` output and `ProductionOutput/Chess3D`.
+- `scripts/verify.ps1` also checks that `Assets/Models/piece_sets.json` and representative OBJ/MTL assets are copied into Chess2D and Chess3D development output and portable `ProductionOutput`.
 - Rubik size, state, rotation, scramble, reverse-history solve, and manual-state ABI calls still work.
 - GPU backend CPU/Auto paths work without CUDA, and Direct3D/CUDA absence is handled as non-fatal where appropriate.
 
@@ -65,8 +67,8 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 
 CUDA is optional. Contract tests must pass without `ChessCudaBackend.dll`. If CUDA is built and placed next to `ChessGpuBackend.dll`, the GPU backend may use it, but absence of CUDA is not a test failure.
 
-The next recommended testing milestone is P2M/P2N: replay/export/import tests over P2I/P2J/P2K/P2L action history and playthrough descriptors, plus UI smoke checks for richer layer-turn/stack/fusion/reserve/projection visualization.
+The next recommended testing milestone is P2N: save/load/replay/export/import tests over P2I/P2J/P2K/P2L action history, playthrough descriptors, and P2M visual asset metadata.
 
 ## UI Smoke Tests
 
-UI smoke tests are currently manual. P2L adds UI-adjacent native ABI contracts and keeps the C# app compiling against the new preview/turn wrappers, but there is still no automated WPF click-through test. The next useful layer is a small launcher/screenshot check for `ChessApp.exe`, `Chess3DApp.exe`, `RubikApp.exe`, and `ChessOnlineApp.exe`.
+UI smoke tests are currently manual. P2M improves click dispatch and visual diagnostics in C# and keeps both WPF apps compiling against the shared OBJ/material loader, but there is still no automated WPF click-through test. The next useful layer is a small launcher/screenshot check for `ChessApp.exe`, `Chess3DApp.exe`, `RubikApp.exe`, and `ChessOnlineApp.exe`.

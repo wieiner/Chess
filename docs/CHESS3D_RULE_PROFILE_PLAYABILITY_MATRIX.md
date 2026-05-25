@@ -9,3 +9,11 @@
 | `hodge_projection_duel_3d_v0_1.json` | `hodge-projection-duel-3d-8x8x8-v0.1` | 2 macro players | six faces as two triads | projected composite moves | classic remove | macro alternating projection | sandbox/checkmate draft | Hodge projected move | all-or-nothing primary + mirrors | Hodge panel, preview, action log | experimental-playable |
 
 Classic is not a forgotten fallback, and Asgard is not the default meaning of Chess3D. Rubik and Hodge are separate profile-gated modes.
+
+## P2M Visual / Interaction Notes
+
+- There are still exactly five real Chess3D RuleProfiles.
+- The canonical OBJ/MTL model catalog is shared across profiles; it is not a new mode.
+- Classic and Single-Side get the same improved readable materials and click diagnostics as experimental profiles.
+- Asgard/Rubik/Hodge capabilities remain profile-gated through JSON and native runtime flags.
+- Click-to-move now follows legal preview entries, so a highlighted target and the actual dispatched action use the same source/target/action-kind contract.

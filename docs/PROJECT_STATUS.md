@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P2L Chess3D playability closure and legal action preview.
+Last audited locally for P2M visual asset pipeline, lighting, and Chess3D interaction reliability.
 
 ## Exists
 
@@ -72,6 +72,15 @@ Last audited locally for P2L Chess3D playability closure and legal action previe
 - `docs/CHESS3D_TURN_CONTROLLER.md`: mode-aware turn/capability ABI.
 - `docs/CHESS3D_UI_PLAYABILITY_GUIDE.md`: player-facing control-center guide.
 - `docs/CHESS3D_SCENARIO_PLAYTHROUGHS.md`: P2L playthrough descriptors.
+- `assets/models/chess/pieces/piece_sets.json`: canonical visual model catalog for Chess2D and Chess3D.
+- `assets/models/chess/pieces/default`: canonical local OBJ/MTL chess piece set.
+- `docs/CHESS_VISUAL_ASSET_AUDIT.md`: P2M audit of OBJ/MTL, lighting, hit-test, and interaction boundaries.
+- `docs/CHESS_MODEL_ASSET_PIPELINE.md`: canonical model asset layout and packaging contract.
+- `docs/CHESS_OBJ_MTL_TEXTURE_SUPPORT.md`: supported OBJ/MTL/texture subset and fallbacks.
+- `docs/CHESS_VISUAL_THEME_AND_LIGHTING.md`: readable fallback materials, background, and lighting.
+- `docs/CHESS3D_INTERACTION_AUDIT.md`: preview-to-action mismatch audit and fix.
+- `docs/CHESS3D_CLICK_TO_MOVE_FLOW.md`: player/runtime click-to-move flow.
+- `docs/CHESS3D_PLAYABILITY_KNOWN_ISSUES.md`: honest remaining UI/visual limitations.
 
 ## Build-Verified
 
@@ -93,7 +102,9 @@ Last audited locally for P2L Chess3D playability closure and legal action previe
 - Chess3D contract tests now cover P2I action history, deterministic notation, move/capture/layer-turn records, reserve restore, auto-restore, failure no-mutation behavior, and string ABI safety.
 - Chess3D contract tests now cover P2J Hodge Projection Duel: JSON/profile validation, profile isolation, macro-player group coverage, face-frame transforms, projected composite moves, all-or-nothing rejection, and classic capture recording.
 - Chess3D contract tests now cover P2L playability closure: exactly five real RuleProfiles, non-mutating legal action preview, invalid-action reasons, capability masks, turn summaries, mode isolation, and scenario playthrough JSON parsing.
+- Chess3D contract tests now cover the P2M visual model manifest and required OBJ/MTL asset references.
 - `scripts/verify.ps1` checks that representative RuleProfile JSON files are copied into Chess3D development output and `ProductionOutput`.
+- `scripts/verify.ps1` checks that the canonical model manifest and representative OBJ/MTL files are copied into Chess2D and Chess3D development output and `ProductionOutput`.
 
 ## User Executables
 
@@ -151,6 +162,10 @@ Portable outputs:
 - Hodge projected composite moves append `HPD` notation and expose projection profile/status through append-only ABI and C# status text.
 - `Chess3DApp.exe` now has a playable control center: RuleProfile selector, capability summary, mode-aware Asgard/Rubik/Hodge panels, and visible action log controls.
 - `Chess3DApp.exe` now lists legal actions for the selected cell, highlights preview targets, exposes invalid-action reasons, and collapses special panels when the active profile does not enable them.
+- `Chess3DApp.exe` now uses preview-aware click dispatch: target clicks must match legal preview entries and Hodge projection clicks use the projection action path instead of a blind normal move.
+- Chess2D and Chess3D share the canonical OBJ model catalog and a WPF material resolver with MTL/texture best-effort support.
+- Black 3D piece fallback material is readable medium slate/charcoal instead of pure black.
+- Chess3D uses a neutral preview background and stronger ambient/key/rim lighting for piece readability.
 - There are exactly five real Chess3D RuleProfiles at P2L; scenario smoke/playthrough files are descriptors, not additional modes.
 - Chess3D action logs can be copied or saved as `.ch3dlog` text with a `rulesetId` header.
 - Chess3D scenario smoke descriptors exist for classic, Asgard, Rubik, and Hodge profiles and are copied to development output and `ProductionOutput`.
@@ -179,4 +194,4 @@ Portable outputs:
 - Full UI automation tests are not present yet.
 - GPU parity/performance needs more benchmark baselines on real target hardware.
 - The project currently relies on local Visual Studio/MSBuild and vcpkg environment availability.
-- Recommended next stage is P2M/P2N: replay/export/import over P2I/P2J/P2K/P2L action history and playthrough descriptors, then richer visualization/animation for stack/fusion/reserve/layer-turn/projection state.
+- Recommended next stage is P2N: save/load/replay/export/import over P2I/P2J/P2K/P2L/P2M action history and visual asset metadata, then P2O richer visualization/animation for stack/fusion/reserve/layer-turn/projection state.

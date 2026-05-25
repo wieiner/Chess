@@ -1089,6 +1089,29 @@ int main()
     test.Check(!profileSchema.empty(), "Chess3D rule profile schema exists");
     test.Check(JsonParser(profileSchema).Parse(), "Chess3D rule profile schema parses as JSON");
 
+    const std::string pieceSetManifest = ReadTextFile("assets\\models\\chess\\pieces\\piece_sets.json");
+    test.Check(!pieceSetManifest.empty(), "Chess visual piece set manifest exists");
+    test.Check(JsonParser(pieceSetManifest).Parse(), "Chess visual piece set manifest parses as JSON");
+    test.Check(pieceSetManifest.find("\"setId\": \"default-obj\"") != std::string::npos, "default OBJ piece set is declared");
+    test.Check(pieceSetManifest.find("\"blackPiece\": \"#58606C\"") != std::string::npos, "black piece fallback is readable slate, not pure black");
+    const std::array<std::string, 6> visualPieces = { "pawn", "rook", "knight", "bishop", "queen", "king" };
+    for (const auto& pieceName : visualPieces)
+    {
+        test.Check(pieceSetManifest.find("\"" + pieceName + "\"") != std::string::npos,
+            "visual manifest declares required piece " + pieceName);
+        test.Check(std::filesystem::exists("assets\\models\\chess\\pieces\\default\\Pieces\\white_" + pieceName + ".obj"),
+            "white OBJ exists for " + pieceName);
+        test.Check(std::filesystem::exists("assets\\models\\chess\\pieces\\default\\Pieces\\black_" + pieceName + ".obj"),
+            "black OBJ exists for " + pieceName);
+        test.Check(std::filesystem::exists("assets\\models\\chess\\pieces\\default\\Pieces\\white_" + pieceName + ".mtl"),
+            "white MTL exists for " + pieceName);
+        test.Check(std::filesystem::exists("assets\\models\\chess\\pieces\\default\\Pieces\\black_" + pieceName + ".mtl"),
+            "black MTL exists for " + pieceName);
+    }
+    test.Check(std::filesystem::exists("assets\\models\\chess\\pieces\\default\\Board\\light_tile.obj") &&
+        std::filesystem::exists("assets\\models\\chess\\pieces\\default\\Board\\dark_tile.obj"),
+        "default OBJ board tiles exist");
+
     const std::string classicProfile = ReadTextFile("assets\\rules\\profiles\\classic_six_side_3d_v0_1.json");
     const std::string singleProfile = ReadTextFile("assets\\rules\\profiles\\single_side_3d_v0_1.json");
     const std::string asgardProfile = ReadTextFile("assets\\rules\\profiles\\asgard_convergence_3d_v0_1.json");

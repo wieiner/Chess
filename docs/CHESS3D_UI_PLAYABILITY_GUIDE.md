@@ -8,7 +8,7 @@ Use the Rule Profile selector to load Classic, Single-Side, Asgard, Rubik, or Ho
 
 ## Legal Actions
 
-Select a cell to populate the Legal actions list. Targets are highlighted in the 2D slice/full 3D preview when move hints are enabled. Invalid moves leave the board unchanged and show a reason in the Common panel.
+Select a cell to populate the Legal actions list. Targets are highlighted in the 2D slice/full 3D preview when move hints are enabled. P2M makes target clicks preview-aware: the clicked target must match an exact preview entry before the UI dispatches a move. Invalid moves leave the board unchanged and show a reason in the Common panel and visual diagnostics.
 
 ## Mode Panels
 
@@ -19,6 +19,10 @@ Select a cell to populate the Legal actions list. Targets are highlighted in the
 
 Panels whose capabilities are disabled by the current RuleProfile are collapsed so Classic stays visually clean and first-class.
 
+## Visual Diagnostics
+
+The visual diagnostics section reports the active model set, OBJ/fallback counts, material fallback/texture status, and last click/action rejection reason. This is meant for local QA when OBJ/MTL assets or hit-tests behave unexpectedly.
+
 ## Deferred
 
-P2L does not add animated layer turns, replay import/export, online serialization, or full 3D check/mate UI.
+P2M does not add animated layer turns, replay import/export, online serialization, or full 3D check/mate UI.

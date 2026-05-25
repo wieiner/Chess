@@ -29,7 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\ChessApp\Assets\Models\**\*.*" Link="Assets\Models\%(RecursiveDir)%(Filename)%(Extension)">
+    <Content Include="..\..\assets\models\chess\pieces\**\*.*" Link="Assets\Models\%(RecursiveDir)%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="..\ChessApp\Assets\Rules3D\**\*.*" Link="Assets\Rules3D\%(RecursiveDir)%(Filename)%(Extension)">

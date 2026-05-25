@@ -41,6 +41,14 @@ No CUDA Toolkit is required for the default build. `ChessGpuBackend.dll` remains
 src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Profiles
 ```
 
+Chess2D and Chess3D both copy the canonical OBJ/MTL model catalog into:
+
+```text
+...\Assets\Models
+```
+
+The source catalog is `assets\models\chess\pieces`. The runtime catalog file is `Assets\Models\piece_sets.json`.
+
 ## Portable Packaging
 
 Run:
@@ -77,7 +85,14 @@ The Chess3D portable folder also includes P2K smoke descriptors and P2L playthro
 ProductionOutput\Chess3D\Assets\Rules3D\Scenarios
 ```
 
-`scripts\verify.ps1` checks representative Asgard, Rubik convergence, and Hodge Projection Duel profiles plus all P2K smoke and P2L playthrough scenario descriptors in both development and portable output.
+The Chess2D and Chess3D portable folders include the canonical visual asset catalog under:
+
+```text
+ProductionOutput\Chess2D\Assets\Models
+ProductionOutput\Chess3D\Assets\Models
+```
+
+`scripts\verify.ps1` checks representative Asgard, Rubik convergence, and Hodge Projection Duel profiles plus all P2K smoke and P2L playthrough scenario descriptors in both development and portable output. It also checks the P2M model manifest and representative OBJ/MTL assets in Chess2D and Chess3D outputs.
 
 ## Root Scripts
 
@@ -124,4 +139,4 @@ After successful verification, CI uploads `ProductionOutput` as the short-retent
 
 `rude-resource/` is a local ignored resource archive and is absent on CI. `scripts\verify.ps1` checks the ignore rule through the probe path `rude-resource/.verify-ignore-probe`, without creating that file.
 
-CUDA remains optional in CI and in the default local build. After P2L, the same verification pipeline also covers Rubik convergence layer turns, action history, deterministic notation, reserve restore contracts, Hodge Projection Duel composite-turn contracts, legal action preview contracts, scenario smoke/playthrough descriptors, and packaging of the Chess3D control-center assets.
+CUDA remains optional in CI and in the default local build. After P2M, the same verification pipeline also covers Rubik convergence layer turns, action history, deterministic notation, reserve restore contracts, Hodge Projection Duel composite-turn contracts, legal action preview contracts, scenario smoke/playthrough descriptors, packaging of the Chess3D control-center assets, and packaging of the canonical OBJ/MTL model catalog.

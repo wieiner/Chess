@@ -103,6 +103,14 @@ try {
     }
     git check-ignore -v -- $ignoredProbe
 
+    Write-Step "Visual asset catalog"
+    Assert-File "assets\models\chess\pieces\piece_sets.json"
+    Assert-File "assets\models\chess\pieces\default\Pieces\white_pawn.obj"
+    Assert-File "assets\models\chess\pieces\default\Pieces\white_pawn.mtl"
+    Assert-File "assets\models\chess\pieces\default\Pieces\black_pawn.obj"
+    Assert-File "assets\models\chess\pieces\default\Pieces\black_pawn.mtl"
+    Assert-File "assets\models\chess\pieces\default\Board\light_tile.obj"
+
     Write-Step "Build Release x64"
     $msbuild = Resolve-MSBuild
     Invoke-Checked { & $msbuild ".\Chess.sln" "/restore" "/m" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal" } "MSBuild failed."
@@ -113,6 +121,12 @@ try {
     Assert-File "src\RubikApp\bin\x64\Release\net8.0-windows\RubikApp.exe"
     Assert-File "src\ChessOnlineApp\bin\x64\Release\net8.0-windows\ChessOnlineApp.exe"
     Assert-File "bin\x64\Release\Chess2DBenchmark.exe"
+    Assert-File "src\ChessApp\bin\x64\Release\net8.0-windows\Assets\Models\piece_sets.json"
+    Assert-File "src\ChessApp\bin\x64\Release\net8.0-windows\Assets\Models\default\Pieces\white_pawn.obj"
+    Assert-File "src\ChessApp\bin\x64\Release\net8.0-windows\Assets\Models\default\Pieces\black_pawn.mtl"
+    Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Models\piece_sets.json"
+    Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Models\default\Pieces\white_pawn.obj"
+    Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Models\default\Pieces\black_pawn.mtl"
     Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Profiles\asgard_convergence_3d_v0_1.json"
     Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Profiles\rubik_convergence_3d_v0_1.json"
     Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Profiles\hodge_projection_duel_3d_v0_1.json"
@@ -135,6 +149,12 @@ try {
     Assert-File "ProductionOutput\Rubik\RubikApp.exe"
     Assert-File "ProductionOutput\ChessOnlineIntegrations\ChessOnlineApp.exe"
     Assert-File "ProductionOutput\Chess2DBenchmark\Chess2DBenchmark.exe"
+    Assert-File "ProductionOutput\Chess2D\Assets\Models\piece_sets.json"
+    Assert-File "ProductionOutput\Chess2D\Assets\Models\default\Pieces\white_pawn.obj"
+    Assert-File "ProductionOutput\Chess2D\Assets\Models\default\Pieces\black_pawn.mtl"
+    Assert-File "ProductionOutput\Chess3D\Assets\Models\piece_sets.json"
+    Assert-File "ProductionOutput\Chess3D\Assets\Models\default\Pieces\white_pawn.obj"
+    Assert-File "ProductionOutput\Chess3D\Assets\Models\default\Pieces\black_pawn.mtl"
     Assert-File "ProductionOutput\Chess3D\Assets\Rules3D\Profiles\asgard_convergence_3d_v0_1.json"
     Assert-File "ProductionOutput\Chess3D\Assets\Rules3D\Profiles\rubik_convergence_3d_v0_1.json"
     Assert-File "ProductionOutput\Chess3D\Assets\Rules3D\Profiles\hodge_projection_duel_3d_v0_1.json"

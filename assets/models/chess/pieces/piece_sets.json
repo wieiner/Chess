@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "canonicalRoot": "assets/models/chess/pieces",
+  "sets": [
+    {
+      "setId": "default-obj",
+      "displayName": "Default OBJ Chess Pieces",
+      "source": "local repository OBJ/MTL assets migrated from src/ChessApp/Assets/Models/Default",
+      "assetRoot": "default",
+      "supportedApps": ["Chess2D", "Chess3D"],
+      "fallbackPalette": {
+        "whitePiece": "#EEE7CE",
+        "blackPiece": "#58606C",
+        "note": "Fallback black is medium charcoal/slate, not pure black."
+      },
+      "scale": 1.0,
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "verticalOffset": 0.0,
+      "pieces": {
+        "pawn": {
+          "white": { "obj": "default/Pieces/white_pawn.obj", "mtl": "default/Pieces/white_pawn.mtl", "fallbackColor": "#EEE7CE" },
+          "black": { "obj": "default/Pieces/black_pawn.obj", "mtl": "default/Pieces/black_pawn.mtl", "fallbackColor": "#58606C" }
+        },
+        "rook": {
+          "white": { "obj": "default/Pieces/white_rook.obj", "mtl": "default/Pieces/white_rook.mtl", "fallbackColor": "#EEE7CE" },
+          "black": { "obj": "default/Pieces/black_rook.obj", "mtl": "default/Pieces/black_rook.mtl", "fallbackColor": "#58606C" }
+        },
+        "knight": {
+          "white": { "obj": "default/Pieces/white_knight.obj", "mtl": "default/Pieces/white_knight.mtl", "fallbackColor": "#EEE7CE" },
+          "black": { "obj": "default/Pieces/black_knight.obj", "mtl": "default/Pieces/black_knight.mtl", "fallbackColor": "#58606C" }
+        },
+        "bishop": {
+          "white": { "obj": "default/Pieces/white_bishop.obj", "mtl": "default/Pieces/white_bishop.mtl", "fallbackColor": "#EEE7CE" },
+          "black": { "obj": "default/Pieces/black_bishop.obj", "mtl": "default/Pieces/black_bishop.mtl", "fallbackColor": "#58606C" }
+        },
+        "officer": {
+          "white": { "obj": "default/Pieces/white_bishop.obj", "mtl": "default/Pieces/white_bishop.mtl", "fallbackColor": "#EEE7CE" },
+          "black": { "obj": "default/Pieces/black_bishop.obj", "mtl": "default/Pieces/black_bishop.mtl", "fallbackColor": "#58606C" }
+        },
+        "queen": {
+          "white": { "obj": "default/Pieces/white_queen.obj", "mtl": "default/Pieces/white_queen.mtl", "fallbackColor": "#EEE7CE" },
+          "black": { "obj": "default/Pieces/black_queen.obj", "mtl": "default/Pieces/black_queen.mtl", "fallbackColor": "#58606C" }
+        },
+        "king": {
+          "white": { "obj": "default/Pieces/white_king.obj", "mtl": "default/Pieces/white_king.mtl", "fallbackColor": "#EEE7CE" },
+          "black": { "obj": "default/Pieces/black_king.obj", "mtl": "default/Pieces/black_king.mtl", "fallbackColor": "#58606C" }
+        }
+      },
+      "board": {
+        "lightTile": { "obj": "default/Board/light_tile.obj", "mtl": "default/Board/light_tile.mtl", "fallbackColor": "#D2D6C6" },
+        "darkTile": { "obj": "default/Board/dark_tile.obj", "mtl": "default/Board/dark_tile.mtl", "fallbackColor": "#52606E" }
+      },
+      "textureSupport": {
+        "diffuse": "bestEffortFromMtlMapKd",
+        "specular": "bestEffortFromMtlKsNs",
+        "normal": "ignoredByWpfMedia3D",
+        "roughness": "ignoredByWpfMedia3D"
+      },
+      "knownLimitations": [
+        "Current repository set has OBJ and MTL files but no colocated diffuse texture files.",
+        "Some MTL files reference missing external or placeholder map_Kd paths; runtime falls back to the readable palette.",
+        "WPF Media3D does not consume normal, roughness, or PBR maps directly."
+      ]
+    }
+  ]
+}
