@@ -1,0 +1,24 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "hodge-blocked-mirror-rollback-v0.1",
+  "profileFile": "hodge_projection_duel_3d_v0_1.json",
+  "rulesetId": "hodge-projection-duel-3d-8x8x8-v0.1",
+  "purpose": "Regression fixture: blocked Hodge mirror child rejects the whole composite action and rolls back state.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "clearBoard" },
+    { "type": "setPiece", "side": 1, "pieceType": 1, "x": 3, "y": 3, "z": 0 },
+    { "type": "setPiece", "side": 3, "pieceType": 1, "x": 3, "y": 0, "z": 3 },
+    { "type": "setPiece", "side": 3, "pieceType": 2, "x": 3, "y": 1, "z": 3 },
+    { "type": "setPiece", "side": 5, "pieceType": 1, "x": 0, "y": 3, "z": 3 },
+    { "type": "rememberStateHash", "name": "beforeProjection" },
+    { "type": "expectProjectedMoveFail", "primarySide": 1, "fromX": 3, "fromY": 3, "fromZ": 0, "toX": 3, "toY": 3, "toZ": 1 },
+    { "type": "assertStateHashEqualsRemembered", "name": "beforeProjection" },
+    { "type": "assertActionCount", "count": 0 },
+    { "type": "assertLastInvalidReasonContains", "text": "Projection move rejected" }
+  ],
+  "knownLimitations": [
+    "Hodge full checkmate and AI/search remain deferred."
+  ]
+}

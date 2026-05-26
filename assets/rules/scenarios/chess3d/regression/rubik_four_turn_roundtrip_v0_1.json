@@ -1,0 +1,25 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "rubik-four-turn-roundtrip-v0.1",
+  "profileFile": "rubik_convergence_3d_v0_1.json",
+  "rulesetId": "rubik-convergence-3d-8x8x8-v0.1",
+  "purpose": "Regression fixture: Rubik layer turns move CoreCell stacks without loss, and four quarter turns return the stack to the starting cell.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "clearBoard" },
+    { "type": "pushCore", "side": 1, "pieceType": 1, "x": 2, "y": 2, "z": 2 },
+    { "type": "rememberStateHash", "name": "beforeLayer" },
+    { "type": "rotateLayer", "axis": 0, "layer": 2, "quarterTurns": 1 },
+    { "type": "assertStateHashChangedFromRemembered", "name": "beforeLayer" },
+    { "type": "assertStackCount", "x": 5, "y": 2, "z": 2, "count": 1 },
+    { "type": "rotateLayer", "axis": 0, "layer": 2, "quarterTurns": 1 },
+    { "type": "rotateLayer", "axis": 0, "layer": 2, "quarterTurns": 1 },
+    { "type": "rotateLayer", "axis": 0, "layer": 2, "quarterTurns": 1 },
+    { "type": "assertStackCount", "x": 2, "y": 2, "z": 2, "count": 1 },
+    { "type": "assertActionCount", "count": 4 }
+  ],
+  "knownLimitations": [
+    "State hash includes action history, so four turns restore geometry but not the exact pre-action hash."
+  ]
+}

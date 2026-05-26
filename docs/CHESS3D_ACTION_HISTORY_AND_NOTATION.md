@@ -49,3 +49,9 @@ P2L legal action preview is intentionally not action history. Preview calls do n
 `Chess3DApp` shows the action stream in the control center. The UI can refresh, copy, and save a `.ch3dlog` text file. The file starts with the active `rulesetId`, followed by deterministic notation lines.
 
 P2N adds structured replay through `.ch3dreplay`. The replay file stores action records as JSON rather than relying on parsing free-form notation.
+
+P2O adds action-generation diagnostics around the same runtime actions:
+
+- perft/divide calls enumerate candidate actions without appending history;
+- failed actions and failed previews remain non-mutating and do not create notation;
+- regression playthroughs assert action counts and state hashes so notation/history bugs can be reproduced headlessly.

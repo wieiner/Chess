@@ -89,3 +89,17 @@ Run:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -SkipBenchmark
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
 ```
+
+## P2O Rules / Perft / Regression Tests
+
+`Chess3DEngineContractTests` now also covers:
+
+- exactly five real Chess3D RuleProfile JSON files, with scenario/playthrough files excluded from mode count;
+- game phase, game outcome, mode rule summary, allowed action mask, and current-turn summary ABI;
+- draft Classic check status summary and side legal-action counts;
+- profile isolation for Classic, Asgard, Rubik, and Hodge action masks;
+- `Chess3D_PerftActions` depth 0/1 and `Chess3D_DivideActionsJson` depth 1;
+- state-hash no-mutation guarantees for perft/divide;
+- regression fixtures under `assets\rules\scenarios\chess3d\regression`.
+
+P2O diagnostics are deliberately small-depth CI checks. They are correctness smoke tests for action generation and transaction safety, not a replacement for future P3A full checkmate or P3B search validation.

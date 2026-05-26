@@ -75,6 +75,10 @@ constexpr int AllowedActionProjection = 16;
 constexpr int AllowedActionCoreStack = 32;
 constexpr int AllowedActionFusion = 64;
 constexpr int AllowedActionCenterAssembly = 128;
+constexpr int GamePhasePlaying = 2;
+constexpr int GamePhaseGameOver = 3;
+constexpr int GameOutcomeNone = 0;
+constexpr int GameOutcomeCenterAssemblyComplete = 3;
 
 std::string ReadTextFile(const std::string& path)
 {
@@ -761,6 +765,29 @@ std::string ReadStateHash(void* game)
     return needed > 0 ? std::string(buffer) : std::string();
 }
 
+std::string ReadCheckStatusSummary(void* game, int side)
+{
+    char buffer[512] = {};
+    const int needed = Chess3D_GetCheckStatusSummary(game, side, buffer, static_cast<int>(sizeof(buffer)));
+    return needed > 0 ? std::string(buffer) : std::string();
+}
+
+std::string ReadDivideActionsJson(void* game, int depth)
+{
+    std::vector<char> buffer(65536);
+    const int needed = Chess3D_DivideActionsJson(game, depth, buffer.data(), static_cast<int>(buffer.size()));
+    if (needed <= 0)
+    {
+        return {};
+    }
+    if (needed > static_cast<int>(buffer.size()))
+    {
+        buffer.assign(static_cast<std::size_t>(needed), '\0');
+        Chess3D_DivideActionsJson(game, depth, buffer.data(), static_cast<int>(buffer.size()));
+    }
+    return std::string(buffer.data());
+}
+
 std::string JsonEscapeForTest(const std::string& value)
 {
     std::string out;
@@ -1011,6 +1038,8 @@ bool RunPlaythroughFile(void* game, const std::string& path, std::string& error)
         return false;
     }
 
+    std::map<std::string, std::string> rememberedHashes;
+
     for (std::size_t i = 0; i < steps.size(); ++i)
     {
         const std::string& step = steps[i];
@@ -1083,6 +1112,26 @@ bool RunPlaythroughFile(void* game, const std::string& path, std::string& error)
                 return fail("move failed");
             }
         }
+        else if (type == "expectMoveFail")
+        {
+            const std::string before = ReadStateHash(game);
+            const int actionsBefore = Chess3D_GetActionCount(game);
+            Chess3DMoveDto played{};
+            const int fromX = IntValue(step, "fromX", -1);
+            const int fromY = IntValue(step, "fromY", -1);
+            const int fromZ = IntValue(step, "fromZ", -1);
+            const int toX = IntValue(step, "toX", -1);
+            const int toY = IntValue(step, "toY", -1);
+            const int toZ = IntValue(step, "toZ", -1);
+            if (Chess3D_TryMakeMove(game, fromX, fromY, fromZ, toX, toY, toZ, 0, &played) != 0)
+            {
+                return fail("expectMoveFail unexpectedly succeeded");
+            }
+            if (ReadStateHash(game) != before || Chess3D_GetActionCount(game) != actionsBefore)
+            {
+                return fail("expectMoveFail mutated state or action history");
+            }
+        }
         else if (type == "projectedMove")
         {
             Chess3DMoveDto played{};
@@ -1096,6 +1145,27 @@ bool RunPlaythroughFile(void* game, const std::string& path, std::string& error)
             if (Chess3D_TryMakeProjectedMove(game, primarySide, fromX, fromY, fromZ, toX, toY, toZ, 0, &played) == 0)
             {
                 return fail("projectedMove failed");
+            }
+        }
+        else if (type == "expectProjectedMoveFail")
+        {
+            const std::string before = ReadStateHash(game);
+            const int actionsBefore = Chess3D_GetActionCount(game);
+            Chess3DMoveDto played{};
+            const int primarySide = IntValue(step, "primarySide", 0);
+            const int fromX = IntValue(step, "fromX", -1);
+            const int fromY = IntValue(step, "fromY", -1);
+            const int fromZ = IntValue(step, "fromZ", -1);
+            const int toX = IntValue(step, "toX", -1);
+            const int toY = IntValue(step, "toY", -1);
+            const int toZ = IntValue(step, "toZ", -1);
+            if (Chess3D_TryMakeProjectedMove(game, primarySide, fromX, fromY, fromZ, toX, toY, toZ, 0, &played) != 0)
+            {
+                return fail("expectProjectedMoveFail unexpectedly succeeded");
+            }
+            if (ReadStateHash(game) != before || Chess3D_GetActionCount(game) != actionsBefore)
+            {
+                return fail("expectProjectedMoveFail mutated state or action history");
             }
         }
         else if (type == "rotateLayer")
@@ -1146,6 +1216,26 @@ bool RunPlaythroughFile(void* game, const std::string& path, std::string& error)
                 return fail("assertStackCount failed");
             }
         }
+        else if (type == "assertFusionKind")
+        {
+            const int x = IntValue(step, "x", -1);
+            const int y = IntValue(step, "y", -1);
+            const int z = IntValue(step, "z", -1);
+            const int kind = IntValue(step, "kind", -1);
+            if (Chess3D_GetCoreFusionKind(game, x, y, z) != kind)
+            {
+                return fail("assertFusionKind failed");
+            }
+        }
+        else if (type == "assertAnchorCount")
+        {
+            const int side = IntValue(step, "side", 0);
+            const int count = IntValue(step, "count", -1);
+            if (Chess3D_GetAnchorCount(game, side) != count)
+            {
+                return fail("assertAnchorCount failed");
+            }
+        }
         else if (type == "assertReserveCount")
         {
             const int side = IntValue(step, "side", 0);
@@ -1162,6 +1252,45 @@ bool RunPlaythroughFile(void* game, const std::string& path, std::string& error)
             if (Chess3D_GetActionCount(game) != count)
             {
                 return fail("assertActionCount failed");
+            }
+        }
+        else if (type == "rememberStateHash")
+        {
+            const std::string name = ExtractStringValue(step, "name");
+            rememberedHashes[name.empty() ? "default" : name] = ReadStateHash(game);
+        }
+        else if (type == "assertStateHashEqualsRemembered")
+        {
+            const std::string name = ExtractStringValue(step, "name");
+            const auto it = rememberedHashes.find(name.empty() ? "default" : name);
+            if (it == rememberedHashes.end() || ReadStateHash(game) != it->second)
+            {
+                return fail("assertStateHashEqualsRemembered failed");
+            }
+        }
+        else if (type == "assertStateHashChangedFromRemembered")
+        {
+            const std::string name = ExtractStringValue(step, "name");
+            const auto it = rememberedHashes.find(name.empty() ? "default" : name);
+            if (it == rememberedHashes.end() || ReadStateHash(game) == it->second)
+            {
+                return fail("assertStateHashChangedFromRemembered failed");
+            }
+        }
+        else if (type == "assertGamePhase")
+        {
+            const int value = IntValue(step, "value", -1);
+            if (Chess3D_GetGamePhase(game) != value)
+            {
+                return fail("assertGamePhase failed");
+            }
+        }
+        else if (type == "assertGameOutcome")
+        {
+            const int value = IntValue(step, "value", -1);
+            if (Chess3D_GetGameOutcome(game) != value)
+            {
+                return fail("assertGameOutcome failed");
             }
         }
         else if (type == "assertGameOver")
@@ -1723,6 +1852,31 @@ int main()
         "classic turn controller exposes side without macro-player");
     test.Check(ReadAbiString(game, Chess3D_GetTurnSummary).find("classic") != std::string::npos,
         "classic turn summary names classic mode");
+    test.Check(Chess3D_GetGamePhase(game) == GamePhasePlaying && Chess3D_GetGameOutcome(game) == GameOutcomeNone,
+        "classic starts in playing phase with no outcome");
+    test.Check(ReadAbiString(game, Chess3D_GetCurrentTurnSummary).find("outcome=none") != std::string::npos,
+        "current turn summary exposes phase and outcome");
+    test.Check(ReadAbiString(game, Chess3D_GetModeRuleSummary).find("kingSafety=checkmateDraft") != std::string::npos,
+        "classic mode rule summary marks checkmate as draft");
+    test.Check(Chess3D_IsActionKindAllowed(game, ActionMove) == 1 &&
+        Chess3D_IsActionKindAllowed(game, ActionLayerTurn) == 0 &&
+        Chess3D_IsActionKindAllowed(game, ActionProjectionCompositeMove) == 0,
+        "classic allows move actions but not layer/projection actions");
+    test.Check(Chess3D_GetSideLegalActionCount(game, 1) > 0 &&
+        Chess3D_HasAnyLegalActionForSide(game, 1) == 1,
+        "classic side legal action count is exposed");
+    test.Check(ReadCheckStatusSummary(game, 1).find("status=draft") != std::string::npos,
+        "classic check status summary is draft and readable");
+    const std::string classicHashBeforePerft = ReadStateHash(game);
+    const long long classicDepth0 = Chess3D_PerftActions(game, 0);
+    const long long classicDepth1 = Chess3D_PerftActions(game, 1);
+    const std::string classicDivide = ReadDivideActionsJson(game, 1);
+    test.Check(classicDepth0 == 1 && classicDepth1 > 0,
+        "classic action perft depth 0/1 returns nodes");
+    test.Check(JsonParser(classicDivide).Parse() && classicDivide.find("chess3d-action-divide") != std::string::npos,
+        "classic action divide returns parseable JSON");
+    test.Check(ReadStateHash(game) == classicHashBeforePerft,
+        "classic action perft/divide do not mutate state hash");
     Chess3D_Clear(game);
     test.Check(Chess3D_SetPiece(game, 0, 0, 0, 1, Rook) == 1 &&
         Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn) == 1 &&
@@ -1790,6 +1944,14 @@ int main()
         (asgardMask & AllowedActionLayerTurn) == 0 &&
         (asgardMask & AllowedActionProjection) == 0,
         "asgard capability mask exposes core/fusion/reserve/center but not layer/projection");
+    test.Check(ReadAbiString(game, Chess3D_GetModeRuleSummary).find("kingSafety=notApplicableOrDeferred") != std::string::npos &&
+        Chess3D_IsActionKindAllowed(game, ActionReserveRestore) == 1 &&
+        Chess3D_IsActionKindAllowed(game, ActionLayerTurn) == 0,
+        "asgard rule summary isolates centerAssembly from checkmate/layer actions");
+    const std::string asgardHashBeforePerft = ReadStateHash(game);
+    test.Check(Chess3D_PerftActions(game, 0) == 1 && Chess3D_PerftActions(game, 1) > 0 &&
+        ReadStateHash(game) == asgardHashBeforePerft,
+        "asgard action perft depth 0/1 is non-mutating");
     Chess3D_Clear(game);
     test.Check(Chess3D_GetCoreStackCount(game, 2, 2, 2) == 0, "asgard clear leaves target stack empty");
     test.Check(Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn)) == 1, "asgard push first core stack piece succeeds");
@@ -2241,6 +2403,10 @@ int main()
         (rubikMask & AllowedActionFusion) != 0 &&
         (rubikMask & AllowedActionProjection) == 0,
         "rubik capability mask exposes layer/core/fusion and excludes Hodge projection");
+    const std::string rubikHashBeforePerft = ReadStateHash(game);
+    test.Check(Chess3D_PerftActions(game, 0) == 1 && Chess3D_PerftActions(game, 1) >= 48 &&
+        ReadStateHash(game) == rubikHashBeforePerft,
+        "rubik action perft includes layer turns and does not mutate state");
     Chess3D_Clear(game);
     Chess3D_SetPiece(game, 2, 2, 1, 1, Rook);
     test.Check(Chess3D_BuildLegalActionPreviewForCell(game, 2, 2, 1, 1) > 0,
@@ -2397,6 +2563,9 @@ int main()
     test.Check(Chess3D_GetCurrentMacroPlayer(game) == 1 &&
         ReadAbiString(game, Chess3D_GetTurnSummary).find("hodgeProjection") != std::string::npos,
         "hodge turn controller exposes current macro-player");
+    test.Check(Chess3D_IsActionKindAllowed(game, ActionProjectionCompositeMove) == 1 &&
+        Chess3D_IsActionKindAllowed(game, ActionLayerTurn) == 0,
+        "hodge allows projection composite actions but not layer turns");
 
     int tfX = -1;
     int tfY = -1;
@@ -2446,6 +2615,10 @@ int main()
         (Chess3D_GetActionFlags(game, 1) & ActionFlagWasProjection) != 0 &&
         ReadActionNotation(game, 1).find("HPD") != std::string::npos,
         "hodge projected move applies primary and two mirror moves as one composite action");
+    const std::string hodgeHashBeforePerft = ReadStateHash(game);
+    test.Check(Chess3D_PerftActions(game, 0) == 1 && Chess3D_PerftActions(game, 1) >= 0 &&
+        ReadStateHash(game) == hodgeHashBeforePerft,
+        "hodge action perft is projection-aware and non-mutating");
 
     Chess3D_LoadRuleProfileJson(game, hodgeProfile.c_str());
     Chess3D_Clear(game);
@@ -2788,6 +2961,20 @@ int main()
         std::string playthroughError;
         test.Check(RunPlaythroughFile(game, playthroughFile, playthroughError),
             "headless playthrough PASS: " + playthroughFile + (playthroughError.empty() ? "" : " :: " + playthroughError));
+    }
+
+    const std::array<std::string, 5> regressionFiles = {
+        "assets\\rules\\scenarios\\chess3d\\regression\\invalid_click_no_mutation_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\rubik_four_turn_roundtrip_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\hodge_blocked_mirror_rollback_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\asgard_stack_fusion_anchor_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\classic_turn_progression_v0_1.json"
+    };
+    for (const std::string& regressionFile : regressionFiles)
+    {
+        std::string regressionError;
+        test.Check(RunPlaythroughFile(game, regressionFile, regressionError),
+            "headless regression PASS: " + regressionFile + (regressionError.empty() ? "" : " :: " + regressionError));
     }
 
     Chess3D_Destroy(game);

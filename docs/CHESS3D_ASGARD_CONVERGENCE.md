@@ -132,3 +132,7 @@ Deferred:
 ## P2L Playability Note
 
 Asgard remains one profile, not the default meaning of all Chess3D. In P2L the UI exposes Asgard-specific core stack, fusion, anchor, reserve, and invalid-reason state only when the active RuleProfile enables those capabilities. Classic, Single-Side, Rubik, and Hodge remain separate modes.
+
+## P2O Rule-Gate Note
+
+P2O keeps Asgard's outcome tied to `centerAssembly`/anchor completion, not Classic checkmate. The rule summary reports king safety as not applicable/deferred for this profile. Action perft/divide can enumerate shallow Asgard legal actions for diagnostics, including profile-enabled reserve restore candidates, but it does not implement destructive implosion or contested-anchor scoring.

@@ -99,3 +99,15 @@ P2N adds a serialization layer above the existing Chess3D runtime:
 - The state hash is diagnostic and deterministic, not a security feature.
 
 The layer is append-only ABI and does not change Chess2D, RubikApp, OnlineApp, CUDA optional behavior, or existing Chess3D exports.
+
+## Chess3D Rules Correctness Gate
+
+P2O adds a profile-aware playability/rules diagnostic layer above the P2N replayable runtime:
+
+- `GamePhase`, `GameOutcome`, current-turn summary, allowed action mask, and mode rule summary are exposed through append-only ABI.
+- Classic Six-Side gets draft king/check status telemetry; final full 3D checkmate/stalemate remains P3A.
+- Asgard/Rubik centerAssembly outcomes remain separate from checkmate.
+- Hodge uses macro-player/projection composite action semantics rather than side-only chess turns.
+- `Chess3D_PerftActions` and `Chess3D_DivideActionsJson` enumerate legal actions by profile for shallow diagnostic counts and never mutate the source state.
+
+This keeps rule diagnostics in the native engine while the WPF UI remains a consumer of summaries, previews, and action/replay APIs.

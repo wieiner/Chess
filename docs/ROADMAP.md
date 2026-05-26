@@ -204,3 +204,21 @@ Next:
 - P3A: full 3D king safety/check/mate/stalemate.
 - P3B: AI/search per profile.
 - P3C: online serialization.
+
+## P2O - Product Playability And Rules Correctness Gate
+
+P2O is completed in the runtime plan:
+
+- Formal rule contract for the five existing Chess3D RuleProfiles.
+- Game phase, game outcome, current turn, allowed-action, and rule-summary ABI.
+- Draft Classic king/check status reporting without pretending full checkmate is solved.
+- Profile-aware action perft/divide diagnostics with no-mutation state-hash checks.
+- UI status hardening for phase, outcome, allowed actions, and invalid/legality reasons.
+- Regression playthrough fixtures built on the P2N headless runner.
+
+Next:
+
+- P2P: richer visualization and animation for stacks, fusion, reserve, layer turns, and Hodge mirrors.
+- P3A: full 3D king safety/check/mate/stalemate.
+- P3B: AI/search integration per profile.
+- P3C: online serialization and multiplayer replay authority.

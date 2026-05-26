@@ -423,7 +423,8 @@ public partial class Chess3DWindow : Window
         ProfileCapabilitiesText.Text =
             $"ruleset {rulesetId}\n" +
             $"goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}\n" +
-            $"core {_engine.GetCorePhysicsProfileType()}, layer {_engine.GetLayerTurnProfileType()}, victory {_engine.GetVictoryProfileType()}, projection {(_engine.IsProjectionModeEnabled() ? "hodgeTriuneProjection" : "none")}" +
+            $"core {_engine.GetCorePhysicsProfileType()}, layer {_engine.GetLayerTurnProfileType()}, victory {_engine.GetVictoryProfileType()}, projection {(_engine.IsProjectionModeEnabled() ? "hodgeTriuneProjection" : "none")}\n" +
+            $"mode summary: {_engine.GetModeRuleSummary()}" +
             (string.IsNullOrWhiteSpace(lastProfileError) ? string.Empty : $"\nlast profile error: {lastProfileError}");
 
         var selectedText = _selectedSquare is { } square
@@ -431,13 +432,14 @@ public partial class Chess3DWindow : Window
             : "none";
         CommonPanelText.Text =
             $"Selected: {selectedText}\n" +
-            $"Active side: {state.SideToMove}, legal moves from selected: {selectedMoveCount}\n" +
+            $"Active side: {state.SideToMove}, macro: {_engine.GetCurrentMacroPlayer()}, phase: {_engine.GetGamePhase()}, outcome: {_engine.GetGameOutcomeName(_engine.GetGameOutcome())}\n" +
+            $"Legal moves from selected: {selectedMoveCount}, side legal actions: {_engine.GetSideLegalActionCount(state.SideToMove)}\n" +
             $"Actions: {_engine.GetActionCount()}, last: {_engine.GetLastActionNotation()}";
         ReplayPanelText.Text =
             $"State hash: {_engine.GetStateHash()}\n" +
             $"Replay cursor: {_engine.GetReplayCursor()}/{_engine.GetReplayActionCount()}\n" +
             $"Last replay error: {(_engine.GetLastReplayError().Length == 0 ? "-" : _engine.GetLastReplayError())}";
-        TurnSummaryText.Text = _engine.GetTurnSummary();
+        TurnSummaryText.Text = $"{_engine.GetCurrentTurnSummary()}\n{_engine.GetCheckStatusSummary(state.SideToMove)}";
         InvalidReasonText.Text = string.IsNullOrWhiteSpace(_lastUiInvalidReason)
             ? _engine.GetLastInvalidActionReason()
             : _lastUiInvalidReason;

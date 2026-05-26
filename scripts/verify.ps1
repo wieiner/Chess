@@ -139,6 +139,11 @@ try {
     Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Scenarios\asgard_core_playthrough_v0_1.json"
     Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Scenarios\rubik_layer_playthrough_v0_1.json"
     Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Scenarios\hodge_projection_playthrough_v0_1.json"
+    Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Scenarios\regression\invalid_click_no_mutation_v0_1.json"
+    Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Scenarios\regression\rubik_four_turn_roundtrip_v0_1.json"
+    Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Scenarios\regression\hodge_blocked_mirror_rollback_v0_1.json"
+    Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Scenarios\regression\asgard_stack_fusion_anchor_v0_1.json"
+    Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Scenarios\regression\classic_turn_progression_v0_1.json"
 
     Write-Step "Production packaging"
     Invoke-Checked { powershell -NoProfile -ExecutionPolicy Bypass -File ".\tools\release\Build-Production.ps1" -Product All } "Production packaging failed."
@@ -167,6 +172,11 @@ try {
     Assert-File "ProductionOutput\Chess3D\Assets\Rules3D\Scenarios\asgard_core_playthrough_v0_1.json"
     Assert-File "ProductionOutput\Chess3D\Assets\Rules3D\Scenarios\rubik_layer_playthrough_v0_1.json"
     Assert-File "ProductionOutput\Chess3D\Assets\Rules3D\Scenarios\hodge_projection_playthrough_v0_1.json"
+    Assert-File "ProductionOutput\Chess3D\Assets\Rules3D\Scenarios\regression\invalid_click_no_mutation_v0_1.json"
+    Assert-File "ProductionOutput\Chess3D\Assets\Rules3D\Scenarios\regression\rubik_four_turn_roundtrip_v0_1.json"
+    Assert-File "ProductionOutput\Chess3D\Assets\Rules3D\Scenarios\regression\hodge_blocked_mirror_rollback_v0_1.json"
+    Assert-File "ProductionOutput\Chess3D\Assets\Rules3D\Scenarios\regression\asgard_stack_fusion_anchor_v0_1.json"
+    Assert-File "ProductionOutput\Chess3D\Assets\Rules3D\Scenarios\regression\classic_turn_progression_v0_1.json"
 
     $excludedExtensions = @(".pdb", ".ipdb", ".iobj", ".lib", ".exp", ".ilk")
     $excludedNames = @("*.tlog", "*.lastbuildstate", "*.recipe", "*.cache", "*.log")

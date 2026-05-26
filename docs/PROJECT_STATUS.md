@@ -214,3 +214,24 @@ Still deferred:
 - replay import/export standardization beyond v0.1;
 - visual replay timeline and animation;
 - full 3D check/mate/stalemate.
+
+## P2O Status
+
+P2O hardens the five existing Chess3D modes without adding a sixth RuleProfile.
+
+Implemented:
+
+- formal runtime rule contract documentation for Classic, Single-Side, Asgard, Rubik, and Hodge;
+- append-only game phase, game outcome, allowed-action, rule-summary, and last-legality-reason ABI;
+- draft Classic king-safety/check status reporting, explicitly not final checkmate enforcement;
+- profile-aware action perft/divide diagnostics for legal action generation smoke checks;
+- non-mutating perft/divide guarantees verified by state hash;
+- Chess3D UI status now surfaces phase, outcome, mode rule summary, turn summary, and side legal-action count;
+- regression playthrough fixtures for invalid-click rollback, Rubik four-turn roundtrip, Hodge blocked-mirror rollback, Asgard stack/fusion/anchor state, and Classic turn progression.
+
+Still deferred:
+
+- full 3D king safety/check/mate/stalemate;
+- AI/search integration over profile-aware legal actions;
+- richer visualization/animation of stacks, fusion, Rubik turns, and Hodge mirrors;
+- online serialization and multiplayer authority rules.

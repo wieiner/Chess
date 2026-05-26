@@ -151,3 +151,13 @@ ProductionOutput continues to include:
 - canonical model assets
 
 The playthrough files are now runnable `chess3d-playthrough` scripts and are copied with the existing scenario asset pipeline.
+
+## P2O Regression Fixtures
+
+P2O adds regression playthrough fixtures under:
+
+- `assets\rules\scenarios\chess3d\regression`
+- `Assets\Rules3D\Scenarios\regression` in development output
+- `ProductionOutput\Chess3D\Assets\Rules3D\Scenarios\regression` in portable output
+
+`scripts\verify.ps1` checks representative regression files in both output locations. These fixtures are not RuleProfiles; they reproduce action/preview/replay bugs against the existing five modes.

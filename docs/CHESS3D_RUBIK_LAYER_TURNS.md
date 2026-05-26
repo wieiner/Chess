@@ -59,3 +59,7 @@ See also `docs/CHESS3D_RUBIK_LAYER_TURN_SEMANTICS.md` and `docs/CHESS3D_RUBIK_ST
 ## P2L Playability Note
 
 Rubik layer turns are visible and playable only when `layerTurnProfile.type = ritualTurn`, currently the Rubik Convergence profile. P2L preview and turn-summary ABI expose whether layer turns are allowed before the user attempts the action.
+
+## P2O Rule-Gate Note
+
+P2O includes Rubik layer turns in profile-aware action perft/divide only for Rubik Convergence. Asgard, Classic, Single-Side, and Hodge do not gain layer turns. Regression fixtures include a four-turn roundtrip that verifies deterministic stack/board state behavior through the headless playthrough runner.

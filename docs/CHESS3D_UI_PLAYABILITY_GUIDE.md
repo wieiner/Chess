@@ -37,3 +37,16 @@ The Chess3D control center includes a `Save / Replay` panel:
 - inspect state hash and last replay error.
 
 Use savegames for bug reports that depend on constructed board/stack/reserve state. Use replay files for action-sequence reproduction.
+
+## P2O Rule Status
+
+The control center now surfaces more rule-state information directly in status text:
+
+- active game phase and outcome;
+- current side and macro-player where relevant;
+- allowed action kinds for the selected profile;
+- mode rule summary, including whether king safety is draft, not applicable, or deferred;
+- selected side legal-action count;
+- last legality/invalid-action reason.
+
+Game-over profiles should block normal play actions until reset/load/replay. Classic remains a first-class non-Asgard mode; Asgard, Rubik, and Hodge panels are profile-gated rather than globally active.

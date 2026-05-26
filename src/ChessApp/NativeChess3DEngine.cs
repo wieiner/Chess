@@ -540,6 +540,71 @@ internal sealed class NativeChess3DEngine : IDisposable
         return ReadString((buffer, capacity) => Chess3D_GetTurnSummary(_handle, buffer, capacity));
     }
 
+    public int GetGamePhase()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetGamePhase(_handle);
+    }
+
+    public int GetGameOutcome()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetGameOutcome(_handle);
+    }
+
+    public string GetGameOutcomeName(int outcome)
+    {
+        return ReadString((buffer, capacity) => Chess3D_GetGameOutcomeName(outcome, buffer, capacity));
+    }
+
+    public string GetCurrentTurnSummary()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetCurrentTurnSummary(_handle, buffer, capacity));
+    }
+
+    public bool IsActionKindAllowed(int actionKind)
+    {
+        ThrowIfDisposed();
+        return Chess3D_IsActionKindAllowed(_handle, actionKind) != 0;
+    }
+
+    public string GetModeRuleSummary()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetModeRuleSummary(_handle, buffer, capacity));
+    }
+
+    public string GetLastMoveLegalityReason()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetLastMoveLegalityReason(_handle, buffer, capacity));
+    }
+
+    public bool IsSideInCheck(int side)
+    {
+        ThrowIfDisposed();
+        return Chess3D_IsSideInCheck(_handle, side) != 0;
+    }
+
+    public int GetSideLegalActionCount(int side)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetSideLegalActionCount(_handle, side);
+    }
+
+    public bool HasAnyLegalActionForSide(int side)
+    {
+        ThrowIfDisposed();
+        return Chess3D_HasAnyLegalActionForSide(_handle, side) != 0;
+    }
+
+    public string GetCheckStatusSummary(int side)
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetCheckStatusSummary(_handle, side, buffer, capacity));
+    }
+
     public string ExportSaveGameJson()
     {
         ThrowIfDisposed();
@@ -604,6 +669,24 @@ internal sealed class NativeChess3DEngine : IDisposable
     {
         ThrowIfDisposed();
         return ReadString((buffer, capacity) => Chess3D_GetStateHash(_handle, buffer, capacity));
+    }
+
+    public long PerftActions(int depth)
+    {
+        ThrowIfDisposed();
+        return Chess3D_PerftActions(_handle, depth);
+    }
+
+    public string DivideActionsJson(int depth)
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_DivideActionsJson(_handle, depth, buffer, capacity), 8192);
+    }
+
+    public string GetLastPerftError()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetLastPerftError(_handle, buffer, capacity));
     }
 
     public void Dispose()
@@ -875,6 +958,39 @@ internal sealed class NativeChess3DEngine : IDisposable
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_GetTurnSummary(IntPtr handle, StringBuilder buffer, int capacity);
 
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetGamePhase(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetGameOutcome(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetGameOutcomeName(int outcome, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetCurrentTurnSummary(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_IsActionKindAllowed(IntPtr handle, int actionKind);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetModeRuleSummary(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastMoveLegalityReason(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_IsSideInCheck(IntPtr handle, int side);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetSideLegalActionCount(IntPtr handle, int side);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_HasAnyLegalActionForSide(IntPtr handle, int side);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetCheckStatusSummary(IntPtr handle, int side, StringBuilder buffer, int capacity);
+
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_ExportSaveGameJson(IntPtr handle, StringBuilder buffer, int capacity);
 
@@ -907,6 +1023,15 @@ internal sealed class NativeChess3DEngine : IDisposable
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_GetStateHash(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern long Chess3D_PerftActions(IntPtr handle, int depth);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_DivideActionsJson(IntPtr handle, int depth, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastPerftError(IntPtr handle, StringBuilder buffer, int capacity);
 }
 
 [StructLayout(LayoutKind.Sequential)]

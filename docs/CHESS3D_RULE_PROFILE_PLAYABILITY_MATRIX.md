@@ -28,3 +28,15 @@ All five real Chess3D profiles now have runnable headless playthrough JSON:
 - Hodge Projection Duel
 
 These files are scenarios, not additional RuleProfiles. The real Chess3D RuleProfile count remains exactly five.
+
+## P2O Rule-Gate Status
+
+| Profile | P2O rule outcome status | Perft/divide status | Check/mate status |
+| --- | --- | --- | --- |
+| Classic Six-Side | playing/gameOver telemetry, draft classic outcome summary | shallow action perft/divide | draft check status only |
+| Single-Side Training | sandbox/training outcome summary | shallow action perft/divide | not applied |
+| Asgard Convergence | centerAssembly outcome remains active | shallow action perft/divide over moves/reserve/core actions | not applicable/deferred |
+| Rubik Convergence | centerAssembly plus layer-turn action status | shallow action perft/divide includes layer turns | not applicable/deferred |
+| Hodge Projection Duel | macro-player projection status | shallow action perft/divide includes projected composite candidates | deferred |
+
+No sixth RuleProfile is introduced by P2O. Regression fixtures and playthroughs remain test data.

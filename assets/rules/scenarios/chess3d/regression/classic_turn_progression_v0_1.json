@@ -1,0 +1,24 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "classic-turn-progression-v0.1",
+  "profileFile": "classic_six_side_3d_v0_1.json",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "Regression fixture: Classic stays non-Asgard and records normal turn progression through action history.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "clearBoard" },
+    { "type": "setPiece", "side": 1, "pieceType": 4, "x": 0, "y": 0, "z": 0 },
+    { "type": "setPiece", "side": 2, "pieceType": 1, "x": 0, "y": 0, "z": 3 },
+    { "type": "setPiece", "side": 2, "pieceType": 4, "x": 7, "y": 7, "z": 7 },
+    { "type": "move", "fromX": 0, "fromY": 0, "fromZ": 0, "toX": 0, "toY": 0, "toZ": 3 },
+    { "type": "assertPiece", "x": 0, "y": 0, "z": 3, "pieceCode": 14 },
+    { "type": "assertPiece", "x": 7, "y": 7, "z": 7, "pieceCode": 24 },
+    { "type": "assertReserveCount", "side": 2, "pieceType": 1, "count": 0 },
+    { "type": "assertActionCount", "count": 1 },
+    { "type": "assertGameOutcome", "value": 0 }
+  ],
+  "knownLimitations": [
+    "Full Classic Six-Side checkmate remains a draft status, not a hardened outcome."
+  ]
+}

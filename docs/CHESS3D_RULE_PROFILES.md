@@ -110,3 +110,11 @@ There are exactly five real Chess3D RuleProfiles at P2L:
 - Hodge Projection Duel
 
 Scenario smoke and playthrough files are not RuleProfiles. The playability status of each profile is tracked in `docs/CHESS3D_RULE_PROFILE_PLAYABILITY_MATRIX.md`.
+
+## P2O Formal Rule Gate
+
+The five RuleProfiles now have a formal runtime contract in `docs/CHESS3D_FORMAL_RULE_CONTRACT.md`.
+
+The engine exposes profile-aware phase/outcome/allowed-action summaries and action perft/divide diagnostics. These diagnostics do not change the RuleProfile count and do not promote any scenario or regression file to a mode.
+
+Classic checkmate is still draft. Asgard/Rubik centerAssembly, Hodge projection turns, and Rubik layer turns remain profile-gated and independent.

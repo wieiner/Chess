@@ -144,6 +144,25 @@ enum TurnKind
     TurnKindHodge = 5
 };
 
+enum GamePhase
+{
+    GamePhaseSetup = 1,
+    GamePhasePlaying = 2,
+    GamePhaseGameOver = 3
+};
+
+enum GameOutcome
+{
+    GameOutcomeNone = 0,
+    GameOutcomeCheckmateDraft = 1,
+    GameOutcomeStalemateDraft = 2,
+    GameOutcomeCenterAssemblyComplete = 3,
+    GameOutcomeResignationFuture = 4,
+    GameOutcomeDrawFuture = 5,
+    GameOutcomeInvalidProfile = 6,
+    GameOutcomeReplayComplete = 7
+};
+
 struct Vec3
 {
     int x = 0;
@@ -332,6 +351,7 @@ struct Game
     std::string lastReserveRestoreInfo;
     std::string lastProjectionError;
     std::string lastInvalidActionReason;
+    std::string lastPerftError;
     bool gameOver = false;
     int winnerSide = 0;
     std::string lastProfileLoadError;
@@ -340,6 +360,7 @@ struct Game
 
 int nextSide(const Rules& rules, int side);
 void recomputeAnchors(Game& game);
+std::vector<Move> generateMoves(const Game& game, const Position& pos);
 bool isProjectionModeEnabled(const Rules& rules);
 int macroPlayerForSide(const Rules& rules, int side);
 bool isCenterAssemblyGoal(const Rules& rules);
@@ -1345,6 +1366,7 @@ void clearActionHistory(Game& game)
     game.lastReserveRestoreInfo.clear();
     game.lastProjectionError.clear();
     game.lastInvalidActionReason.clear();
+    game.lastPerftError.clear();
 }
 
 void clearGamePosition(Game& game)
@@ -1864,6 +1886,137 @@ std::string turnKindName(int kind)
     case TurnKindRubik: return "rubik";
     case TurnKindHodge: return "hodgeProjection";
     default: return "unknown";
+    }
+}
+
+std::string gamePhaseName(int phase)
+{
+    switch (phase)
+    {
+    case GamePhaseSetup: return "setup";
+    case GamePhasePlaying: return "playing";
+    case GamePhaseGameOver: return "gameOver";
+    default: return "unknown";
+    }
+}
+
+std::string gameOutcomeName(int outcome)
+{
+    switch (outcome)
+    {
+    case GameOutcomeNone: return "none";
+    case GameOutcomeCheckmateDraft: return "checkmateDraft";
+    case GameOutcomeStalemateDraft: return "stalemateDraft";
+    case GameOutcomeCenterAssemblyComplete: return "centerAssemblyComplete";
+    case GameOutcomeResignationFuture: return "resignationFuture";
+    case GameOutcomeDrawFuture: return "drawFuture";
+    case GameOutcomeInvalidProfile: return "invalidProfile";
+    case GameOutcomeReplayComplete: return "replayComplete";
+    default: return "unknown";
+    }
+}
+
+int gamePhase(const Game& game)
+{
+    return game.gameOver ? GamePhaseGameOver : GamePhasePlaying;
+}
+
+bool isClassicCheckmateProfile(const Rules& rules)
+{
+    return rules.goalProfileType == "classicCheckmate" || rules.victoryProfileType == "checkmate";
+}
+
+bool isSideInCheckDraft(const Game& game, int side)
+{
+    if (side < 1 || side > game.rules.activeSideCount || !isClassicCheckmateProfile(game.rules))
+    {
+        return false;
+    }
+
+    int kingSquare = -1;
+    for (int i = 0; i < CellCount; ++i)
+    {
+        const int piece = game.pos.board[static_cast<std::size_t>(i)];
+        if (pieceSide(piece) == side && pieceType(piece) == King)
+        {
+            kingSquare = i;
+            break;
+        }
+    }
+    if (kingSquare < 0)
+    {
+        return false;
+    }
+
+    for (int attacker = 1; attacker <= game.rules.activeSideCount; ++attacker)
+    {
+        if (attacker == side)
+        {
+            continue;
+        }
+        Position scoped = game.pos;
+        scoped.sideToMove = attacker;
+        const auto moves = generateMoves(game, scoped);
+        if (std::any_of(moves.begin(), moves.end(), [&](const Move& move) { return move.to == kingSquare; }))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+int sideLegalMoveCount(const Game& game, int side)
+{
+    if (side < 1 || side > game.rules.activeSideCount)
+    {
+        return 0;
+    }
+    Position scoped = game.pos;
+    scoped.sideToMove = side;
+    return static_cast<int>(generateMoves(game, scoped).size());
+}
+
+int gameOutcome(const Game& game)
+{
+    if (game.gameOver && isCenterAssemblyGoal(game.rules))
+    {
+        return GameOutcomeCenterAssemblyComplete;
+    }
+    if (isClassicCheckmateProfile(game.rules))
+    {
+        const int side = game.pos.sideToMove;
+        const bool noActions = sideLegalMoveCount(game, side) == 0;
+        if (noActions && isSideInCheckDraft(game, side))
+        {
+            return GameOutcomeCheckmateDraft;
+        }
+        if (noActions)
+        {
+            return GameOutcomeStalemateDraft;
+        }
+    }
+    if (!game.replayActions.empty() && game.replayCursor >= static_cast<int>(game.replayActions.size()))
+    {
+        return GameOutcomeReplayComplete;
+    }
+    return GameOutcomeNone;
+}
+
+bool isActionKindAllowed(const Game& game, int actionKind)
+{
+    const int mask = allowedActionMask(game);
+    switch (actionKind)
+    {
+    case ActionMove:
+        return (mask & (AllowedActionNormalMove | AllowedActionCapture)) != 0;
+    case ActionLayerTurn:
+        return (mask & AllowedActionLayerTurn) != 0;
+    case ActionReserveRestore:
+        return (mask & AllowedActionReserveRestore) != 0;
+    case ActionProjectionCompositeMove:
+        return (mask & AllowedActionProjection) != 0;
+    default:
+        return false;
     }
 }
 
@@ -3668,6 +3821,274 @@ bool applyReplayAction(Game& game, const ReplayAction& action, std::string& erro
     return false;
 }
 
+struct DiagnosticAction
+{
+    int actionKind = ActionNone;
+    int side = 0;
+    int from = -1;
+    int to = -1;
+    int axis = -1;
+    int layer = -1;
+    int quarterTurns = 0;
+    int pieceType = Empty;
+    std::string label;
+};
+
+std::string diagnosticActionLabel(const DiagnosticAction& action)
+{
+    std::ostringstream out;
+    if (action.actionKind == ActionMove)
+    {
+        out << "S" << action.side << " " << coordText(xOf(action.from), yOf(action.from), zOf(action.from))
+            << "->" << coordText(xOf(action.to), yOf(action.to), zOf(action.to));
+    }
+    else if (action.actionKind == ActionProjectionCompositeMove)
+    {
+        out << "M" << action.side << " HPD " << coordText(xOf(action.from), yOf(action.from), zOf(action.from))
+            << "->" << coordText(xOf(action.to), yOf(action.to), zOf(action.to));
+    }
+    else if (action.actionKind == ActionLayerTurn)
+    {
+        out << "LAYER " << layerTurnAxisName(action.axis) << "[" << action.layer << "]" << layerTurnSign(action.quarterTurns);
+    }
+    else if (action.actionKind == ActionReserveRestore)
+    {
+        out << "S" << action.side << " RESTORE " << pieceName(makePiece(action.side, action.pieceType))
+            << " reserve->" << coordText(xOf(action.to), yOf(action.to), zOf(action.to));
+    }
+    else
+    {
+        out << "unknown";
+    }
+    return out.str();
+}
+
+bool applyDiagnosticAction(Game& game, const DiagnosticAction& action, std::string& error)
+{
+    Chess3DMoveDto played{};
+    if (action.actionKind == ActionMove)
+    {
+        if (Chess3D_TryMakeMove(&game, xOf(action.from), yOf(action.from), zOf(action.from),
+            xOf(action.to), yOf(action.to), zOf(action.to), Queen, &played) == 0)
+        {
+            error = game.lastInvalidActionReason.empty() ? "perft move rejected" : game.lastInvalidActionReason;
+            return false;
+        }
+        return true;
+    }
+    if (action.actionKind == ActionProjectionCompositeMove)
+    {
+        if (Chess3D_TryMakeProjectedMove(&game, action.side, xOf(action.from), yOf(action.from), zOf(action.from),
+            xOf(action.to), yOf(action.to), zOf(action.to), Queen, &played) == 0)
+        {
+            error = game.lastProjectionError.empty() ? "perft projected move rejected" : game.lastProjectionError;
+            return false;
+        }
+        return true;
+    }
+    if (action.actionKind == ActionLayerTurn)
+    {
+        if (Chess3D_RotateLayer(&game, action.axis, action.layer, action.quarterTurns) == 0)
+        {
+            error = game.lastInvalidActionReason.empty() ? "perft layer turn rejected" : game.lastInvalidActionReason;
+            return false;
+        }
+        return true;
+    }
+    if (action.actionKind == ActionReserveRestore)
+    {
+        if (Chess3D_RestoreReservePiece(&game, action.side, action.pieceType, xOf(action.to), yOf(action.to), zOf(action.to)) == 0)
+        {
+            error = game.lastInvalidActionReason.empty() ? "perft reserve restore rejected" : game.lastInvalidActionReason;
+            return false;
+        }
+        return true;
+    }
+    error = "perft unsupported action kind";
+    return false;
+}
+
+std::vector<DiagnosticAction> enumerateDiagnosticActions(const Game& game)
+{
+    std::vector<DiagnosticAction> actions;
+    if (game.gameOver)
+    {
+        return actions;
+    }
+
+    if (isProjectionModeEnabled(game.rules))
+    {
+        const int macro = macroPlayerForSide(game.rules, game.pos.sideToMove);
+        if (macro >= 1 && macro <= game.rules.projectionMacroPlayerCount)
+        {
+            for (int i = 0; i < game.rules.projectionCountPerMacroPlayer; ++i)
+            {
+                const int side = game.rules.projectionGroups[macro][i];
+                Position scoped = game.pos;
+                scoped.sideToMove = side;
+                for (const Move& move : generateMoves(game, scoped))
+                {
+                    Game copy = game;
+                    Chess3DMoveDto played{};
+                    if (Chess3D_TryMakeProjectedMove(&copy, side, xOf(move.from), yOf(move.from), zOf(move.from),
+                        xOf(move.to), yOf(move.to), zOf(move.to), Queen, &played) != 0)
+                    {
+                        DiagnosticAction action{};
+                        action.actionKind = ActionProjectionCompositeMove;
+                        action.side = side;
+                        action.from = move.from;
+                        action.to = move.to;
+                        action.label = diagnosticActionLabel(action);
+                        actions.push_back(std::move(action));
+                    }
+                }
+            }
+        }
+        return actions;
+    }
+
+    for (const Move& move : generateMoves(game, game.pos))
+    {
+        DiagnosticAction action{};
+        action.actionKind = ActionMove;
+        action.side = game.pos.sideToMove;
+        action.from = move.from;
+        action.to = move.to;
+        action.label = diagnosticActionLabel(action);
+        actions.push_back(std::move(action));
+    }
+
+    if (isLayerTurnEnabled(game.rules))
+    {
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            for (int layer = 0; layer < BoardSize; ++layer)
+            {
+                for (int quarterTurns : { -1, 1 })
+                {
+                    if (isValidLayerTurnAxis(axis) && isValidLayerTurnLayer(layer) && isValidLayerTurnQuarterTurns(quarterTurns))
+                    {
+                        DiagnosticAction action{};
+                        action.actionKind = ActionLayerTurn;
+                        action.axis = axis;
+                        action.layer = layer;
+                        action.quarterTurns = quarterTurns;
+                        action.label = diagnosticActionLabel(action);
+                        actions.push_back(std::move(action));
+                    }
+                }
+            }
+        }
+    }
+
+    if (isReserveEnabled(game.rules))
+    {
+        const int side = game.pos.sideToMove;
+        for (int type = Pawn; type <= King; ++type)
+        {
+            if (side < 1 || side > 6 || game.reserveCounts[side][type] <= 0)
+            {
+                continue;
+            }
+            for (int i = 0; i < CellCount; ++i)
+            {
+                if (canRestoreReservePiece(game, side, type, xOf(i), yOf(i), zOf(i)))
+                {
+                    DiagnosticAction action{};
+                    action.actionKind = ActionReserveRestore;
+                    action.side = side;
+                    action.pieceType = type;
+                    action.to = i;
+                    action.label = diagnosticActionLabel(action);
+                    actions.push_back(std::move(action));
+                }
+            }
+        }
+    }
+    return actions;
+}
+
+long long perftActions(Game& game, int depth, std::string& error)
+{
+    if (depth < 0 || depth > 3)
+    {
+        error = "Action perft supports depth 0..3 in v0.1.";
+        return -1;
+    }
+    if (depth == 0)
+    {
+        return 1;
+    }
+    const auto actions = enumerateDiagnosticActions(game);
+    if (depth == 1)
+    {
+        return static_cast<long long>(actions.size());
+    }
+
+    long long total = 0;
+    for (const DiagnosticAction& action : actions)
+    {
+        Game child = game;
+        if (!applyDiagnosticAction(child, action, error))
+        {
+            return -1;
+        }
+        const long long childCount = perftActions(child, depth - 1, error);
+        if (childCount < 0)
+        {
+            return -1;
+        }
+        total += childCount;
+    }
+    return total;
+}
+
+std::string divideActionsJson(Game& game, int depth, std::string& error)
+{
+    if (depth < 1 || depth > 3)
+    {
+        error = "Action divide supports depth 1..3 in v0.1.";
+        return {};
+    }
+    const auto actions = enumerateDiagnosticActions(game);
+    std::ostringstream out;
+    out << "{\n  \"format\": \"chess3d-action-divide\",\n"
+        << "  \"version\": \"0.1\",\n"
+        << "  \"rulesetId\": \"" << jsonEscape(game.rules.rulesetId) << "\",\n"
+        << "  \"depth\": " << depth << ",\n"
+        << "  \"actions\": [\n";
+    long long total = 0;
+    for (std::size_t i = 0; i < actions.size(); ++i)
+    {
+        Game child = game;
+        long long count = 1;
+        if (!applyDiagnosticAction(child, actions[i], error))
+        {
+            return {};
+        }
+        if (depth > 1)
+        {
+            count = perftActions(child, depth - 1, error);
+            if (count < 0)
+            {
+                return {};
+            }
+        }
+        total += count;
+        out << "    {\"index\":" << (i + 1)
+            << ",\"actionKind\":" << actions[i].actionKind
+            << ",\"notation\":\"" << jsonEscape(actions[i].label)
+            << "\",\"nodes\":" << count << "}";
+        if (i + 1 < actions.size())
+        {
+            out << ",";
+        }
+        out << "\n";
+    }
+    out << "  ],\n  \"total\": " << total << "\n}";
+    return out.str();
+}
+
 Game* asGame(void* handle)
 {
     return static_cast<Game*>(handle);
@@ -4533,6 +4954,139 @@ CHESS3D_API int Chess3D_GetTurnSummary(void* handle, char* buffer, int capacity)
     return copyString(summary.str(), buffer, capacity);
 }
 
+CHESS3D_API int Chess3D_GetGamePhase(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? gamePhase(*game) : 0;
+}
+
+CHESS3D_API int Chess3D_GetGameOutcome(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? gameOutcome(*game) : GameOutcomeInvalidProfile;
+}
+
+CHESS3D_API int Chess3D_GetGameOutcomeName(int outcome, char* buffer, int capacity)
+{
+    return copyString(gameOutcomeName(outcome), buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_GetCurrentTurnSummary(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return copyString("", buffer, capacity);
+    }
+    std::ostringstream summary;
+    summary << "phase=" << gamePhaseName(gamePhase(*game))
+        << "; outcome=" << gameOutcomeName(gameOutcome(*game))
+        << "; " << "turnKind=" << turnKindName(currentTurnKind(*game))
+        << "; side=" << game->pos.sideToMove
+        << "; macroPlayer=" << macroPlayerForSide(game->rules, game->pos.sideToMove)
+        << "; allowedMask=" << allowedActionMask(*game)
+        << "; gameOver=" << (game->gameOver ? "true" : "false")
+        << "; winnerSide=" << game->winnerSide;
+    return copyString(summary.str(), buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_IsActionKindAllowed(void* handle, int actionKind)
+{
+    auto* game = asGame(handle);
+    return game != nullptr && isActionKindAllowed(*game, actionKind) ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_GetModeRuleSummary(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return copyString("", buffer, capacity);
+    }
+    std::ostringstream summary;
+    summary << "ruleset=" << game->rules.rulesetId
+        << "; goal=" << game->rules.goalProfileType
+        << "; capture=" << game->rules.captureProfileType
+        << "; occupancy=" << game->rules.occupancyProfileType
+        << "; fusion=" << game->rules.fusionProfileType
+        << "; layerTurn=" << game->rules.layerTurnProfileType
+        << "; projection=" << game->rules.projectionProfileType
+        << "; victory=" << game->rules.victoryProfileType;
+    if (isClassicCheckmateProfile(game->rules))
+    {
+        summary << "; kingSafety=checkmateDraft";
+    }
+    else
+    {
+        summary << "; kingSafety=notApplicableOrDeferred";
+    }
+    return copyString(summary.str(), buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_GetLastMoveLegalityReason(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->lastInvalidActionReason, buffer, capacity) : copyString("", buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_IsSideInCheck(void* handle, int side)
+{
+    auto* game = asGame(handle);
+    return game != nullptr && isSideInCheckDraft(*game, side) ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_GetSideLegalActionCount(void* handle, int side)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || side < 1 || side > game->rules.activeSideCount)
+    {
+        return 0;
+    }
+    if (isProjectionModeEnabled(game->rules))
+    {
+        Game copy = *game;
+        copy.pos.sideToMove = side;
+        return static_cast<int>(enumerateDiagnosticActions(copy).size());
+    }
+    Position scoped = game->pos;
+    scoped.sideToMove = side;
+    int count = static_cast<int>(generateMoves(*game, scoped).size());
+    if (side == game->pos.sideToMove)
+    {
+        const int specialCount = static_cast<int>(enumerateDiagnosticActions(*game).size()) - static_cast<int>(generateMoves(*game, game->pos).size());
+        count += std::max(0, specialCount);
+    }
+    return count;
+}
+
+CHESS3D_API int Chess3D_HasAnyLegalActionForSide(void* handle, int side)
+{
+    return Chess3D_GetSideLegalActionCount(handle, side) > 0 ? 1 : 0;
+}
+
+CHESS3D_API int Chess3D_GetCheckStatusSummary(void* handle, int side, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return copyString("", buffer, capacity);
+    }
+    std::ostringstream summary;
+    const bool applicable = isClassicCheckmateProfile(game->rules);
+    const bool inCheck = isSideInCheckDraft(*game, side);
+    const int legalCount = Chess3D_GetSideLegalActionCount(handle, side);
+    summary << "side=" << side
+        << "; applicable=" << (applicable ? "true" : "false")
+        << "; status=" << (applicable ? "draft" : "notApplicable")
+        << "; inCheck=" << (inCheck ? "true" : "false")
+        << "; legalActionCount=" << legalCount;
+    if (applicable && legalCount == 0)
+    {
+        summary << "; outcomeDraft=" << (inCheck ? "checkmateDraft" : "stalemateDraft");
+    }
+    return copyString(summary.str(), buffer, capacity);
+}
+
 CHESS3D_API int Chess3D_GetRulesInfo(void* handle, Chess3DRulesInfoDto* info)
 {
     auto* game = asGame(handle);
@@ -5341,6 +5895,50 @@ CHESS3D_API int Chess3D_GetStateHash(void* handle, char* buffer, int capacity)
 {
     auto* game = asGame(handle);
     return game != nullptr ? copyString(stateHash(*game), buffer, capacity) : 0;
+}
+
+CHESS3D_API long long Chess3D_PerftActions(void* handle, int depth)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return -1;
+    }
+    Game copy = *game;
+    std::string error;
+    const long long nodes = perftActions(copy, depth, error);
+    if (nodes < 0)
+    {
+        game->lastPerftError = error;
+        return -1;
+    }
+    game->lastPerftError.clear();
+    return nodes;
+}
+
+CHESS3D_API int Chess3D_DivideActionsJson(void* handle, int depth, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return copyString("", buffer, capacity);
+    }
+    Game copy = *game;
+    std::string error;
+    const std::string json = divideActionsJson(copy, depth, error);
+    if (json.empty())
+    {
+        game->lastPerftError = error.empty() ? "Action divide failed." : error;
+        return copyString("", buffer, capacity);
+    }
+    game->lastPerftError.clear();
+    return copyString(json, buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_GetLastPerftError(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->lastPerftError, buffer, capacity) : copyString("", buffer, capacity);
 }
 
 CHESS3D_API int Chess3D_GetPositionText(void* handle, char* buffer, int capacity)

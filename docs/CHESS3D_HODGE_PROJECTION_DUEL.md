@@ -64,3 +64,7 @@ This is still not a full Hodge editor, replay system, or AI/search integration.
 ## P2L Playability Note
 
 Hodge Projection Duel remains separate from Asgard. P2L exposes Hodge capability through the turn summary, projection panel, legal action preview, and invalid-action reasons. Hodge defaults to exclusive occupancy, classic capture, no core stacks, no fusion, no reserve, and no Rubik layer turns.
+
+## P2O Rule-Gate Note
+
+P2O keeps Hodge on macro-player projection turns. The rule summary reports projection composite moves as the profile's special action and does not apply Asgard core/fusion, Rubik layer turns, or automatic Classic checkmate. Action perft/divide can enumerate shallow all-or-nothing projected candidates for diagnostics, and regression fixtures cover blocked-mirror rollback.
