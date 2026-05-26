@@ -46,4 +46,6 @@ P2L legal action preview is intentionally not action history. Preview calls do n
 
 ## P2K UI Exposure
 
-`Chess3DApp` now shows the action stream in the control center. The UI can refresh, copy, and save a `.ch3dlog` text file. The file starts with the active `rulesetId`, followed by deterministic notation lines. Import/replay is still deferred to P2L.
+`Chess3DApp` shows the action stream in the control center. The UI can refresh, copy, and save a `.ch3dlog` text file. The file starts with the active `rulesetId`, followed by deterministic notation lines.
+
+P2N adds structured replay through `.ch3dreplay`. The replay file stores action records as JSON rather than relying on parsing free-form notation.

@@ -433,6 +433,10 @@ public partial class Chess3DWindow : Window
             $"Selected: {selectedText}\n" +
             $"Active side: {state.SideToMove}, legal moves from selected: {selectedMoveCount}\n" +
             $"Actions: {_engine.GetActionCount()}, last: {_engine.GetLastActionNotation()}";
+        ReplayPanelText.Text =
+            $"State hash: {_engine.GetStateHash()}\n" +
+            $"Replay cursor: {_engine.GetReplayCursor()}/{_engine.GetReplayActionCount()}\n" +
+            $"Last replay error: {(_engine.GetLastReplayError().Length == 0 ? "-" : _engine.GetLastReplayError())}";
         TurnSummaryText.Text = _engine.GetTurnSummary();
         InvalidReasonText.Text = string.IsNullOrWhiteSpace(_lastUiInvalidReason)
             ? _engine.GetLastInvalidActionReason()
@@ -967,6 +971,108 @@ public partial class Chess3DWindow : Window
         {
             File.WriteAllText(dialog.FileName, BuildActionLogText());
         }
+    }
+
+    private void SaveGame_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Chess3D savegame (*.ch3dsave)|*.ch3dsave|JSON files (*.json)|*.json|All files (*.*)|*.*",
+            FileName = $"{SanitizeFileName(_engine.GetCurrentRulesetId())}.ch3dsave"
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            File.WriteAllText(dialog.FileName, _engine.ExportSaveGameJson());
+            RefreshAll();
+        }
+    }
+
+    private void LoadGame_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = "Chess3D savegame (*.ch3dsave)|*.ch3dsave|JSON files (*.json)|*.json|All files (*.*)|*.*"
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+        if (!_engine.LoadSaveGameJson(File.ReadAllText(dialog.FileName)))
+        {
+            MessageBox.Show(this, $"Load failed: {_engine.GetLastReplayError()}", "Chess3D Save", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        _selectedSquare = null;
+        RefreshAll();
+    }
+
+    private void ExportReplay_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Chess3D replay (*.ch3dreplay)|*.ch3dreplay|JSON files (*.json)|*.json|All files (*.*)|*.*",
+            FileName = $"{SanitizeFileName(_engine.GetCurrentRulesetId())}.ch3dreplay"
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            File.WriteAllText(dialog.FileName, _engine.ExportReplayJson());
+            RefreshAll();
+        }
+    }
+
+    private void ImportReplay_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = "Chess3D replay (*.ch3dreplay)|*.ch3dreplay|JSON files (*.json)|*.json|All files (*.*)|*.*"
+        };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+        if (!_engine.LoadReplayJson(File.ReadAllText(dialog.FileName)))
+        {
+            MessageBox.Show(this, $"Import replay failed: {_engine.GetLastReplayError()}", "Chess3D Replay", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        _selectedSquare = null;
+        RefreshAll();
+    }
+
+    private void ReplayStep_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_engine.ReplayAction())
+        {
+            MessageBox.Show(this, $"Replay step failed: {_engine.GetLastReplayError()}", "Chess3D Replay", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        _selectedSquare = null;
+        RefreshAll();
+    }
+
+    private void ReplayAll_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_engine.ReplayAll())
+        {
+            MessageBox.Show(this, $"Replay failed: {_engine.GetLastReplayError()}", "Chess3D Replay", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        _selectedSquare = null;
+        RefreshAll();
+    }
+
+    private void ResetReplayCursor_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_engine.ResetReplayCursor())
+        {
+            MessageBox.Show(this, $"Replay reset failed: {_engine.GetLastReplayError()}", "Chess3D Replay", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        _selectedSquare = null;
+        RefreshAll();
+    }
+
+    private void ShowStateHash_Click(object sender, RoutedEventArgs e)
+    {
+        MessageBox.Show(this, _engine.GetStateHash(), "Chess3D State Hash", MessageBoxButton.OK, MessageBoxImage.Information);
+        RefreshAll();
     }
 
     private void RubikRotate_Click(object sender, RoutedEventArgs e)

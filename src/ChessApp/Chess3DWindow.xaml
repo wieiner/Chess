@@ -345,6 +345,26 @@
                         </Border>
                     </Expander>
 
+                    <Expander Header="Save / Replay" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
+                        <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CommandBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
+                            <StackPanel>
+                                <WrapPanel>
+                                    <Button Content="Save Game" Click="SaveGame_Click" />
+                                    <Button Content="Load Game" Click="LoadGame_Click" />
+                                    <Button Content="Export Replay" Click="ExportReplay_Click" />
+                                    <Button Content="Import Replay" Click="ImportReplay_Click" />
+                                </WrapPanel>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button Content="Replay Step" Click="ReplayStep_Click" />
+                                    <Button Content="Replay All" Click="ReplayAll_Click" />
+                                    <Button Content="Reset Cursor" Click="ResetReplayCursor_Click" />
+                                    <Button Content="State Hash" Click="ShowStateHash_Click" />
+                                </WrapPanel>
+                                <TextBlock x:Name="ReplayPanelText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
                     <Expander Header="Scenario Smoke Pack" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
                         <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CommandBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
                             <StackPanel>

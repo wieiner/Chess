@@ -195,3 +195,22 @@ Portable outputs:
 - GPU parity/performance needs more benchmark baselines on real target hardware.
 - The project currently relies on local Visual Studio/MSBuild and vcpkg environment availability.
 - Recommended next stage is P2N: save/load/replay/export/import over P2I/P2J/P2K/P2L/P2M action history and visual asset metadata, then P2O richer visualization/animation for stack/fusion/reserve/layer-turn/projection state.
+## P2N Status
+
+P2N adds reproducibility to the existing five Chess3D modes. No sixth mode was added.
+
+Implemented:
+
+- savegame JSON snapshot ABI and UI;
+- replay JSON ABI and UI;
+- replay cursor/error state;
+- state hash;
+- runnable playthrough JSON for Classic, Single-Side, Asgard, Rubik, and Hodge;
+- contract coverage for save/load/replay/playthrough roundtrips.
+
+Still deferred:
+
+- online serialization;
+- replay import/export standardization beyond v0.1;
+- visual replay timeline and animation;
+- full 3D check/mate/stalemate.

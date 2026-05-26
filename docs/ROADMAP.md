@@ -187,3 +187,20 @@
 - Keep GitHub Actions Windows build verification green.
 - Produce zipped portable artifacts.
 - Optionally add installer packaging later.
+## P2N - Save / Load / Replay / Playthrough Runner
+
+P2N is completed in the runtime plan:
+
+- `.ch3dsave` JSON snapshot export/import.
+- `.ch3dreplay` JSON action replay import/export.
+- Engine-level replay cursor and replay errors.
+- Deterministic state hash for diagnostics.
+- Runnable headless playthrough JSON for all five Chess3D RuleProfiles.
+- Minimal Chess3D UI panel for save/load/replay/hash.
+
+Next:
+
+- P2O: richer visualization and animation.
+- P3A: full 3D king safety/check/mate/stalemate.
+- P3B: AI/search per profile.
+- P3C: online serialization.

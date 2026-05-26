@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstdint>
 #include <cstring>
 #include <initializer_list>
 #include <limits>
@@ -272,6 +273,27 @@ struct ActionRecord
     std::string info;
 };
 
+struct ReplayAction
+{
+    int actionIndex = 0;
+    int actionKind = ActionNone;
+    int side = 0;
+    int pieceCode = 0;
+    int pieceType = 0;
+    int fromX = -1;
+    int fromY = -1;
+    int fromZ = -1;
+    int toX = -1;
+    int toY = -1;
+    int toZ = -1;
+    int axis = -1;
+    int layer = -1;
+    int quarterTurns = 0;
+    int reserveSide = 0;
+    int reservePieceType = 0;
+    std::string notation;
+};
+
 struct LegalActionPreviewEntry
 {
     Chess3DLegalActionPreviewEntryDto dto{};
@@ -301,6 +323,11 @@ struct Game
     int lastLayerTurnQuarterTurns = 0;
     int lastLayerTurnResultCode = LayerTurnNone;
     std::vector<ActionRecord> actionHistory;
+    std::vector<ReplayAction> replayActions;
+    int replayCursor = 0;
+    std::string replayInitialRulesetId;
+    std::string replayInitialSaveJson;
+    std::string lastReplayError;
     std::vector<LegalActionPreviewEntry> selectionPreview;
     std::string lastReserveRestoreInfo;
     std::string lastProjectionError;
@@ -316,6 +343,7 @@ void recomputeAnchors(Game& game);
 bool isProjectionModeEnabled(const Rules& rules);
 int macroPlayerForSide(const Rules& rules, int side);
 bool isCenterAssemblyGoal(const Rules& rules);
+int currentTurnKind(const Game& game);
 void generatePieceMoves(const Game& game, const Position& pos, int from, std::vector<Move>& moves);
 
 bool inside(int x, int y, int z)
@@ -1308,6 +1336,11 @@ void clearLastLayerTurnState(Game& game)
 void clearActionHistory(Game& game)
 {
     game.actionHistory.clear();
+    game.replayActions.clear();
+    game.replayCursor = 0;
+    game.replayInitialRulesetId.clear();
+    game.replayInitialSaveJson.clear();
+    game.lastReplayError.clear();
     game.selectionPreview.clear();
     game.lastReserveRestoreInfo.clear();
     game.lastProjectionError.clear();
@@ -3031,6 +3064,610 @@ std::string positionText(const Position& pos)
     return out.str();
 }
 
+std::string jsonEscape(const std::string& value)
+{
+    std::string out;
+    out.reserve(value.size() + 8);
+    for (char ch : value)
+    {
+        switch (ch)
+        {
+        case '\\': out += "\\\\"; break;
+        case '"': out += "\\\""; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        default:
+            if (static_cast<unsigned char>(ch) < 0x20)
+            {
+                out += ' ';
+            }
+            else
+            {
+                out += ch;
+            }
+            break;
+        }
+    }
+    return out;
+}
+
+std::string jsonUnescape(const std::string& value)
+{
+    std::string out;
+    out.reserve(value.size());
+    for (std::size_t i = 0; i < value.size(); ++i)
+    {
+        const char ch = value[i];
+        if (ch != '\\' || i + 1 >= value.size())
+        {
+            out += ch;
+            continue;
+        }
+        const char next = value[++i];
+        switch (next)
+        {
+        case '\\': out += '\\'; break;
+        case '"': out += '"'; break;
+        case 'n': out += '\n'; break;
+        case 'r': out += '\r'; break;
+        case 't': out += '\t'; break;
+        default: out += next; break;
+        }
+    }
+    return out;
+}
+
+std::string extractEscapedString(const std::string& json, const std::string& key, const std::string& fallback = "")
+{
+    const auto keyPos = json.find("\"" + key + "\"");
+    if (keyPos == std::string::npos)
+    {
+        return fallback;
+    }
+    const auto colon = json.find(':', keyPos);
+    if (colon == std::string::npos)
+    {
+        return fallback;
+    }
+    auto first = json.find('"', colon + 1);
+    if (first == std::string::npos)
+    {
+        return fallback;
+    }
+    std::string raw;
+    bool escaped = false;
+    for (std::size_t pos = first + 1; pos < json.size(); ++pos)
+    {
+        const char ch = json[pos];
+        if (escaped)
+        {
+            raw += '\\';
+            raw += ch;
+            escaped = false;
+            continue;
+        }
+        if (ch == '\\')
+        {
+            escaped = true;
+            continue;
+        }
+        if (ch == '"')
+        {
+            return jsonUnescape(raw);
+        }
+        raw += ch;
+    }
+    return fallback;
+}
+
+std::vector<std::string> extractObjectList(const std::string& arrayText)
+{
+    std::vector<std::string> objects;
+    const auto open = arrayText.find('[');
+    const auto close = arrayText.rfind(']');
+    if (open == std::string::npos || close == std::string::npos || close <= open)
+    {
+        return objects;
+    }
+    for (std::size_t pos = open + 1; pos < close; ++pos)
+    {
+        if (arrayText[pos] != '{')
+        {
+            continue;
+        }
+        const auto end = findMatchingDelimiter(arrayText, pos, '{', '}');
+        if (end == std::string::npos || end > close)
+        {
+            return {};
+        }
+        objects.push_back(arrayText.substr(pos, end - pos + 1));
+        pos = end;
+    }
+    return objects;
+}
+
+std::string actionToJson(const ActionRecord& action)
+{
+    std::ostringstream json;
+    json << "{"
+        << "\"actionNumber\":" << action.actionIndex
+        << ",\"actionKind\":" << action.actionKind
+        << ",\"side\":" << action.side
+        << ",\"pieceCode\":" << action.pieceCode
+        << ",\"pieceType\":" << action.pieceType
+        << ",\"fromX\":" << action.fromX
+        << ",\"fromY\":" << action.fromY
+        << ",\"fromZ\":" << action.fromZ
+        << ",\"toX\":" << action.toX
+        << ",\"toY\":" << action.toY
+        << ",\"toZ\":" << action.toZ
+        << ",\"axis\":" << action.axis
+        << ",\"layer\":" << action.layer
+        << ",\"quarterTurns\":" << action.quarterTurns
+        << ",\"capturedPieceCode\":" << action.capturedPieceCode
+        << ",\"captureDestination\":" << action.captureDestination
+        << ",\"reserveSide\":" << action.reserveSide
+        << ",\"reservePieceType\":" << action.reservePieceType
+        << ",\"reserveDelta\":" << action.reserveDelta
+        << ",\"resultCode\":" << action.resultCode
+        << ",\"flags\":" << action.flags
+        << ",\"notation\":\"" << jsonEscape(action.notation) << "\""
+        << "}";
+    return json.str();
+}
+
+ReplayAction replayActionFromJson(const std::string& json)
+{
+    ReplayAction action{};
+    action.actionIndex = extractInt(json, "actionNumber", extractInt(json, "actionIndex", 0));
+    action.actionKind = extractInt(json, "actionKind", ActionNone);
+    action.side = extractInt(json, "side", 0);
+    action.pieceCode = extractInt(json, "pieceCode", 0);
+    action.pieceType = extractInt(json, "pieceType", 0);
+    action.fromX = extractInt(json, "fromX", -1);
+    action.fromY = extractInt(json, "fromY", -1);
+    action.fromZ = extractInt(json, "fromZ", -1);
+    action.toX = extractInt(json, "toX", -1);
+    action.toY = extractInt(json, "toY", -1);
+    action.toZ = extractInt(json, "toZ", -1);
+    action.axis = extractInt(json, "axis", -1);
+    action.layer = extractInt(json, "layer", -1);
+    action.quarterTurns = extractInt(json, "quarterTurns", 0);
+    action.reserveSide = extractInt(json, "reserveSide", 0);
+    action.reservePieceType = extractInt(json, "reservePieceType", 0);
+    action.notation = extractEscapedString(json, "notation", "");
+    return action;
+}
+
+ActionRecord actionRecordFromJson(const std::string& json)
+{
+    ActionRecord action{};
+    action.actionIndex = extractInt(json, "actionNumber", extractInt(json, "actionIndex", 0));
+    action.actionKind = extractInt(json, "actionKind", ActionNone);
+    action.side = extractInt(json, "side", 0);
+    action.pieceCode = extractInt(json, "pieceCode", 0);
+    action.pieceType = extractInt(json, "pieceType", 0);
+    action.fromX = extractInt(json, "fromX", -1);
+    action.fromY = extractInt(json, "fromY", -1);
+    action.fromZ = extractInt(json, "fromZ", -1);
+    action.toX = extractInt(json, "toX", -1);
+    action.toY = extractInt(json, "toY", -1);
+    action.toZ = extractInt(json, "toZ", -1);
+    action.axis = extractInt(json, "axis", -1);
+    action.layer = extractInt(json, "layer", -1);
+    action.quarterTurns = extractInt(json, "quarterTurns", 0);
+    action.capturedPieceCode = extractInt(json, "capturedPieceCode", 0);
+    action.captureDestination = extractInt(json, "captureDestination", CaptureDestinationNone);
+    action.reserveSide = extractInt(json, "reserveSide", 0);
+    action.reservePieceType = extractInt(json, "reservePieceType", 0);
+    action.reserveDelta = extractInt(json, "reserveDelta", 0);
+    action.resultCode = extractInt(json, "resultCode", 0);
+    action.flags = extractInt(json, "flags", 0);
+    action.notation = extractEscapedString(json, "notation", "");
+    action.info = actionKindName(action.actionKind) + ": " + action.notation;
+    return action;
+}
+
+std::string exportSaveGameJson(const Game& game)
+{
+    std::ostringstream json;
+    json << "{\n"
+        << "  \"format\": \"chess3d-savegame\",\n"
+        << "  \"version\": \"0.1\",\n"
+        << "  \"rulesetId\": \"" << jsonEscape(game.rules.rulesetId) << "\",\n"
+        << "  \"rulesetFileName\": \"\",\n"
+        << "  \"rulesJson\": \"" << jsonEscape(game.rules.json) << "\",\n"
+        << "  \"board\": { \"width\": 8, \"height\": 8, \"depth\": 8 },\n"
+        << "  \"currentSide\": " << game.pos.sideToMove << ",\n"
+        << "  \"currentMacroPlayer\": " << macroPlayerForSide(game.rules, game.pos.sideToMove) << ",\n"
+        << "  \"currentTurnKind\": " << currentTurnKind(game) << ",\n"
+        << "  \"gameOver\": " << (game.gameOver ? "true" : "false") << ",\n"
+        << "  \"winnerSide\": " << game.winnerSide << ",\n"
+        << "  \"recomputeFusionOnLoad\": true,\n"
+        << "  \"recomputeAnchorsOnLoad\": true,\n"
+        << "  \"projectedBoard\": [";
+    for (int i = 0; i < CellCount; ++i)
+    {
+        if (i > 0) json << ",";
+        json << game.pos.board[static_cast<std::size_t>(i)];
+    }
+    json << "],\n  \"coreStacks\": [";
+    bool firstStack = true;
+    if (isCoreStackEnabled(game.rules))
+    {
+        for (int i = 0; i < CellCount; ++i)
+        {
+            const auto& stack = game.coreStacks[static_cast<std::size_t>(i)];
+            if (stack.empty())
+            {
+                continue;
+            }
+            if (!firstStack) json << ",";
+            firstStack = false;
+            json << "{\"x\":" << xOf(i) << ",\"y\":" << yOf(i) << ",\"z\":" << zOf(i) << ",\"entries\":[";
+            for (std::size_t j = 0; j < stack.size(); ++j)
+            {
+                if (j > 0) json << ",";
+                const auto& entry = stack[j];
+                json << "{\"side\":" << entry.side << ",\"pieceType\":" << entry.pieceType
+                    << ",\"pieceCode\":" << entry.pieceCode << ",\"flags\":" << entry.flags << "}";
+            }
+            json << "]}";
+        }
+    }
+    json << "],\n  \"reserveCounts\": [";
+    bool firstReserve = true;
+    for (int side = 1; side <= 6; ++side)
+    {
+        for (int type = Pawn; type <= King; ++type)
+        {
+            const int count = game.reserveCounts[side][type];
+            if (count <= 0)
+            {
+                continue;
+            }
+            if (!firstReserve) json << ",";
+            firstReserve = false;
+            json << "{\"side\":" << side << ",\"pieceType\":" << type << ",\"count\":" << count << "}";
+        }
+    }
+    json << "],\n  \"actionHistory\": [";
+    for (std::size_t i = 0; i < game.actionHistory.size(); ++i)
+    {
+        if (i > 0) json << ",";
+        json << actionToJson(game.actionHistory[i]);
+    }
+    json << "],\n  \"createdUtc\": \"runtime-local\",\n"
+        << "  \"knownLimitations\": [\"Savegame v0.1 is a diagnostic JSON snapshot, not a stable online protocol.\"]\n"
+        << "}\n";
+    return json.str();
+}
+
+std::string exportReplayJson(const Game& game)
+{
+    std::ostringstream json;
+    json << "{\n"
+        << "  \"format\": \"chess3d-replay\",\n"
+        << "  \"version\": \"0.1\",\n"
+        << "  \"initialRulesetId\": \"" << jsonEscape(game.rules.rulesetId) << "\",\n"
+        << "  \"initialRulesJson\": \"" << jsonEscape(game.rules.json) << "\",\n"
+        << "  \"actions\": [";
+    for (std::size_t i = 0; i < game.actionHistory.size(); ++i)
+    {
+        if (i > 0) json << ",";
+        json << actionToJson(game.actionHistory[i]);
+    }
+    json << "],\n  \"finalHash\": \"future\"\n}\n";
+    return json.str();
+}
+
+std::string canonicalStateString(const Game& game)
+{
+    std::ostringstream out;
+    out << "rules=" << game.rules.rulesetId << ";side=" << game.pos.sideToMove
+        << ";macro=" << macroPlayerForSide(game.rules, game.pos.sideToMove)
+        << ";gameOver=" << (game.gameOver ? 1 : 0) << ";winner=" << game.winnerSide
+        << ";actions=" << game.actionHistory.size() << ";board=";
+    for (int value : game.pos.board)
+    {
+        out << value << ",";
+    }
+    out << ";stacks=";
+    if (isCoreStackEnabled(game.rules))
+    {
+        for (int i = 0; i < CellCount; ++i)
+        {
+            const auto& stack = game.coreStacks[static_cast<std::size_t>(i)];
+            if (stack.empty())
+            {
+                continue;
+            }
+            out << i << ":";
+            for (const auto& entry : stack)
+            {
+                out << entry.pieceCode << "/" << entry.flags << ",";
+            }
+            out << ";";
+        }
+    }
+    out << "reserve=";
+    for (int side = 1; side <= 6; ++side)
+    {
+        for (int type = Pawn; type <= King; ++type)
+        {
+            out << side << "." << type << "=" << game.reserveCounts[side][type] << ",";
+        }
+    }
+    out << ";history=";
+    for (const auto& action : game.actionHistory)
+    {
+        out << action.actionKind << ":" << action.notation << "|";
+    }
+    return out.str();
+}
+
+std::string stateHash(const Game& game)
+{
+    const std::string text = canonicalStateString(game);
+    std::uint64_t hash = 1469598103934665603ull;
+    for (unsigned char ch : text)
+    {
+        hash ^= ch;
+        hash *= 1099511628211ull;
+    }
+    const char* digits = "0123456789abcdef";
+    std::string out(16, '0');
+    for (int i = 15; i >= 0; --i)
+    {
+        out[static_cast<std::size_t>(i)] = digits[hash & 0xF];
+        hash >>= 4;
+    }
+    return out;
+}
+
+bool loadSaveGameJson(Game& game, const std::string& json, std::string& error)
+{
+    if (json.empty() || !hasJsonObjectEnvelope(json) || extractEscapedString(json, "format", "") != "chess3d-savegame")
+    {
+        error = "Savegame load failed: expected chess3d-savegame JSON.";
+        return false;
+    }
+
+    const std::string rulesJson = extractEscapedString(json, "rulesJson", "");
+    if (rulesJson.empty() || !hasJsonObjectEnvelope(rulesJson))
+    {
+        error = "Savegame load failed: missing embedded RuleProfile JSON.";
+        return false;
+    }
+
+    Rules rules;
+    loadRules(rules, rulesJson);
+    if (rulesJson.find("\"rulesetId\"") != std::string::npos && !parseRuleProfileMetadata(rules, error))
+    {
+        error = "Savegame load failed: " + error;
+        return false;
+    }
+    const std::string savedRuleset = extractEscapedString(json, "rulesetId", "");
+    if (!savedRuleset.empty() && savedRuleset != rules.rulesetId)
+    {
+        error = "Savegame load failed: embedded ruleset does not match savegame rulesetId.";
+        return false;
+    }
+
+    std::vector<int> boardValues;
+    if (!parseIntArrayValues(extractArray(json, "projectedBoard"), boardValues) || boardValues.size() != CellCount)
+    {
+        error = "Savegame load failed: projectedBoard must contain 512 cells.";
+        return false;
+    }
+    for (int piece : boardValues)
+    {
+        if (!isValidPieceCode(piece))
+        {
+            error = "Savegame load failed: projectedBoard contains an invalid piece code.";
+            return false;
+        }
+    }
+
+    Game next;
+    next.rules = rules;
+    clearGamePosition(next);
+    for (int i = 0; i < CellCount; ++i)
+    {
+        next.pos.board[static_cast<std::size_t>(i)] = boardValues[static_cast<std::size_t>(i)];
+    }
+    next.pos.sideToMove = std::clamp(extractInt(json, "currentSide", 1), 1, std::max(1, next.rules.activeSideCount));
+    const bool savedGameOver = extractBool(json, "gameOver", false);
+    const int savedWinnerSide = std::clamp(extractInt(json, "winnerSide", 0), 0, 6);
+
+    if (isCoreStackEnabled(next.rules))
+    {
+        clearCoreStacks(next);
+        for (const std::string& stackObject : extractObjectList(extractArray(json, "coreStacks")))
+        {
+            const int x = extractInt(stackObject, "x", -1);
+            const int y = extractInt(stackObject, "y", -1);
+            const int z = extractInt(stackObject, "z", -1);
+            if (!inside(x, y, z) || !isInsideCore(next.rules, x, y, z))
+            {
+                error = "Savegame load failed: core stack coordinate is invalid.";
+                return false;
+            }
+            auto& stack = next.coreStacks[static_cast<std::size_t>(indexOf(x, y, z))];
+            stack.clear();
+            for (const std::string& entryObject : extractObjectList(extractArray(stackObject, "entries")))
+            {
+                const int pieceCode = extractInt(entryObject, "pieceCode", 0);
+                const int flags = extractInt(entryObject, "flags", 0);
+                if (!isValidPieceCode(pieceCode) || pieceCode == Empty)
+                {
+                    error = "Savegame load failed: core stack entry has an invalid piece code.";
+                    return false;
+                }
+                stack.push_back(makeStackEntry(pieceCode, flags));
+            }
+        }
+        syncAllProjectedCoreCells(next);
+    }
+
+    for (const std::string& reserveObject : extractObjectList(extractArray(json, "reserveCounts")))
+    {
+        const int side = extractInt(reserveObject, "side", 0);
+        const int type = extractInt(reserveObject, "pieceType", 0);
+        const int count = extractInt(reserveObject, "count", 0);
+        if (side < 1 || side > 6 || type < Pawn || type > King || count < 0)
+        {
+            error = "Savegame load failed: reserve count entry is invalid.";
+            return false;
+        }
+        next.reserveCounts[side][type] = count;
+    }
+
+    next.actionHistory.clear();
+    for (const std::string& actionObject : extractObjectList(extractArray(json, "actionHistory")))
+    {
+        ActionRecord action = actionRecordFromJson(actionObject);
+        if (action.actionIndex <= 0)
+        {
+            action.actionIndex = static_cast<int>(next.actionHistory.size()) + 1;
+        }
+        if (action.notation.empty())
+        {
+            finalizeActionNotation(action);
+        }
+        next.actionHistory.push_back(std::move(action));
+    }
+
+    recomputeAnchors(next);
+    if (savedGameOver)
+    {
+        next.gameOver = true;
+        next.winnerSide = savedWinnerSide;
+    }
+    next.lastInfo = "3D savegame loaded.";
+    game = std::move(next);
+    return true;
+}
+
+bool loadReplayJson(Game& game, const std::string& json, std::string& error)
+{
+    if (json.empty() || !hasJsonObjectEnvelope(json) || extractEscapedString(json, "format", "") != "chess3d-replay")
+    {
+        error = "Replay load failed: expected chess3d-replay JSON.";
+        return false;
+    }
+
+    const std::string rulesJson = extractEscapedString(json, "initialRulesJson", "");
+    if (rulesJson.empty() || !hasJsonObjectEnvelope(rulesJson))
+    {
+        error = "Replay load failed: missing embedded initial RuleProfile JSON.";
+        return false;
+    }
+
+    Rules rules;
+    loadRules(rules, rulesJson);
+    if (rulesJson.find("\"rulesetId\"") != std::string::npos && !parseRuleProfileMetadata(rules, error))
+    {
+        error = "Replay load failed: " + error;
+        return false;
+    }
+    const std::string replayRuleset = extractEscapedString(json, "initialRulesetId", "");
+    if (!replayRuleset.empty() && replayRuleset != rules.rulesetId)
+    {
+        error = "Replay load failed: embedded ruleset does not match initialRulesetId.";
+        return false;
+    }
+
+    std::vector<ReplayAction> actions;
+    for (const std::string& actionObject : extractObjectList(extractArray(json, "actions")))
+    {
+        ReplayAction action = replayActionFromJson(actionObject);
+        if (action.actionKind == ActionNone)
+        {
+            error = "Replay load failed: unsupported or missing actionKind.";
+            return false;
+        }
+        if (action.actionIndex <= 0)
+        {
+            action.actionIndex = static_cast<int>(actions.size()) + 1;
+        }
+        actions.push_back(std::move(action));
+    }
+
+    const std::string initialSaveJson = extractEscapedString(json, "initialSaveJson", "");
+    if (!initialSaveJson.empty())
+    {
+        if (!loadSaveGameJson(game, initialSaveJson, error))
+        {
+            error = "Replay load failed: embedded initial savegame is invalid. " + error;
+            return false;
+        }
+    }
+    else
+    {
+        game.rules = rules;
+        resetPosition(game);
+    }
+    game.replayActions = std::move(actions);
+    game.replayCursor = 0;
+    game.replayInitialRulesetId = rules.rulesetId;
+    game.replayInitialSaveJson = initialSaveJson;
+    game.lastReplayError.clear();
+    game.lastInfo = "3D replay loaded.";
+    return true;
+}
+
+bool applyReplayAction(Game& game, const ReplayAction& action, std::string& error)
+{
+    Chess3DMoveDto played{};
+    if (action.actionKind == ActionMove)
+    {
+        if (!inside(action.fromX, action.fromY, action.fromZ) || !inside(action.toX, action.toY, action.toZ))
+        {
+            error = "Replay action failed: move coordinates are invalid.";
+            return false;
+        }
+        if (Chess3D_TryMakeMove(&game, action.fromX, action.fromY, action.fromZ, action.toX, action.toY, action.toZ, Queen, &played) == 0)
+        {
+            error = game.lastInvalidActionReason.empty() ? "Replay action failed: illegal move." : game.lastInvalidActionReason;
+            return false;
+        }
+        return true;
+    }
+    if (action.actionKind == ActionProjectionCompositeMove)
+    {
+        const int primarySide = pieceSide(action.pieceCode) != 0 ? pieceSide(action.pieceCode) : action.side;
+        if (Chess3D_TryMakeProjectedMove(&game, primarySide, action.fromX, action.fromY, action.fromZ, action.toX, action.toY, action.toZ, Queen, &played) == 0)
+        {
+            error = game.lastProjectionError.empty() ? "Replay action failed: projected move rejected." : game.lastProjectionError;
+            return false;
+        }
+        return true;
+    }
+    if (action.actionKind == ActionLayerTurn)
+    {
+        if (Chess3D_RotateLayer(&game, action.axis, action.layer, action.quarterTurns) == 0)
+        {
+            error = game.lastInvalidActionReason.empty() ? "Replay action failed: layer turn rejected." : game.lastInvalidActionReason;
+            return false;
+        }
+        return true;
+    }
+    if (action.actionKind == ActionReserveRestore)
+    {
+        if (Chess3D_RestoreReservePiece(&game, action.reserveSide, action.reservePieceType, action.toX, action.toY, action.toZ) == 0)
+        {
+            error = game.lastReserveRestoreInfo.empty() ? "Replay action failed: reserve restore rejected." : game.lastReserveRestoreInfo;
+            return false;
+        }
+        return true;
+    }
+
+    error = "Replay action failed: unsupported action kind.";
+    return false;
+}
+
 Game* asGame(void* handle)
 {
     return static_cast<Game*>(handle);
@@ -4527,6 +5164,183 @@ CHESS3D_API int Chess3D_TransformMoveBetweenSides(void* handle, int sourceSide, 
     *outToY = outTo.y;
     *outToZ = outTo.z;
     return 1;
+}
+
+CHESS3D_API int Chess3D_ExportSaveGameJson(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(exportSaveGameJson(*game), buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_LoadSaveGameJson(void* handle, const char* json)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    Game backup = *game;
+    std::string error;
+    if (!loadSaveGameJson(*game, json != nullptr ? json : "", error))
+    {
+        *game = std::move(backup);
+        game->lastReplayError = error;
+        game->lastInfo = error;
+        return 0;
+    }
+    game->lastReplayError.clear();
+    return 1;
+}
+
+CHESS3D_API int Chess3D_ExportReplayJson(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(exportReplayJson(*game), buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_LoadReplayJson(void* handle, const char* json, int mode)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    Game backup = *game;
+    std::string error;
+    if (!loadReplayJson(*game, json != nullptr ? json : "", error))
+    {
+        *game = std::move(backup);
+        game->lastReplayError = error;
+        game->lastInfo = error;
+        return 0;
+    }
+    if (mode != 0 && Chess3D_ReplayAll(game) == 0)
+    {
+        error = game->lastReplayError;
+        *game = std::move(backup);
+        game->lastReplayError = error;
+        game->lastInfo = error;
+        return 0;
+    }
+    return 1;
+}
+
+CHESS3D_API int Chess3D_ReplayAction(void* handle, int actionIndex)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    const int index = actionIndex > 0 ? actionIndex : game->replayCursor + 1;
+    if (index < 1 || index > static_cast<int>(game->replayActions.size()))
+    {
+        game->lastReplayError = "Replay action failed: action index out of range.";
+        game->lastInfo = game->lastReplayError;
+        return 0;
+    }
+    if (index != game->replayCursor + 1)
+    {
+        game->lastReplayError = "Replay action failed: replay cursor requires sequential playback.";
+        game->lastInfo = game->lastReplayError;
+        return 0;
+    }
+
+    Game backup = *game;
+    std::string error;
+    if (!applyReplayAction(*game, game->replayActions[static_cast<std::size_t>(index - 1)], error))
+    {
+        *game = std::move(backup);
+        game->lastReplayError = error;
+        game->lastInfo = error;
+        return 0;
+    }
+    game->replayCursor = index;
+    game->lastReplayError.clear();
+    game->lastInfo = "3D replay action applied.";
+    return 1;
+}
+
+CHESS3D_API int Chess3D_ReplayAll(void* handle)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    while (game->replayCursor < static_cast<int>(game->replayActions.size()))
+    {
+        if (Chess3D_ReplayAction(game, game->replayCursor + 1) == 0)
+        {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+CHESS3D_API int Chess3D_ResetReplayCursor(void* handle)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    if (game->replayInitialRulesetId.empty())
+    {
+        game->replayCursor = 0;
+        return 1;
+    }
+    const auto actions = game->replayActions;
+    const auto rulesJson = game->rules.json;
+    const auto ruleset = game->rules.rulesetId;
+    const auto initialSaveJson = game->replayInitialSaveJson;
+    if (!initialSaveJson.empty())
+    {
+        std::string error;
+        if (!loadSaveGameJson(*game, initialSaveJson, error))
+        {
+            game->lastReplayError = "Replay cursor reset failed: " + error;
+            return 0;
+        }
+    }
+    else
+    {
+        Rules rules;
+        loadRules(rules, rulesJson);
+        game->rules = rules;
+        resetPosition(*game);
+    }
+    game->replayActions = actions;
+    game->replayInitialRulesetId = ruleset;
+    game->replayInitialSaveJson = initialSaveJson;
+    game->replayCursor = 0;
+    game->lastReplayError.clear();
+    game->lastInfo = "3D replay cursor reset.";
+    return 1;
+}
+
+CHESS3D_API int Chess3D_GetReplayActionCount(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? static_cast<int>(game->replayActions.size()) : 0;
+}
+
+CHESS3D_API int Chess3D_GetReplayCursor(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? game->replayCursor : 0;
+}
+
+CHESS3D_API int Chess3D_GetLastReplayError(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->lastReplayError, buffer, capacity) : 0;
+}
+
+CHESS3D_API int Chess3D_GetStateHash(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(stateHash(*game), buffer, capacity) : 0;
 }
 
 CHESS3D_API int Chess3D_GetPositionText(void* handle, char* buffer, int capacity)

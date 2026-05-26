@@ -1,4 +1,6 @@
 {
+  "format": "chess3d-playthrough",
+  "version": "0.1",
   "scenarioId": "asgard-core-playthrough-v0.1",
   "displayName": "Asgard Core Playthrough v0.1",
   "profileFile": "asgard_convergence_3d_v0_1.json",
@@ -13,6 +15,16 @@
     "layerTurn": false,
     "projection": false
   },
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "clearBoard" },
+    { "type": "setPiece", "side": 1, "pieceType": 4, "x": 2, "y": 2, "z": 1 },
+    { "type": "pushCore", "side": 1, "pieceType": 1, "x": 2, "y": 2, "z": 2 },
+    { "type": "move", "fromX": 2, "fromY": 2, "fromZ": 1, "toX": 2, "toY": 2, "toZ": 2 },
+    { "type": "assertStackCount", "x": 2, "y": 2, "z": 2, "minCount": 2 },
+    { "type": "assertActionCount", "count": 1 },
+    { "type": "assertGameOver", "value": false }
+  ],
   "sequenceOfActions": [
     "SET S1 R (2,2,1)",
     "PUSH_CORE S1 P (2,2,2)",

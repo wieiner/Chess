@@ -540,6 +540,72 @@ internal sealed class NativeChess3DEngine : IDisposable
         return ReadString((buffer, capacity) => Chess3D_GetTurnSummary(_handle, buffer, capacity));
     }
 
+    public string ExportSaveGameJson()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_ExportSaveGameJson(_handle, buffer, capacity), 65536);
+    }
+
+    public bool LoadSaveGameJson(string json)
+    {
+        ThrowIfDisposed();
+        return Chess3D_LoadSaveGameJson(_handle, json) != 0;
+    }
+
+    public string ExportReplayJson()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_ExportReplayJson(_handle, buffer, capacity), 65536);
+    }
+
+    public bool LoadReplayJson(string json, int mode = 0)
+    {
+        ThrowIfDisposed();
+        return Chess3D_LoadReplayJson(_handle, json, mode) != 0;
+    }
+
+    public bool ReplayAction(int actionIndex = 0)
+    {
+        ThrowIfDisposed();
+        return Chess3D_ReplayAction(_handle, actionIndex) != 0;
+    }
+
+    public bool ReplayAll()
+    {
+        ThrowIfDisposed();
+        return Chess3D_ReplayAll(_handle) != 0;
+    }
+
+    public bool ResetReplayCursor()
+    {
+        ThrowIfDisposed();
+        return Chess3D_ResetReplayCursor(_handle) != 0;
+    }
+
+    public int GetReplayActionCount()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetReplayActionCount(_handle);
+    }
+
+    public int GetReplayCursor()
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetReplayCursor(_handle);
+    }
+
+    public string GetLastReplayError()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetLastReplayError(_handle, buffer, capacity));
+    }
+
+    public string GetStateHash()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetStateHash(_handle, buffer, capacity));
+    }
+
     public void Dispose()
     {
         if (_handle != IntPtr.Zero)
@@ -549,9 +615,9 @@ internal sealed class NativeChess3DEngine : IDisposable
         }
     }
 
-    private string ReadString(Func<StringBuilder, int, int> reader)
+    private string ReadString(Func<StringBuilder, int, int> reader, int initialCapacity = 512)
     {
-        var buffer = new StringBuilder(512);
+        var buffer = new StringBuilder(initialCapacity);
         var needed = reader(buffer, buffer.Capacity);
         if (needed > buffer.Capacity)
         {
@@ -808,6 +874,39 @@ internal sealed class NativeChess3DEngine : IDisposable
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_GetTurnSummary(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_ExportSaveGameJson(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_LoadSaveGameJson(IntPtr handle, string json);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_ExportReplayJson(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_LoadReplayJson(IntPtr handle, string json, int mode);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_ReplayAction(IntPtr handle, int actionIndex);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_ReplayAll(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_ResetReplayCursor(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetReplayActionCount(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetReplayCursor(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastReplayError(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetStateHash(IntPtr handle, StringBuilder buffer, int capacity);
 }
 
 [StructLayout(LayoutKind.Sequential)]

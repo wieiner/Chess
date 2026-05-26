@@ -17,3 +17,14 @@ Classic is not a forgotten fallback, and Asgard is not the default meaning of Ch
 - Classic and Single-Side get the same improved readable materials and click diagnostics as experimental profiles.
 - Asgard/Rubik/Hodge capabilities remain profile-gated through JSON and native runtime flags.
 - Click-to-move now follows legal preview entries, so a highlighted target and the actual dispatched action use the same source/target/action-kind contract.
+## P2N Reproducibility
+
+All five real Chess3D profiles now have runnable headless playthrough JSON:
+
+- Classic Six-Side
+- Single-Side Training
+- Asgard Convergence
+- Rubik Convergence
+- Hodge Projection Duel
+
+These files are scenarios, not additional RuleProfiles. The real Chess3D RuleProfile count remains exactly five.

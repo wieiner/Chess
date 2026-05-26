@@ -88,3 +88,14 @@ The engine still reserves side ids `1..6`. Six-sided chess should be built by ma
 - Online integrations involve credentials, platform policies, and relay concerns.
 
 Keeping them separate reduces coupling, avoids accidental feature bleed, and allows independent packaging.
+## Chess3D Save / Replay Layer
+
+P2N adds a serialization layer above the existing Chess3D runtime:
+
+- `Position::board` remains the projected 512-cell board.
+- CoreCell stacks, reserve counts, and action history are serialized explicitly.
+- Fusion, anchors, implosion progress, and victory overlays are recomputed after load.
+- Replay executes through the same public move/layer/projection/restore entry points used by UI and tests.
+- The state hash is diagnostic and deterministic, not a security feature.
+
+The layer is append-only ABI and does not change Chess2D, RubikApp, OnlineApp, CUDA optional behavior, or existing Chess3D exports.

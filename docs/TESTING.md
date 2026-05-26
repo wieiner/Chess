@@ -72,3 +72,20 @@ The next recommended testing milestone is P2N: save/load/replay/export/import te
 ## UI Smoke Tests
 
 UI smoke tests are currently manual. P2M improves click dispatch and visual diagnostics in C# and keeps both WPF apps compiling against the shared OBJ/material loader, but there is still no automated WPF click-through test. The next useful layer is a small launcher/screenshot check for `ChessApp.exe`, `Chess3DApp.exe`, `RubikApp.exe`, and `ChessOnlineApp.exe`.
+## P2N Save / Replay Tests
+
+`Chess3DEngineContractTests` now covers:
+
+- valid savegame export;
+- transactional invalid save load;
+- save/load hash roundtrips for Classic, Single-Side, Asgard, Rubik, and Hodge;
+- replay of normal move, Rubik layer turn, Hodge projected move, and reserve restore;
+- invalid replay load error handling;
+- all five `*_playthrough_v0_1.json` scenario files as runnable headless scripts.
+
+Run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -SkipBenchmark
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
+```

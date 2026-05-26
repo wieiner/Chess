@@ -26,3 +26,14 @@ The visual diagnostics section reports the active model set, OBJ/fallback counts
 ## Deferred
 
 P2M does not add animated layer turns, replay import/export, online serialization, or full 3D check/mate UI.
+## Save / Replay
+
+The Chess3D control center includes a `Save / Replay` panel:
+
+- save/load `.ch3dsave`;
+- export/import `.ch3dreplay`;
+- replay step/all;
+- reset replay cursor;
+- inspect state hash and last replay error.
+
+Use savegames for bug reports that depend on constructed board/stack/reserve state. Use replay files for action-sequence reproduction.

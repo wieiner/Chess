@@ -1,4 +1,6 @@
 {
+  "format": "chess3d-playthrough",
+  "version": "0.1",
   "scenarioId": "rubik-layer-playthrough-v0.1",
   "displayName": "Rubik Layer Playthrough v0.1",
   "profileFile": "rubik_convergence_3d_v0_1.json",
@@ -13,6 +15,15 @@
     "layerTurn": true,
     "projection": false
   },
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "clearBoard" },
+    { "type": "pushCore", "side": 1, "pieceType": 1, "x": 2, "y": 2, "z": 2 },
+    { "type": "pushCore", "side": 1, "pieceType": 4, "x": 2, "y": 2, "z": 2 },
+    { "type": "rotateLayer", "axis": 0, "layer": 2, "quarterTurns": 1 },
+    { "type": "assertStackCount", "x": 5, "y": 2, "z": 2, "minCount": 2 },
+    { "type": "assertActionCount", "count": 1 }
+  ],
   "sequenceOfActions": [
     "PUSH_CORE S1 P (2,2,2)",
     "PUSH_CORE S1 R (2,2,2)",

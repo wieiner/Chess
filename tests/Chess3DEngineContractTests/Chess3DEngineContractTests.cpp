@@ -458,6 +458,107 @@ std::string ExtractObject(const std::string& json, const std::string& key)
     return {};
 }
 
+std::string ExtractArray(const std::string& json, const std::string& key)
+{
+    const auto colon = FindKeyColon(json, key);
+    if (colon == std::string::npos)
+    {
+        return {};
+    }
+    auto pos = json.find('[', colon + 1);
+    if (pos == std::string::npos)
+    {
+        return {};
+    }
+    const std::size_t start = pos;
+    int depth = 0;
+    bool inString = false;
+    bool escaped = false;
+    for (; pos < json.size(); ++pos)
+    {
+        const char ch = json[pos];
+        if (inString)
+        {
+            if (escaped)
+            {
+                escaped = false;
+            }
+            else if (ch == '\\')
+            {
+                escaped = true;
+            }
+            else if (ch == '"')
+            {
+                inString = false;
+            }
+            continue;
+        }
+        if (ch == '"')
+        {
+            inString = true;
+        }
+        else if (ch == '[')
+        {
+            ++depth;
+        }
+        else if (ch == ']')
+        {
+            --depth;
+            if (depth == 0)
+            {
+                return json.substr(start, pos - start + 1);
+            }
+        }
+    }
+    return {};
+}
+
+std::vector<std::string> ExtractObjectList(const std::string& arrayText)
+{
+    std::vector<std::string> objects;
+    const auto open = arrayText.find('[');
+    const auto close = arrayText.rfind(']');
+    if (open == std::string::npos || close == std::string::npos || close <= open)
+    {
+        return objects;
+    }
+    int depth = 0;
+    bool inString = false;
+    bool escaped = false;
+    std::size_t start = std::string::npos;
+    for (std::size_t pos = open + 1; pos < close; ++pos)
+    {
+        const char ch = arrayText[pos];
+        if (inString)
+        {
+            if (escaped) escaped = false;
+            else if (ch == '\\') escaped = true;
+            else if (ch == '"') inString = false;
+            continue;
+        }
+        if (ch == '"')
+        {
+            inString = true;
+            continue;
+        }
+        if (ch == '{')
+        {
+            if (depth == 0) start = pos;
+            ++depth;
+        }
+        else if (ch == '}')
+        {
+            --depth;
+            if (depth == 0 && start != std::string::npos)
+            {
+                objects.push_back(arrayText.substr(start, pos - start + 1));
+                start = std::string::npos;
+            }
+        }
+    }
+    return objects;
+}
+
 std::string ExtractStringValue(const std::string& json, const std::string& key)
 {
     const auto colon = FindKeyColon(json, key);
@@ -550,6 +651,13 @@ bool ExtractBoolValue(const std::string& json, const std::string& key, bool& val
     return false;
 }
 
+int IntValue(const std::string& json, const std::string& key, int fallback = 0)
+{
+    int value = fallback;
+    ExtractIntValue(json, key, value);
+    return value;
+}
+
 bool ValidateBoardProfile(const std::string& json)
 {
     const std::string board = ExtractObject(json, "boardProfile");
@@ -628,6 +736,47 @@ std::string ReadActionNotation(void* game, int actionIndex)
         return {};
     }
     return std::string(buffer);
+}
+
+std::string ReadLargeAbiString(void* game, int (*reader)(void*, char*, int))
+{
+    std::vector<char> buffer(65536);
+    const int needed = reader(game, buffer.data(), static_cast<int>(buffer.size()));
+    if (needed <= 0)
+    {
+        return {};
+    }
+    if (needed > static_cast<int>(buffer.size()))
+    {
+        buffer.assign(static_cast<std::size_t>(needed), '\0');
+        reader(game, buffer.data(), static_cast<int>(buffer.size()));
+    }
+    return std::string(buffer.data());
+}
+
+std::string ReadStateHash(void* game)
+{
+    char buffer[128] = {};
+    const int needed = Chess3D_GetStateHash(game, buffer, static_cast<int>(sizeof(buffer)));
+    return needed > 0 ? std::string(buffer) : std::string();
+}
+
+std::string JsonEscapeForTest(const std::string& value)
+{
+    std::string out;
+    for (char ch : value)
+    {
+        switch (ch)
+        {
+        case '\\': out += "\\\\"; break;
+        case '"': out += "\\\""; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        default: out += ch; break;
+        }
+    }
+    return out;
 }
 
 std::string ReadPreviewReason(void* game, int previewIndex)
@@ -838,6 +987,217 @@ std::vector<TargetCell> HomeCellsForSide(int side)
         }
     }
     return cells;
+}
+
+bool RunPlaythroughFile(void* game, const std::string& path, std::string& error)
+{
+    const std::string json = ReadTextFile(path);
+    if (json.empty() || !JsonParser(json).Parse())
+    {
+        error = "playthrough JSON does not parse: " + path;
+        return false;
+    }
+    if (ExtractStringValue(json, "format") != "chess3d-playthrough")
+    {
+        error = "playthrough missing chess3d-playthrough format: " + path;
+        return false;
+    }
+
+    const std::string profileFile = ExtractStringValue(json, "profileFile");
+    const auto steps = ExtractObjectList(ExtractArray(json, "steps"));
+    if (profileFile.empty() || steps.empty())
+    {
+        error = "playthrough missing profileFile or steps: " + path;
+        return false;
+    }
+
+    for (std::size_t i = 0; i < steps.size(); ++i)
+    {
+        const std::string& step = steps[i];
+        const std::string type = ExtractStringValue(step, "type");
+        auto fail = [&](const std::string& message)
+        {
+            std::ostringstream out;
+            out << path << " step " << (i + 1) << " (" << type << "): " << message;
+            error = out.str();
+            return false;
+        };
+
+        if (type == "loadProfile")
+        {
+            const std::string profile = ReadTextFile("assets\\rules\\profiles\\" + profileFile);
+            if (profile.empty() || Chess3D_LoadRuleProfileJson(game, profile.c_str()) == 0)
+            {
+                return fail("profile load failed");
+            }
+        }
+        else if (type == "clearBoard")
+        {
+            Chess3D_Clear(game);
+        }
+        else if (type == "setPiece")
+        {
+            const int side = IntValue(step, "side", 0);
+            const int pieceType = IntValue(step, "pieceType", 0);
+            const int x = IntValue(step, "x", -1);
+            const int y = IntValue(step, "y", -1);
+            const int z = IntValue(step, "z", -1);
+            if (Chess3D_SetPiece(game, x, y, z, side, pieceType) == 0)
+            {
+                return fail("setPiece failed");
+            }
+        }
+        else if (type == "clearCell")
+        {
+            const int x = IntValue(step, "x", -1);
+            const int y = IntValue(step, "y", -1);
+            const int z = IntValue(step, "z", -1);
+            if (Chess3D_SetPiece(game, x, y, z, 0, 0) == 0)
+            {
+                return fail("clearCell failed");
+            }
+        }
+        else if (type == "pushCore")
+        {
+            const int side = IntValue(step, "side", 0);
+            const int pieceType = IntValue(step, "pieceType", 0);
+            const int x = IntValue(step, "x", -1);
+            const int y = IntValue(step, "y", -1);
+            const int z = IntValue(step, "z", -1);
+            if (Chess3D_PushCoreStackPiece(game, x, y, z, PieceCode(side, pieceType)) == 0)
+            {
+                return fail("pushCore failed");
+            }
+        }
+        else if (type == "move")
+        {
+            Chess3DMoveDto played{};
+            const int fromX = IntValue(step, "fromX", -1);
+            const int fromY = IntValue(step, "fromY", -1);
+            const int fromZ = IntValue(step, "fromZ", -1);
+            const int toX = IntValue(step, "toX", -1);
+            const int toY = IntValue(step, "toY", -1);
+            const int toZ = IntValue(step, "toZ", -1);
+            if (Chess3D_TryMakeMove(game, fromX, fromY, fromZ, toX, toY, toZ, 0, &played) == 0)
+            {
+                return fail("move failed");
+            }
+        }
+        else if (type == "projectedMove")
+        {
+            Chess3DMoveDto played{};
+            const int primarySide = IntValue(step, "primarySide", 0);
+            const int fromX = IntValue(step, "fromX", -1);
+            const int fromY = IntValue(step, "fromY", -1);
+            const int fromZ = IntValue(step, "fromZ", -1);
+            const int toX = IntValue(step, "toX", -1);
+            const int toY = IntValue(step, "toY", -1);
+            const int toZ = IntValue(step, "toZ", -1);
+            if (Chess3D_TryMakeProjectedMove(game, primarySide, fromX, fromY, fromZ, toX, toY, toZ, 0, &played) == 0)
+            {
+                return fail("projectedMove failed");
+            }
+        }
+        else if (type == "rotateLayer")
+        {
+            const int axis = IntValue(step, "axis", -1);
+            const int layer = IntValue(step, "layer", -1);
+            const int quarterTurns = IntValue(step, "quarterTurns", 0);
+            if (Chess3D_RotateLayer(game, axis, layer, quarterTurns) == 0)
+            {
+                return fail("rotateLayer failed");
+            }
+        }
+        else if (type == "reserveRestore")
+        {
+            const int side = IntValue(step, "side", 0);
+            const int pieceType = IntValue(step, "pieceType", 0);
+            const int x = IntValue(step, "x", -1);
+            const int y = IntValue(step, "y", -1);
+            const int z = IntValue(step, "z", -1);
+            if (Chess3D_RestoreReservePiece(game, side, pieceType, x, y, z) == 0)
+            {
+                return fail("reserveRestore failed");
+            }
+        }
+        else if (type == "assertPiece")
+        {
+            const int x = IntValue(step, "x", -1);
+            const int y = IntValue(step, "y", -1);
+            const int z = IntValue(step, "z", -1);
+            const int pieceCode = IntValue(step, "pieceCode", -1);
+            if (Chess3D_GetPiece(game, x, y, z) != pieceCode)
+            {
+                return fail("assertPiece failed");
+            }
+        }
+        else if (type == "assertStackCount")
+        {
+            const int x = IntValue(step, "x", -1);
+            const int y = IntValue(step, "y", -1);
+            const int z = IntValue(step, "z", -1);
+            int minCount = 0;
+            int exactCount = -1;
+            ExtractIntValue(step, "minCount", minCount);
+            ExtractIntValue(step, "count", exactCount);
+            const int actual = Chess3D_GetCoreStackCount(game, x, y, z);
+            if ((exactCount >= 0 && actual != exactCount) || (exactCount < 0 && actual < minCount))
+            {
+                return fail("assertStackCount failed");
+            }
+        }
+        else if (type == "assertReserveCount")
+        {
+            const int side = IntValue(step, "side", 0);
+            const int pieceType = IntValue(step, "pieceType", 0);
+            const int count = IntValue(step, "count", -1);
+            if (Chess3D_GetReserveCount(game, side, pieceType) != count)
+            {
+                return fail("assertReserveCount failed");
+            }
+        }
+        else if (type == "assertActionCount")
+        {
+            const int count = IntValue(step, "count", -1);
+            if (Chess3D_GetActionCount(game) != count)
+            {
+                return fail("assertActionCount failed");
+            }
+        }
+        else if (type == "assertGameOver")
+        {
+            bool expected = false;
+            if (!ExtractBoolValue(step, "value", expected) || (Chess3D_IsGameOver(game) != 0) != expected)
+            {
+                return fail("assertGameOver failed");
+            }
+        }
+        else if (type == "assertPreviewCountAtLeast")
+        {
+            const int x = IntValue(step, "x", -1);
+            const int y = IntValue(step, "y", -1);
+            const int z = IntValue(step, "z", -1);
+            const int side = IntValue(step, "side", 0);
+            const int count = IntValue(step, "count", 0);
+            if (Chess3D_BuildLegalActionPreviewForCell(game, x, y, z, side) < count)
+            {
+                return fail("assertPreviewCountAtLeast failed");
+            }
+        }
+        else if (type == "assertLastInvalidReasonContains")
+        {
+            const std::string needle = ExtractStringValue(step, "text");
+            if (ReadAbiString(game, Chess3D_GetLastInvalidActionReason).find(needle) == std::string::npos)
+            {
+                return fail("assertLastInvalidReasonContains failed");
+            }
+        }
+        else
+        {
+            return fail("unsupported step type");
+        }
+    }
+    return true;
 }
 }
 
@@ -2263,6 +2623,172 @@ int main()
         Chess3D_GetCaptureDestinationName(CaptureDestinationReserve, nameBuffer, static_cast<int>(sizeof(nameBuffer))) > 0 &&
         std::string(nameBuffer) == "reserve",
         "action and capture destination name helpers are exposed");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, classicProfile.c_str()) == 1, "save/load classic test loads classic profile");
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 0, 0, 0, 1, Rook);
+    Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn);
+    Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 3, 0, &played);
+    const std::string classicHash = ReadStateHash(game);
+    const std::string classicSave = ReadLargeAbiString(game, Chess3D_ExportSaveGameJson);
+    test.Check(JsonParser(classicSave).Parse() && classicSave.find("\"format\": \"chess3d-savegame\"") != std::string::npos,
+        "classic save/export JSON is valid");
+    test.Check(Chess3D_LoadSaveGameJson(game, "{ not json }") == 0 &&
+        ReadStateHash(game) == classicHash,
+        "invalid savegame load fails without mutation");
+    test.Check(Chess3D_LoadSaveGameJson(game, classicSave.c_str()) == 1 &&
+        ReadStateHash(game) == classicHash &&
+        Chess3D_GetActionCount(game) == 1,
+        "classic profile save/load roundtrip preserves hash and action count");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, singleProfile.c_str()) == 1, "save/load single-side test loads profile");
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 3, 3, 0, 1, Pawn);
+    Chess3D_TryMakeMove(game, 3, 3, 0, 3, 3, 1, 0, &played);
+    const std::string singleHash = ReadStateHash(game);
+    const std::string singleSave = ReadLargeAbiString(game, Chess3D_ExportSaveGameJson);
+    test.Check(Chess3D_LoadSaveGameJson(game, singleSave.c_str()) == 1 && ReadStateHash(game) == singleHash,
+        "single-side save/load roundtrip preserves hash");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "save/load asgard test loads profile");
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn));
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Rook));
+    for (const TargetCell& home : HomeCellsForSide(2))
+    {
+        if (home.type == Pawn)
+        {
+            Chess3D_SetPiece(game, home.x, home.y, home.z, 2, Pawn);
+        }
+    }
+    Chess3D_SetPiece(game, 0, 0, 0, 1, Rook);
+    Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn);
+    Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 3, 0, &played);
+    const std::string asgardHash = ReadStateHash(game);
+    const std::string asgardSave = ReadLargeAbiString(game, Chess3D_ExportSaveGameJson);
+    test.Check(Chess3D_LoadSaveGameJson(game, asgardSave.c_str()) == 1 &&
+        ReadStateHash(game) == asgardHash &&
+        Chess3D_GetCoreStackCount(game, 2, 2, 2) == 2 &&
+        Chess3D_GetReserveCount(game, 2, Pawn) == 1 &&
+        Chess3D_GetCoreFusionKind(game, 2, 2, 2) != FusionNone,
+        "asgard save/load preserves core stacks, fusion recompute, reserve counts, and hash");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, rubikProfile.c_str()) == 1, "save/load rubik test loads profile");
+    Chess3D_Clear(game);
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Pawn));
+    Chess3D_PushCoreStackPiece(game, 2, 2, 2, PieceCode(1, Rook));
+    Chess3D_RotateLayer(game, 0, 2, 1);
+    const std::string rubikHash = ReadStateHash(game);
+    const std::string rubikSave = ReadLargeAbiString(game, Chess3D_ExportSaveGameJson);
+    test.Check(Chess3D_LoadSaveGameJson(game, rubikSave.c_str()) == 1 &&
+        ReadStateHash(game) == rubikHash &&
+        Chess3D_GetCoreStackCount(game, 5, 2, 2) == 2,
+        "rubik save/load preserves layer-moved stack and hash");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, hodgeProfile.c_str()) == 1, "save/load hodge test loads profile");
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 3, 3, 0, 1, Pawn);
+    Chess3D_SetPiece(game, 3, 0, 3, 3, Pawn);
+    Chess3D_SetPiece(game, 0, 3, 3, 5, Pawn);
+    Chess3D_TryMakeProjectedMove(game, 1, 3, 3, 0, 3, 3, 1, 0, &played);
+    const std::string hodgeHash = ReadStateHash(game);
+    const std::string hodgeSave = ReadLargeAbiString(game, Chess3D_ExportSaveGameJson);
+    test.Check(Chess3D_LoadSaveGameJson(game, hodgeSave.c_str()) == 1 &&
+        ReadStateHash(game) == hodgeHash &&
+        Chess3D_IsProjectionModeEnabled(game) == 1 &&
+        Chess3D_GetActionCount(game) == 1,
+        "hodge save/load preserves projection state, macro turn, action history, and hash");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, singleProfile.c_str()) == 1, "replay normal move setup loads single-side");
+    Chess3D_Reset(game);
+    Chess3DMoveDto resetMoves[256]{};
+    const int resetMoveCount = Chess3D_GetLegalMoves(game, resetMoves, 256);
+    test.Check(resetMoveCount > 0, "single-side reset has a replayable legal move");
+    const Chess3DMoveDto replaySeedMove = resetMoves[0];
+    Chess3D_TryMakeMove(game, replaySeedMove.fromX, replaySeedMove.fromY, replaySeedMove.fromZ,
+        replaySeedMove.toX, replaySeedMove.toY, replaySeedMove.toZ, replaySeedMove.promotionType, &played);
+    const std::string replayJson = ReadLargeAbiString(game, Chess3D_ExportReplayJson);
+    const std::string replayHash = ReadStateHash(game);
+    test.Check(JsonParser(replayJson).Parse() && replayJson.find("\"format\": \"chess3d-replay\"") != std::string::npos,
+        "replay/export JSON is valid");
+    test.Check(Chess3D_LoadReplayJson(game, replayJson.c_str(), 0) == 1 &&
+        Chess3D_GetReplayActionCount(game) == 1 &&
+        Chess3D_GetReplayCursor(game) == 0 &&
+        Chess3D_ReplayAll(game) == 1 &&
+        ReadStateHash(game) == replayHash,
+        "replay normal move reaches exported final state hash");
+    test.Check(Chess3D_LoadReplayJson(game, "{ bad replay }", 0) == 0,
+        "replay invalid JSON fails cleanly");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, rubikProfile.c_str()) == 1, "replay rubik setup loads profile");
+    Chess3D_Reset(game);
+    Chess3D_RotateLayer(game, 0, 2, 1);
+    const std::string rubikReplay = ReadLargeAbiString(game, Chess3D_ExportReplayJson);
+    const std::string rubikReplayHash = ReadStateHash(game);
+    test.Check(Chess3D_LoadReplayJson(game, rubikReplay.c_str(), 1) == 1 &&
+        ReadStateHash(game) == rubikReplayHash,
+        "replay rubik layer turn works");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, hodgeProfile.c_str()) == 1, "replay hodge setup loads profile");
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 3, 3, 0, 1, Pawn);
+    Chess3D_SetPiece(game, 3, 0, 3, 3, Pawn);
+    Chess3D_SetPiece(game, 0, 3, 3, 5, Pawn);
+    const std::string hodgeInitialSave = ReadLargeAbiString(game, Chess3D_ExportSaveGameJson);
+    Chess3D_TryMakeProjectedMove(game, 1, 3, 3, 0, 3, 3, 1, 0, &played);
+    std::string hodgeReplay = ReadLargeAbiString(game, Chess3D_ExportReplayJson);
+    hodgeReplay.insert(hodgeReplay.find("\"actions\""),
+        "\"initialSaveJson\": \"" + JsonEscapeForTest(hodgeInitialSave) + "\",\n  ");
+    const std::string hodgeReplayHash = ReadStateHash(game);
+    test.Check(Chess3D_LoadReplayJson(game, hodgeReplay.c_str(), 1) == 1 &&
+        ReadStateHash(game) == hodgeReplayHash,
+        "replay projected Hodge move works all-or-nothing");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, asgardProfile.c_str()) == 1, "replay reserve restore setup loads profile");
+    Chess3D_Clear(game);
+    for (const TargetCell& home : HomeCellsForSide(2))
+    {
+        if (home.type == Pawn)
+        {
+            Chess3D_SetPiece(game, home.x, home.y, home.z, 2, Pawn);
+        }
+    }
+    Chess3D_SetPiece(game, 0, 0, 0, 1, Rook);
+    Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn);
+    Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 3, 0, &played);
+    Chess3D_SetPiece(game, freePawnHome.x, freePawnHome.y, freePawnHome.z, 0, 0);
+    const std::string restoreInitialSave = ReadLargeAbiString(game, Chess3D_ExportSaveGameJson);
+    Chess3D_RestoreReservePiece(game, 2, Pawn, freePawnHome.x, freePawnHome.y, freePawnHome.z);
+    std::ostringstream restoreReplayBuilder;
+    restoreReplayBuilder << "{\n"
+        << "  \"format\": \"chess3d-replay\",\n"
+        << "  \"version\": \"0.1\",\n"
+        << "  \"initialRulesetId\": \"asgard-convergence-3d-8x8x8-v0.1\",\n"
+        << "  \"initialRulesJson\": \"" << JsonEscapeForTest(asgardProfile) << "\",\n"
+        << "  \"initialSaveJson\": \"" << JsonEscapeForTest(restoreInitialSave) << "\",\n"
+        << "  \"actions\": [{\"actionNumber\":1,\"actionKind\":3,\"side\":2,\"pieceCode\":21,\"pieceType\":1,"
+        << "\"toX\":" << freePawnHome.x << ",\"toY\":" << freePawnHome.y << ",\"toZ\":" << freePawnHome.z
+        << ",\"reserveSide\":2,\"reservePieceType\":1,\"notation\":\"restore\"}]\n"
+        << "}\n";
+    const std::string restoreReplay = restoreReplayBuilder.str();
+    const std::string restoreReplayHash = ReadStateHash(game);
+    test.Check(Chess3D_LoadReplayJson(game, restoreReplay.c_str(), 1) == 1 &&
+        ReadStateHash(game) == restoreReplayHash,
+        "replay reserve restore works");
+
+    const std::array<std::string, 5> playthroughFiles = {
+        "assets\\rules\\scenarios\\chess3d\\classic_six_side_playthrough_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\single_side_training_playthrough_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\asgard_core_playthrough_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\rubik_layer_playthrough_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\hodge_projection_playthrough_v0_1.json"
+    };
+    for (const std::string& playthroughFile : playthroughFiles)
+    {
+        std::string playthroughError;
+        test.Check(RunPlaythroughFile(game, playthroughFile, playthroughError),
+            "headless playthrough PASS: " + playthroughFile + (playthroughError.empty() ? "" : " :: " + playthroughError));
+    }
 
     Chess3D_Destroy(game);
     return test.Finish("Chess3DEngineContractTests");

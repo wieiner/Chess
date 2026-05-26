@@ -140,3 +140,14 @@ After successful verification, CI uploads `ProductionOutput` as the short-retent
 `rude-resource/` is a local ignored resource archive and is absent on CI. `scripts\verify.ps1` checks the ignore rule through the probe path `rude-resource/.verify-ignore-probe`, without creating that file.
 
 CUDA remains optional in CI and in the default local build. After P2M, the same verification pipeline also covers Rubik convergence layer turns, action history, deterministic notation, reserve restore contracts, Hodge Projection Duel composite-turn contracts, legal action preview contracts, scenario smoke/playthrough descriptors, packaging of the Chess3D control-center assets, and packaging of the canonical OBJ/MTL model catalog.
+## P2N Packaging Notes
+
+Save/replay code does not add required runtime data files beyond the existing RuleProfile and scenario assets.
+
+ProductionOutput continues to include:
+
+- `Assets/Rules3D/Profiles/*.json`
+- `Assets/Rules3D/Scenarios/*.json`
+- canonical model assets
+
+The playthrough files are now runnable `chess3d-playthrough` scripts and are copied with the existing scenario asset pipeline.

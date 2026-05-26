@@ -1,4 +1,6 @@
 {
+  "format": "chess3d-playthrough",
+  "version": "0.1",
   "scenarioId": "hodge-projection-playthrough-v0.1",
   "displayName": "Hodge Projection Playthrough v0.1",
   "profileFile": "hodge_projection_duel_3d_v0_1.json",
@@ -13,6 +15,17 @@
     "layerTurn": false,
     "projection": true
   },
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "clearBoard" },
+    { "type": "setPiece", "side": 1, "pieceType": 1, "x": 3, "y": 3, "z": 0 },
+    { "type": "setPiece", "side": 3, "pieceType": 1, "x": 3, "y": 0, "z": 3 },
+    { "type": "setPiece", "side": 5, "pieceType": 1, "x": 0, "y": 3, "z": 3 },
+    { "type": "projectedMove", "primarySide": 1, "fromX": 3, "fromY": 3, "fromZ": 0, "toX": 3, "toY": 3, "toZ": 1 },
+    { "type": "assertPiece", "x": 3, "y": 3, "z": 1, "pieceCode": 11 },
+    { "type": "assertActionCount", "count": 1 },
+    { "type": "assertGameOver", "value": false }
+  ],
   "sequenceOfActions": [
     "SET S1 P (3,3,0)",
     "SET S3 P (3,0,3)",
