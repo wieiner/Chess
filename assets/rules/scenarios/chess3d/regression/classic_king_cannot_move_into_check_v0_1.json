@@ -1,0 +1,18 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "classic-king-cannot-move-into-check-v0.1",
+  "profileFile": "classic_six_side_3d_v0_1.json",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "The king may not move onto a square attacked by an enemy sliding piece.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "clearBoard" },
+    { "type": "setPiece", "side": 1, "pieceType": 6, "x": 0, "y": 0, "z": 0 },
+    { "type": "setPiece", "side": 2, "pieceType": 4, "x": 0, "y": 0, "z": 7 },
+    { "type": "expectMoveFail", "fromX": 0, "fromY": 0, "fromZ": 0, "toX": 0, "toY": 0, "toZ": 1 },
+    { "type": "assertLastInvalidReasonContains", "text": "king would move into check" },
+    { "type": "assertActionCount", "count": 0 }
+  ],
+  "knownLimitations": []
+}

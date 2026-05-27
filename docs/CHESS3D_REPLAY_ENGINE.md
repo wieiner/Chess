@@ -23,3 +23,7 @@ Supported runtime actions:
 - reserve restore.
 
 Errors are reported as readable `lastReplayError` strings. The engine restores pre-action state if a replay action fails.
+
+## P3A King Safety
+
+Replay uses the same `TryMakeMove` path as live play. Classic/Single-Side replay actions are rejected if they leave the own king in check, move the king into attack, or try to continue after a game-over outcome. Checkmate/stalemate positions replay to the same state hash as the original game when the action sequence is valid.

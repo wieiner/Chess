@@ -21,6 +21,7 @@ public partial class Chess3DWindow : Window
     private readonly Brush _selected = new SolidColorBrush(Color.FromRgb(246, 211, 101));
     private readonly Brush _target = new SolidColorBrush(Color.FromRgb(83, 174, 204));
     private readonly Brush _capture = new SolidColorBrush(Color.FromRgb(214, 92, 76));
+    private readonly Brush _check = new SolidColorBrush(Color.FromRgb(238, 74, 92));
     private readonly Dictionary<Model3D, Square3D> _hitSquares = new();
     private Square3D? _selectedSquare;
     private bool _dragging3D;
@@ -361,6 +362,11 @@ public partial class Chess3DWindow : Window
                     state.LastToX == square.X && state.LastToY == square.Y && state.LastToZ == square.Z)
                 {
                     button.Background = _last;
+                }
+                if (IsCheckedKing(piece, state.SideToMove))
+                {
+                    button.Background = _check;
+                    button.BorderBrush = Brushes.White;
                 }
                 var preview = selectedPreview.FirstOrDefault(m => m.ToX == square.X && m.ToY == square.Y && m.ToZ == square.Z);
                 if (MoveHintsEnabled() && preview.PieceCode != 0 && preview.Kind is 1 or 2 or 5)
@@ -1910,6 +1916,11 @@ public partial class Chess3DWindow : Window
         var side = piece / 10;
         var type = piece % 10;
         return $"{SideLetter(side)}{TypeLetter(type)}";
+    }
+
+    private bool IsCheckedKing(int piece, int currentSide)
+    {
+        return piece != 0 && piece / 10 == currentSide && piece % 10 == NativeChess3DEngine.King && _engine.IsSideInCheck(currentSide);
     }
 
     private static string SideLetter(int side)

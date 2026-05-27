@@ -1,0 +1,33 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "classic-stalemate-micro-v0.1",
+  "profileFile": "classic_six_side_3d_v0_1.json",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "A corner king not in check with every adjacent escape square occupied and protected is stalemate.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "clearBoard" },
+    { "type": "setPiece", "side": 1, "pieceType": 6, "x": 0, "y": 0, "z": 0 },
+    { "type": "setPiece", "side": 2, "pieceType": 2, "x": 0, "y": 0, "z": 1 },
+    { "type": "setPiece", "side": 2, "pieceType": 2, "x": 0, "y": 1, "z": 0 },
+    { "type": "setPiece", "side": 2, "pieceType": 2, "x": 1, "y": 0, "z": 0 },
+    { "type": "setPiece", "side": 2, "pieceType": 2, "x": 1, "y": 1, "z": 0 },
+    { "type": "setPiece", "side": 2, "pieceType": 2, "x": 1, "y": 0, "z": 1 },
+    { "type": "setPiece", "side": 2, "pieceType": 2, "x": 0, "y": 1, "z": 1 },
+    { "type": "setPiece", "side": 2, "pieceType": 2, "x": 1, "y": 1, "z": 1 },
+    { "type": "setPiece", "side": 2, "pieceType": 4, "x": 0, "y": 0, "z": 7 },
+    { "type": "setPiece", "side": 2, "pieceType": 4, "x": 0, "y": 7, "z": 0 },
+    { "type": "setPiece", "side": 2, "pieceType": 4, "x": 7, "y": 0, "z": 0 },
+    { "type": "setPiece", "side": 2, "pieceType": 5, "x": 7, "y": 7, "z": 0 },
+    { "type": "setPiece", "side": 2, "pieceType": 5, "x": 7, "y": 0, "z": 7 },
+    { "type": "setPiece", "side": 2, "pieceType": 5, "x": 0, "y": 7, "z": 7 },
+    { "type": "setPiece", "side": 2, "pieceType": 5, "x": 7, "y": 7, "z": 7 },
+    { "type": "assertSideInCheck", "side": 1, "value": false },
+    { "type": "assertSideLegalActionCount", "side": 1, "count": 0 },
+    { "type": "assertGameOver", "value": true },
+    { "type": "assertGameOutcome", "value": 2 },
+    { "type": "assertWinnerSide", "value": 0 }
+  ],
+  "knownLimitations": []
+}

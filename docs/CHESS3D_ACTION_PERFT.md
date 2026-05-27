@@ -22,4 +22,4 @@ Perft runs on copied state. It must not mutate board, CoreCell stacks, reserve c
 
 ## Limitations
 
-Classic checkmate legality remains draft, so perft currently reflects generated legal-action contracts rather than fully king-safe orthodox 3D chess.
+P3A changes Classic/Single-Side perft from pseudo-action smoke to king-safe legal-action smoke. The counts now exclude moves that leave the own king in check or move the king into attack. Larger exhaustive search still belongs to later AI/search tooling.

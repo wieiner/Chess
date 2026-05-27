@@ -152,11 +152,15 @@
 
 ### P3A - Full 3D King Safety / Check / Mate / Stalemate
 
-- Harden Classic Six-Side king safety, check, mate, and stalemate.
+- Completed: Classic Six-Side runtime king safety, check, checkmate, and stalemate.
+- Completed: Single-Side uses the same legal filter when a king is present.
+- Completed: legal action preview, `TryMakeMove`, side legal-action counts, and action perft/divide use king-safe legal actions for Classic/Single-Side.
+- Completed: Asgard/Rubik/Hodge outcome isolation remains intact.
 
 ### P3B - AI/Search Integration Per Profile
 
-- Integrate AI/search with normal moves, reserve restore, Rubik layer turns, and Hodge projected composite actions.
+- Next: visual playability sprint final for stack/fusion overlays, Rubik layer-turn animation, Hodge mirror arrows, and replay/action animation.
+- Later: integrate AI/search with normal moves, reserve restore, Rubik layer turns, and Hodge projected composite actions.
 
 ### P3 - Full Six-Side Gameplay And Hybrid Victory
 
@@ -201,7 +205,7 @@ P2N is completed in the runtime plan:
 Next:
 
 - P2O: richer visualization and animation.
-- P3A: full 3D king safety/check/mate/stalemate.
+- P3A: completed Classic/Single-Side king safety/check/mate/stalemate.
 - P3B: AI/search per profile.
 - P3C: online serialization.
 
@@ -211,14 +215,13 @@ P2O is completed in the runtime plan:
 
 - Formal rule contract for the five existing Chess3D RuleProfiles.
 - Game phase, game outcome, current turn, allowed-action, and rule-summary ABI.
-- Draft Classic king/check status reporting without pretending full checkmate is solved.
+- P2O originally exposed draft Classic king/check status; P3A now turns that layer into runtime Classic/Single-Side king safety.
 - Profile-aware action perft/divide diagnostics with no-mutation state-hash checks.
 - UI status hardening for phase, outcome, allowed actions, and invalid/legality reasons.
 - Regression playthrough fixtures built on the P2N headless runner.
 
 Next:
 
-- P2P: richer visualization and animation for stacks, fusion, reserve, layer turns, and Hodge mirrors.
-- P3A: full 3D king safety/check/mate/stalemate.
-- P3B: AI/search integration per profile.
-- P3C: online serialization and multiplayer replay authority.
+- P3B: visual playability sprint final for stacks, fusion, layer turns, Hodge mirrors, and replay/action animation.
+- P3C: AI/search integration per profile.
+- P3D: online serialization and multiplayer replay authority.

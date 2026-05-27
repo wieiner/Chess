@@ -23,7 +23,7 @@ The board UI continues to use legal preview as the source of truth. A target cli
 
 ## Game Over
 
-P2O exposes `GamePhase` and `GameOutcome` through ABI so the UI can show completion status. CenterAssembly completion is runtime; Classic checkmate remains draft.
+P2O exposes `GamePhase` and `GameOutcome` through ABI so the UI can show completion status. CenterAssembly completion is runtime for Asgard/Rubik, and P3A makes Classic/Single-Side checkmate and stalemate runtime-backed.
 
 ## Deferred UI
 

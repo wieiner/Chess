@@ -22,7 +22,7 @@ The name is Hodge-inspired. Hodge star and duality motivate the idea that a dire
 - Occupancy: `exclusive`.
 - Fusion: `none`.
 - Core physics: `none`.
-- Goal: `sandbox` while full 3D checkmate remains draft.
+- Goal: `sandbox` for v0.1; Hodge macro-player checkmate remains deferred and does not inherit Classic P3A checkmate automatically.
 - Layer turns: `disabled`.
 - Projection: `hodgeTriuneProjection`.
 - Mirror policy: `allOrNothing`.

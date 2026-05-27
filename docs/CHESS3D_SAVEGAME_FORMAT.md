@@ -28,4 +28,6 @@ Required top-level fields:
 
 Fusion, anchors, implosion progress, and victory descriptors are recomputed after load. This keeps derived overlays honest instead of trusting stale serialized descriptors.
 
+P3A also recomputes Classic/Single-Side check, checkmate, stalemate, game-over state, and winner/no-winner from the loaded board. Older v0.1 save files remain loadable; the runtime derives the stronger outcome truth after load.
+
 Known limitation: this is not the online/network save protocol. It is a local JSON snapshot format.

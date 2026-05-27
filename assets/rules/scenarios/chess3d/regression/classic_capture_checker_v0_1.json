@@ -1,0 +1,20 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "classic-capture-checker-v0.1",
+  "profileFile": "classic_six_side_3d_v0_1.json",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "Capturing a checking rook is legal when it resolves check.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "clearBoard" },
+    { "type": "setPiece", "side": 1, "pieceType": 6, "x": 0, "y": 0, "z": 0 },
+    { "type": "setPiece", "side": 1, "pieceType": 4, "x": 1, "y": 0, "z": 3 },
+    { "type": "setPiece", "side": 2, "pieceType": 4, "x": 0, "y": 0, "z": 3 },
+    { "type": "assertSideInCheck", "side": 1, "value": true },
+    { "type": "move", "fromX": 1, "fromY": 0, "fromZ": 3, "toX": 0, "toY": 0, "toZ": 3 },
+    { "type": "assertPiece", "x": 0, "y": 0, "z": 3, "pieceCode": 14 },
+    { "type": "assertActionCount", "count": 1 }
+  ],
+  "knownLimitations": []
+}

@@ -361,11 +361,19 @@ struct Game
 int nextSide(const Rules& rules, int side);
 void recomputeAnchors(Game& game);
 std::vector<Move> generateMoves(const Game& game, const Position& pos);
+std::vector<Move> generateLegalMoves(const Game& game, const Position& pos);
 bool isProjectionModeEnabled(const Rules& rules);
 int macroPlayerForSide(const Rules& rules, int side);
 bool isCenterAssemblyGoal(const Rules& rules);
 int currentTurnKind(const Game& game);
 void generatePieceMoves(const Game& game, const Position& pos, int from, std::vector<Move>& moves);
+void applyMove(const Rules& rules, Position& pos, Move move);
+std::vector<Vec3> lineDirectionsFor(int type);
+std::vector<Vec3> knightDirections();
+std::vector<Vec3> perpendicularOffsets(Vec3 forward);
+bool isKingSafetyEnforcedProfile(const Rules& rules);
+int findKingSquare(const Position& pos, int side);
+int sideLegalMoveCount(const Game& game, int side);
 
 bool inside(int x, int y, int z)
 {
@@ -1905,8 +1913,8 @@ std::string gameOutcomeName(int outcome)
     switch (outcome)
     {
     case GameOutcomeNone: return "none";
-    case GameOutcomeCheckmateDraft: return "checkmateDraft";
-    case GameOutcomeStalemateDraft: return "stalemateDraft";
+    case GameOutcomeCheckmateDraft: return "checkmate";
+    case GameOutcomeStalemateDraft: return "stalemate";
     case GameOutcomeCenterAssemblyComplete: return "centerAssemblyComplete";
     case GameOutcomeResignationFuture: return "resignationFuture";
     case GameOutcomeDrawFuture: return "drawFuture";
@@ -1918,7 +1926,19 @@ std::string gameOutcomeName(int outcome)
 
 int gamePhase(const Game& game)
 {
-    return game.gameOver ? GamePhaseGameOver : GamePhasePlaying;
+    if (game.gameOver)
+    {
+        return GamePhaseGameOver;
+    }
+    if (isKingSafetyEnforcedProfile(game.rules))
+    {
+        const int side = game.pos.sideToMove;
+        if (findKingSquare(game.pos, side) >= 0 && sideLegalMoveCount(game, side) == 0)
+        {
+            return GamePhaseGameOver;
+        }
+    }
+    return GamePhasePlaying;
 }
 
 bool isClassicCheckmateProfile(const Rules& rules)
@@ -1926,38 +1946,118 @@ bool isClassicCheckmateProfile(const Rules& rules)
     return rules.goalProfileType == "classicCheckmate" || rules.victoryProfileType == "checkmate";
 }
 
-bool isSideInCheckDraft(const Game& game, int side)
+bool isKingSafetyEnforcedProfile(const Rules& rules)
 {
-    if (side < 1 || side > game.rules.activeSideCount || !isClassicCheckmateProfile(game.rules))
-    {
-        return false;
-    }
+    return rules.rulesetId.find("classic-six-side") != std::string::npos ||
+        rules.rulesetId.find("single-side") != std::string::npos;
+}
 
-    int kingSquare = -1;
+int findKingSquare(const Position& pos, int side)
+{
+    if (side < 1 || side > 6)
+    {
+        return -1;
+    }
     for (int i = 0; i < CellCount; ++i)
     {
-        const int piece = game.pos.board[static_cast<std::size_t>(i)];
+        const int piece = pos.board[static_cast<std::size_t>(i)];
         if (pieceSide(piece) == side && pieceType(piece) == King)
         {
-            kingSquare = i;
-            break;
+            return i;
         }
     }
-    if (kingSquare < 0)
+    return -1;
+}
+
+bool linePieceAttacksSquare(const Position& pos, int from, int target, const std::vector<Vec3>& dirs, bool sliding)
+{
+    const int fx = xOf(from);
+    const int fy = yOf(from);
+    const int fz = zOf(from);
+    for (const Vec3& d : dirs)
+    {
+        int tx = fx + d.x;
+        int ty = fy + d.y;
+        int tz = fz + d.z;
+        while (inside(tx, ty, tz))
+        {
+            const int square = indexOf(tx, ty, tz);
+            if (square == target)
+            {
+                return true;
+            }
+            if (!sliding || pos.board[static_cast<std::size_t>(square)] != Empty)
+            {
+                break;
+            }
+            tx += d.x;
+            ty += d.y;
+            tz += d.z;
+        }
+    }
+    return false;
+}
+
+bool pieceAttacksSquare(const Game& game, const Position& pos, int from, int target)
+{
+    if (from < 0 || from >= CellCount || target < 0 || target >= CellCount)
+    {
+        return false;
+    }
+    const int piece = pos.board[static_cast<std::size_t>(from)];
+    const int type = pieceType(piece);
+    const int side = pieceSide(piece);
+    if (side < 1 || side > 6 || type < Pawn || type > King)
     {
         return false;
     }
 
-    for (int attacker = 1; attacker <= game.rules.activeSideCount; ++attacker)
+    const int fx = xOf(from);
+    const int fy = yOf(from);
+    const int fz = zOf(from);
+    if (type == Pawn)
     {
-        if (attacker == side)
+        const Vec3 f = game.rules.sides[side].forward;
+        const int oneX = fx + f.x;
+        const int oneY = fy + f.y;
+        const int oneZ = fz + f.z;
+        for (const Vec3& offset : perpendicularOffsets(f))
         {
-            continue;
+            const int tx = oneX + offset.x;
+            const int ty = oneY + offset.y;
+            const int tz = oneZ + offset.z;
+            if (inside(tx, ty, tz) && indexOf(tx, ty, tz) == target)
+            {
+                return true;
+            }
         }
-        Position scoped = game.pos;
-        scoped.sideToMove = attacker;
-        const auto moves = generateMoves(game, scoped);
-        if (std::any_of(moves.begin(), moves.end(), [&](const Move& move) { return move.to == kingSquare; }))
+        return false;
+    }
+    if (type == Knight)
+    {
+        for (const Vec3& d : knightDirections())
+        {
+            if (inside(fx + d.x, fy + d.y, fz + d.z) && indexOf(fx + d.x, fy + d.y, fz + d.z) == target)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    const bool sliding = type == Rook || type == Bishop || type == Queen;
+    return linePieceAttacksSquare(pos, from, target, lineDirectionsFor(type), sliding);
+}
+
+bool isSquareAttackedBySide(const Game& game, const Position& pos, int square, int attackerSide)
+{
+    if (square < 0 || square >= CellCount || attackerSide < 1 || attackerSide > 6)
+    {
+        return false;
+    }
+    for (int i = 0; i < CellCount; ++i)
+    {
+        const int piece = pos.board[static_cast<std::size_t>(i)];
+        if (pieceSide(piece) == attackerSide && pieceAttacksSquare(game, pos, i, square))
         {
             return true;
         }
@@ -1965,15 +2065,63 @@ bool isSideInCheckDraft(const Game& game, int side)
     return false;
 }
 
+bool isSideInCheckOnPosition(const Game& game, const Position& pos, int side)
+{
+    if (side < 1 || side > 6 || !isKingSafetyEnforcedProfile(game.rules))
+    {
+        return false;
+    }
+    const int kingSquare = findKingSquare(pos, side);
+    if (kingSquare < 0)
+    {
+        return false;
+    }
+    for (int attacker = 1; attacker <= 6; ++attacker)
+    {
+        if (attacker != side && isSquareAttackedBySide(game, pos, kingSquare, attacker))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool moveLeavesOwnKingInCheck(const Game& game, const Position& pos, const Move& move)
+{
+    const int side = pieceSide(move.piece);
+    if (!isKingSafetyEnforcedProfile(game.rules) || findKingSquare(pos, side) < 0)
+    {
+        return false;
+    }
+    if (pieceType(move.captured) == King)
+    {
+        return true;
+    }
+    Position child = pos;
+    applyMove(game.rules, child, move);
+    return isSideInCheckOnPosition(game, child, side);
+}
+
+bool kingMoveWouldEnterCheck(const Game& game, const Position& pos, const Move& move)
+{
+    if (pieceType(move.piece) != King || !isKingSafetyEnforcedProfile(game.rules))
+    {
+        return false;
+    }
+    Position child = pos;
+    applyMove(game.rules, child, move);
+    return isSideInCheckOnPosition(game, child, pieceSide(move.piece));
+}
+
 int sideLegalMoveCount(const Game& game, int side)
 {
-    if (side < 1 || side > game.rules.activeSideCount)
+    if (side < 1 || side > 6)
     {
         return 0;
     }
     Position scoped = game.pos;
     scoped.sideToMove = side;
-    return static_cast<int>(generateMoves(game, scoped).size());
+    return static_cast<int>(generateLegalMoves(game, scoped).size());
 }
 
 int gameOutcome(const Game& game)
@@ -1982,17 +2130,20 @@ int gameOutcome(const Game& game)
     {
         return GameOutcomeCenterAssemblyComplete;
     }
-    if (isClassicCheckmateProfile(game.rules))
+    if (isKingSafetyEnforcedProfile(game.rules))
     {
         const int side = game.pos.sideToMove;
-        const bool noActions = sideLegalMoveCount(game, side) == 0;
-        if (noActions && isSideInCheckDraft(game, side))
+        if (findKingSquare(game.pos, side) >= 0)
         {
-            return GameOutcomeCheckmateDraft;
-        }
-        if (noActions)
-        {
-            return GameOutcomeStalemateDraft;
+            const bool noActions = sideLegalMoveCount(game, side) == 0;
+            if (noActions && isSideInCheckOnPosition(game, game.pos, side))
+            {
+                return GameOutcomeCheckmateDraft;
+            }
+            if (noActions)
+            {
+                return GameOutcomeStalemateDraft;
+            }
         }
     }
     if (!game.replayActions.empty() && game.replayCursor >= static_cast<int>(game.replayActions.size()))
@@ -2000,6 +2151,52 @@ int gameOutcome(const Game& game)
         return GameOutcomeReplayComplete;
     }
     return GameOutcomeNone;
+}
+
+int previousSide(const Rules& rules, int side)
+{
+    if (rules.activeSideCount <= 1)
+    {
+        return side;
+    }
+    int previous = side - 1;
+    if (previous < 1)
+    {
+        previous = rules.activeSideCount;
+    }
+    return previous;
+}
+
+int winnerSideFor(const Game& game)
+{
+    if (game.winnerSide != 0)
+    {
+        return game.winnerSide;
+    }
+    if (gameOutcome(game) == GameOutcomeCheckmateDraft)
+    {
+        return previousSide(game.rules, game.pos.sideToMove);
+    }
+    return 0;
+}
+
+void updateClassicOutcomeState(Game& game)
+{
+    if (!isKingSafetyEnforcedProfile(game.rules) || game.gameOver)
+    {
+        return;
+    }
+    const int outcome = gameOutcome(game);
+    if (outcome == GameOutcomeCheckmateDraft)
+    {
+        game.gameOver = true;
+        game.winnerSide = winnerSideFor(game);
+    }
+    else if (outcome == GameOutcomeStalemateDraft)
+    {
+        game.gameOver = true;
+        game.winnerSide = 0;
+    }
 }
 
 bool isActionKindAllowed(const Game& game, int actionKind)
@@ -2132,10 +2329,22 @@ int buildLegalActionPreview(Game& game, int x, int y, int z, int side)
     const int previewSide = side >= 1 && side <= 6 ? side : pieceSide(piece);
     if (piece != Empty && game.rules.movementProfile != 0)
     {
+        if (isKingSafetyEnforcedProfile(game.rules) && pieceSide(piece) != previewSide)
+        {
+            game.lastInvalidActionReason = "Preview rejected: selected piece is not the current side.";
+            addReservePreviewEntries(game, previewSide);
+            return static_cast<int>(game.selectionPreview.size());
+        }
         Position scoped = game.pos;
         scoped.sideToMove = pieceSide(piece);
         std::vector<Move> moves;
-        generatePieceMoves(game, scoped, from, moves);
+        for (const Move& move : generateLegalMoves(game, scoped))
+        {
+            if (move.from == from)
+            {
+                moves.push_back(move);
+            }
+        }
         for (const Move& move : moves)
         {
             const int flags = previewFlagsForMove(game, move);
@@ -2762,6 +2971,26 @@ std::vector<Move> generateMoves(const Game& game, const Position& pos)
     return moves;
 }
 
+std::vector<Move> generateLegalMoves(const Game& game, const Position& pos)
+{
+    std::vector<Move> moves = generateMoves(game, pos);
+    if (!isKingSafetyEnforcedProfile(game.rules) || findKingSquare(pos, pos.sideToMove) < 0)
+    {
+        return moves;
+    }
+
+    std::vector<Move> legal;
+    legal.reserve(moves.size());
+    for (const Move& move : moves)
+    {
+        if (!moveLeavesOwnKingInCheck(game, pos, move))
+        {
+            legal.push_back(move);
+        }
+    }
+    return legal;
+}
+
 void applyMove(const Rules& rules, Position& pos, Move move)
 {
     int piece = pos.board[move.from];
@@ -2895,7 +3124,7 @@ bool findLegalMoveForSide(const Game& game, int side, int from, int to, int prom
     }
     Position scoped = game.pos;
     scoped.sideToMove = side;
-    const auto moves = generateMoves(game, scoped);
+    const auto moves = generateLegalMoves(game, scoped);
     for (Move move : moves)
     {
         if (move.from == from && move.to == to)
@@ -3143,7 +3372,7 @@ int minimax(const Game& game, Position& pos, int depth, int rootSide)
     {
         return evaluateForSide(pos, rootSide);
     }
-    auto moves = generateMoves(game, pos);
+    auto moves = generateLegalMoves(game, pos);
     if (moves.empty())
     {
         return evaluateForSide(pos, rootSide);
@@ -3435,8 +3664,8 @@ std::string exportSaveGameJson(const Game& game)
         << "  \"currentSide\": " << game.pos.sideToMove << ",\n"
         << "  \"currentMacroPlayer\": " << macroPlayerForSide(game.rules, game.pos.sideToMove) << ",\n"
         << "  \"currentTurnKind\": " << currentTurnKind(game) << ",\n"
-        << "  \"gameOver\": " << (game.gameOver ? "true" : "false") << ",\n"
-        << "  \"winnerSide\": " << game.winnerSide << ",\n"
+        << "  \"gameOver\": " << (gamePhase(game) == GamePhaseGameOver ? "true" : "false") << ",\n"
+        << "  \"winnerSide\": " << winnerSideFor(game) << ",\n"
         << "  \"recomputeFusionOnLoad\": true,\n"
         << "  \"recomputeAnchorsOnLoad\": true,\n"
         << "  \"projectedBoard\": [";
@@ -3520,7 +3749,7 @@ std::string canonicalStateString(const Game& game)
     std::ostringstream out;
     out << "rules=" << game.rules.rulesetId << ";side=" << game.pos.sideToMove
         << ";macro=" << macroPlayerForSide(game.rules, game.pos.sideToMove)
-        << ";gameOver=" << (game.gameOver ? 1 : 0) << ";winner=" << game.winnerSide
+        << ";gameOver=" << (gamePhase(game) == GamePhaseGameOver ? 1 : 0) << ";winner=" << winnerSideFor(game)
         << ";actions=" << game.actionHistory.size() << ";board=";
     for (int value : game.pos.board)
     {
@@ -3698,6 +3927,7 @@ bool loadSaveGameJson(Game& game, const std::string& json, std::string& error)
         next.gameOver = true;
         next.winnerSide = savedWinnerSide;
     }
+    updateClassicOutcomeState(next);
     next.lastInfo = "3D savegame loaded.";
     game = std::move(next);
     return true;
@@ -3926,7 +4156,7 @@ std::vector<DiagnosticAction> enumerateDiagnosticActions(const Game& game)
                 const int side = game.rules.projectionGroups[macro][i];
                 Position scoped = game.pos;
                 scoped.sideToMove = side;
-                for (const Move& move : generateMoves(game, scoped))
+                for (const Move& move : generateLegalMoves(game, scoped))
                 {
                     Game copy = game;
                     Chess3DMoveDto played{};
@@ -3947,7 +4177,7 @@ std::vector<DiagnosticAction> enumerateDiagnosticActions(const Game& game)
         return actions;
     }
 
-    for (const Move& move : generateMoves(game, game.pos))
+    for (const Move& move : generateLegalMoves(game, game.pos))
     {
         DiagnosticAction action{};
         action.actionKind = ActionMove;
@@ -4340,13 +4570,22 @@ CHESS3D_API int Chess3D_IsAnchoredCell(void* handle, int x, int y, int z)
 CHESS3D_API int Chess3D_IsGameOver(void* handle)
 {
     auto* game = asGame(handle);
-    return game != nullptr && game->gameOver ? 1 : 0;
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    const int outcome = gameOutcome(*game);
+    return (game->gameOver || outcome == GameOutcomeCheckmateDraft || outcome == GameOutcomeStalemateDraft) ? 1 : 0;
 }
 
 CHESS3D_API int Chess3D_GetWinnerSide(void* handle)
 {
     auto* game = asGame(handle);
-    return game != nullptr ? game->winnerSide : 0;
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    return winnerSideFor(*game);
 }
 
 CHESS3D_API int Chess3D_GetLastProfileError(void* handle, char* buffer, int capacity)
@@ -4985,8 +5224,8 @@ CHESS3D_API int Chess3D_GetCurrentTurnSummary(void* handle, char* buffer, int ca
         << "; side=" << game->pos.sideToMove
         << "; macroPlayer=" << macroPlayerForSide(game->rules, game->pos.sideToMove)
         << "; allowedMask=" << allowedActionMask(*game)
-        << "; gameOver=" << (game->gameOver ? "true" : "false")
-        << "; winnerSide=" << game->winnerSide;
+        << "; gameOver=" << (gamePhase(*game) == GamePhaseGameOver ? "true" : "false")
+        << "; winnerSide=" << winnerSideFor(*game);
     return copyString(summary.str(), buffer, capacity);
 }
 
@@ -5012,9 +5251,9 @@ CHESS3D_API int Chess3D_GetModeRuleSummary(void* handle, char* buffer, int capac
         << "; layerTurn=" << game->rules.layerTurnProfileType
         << "; projection=" << game->rules.projectionProfileType
         << "; victory=" << game->rules.victoryProfileType;
-    if (isClassicCheckmateProfile(game->rules))
+    if (isKingSafetyEnforcedProfile(game->rules))
     {
-        summary << "; kingSafety=checkmateDraft";
+        summary << "; kingSafety=runtime";
     }
     else
     {
@@ -5032,7 +5271,7 @@ CHESS3D_API int Chess3D_GetLastMoveLegalityReason(void* handle, char* buffer, in
 CHESS3D_API int Chess3D_IsSideInCheck(void* handle, int side)
 {
     auto* game = asGame(handle);
-    return game != nullptr && isSideInCheckDraft(*game, side) ? 1 : 0;
+    return game != nullptr && isSideInCheckOnPosition(*game, game->pos, side) ? 1 : 0;
 }
 
 CHESS3D_API int Chess3D_GetSideLegalActionCount(void* handle, int side)
@@ -5050,10 +5289,10 @@ CHESS3D_API int Chess3D_GetSideLegalActionCount(void* handle, int side)
     }
     Position scoped = game->pos;
     scoped.sideToMove = side;
-    int count = static_cast<int>(generateMoves(*game, scoped).size());
+    int count = static_cast<int>(generateLegalMoves(*game, scoped).size());
     if (side == game->pos.sideToMove)
     {
-        const int specialCount = static_cast<int>(enumerateDiagnosticActions(*game).size()) - static_cast<int>(generateMoves(*game, game->pos).size());
+        const int specialCount = static_cast<int>(enumerateDiagnosticActions(*game).size()) - static_cast<int>(generateLegalMoves(*game, game->pos).size());
         count += std::max(0, specialCount);
     }
     return count;
@@ -5072,17 +5311,19 @@ CHESS3D_API int Chess3D_GetCheckStatusSummary(void* handle, int side, char* buff
         return copyString("", buffer, capacity);
     }
     std::ostringstream summary;
-    const bool applicable = isClassicCheckmateProfile(game->rules);
-    const bool inCheck = isSideInCheckDraft(*game, side);
+    const bool applicable = isKingSafetyEnforcedProfile(game->rules);
+    const bool hasKing = findKingSquare(game->pos, side) >= 0;
+    const bool inCheck = isSideInCheckOnPosition(*game, game->pos, side);
     const int legalCount = Chess3D_GetSideLegalActionCount(handle, side);
     summary << "side=" << side
         << "; applicable=" << (applicable ? "true" : "false")
-        << "; status=" << (applicable ? "draft" : "notApplicable")
+        << "; status=" << (applicable ? "runtime" : "notApplicable")
+        << "; king=" << (hasKing ? "present" : "missing")
         << "; inCheck=" << (inCheck ? "true" : "false")
         << "; legalActionCount=" << legalCount;
-    if (applicable && legalCount == 0)
+    if (applicable && hasKing && legalCount == 0)
     {
-        summary << "; outcomeDraft=" << (inCheck ? "checkmateDraft" : "stalemateDraft");
+        summary << "; outcome=" << (inCheck ? "checkmate" : "stalemate");
     }
     return copyString(summary.str(), buffer, capacity);
 }
@@ -5112,7 +5353,7 @@ CHESS3D_API int Chess3D_GetState(void* handle, Chess3DStateDto* state)
     {
         return 0;
     }
-    const auto moves = generateMoves(*game, game->pos);
+    const auto moves = generateLegalMoves(*game, game->pos);
     int pieces = 0;
     for (int piece : game->pos.board)
     {
@@ -5223,7 +5464,7 @@ CHESS3D_API int Chess3D_GetLegalMoves(void* handle, Chess3DMoveDto* buffer, int 
     {
         return 0;
     }
-    const auto moves = generateMoves(*game, game->pos);
+    const auto moves = generateLegalMoves(*game, game->pos);
     if (buffer != nullptr && capacity > 0)
     {
         const int count = std::min(capacity, static_cast<int>(moves.size()));
@@ -5253,7 +5494,13 @@ CHESS3D_API int Chess3D_GetPieceMoves(void* handle, int fromX, int fromY, int fr
     Position scoped = game->pos;
     scoped.sideToMove = pieceSide(piece);
     std::vector<Move> moves;
-    generatePieceMoves(*game, scoped, from, moves);
+    for (const Move& move : generateLegalMoves(*game, scoped))
+    {
+        if (move.from == from)
+        {
+            moves.push_back(move);
+        }
+    }
     if (buffer != nullptr && capacity > 0)
     {
         const int count = std::min(capacity, static_cast<int>(moves.size()));
@@ -5278,7 +5525,24 @@ CHESS3D_API int Chess3D_TryMakeMove(void* handle, int fromX, int fromY, int from
     }
     const int from = indexOf(fromX, fromY, fromZ);
     const int to = indexOf(toX, toY, toZ);
-    auto moves = generateMoves(*game, game->pos);
+    const int movingPiece = game->pos.board[static_cast<std::size_t>(from)];
+    if (gamePhase(*game) == GamePhaseGameOver)
+    {
+        game->lastInvalidActionReason = "Move rejected: game is already over.";
+        return 0;
+    }
+    if (movingPiece == Empty)
+    {
+        game->lastInvalidActionReason = "Move rejected: source cell is empty.";
+        return 0;
+    }
+    if (isKingSafetyEnforcedProfile(game->rules) && pieceSide(movingPiece) != game->pos.sideToMove)
+    {
+        game->lastInvalidActionReason = "Move rejected: selected piece is not the current side.";
+        return 0;
+    }
+
+    auto moves = generateLegalMoves(*game, game->pos);
     for (Move move : moves)
     {
         if (move.from == from && move.to == to)
@@ -5292,6 +5556,7 @@ CHESS3D_API int Chess3D_TryMakeMove(void* handle, int fromX, int fromY, int from
                 !game->coreStacks[static_cast<std::size_t>(move.to)].empty();
             applyMove(*game, move);
             recomputeAnchors(*game);
+            updateClassicOutcomeState(*game);
             appendAction(*game, makeMoveAction(*game, move, targetCoreHadOccupants));
             game->lastInfo = "3D move played.";
             game->lastInvalidActionReason.clear();
@@ -5301,6 +5566,37 @@ CHESS3D_API int Chess3D_TryMakeMove(void* handle, int fromX, int fromY, int from
             }
             return 1;
         }
+    }
+    const int targetPiece = game->pos.board[static_cast<std::size_t>(to)];
+    const bool stackTarget = isCoreStackEnabled(game->rules) && isInsideCore(game->rules, to);
+    if (targetPiece != Empty && isSameSide(movingPiece, targetPiece) && !stackTarget)
+    {
+        game->lastInvalidActionReason = "Move rejected: target cell contains your own piece.";
+        return 0;
+    }
+    if (isKingSafetyEnforcedProfile(game->rules))
+    {
+        Position scoped = game->pos;
+        scoped.sideToMove = pieceSide(movingPiece);
+        const auto pseudoMoves = generateMoves(*game, scoped);
+        auto pseudoIt = std::find_if(pseudoMoves.begin(), pseudoMoves.end(), [&](const Move& move)
+        {
+            return move.from == from && move.to == to;
+        });
+        if (pseudoIt != pseudoMoves.end())
+        {
+            if (kingMoveWouldEnterCheck(*game, scoped, *pseudoIt))
+            {
+                game->lastInvalidActionReason = "Move rejected: king would move into check.";
+            }
+            else
+            {
+                game->lastInvalidActionReason = "Move rejected: leaves king in check.";
+            }
+            return 0;
+        }
+        game->lastInvalidActionReason = "Move rejected: move pattern is invalid for this piece.";
+        return 0;
     }
     game->lastInvalidActionReason = "Move rejected: no legal move matches the selected source and target.";
     return 0;
@@ -5439,7 +5735,7 @@ CHESS3D_API int Chess3D_MakeBestMove(void* handle, int depth, Chess3DMoveDto* pl
     {
         return 0;
     }
-    auto moves = generateMoves(*game, game->pos);
+    auto moves = generateLegalMoves(*game, game->pos);
     if (moves.empty())
     {
         game->lastInfo = "3D AI has no moves.";
@@ -5466,6 +5762,7 @@ CHESS3D_API int Chess3D_MakeBestMove(void* handle, int depth, Chess3DMoveDto* pl
         !game->coreStacks[static_cast<std::size_t>(best.to)].empty();
     applyMove(*game, best);
     recomputeAnchors(*game);
+    updateClassicOutcomeState(*game);
     appendAction(*game, makeMoveAction(*game, best, targetCoreHadOccupants));
     if (playedMove != nullptr)
     {

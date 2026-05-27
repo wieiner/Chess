@@ -45,8 +45,12 @@ The control center now surfaces more rule-state information directly in status t
 - active game phase and outcome;
 - current side and macro-player where relevant;
 - allowed action kinds for the selected profile;
-- mode rule summary, including whether king safety is draft, not applicable, or deferred;
+- mode rule summary, including whether king safety is runtime, not applicable, or deferred;
 - selected side legal-action count;
 - last legality/invalid-action reason.
 
 Game-over profiles should block normal play actions until reset/load/replay. Classic remains a first-class non-Asgard mode; Asgard, Rubik, and Hodge panels are profile-gated rather than globally active.
+
+## P3A Check / Mate UI
+
+Classic and Single-Side now report runtime check truth where a king exists. The status area shows check, checkmate, stalemate, current side legal-action count, and last legality reason. A current-side king in check is highlighted in the board UI. Asgard, Rubik, and Hodge do not show Classic checkmate as their victory condition unless a future profile explicitly opts in.

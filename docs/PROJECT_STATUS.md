@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P2M visual asset pipeline, lighting, and Chess3D interaction reliability.
+Last audited locally for P3A Classic/Single-Side king safety and outcomes.
 
 ## Exists
 
@@ -81,6 +81,11 @@ Last audited locally for P2M visual asset pipeline, lighting, and Chess3D intera
 - `docs/CHESS3D_INTERACTION_AUDIT.md`: preview-to-action mismatch audit and fix.
 - `docs/CHESS3D_CLICK_TO_MOVE_FLOW.md`: player/runtime click-to-move flow.
 - `docs/CHESS3D_PLAYABILITY_KNOWN_ISSUES.md`: honest remaining UI/visual limitations.
+- `docs/CHESS3D_P3A_KING_SAFETY_AUDIT.md`: audit of the move-generation, preview, and outcome boundary before closing P3A.
+- `docs/CHESS3D_KING_SAFETY_RUNTIME.md`: runtime king-safety behavior for Classic/Single-Side.
+- `docs/CHESS3D_CHECKMATE_STALEMATE_SCOPE.md`: profile scope for checkmate/stalemate.
+- `docs/CHESS3D_LEGAL_MOVE_FILTER.md`: pseudo-legal to legal move filtering.
+- `docs/CHESS3D_P3A_REGRESSION_FIXTURES.md`: executable king-safety regression fixtures.
 
 ## Build-Verified
 
@@ -103,6 +108,7 @@ Last audited locally for P2M visual asset pipeline, lighting, and Chess3D intera
 - Chess3D contract tests now cover P2J Hodge Projection Duel: JSON/profile validation, profile isolation, macro-player group coverage, face-frame transforms, projected composite moves, all-or-nothing rejection, and classic capture recording.
 - Chess3D contract tests now cover P2L playability closure: exactly five real RuleProfiles, non-mutating legal action preview, invalid-action reasons, capability masks, turn summaries, mode isolation, and scenario playthrough JSON parsing.
 - Chess3D contract tests now cover the P2M visual model manifest and required OBJ/MTL asset references.
+- Chess3D contract tests now cover P3A Classic/Single-Side king safety: self-check rejection, king-into-check rejection, checker capture, sliding-check block, attack-map smoke, checkmate/stalemate micro positions, legal perft/divide no-mutation, and non-classic outcome isolation.
 - `scripts/verify.ps1` checks that representative RuleProfile JSON files are copied into Chess3D development output and `ProductionOutput`.
 - `scripts/verify.ps1` checks that the canonical model manifest and representative OBJ/MTL files are copied into Chess2D and Chess3D development output and `ProductionOutput`.
 
@@ -175,7 +181,7 @@ Portable outputs:
 ## Draft
 
 - Six-sided 3D chess laws are still draft and JSON-driven.
-- 3D king safety, check, mate, and stalemate remain draft after P2L and are tracked for P3A.
+- Classic Six-Side now has runtime king safety, check, checkmate, and stalemate. Single-Side applies the same legal filter when a king is present.
 - Final Asgard/Meru fusion physics are not implemented yet; P2F provides descriptor/progress state but not destructive transformation, visual effects, or full victory variants.
 - Runtime board projection remains one integer piece per cell for compatibility, while stack data exists as a Forbidden Core overlay.
 - Full reserve inventory UI, drag/drop restore, restore into core, and restore captures are not implemented yet.
@@ -194,7 +200,7 @@ Portable outputs:
 - Full UI automation tests are not present yet.
 - GPU parity/performance needs more benchmark baselines on real target hardware.
 - The project currently relies on local Visual Studio/MSBuild and vcpkg environment availability.
-- Recommended next stage is P2N: save/load/replay/export/import over P2I/P2J/P2K/P2L/P2M action history and visual asset metadata, then P2O richer visualization/animation for stack/fusion/reserve/layer-turn/projection state.
+- Recommended next stage is P3B visual playability: stack/fusion overlays, Rubik layer-turn animation, Hodge mirror arrows, and replay/action animation.
 ## P2N Status
 
 P2N adds reproducibility to the existing five Chess3D modes. No sixth mode was added.
@@ -219,11 +225,30 @@ Still deferred:
 
 P2O hardens the five existing Chess3D modes without adding a sixth RuleProfile.
 
+## P3A Status
+
+P3A closes Classic/Single-Side king safety without adding new modes.
+
+Implemented:
+
+- runtime attack map and king lookup for Classic/Single-Side;
+- legal filtering for self-check and king-into-check;
+- engine-backed checkmate/stalemate outcomes;
+- legal preview and `TryMakeMove` consistency;
+- action perft/divide over legal actions for Classic/Single-Side;
+- regression fixtures for self-check, king safety, checker capture, sliding blocks, checkmate, stalemate, Single-Side smoke, and non-classic isolation.
+
+Still deferred:
+
+- AI/search per profile;
+- rich animation and visualization;
+- online serialization/multiplayer authority.
+
 Implemented:
 
 - formal runtime rule contract documentation for Classic, Single-Side, Asgard, Rubik, and Hodge;
 - append-only game phase, game outcome, allowed-action, rule-summary, and last-legality-reason ABI;
-- draft Classic king-safety/check status reporting, explicitly not final checkmate enforcement;
+- P2O draft Classic king-safety/check status was replaced by P3A runtime checkmate/stalemate enforcement;
 - profile-aware action perft/divide diagnostics for legal action generation smoke checks;
 - non-mutating perft/divide guarantees verified by state hash;
 - Chess3D UI status now surfaces phase, outcome, mode rule summary, turn summary, and side legal-action count;
@@ -231,7 +256,7 @@ Implemented:
 
 Still deferred:
 
-- full 3D king safety/check/mate/stalemate;
+- broader AI/search validation over the new king-safe legal action layer;
 - AI/search integration over profile-aware legal actions;
 - richer visualization/animation of stacks, fusion, Rubik turns, and Hodge mirrors;
 - online serialization and multiplayer authority rules.

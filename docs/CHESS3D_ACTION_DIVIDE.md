@@ -25,6 +25,8 @@ The result is JSON:
 
 Divide makes move-generation bugs reproducible: it lists first-ply actions and their subtree counts. For Rubik and Hodge, this means the diagnostic can show layer turns and projection composite moves alongside ordinary moves.
 
+For Classic/Single-Side after P3A, divide roots are filtered through the king-safety legal move layer. Self-check and king-into-check roots should not appear in the JSON.
+
 ## Limits
 
 Depth is intentionally capped at 3 for v0.1. Larger exhaustive search belongs to later AI/search tooling.

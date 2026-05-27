@@ -10,7 +10,7 @@ This document is the P2O rule contract for the five existing Chess3D profiles. I
 - Players: six side ids, side turn.
 - Actions: normal 3D moves and classic captures.
 - Disabled: Asgard core, fusion, reserve, Rubik layer turns, Hodge projection.
-- Victory: `classicCheckmate` / `checkmate` draft. P2O exposes check/stalemate/checkmate draft status, but full legal king-safety hardening remains P3A.
+- Victory: `classicCheckmate` / `checkmate` runtime. P3A enforces king safety, rejects self-check, detects checkmate/stalemate from legal action counts, and reports winner/no-winner consistently.
 - Save/replay: supported.
 - UI: must show Classic as first-class, not as Asgard without features.
 
@@ -21,7 +21,7 @@ This document is the P2O rule contract for the five existing Chess3D profiles. I
 - Board: 8x8x8, central 4x4 training setup.
 - Players: one side, sandbox/training turn.
 - Actions: normal movement/capture preview for movement QA.
-- Victory: sandbox; no checkmate.
+- Victory: sandbox/training. P3A applies the same king-safety legal filter when a king is present, but Single-Side remains a training profile rather than a full competitive six-side game.
 - Save/replay: supported.
 - UI: should make clear that this is a training board.
 
@@ -56,7 +56,7 @@ This document is the P2O rule contract for the five existing Chess3D profiles. I
 - Players: two macro-players, each with three side projections.
 - Action: all-or-nothing projected composite move.
 - Disabled by default: Asgard core/fusion/reserve and Rubik layer turns.
-- Victory: sandbox/checkmate draft; macro-player checkmate is deferred.
+- Victory: sandbox/checkmate deferred for macro-player semantics. Hodge does not inherit Classic checkmate automatically.
 - Save/replay: supported.
 
 ## Cross-Profile Contract

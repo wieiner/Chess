@@ -105,7 +105,7 @@ The layer is append-only ABI and does not change Chess2D, RubikApp, OnlineApp, C
 P2O adds a profile-aware playability/rules diagnostic layer above the P2N replayable runtime:
 
 - `GamePhase`, `GameOutcome`, current-turn summary, allowed action mask, and mode rule summary are exposed through append-only ABI.
-- Classic Six-Side gets draft king/check status telemetry; final full 3D checkmate/stalemate remains P3A.
+- Classic Six-Side now uses P3A runtime king safety for legal preview, move execution, check, checkmate, and stalemate. Single-Side uses the same filter when a king is present.
 - Asgard/Rubik centerAssembly outcomes remain separate from checkmate.
 - Hodge uses macro-player/projection composite action semantics rather than side-only chess turns.
 - `Chess3D_PerftActions` and `Chess3D_DivideActionsJson` enumerate legal actions by profile for shallow diagnostic counts and never mutate the source state.

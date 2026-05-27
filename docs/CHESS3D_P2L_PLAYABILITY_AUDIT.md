@@ -16,7 +16,7 @@ No sixth Chess3D RuleProfile exists in the repository at P2L. Scenario files und
 
 ## Current Playability
 
-- Classic Six-Side is playable-draft: normal 3D piece movement and classic captures work, but full 3D king safety/check/mate/stalemate remain draft.
+- Classic Six-Side was playable-draft at P2L; P3A later adds runtime king safety/check/mate/stalemate.
 - Single-Side is training/playable: it exposes the one-side movement core and is useful for UI and piece-rule debugging.
 - Asgard Convergence is experimental-playable: core stacks, fusion descriptors, anchors, knockback/reserve, and reserve restore exist, while contested anchor policy and destructive implosion remain deferred.
 - Rubik Convergence is experimental-playable: Asgard-style state plus profile-gated Rubik layer turns over projected board and core stacks.

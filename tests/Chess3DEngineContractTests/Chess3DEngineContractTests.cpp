@@ -78,6 +78,8 @@ constexpr int AllowedActionCenterAssembly = 128;
 constexpr int GamePhasePlaying = 2;
 constexpr int GamePhaseGameOver = 3;
 constexpr int GameOutcomeNone = 0;
+constexpr int GameOutcomeCheckmate = 1;
+constexpr int GameOutcomeStalemate = 2;
 constexpr int GameOutcomeCenterAssemblyComplete = 3;
 
 std::string ReadTextFile(const std::string& path)
@@ -1246,6 +1248,24 @@ bool RunPlaythroughFile(void* game, const std::string& path, std::string& error)
                 return fail("assertReserveCount failed");
             }
         }
+        else if (type == "assertSideInCheck")
+        {
+            const int side = IntValue(step, "side", 0);
+            bool expected = false;
+            if (!ExtractBoolValue(step, "value", expected) || (Chess3D_IsSideInCheck(game, side) != 0) != expected)
+            {
+                return fail("assertSideInCheck failed");
+            }
+        }
+        else if (type == "assertSideLegalActionCount")
+        {
+            const int side = IntValue(step, "side", 0);
+            const int count = IntValue(step, "count", -1);
+            if (Chess3D_GetSideLegalActionCount(game, side) != count)
+            {
+                return fail("assertSideLegalActionCount failed");
+            }
+        }
         else if (type == "assertActionCount")
         {
             const int count = IntValue(step, "count", -1);
@@ -1299,6 +1319,14 @@ bool RunPlaythroughFile(void* game, const std::string& path, std::string& error)
             if (!ExtractBoolValue(step, "value", expected) || (Chess3D_IsGameOver(game) != 0) != expected)
             {
                 return fail("assertGameOver failed");
+            }
+        }
+        else if (type == "assertWinnerSide")
+        {
+            const int value = IntValue(step, "value", -1);
+            if (Chess3D_GetWinnerSide(game) != value)
+            {
+                return fail("assertWinnerSide failed");
             }
         }
         else if (type == "assertPreviewCountAtLeast")
@@ -1856,8 +1884,8 @@ int main()
         "classic starts in playing phase with no outcome");
     test.Check(ReadAbiString(game, Chess3D_GetCurrentTurnSummary).find("outcome=none") != std::string::npos,
         "current turn summary exposes phase and outcome");
-    test.Check(ReadAbiString(game, Chess3D_GetModeRuleSummary).find("kingSafety=checkmateDraft") != std::string::npos,
-        "classic mode rule summary marks checkmate as draft");
+    test.Check(ReadAbiString(game, Chess3D_GetModeRuleSummary).find("kingSafety=runtime") != std::string::npos,
+        "classic mode rule summary marks king safety as runtime");
     test.Check(Chess3D_IsActionKindAllowed(game, ActionMove) == 1 &&
         Chess3D_IsActionKindAllowed(game, ActionLayerTurn) == 0 &&
         Chess3D_IsActionKindAllowed(game, ActionProjectionCompositeMove) == 0,
@@ -1865,8 +1893,8 @@ int main()
     test.Check(Chess3D_GetSideLegalActionCount(game, 1) > 0 &&
         Chess3D_HasAnyLegalActionForSide(game, 1) == 1,
         "classic side legal action count is exposed");
-    test.Check(ReadCheckStatusSummary(game, 1).find("status=draft") != std::string::npos,
-        "classic check status summary is draft and readable");
+    test.Check(ReadCheckStatusSummary(game, 1).find("status=runtime") != std::string::npos,
+        "classic check status summary is runtime and readable");
     const std::string classicHashBeforePerft = ReadStateHash(game);
     const long long classicDepth0 = Chess3D_PerftActions(game, 0);
     const long long classicDepth1 = Chess3D_PerftActions(game, 1);
@@ -1877,6 +1905,63 @@ int main()
         "classic action divide returns parseable JSON");
     test.Check(ReadStateHash(game) == classicHashBeforePerft,
         "classic action perft/divide do not mutate state hash");
+
+    Chess3D_Clear(game);
+    test.Check(Chess3D_SetPiece(game, 0, 0, 0, 1, King) == 1 &&
+        Chess3D_SetPiece(game, 0, 0, 1, 1, Rook) == 1 &&
+        Chess3D_SetPiece(game, 0, 0, 7, 2, Rook) == 1,
+        "classic self-check test position is set");
+    const std::string selfCheckHash = ReadStateHash(game);
+    test.Check(Chess3D_TryMakeMove(game, 0, 0, 1, 1, 0, 1, 0, &played) == 0 &&
+        ReadStateHash(game) == selfCheckHash &&
+        ReadAbiString(game, Chess3D_GetLastMoveLegalityReason).find("leaves king in check") != std::string::npos,
+        "classic self-check move is rejected without mutation");
+
+    Chess3D_Clear(game);
+    test.Check(Chess3D_SetPiece(game, 0, 0, 0, 1, King) == 1 &&
+        Chess3D_SetPiece(game, 0, 0, 7, 2, Rook) == 1,
+        "classic king move into check position is set");
+    test.Check(Chess3D_TryMakeMove(game, 0, 0, 0, 0, 0, 1, 0, &played) == 0 &&
+        ReadAbiString(game, Chess3D_GetLastMoveLegalityReason).find("king would move into check") != std::string::npos,
+        "classic king cannot move into an attacked cell");
+
+    Chess3D_Clear(game);
+    test.Check(Chess3D_SetPiece(game, 0, 0, 0, 1, King) == 1 &&
+        Chess3D_SetPiece(game, 1, 0, 3, 1, Rook) == 1 &&
+        Chess3D_SetPiece(game, 0, 0, 3, 2, Rook) == 1 &&
+        Chess3D_IsSideInCheck(game, 1) == 1 &&
+        Chess3D_TryMakeMove(game, 1, 0, 3, 0, 0, 3, 0, &played) == 1 &&
+        Chess3D_GetPiece(game, 0, 0, 3) == PieceCode(1, Rook),
+        "classic can capture a checking piece when it resolves check");
+
+    Chess3D_Clear(game);
+    test.Check(Chess3D_SetPiece(game, 0, 0, 0, 1, King) == 1 &&
+        Chess3D_SetPiece(game, 1, 0, 1, 1, Rook) == 1 &&
+        Chess3D_SetPiece(game, 0, 0, 7, 2, Rook) == 1 &&
+        Chess3D_IsSideInCheck(game, 1) == 1 &&
+        Chess3D_TryMakeMove(game, 1, 0, 1, 0, 0, 1, 0, &played) == 1,
+        "classic can block a sliding rook check");
+
+    Chess3D_Clear(game);
+    test.Check(Chess3D_SetPiece(game, 4, 3, 5, 1, King) == 1 &&
+        Chess3D_SetPiece(game, 3, 3, 6, 2, Pawn) == 1 &&
+        Chess3D_IsSideInCheck(game, 1) == 1,
+        "classic attack map detects pawn attacks");
+    Chess3D_Clear(game);
+    test.Check(Chess3D_SetPiece(game, 0, 0, 0, 1, King) == 1 &&
+        Chess3D_SetPiece(game, 7, 7, 0, 2, Bishop) == 1 &&
+        Chess3D_IsSideInCheck(game, 1) == 1,
+        "classic attack map detects bishop/officer diagonal attacks");
+    Chess3D_Clear(game);
+    test.Check(Chess3D_SetPiece(game, 0, 0, 0, 1, King) == 1 &&
+        Chess3D_SetPiece(game, 7, 7, 7, 2, Queen) == 1 &&
+        Chess3D_IsSideInCheck(game, 1) == 1,
+        "classic attack map detects queen 3D line attacks");
+    Chess3D_Clear(game);
+    test.Check(Chess3D_SetPiece(game, 0, 0, 0, 1, King) == 1 &&
+        Chess3D_SetPiece(game, 1, 0, 0, 2, King) == 1 &&
+        Chess3D_IsSideInCheck(game, 1) == 1,
+        "classic attack map detects adjacent king attacks");
     Chess3D_Clear(game);
     test.Check(Chess3D_SetPiece(game, 0, 0, 0, 1, Rook) == 1 &&
         Chess3D_SetPiece(game, 0, 0, 3, 2, Pawn) == 1 &&
@@ -2963,12 +3048,20 @@ int main()
             "headless playthrough PASS: " + playthroughFile + (playthroughError.empty() ? "" : " :: " + playthroughError));
     }
 
-    const std::array<std::string, 5> regressionFiles = {
+    const std::array<std::string, 13> regressionFiles = {
         "assets\\rules\\scenarios\\chess3d\\regression\\invalid_click_no_mutation_v0_1.json",
         "assets\\rules\\scenarios\\chess3d\\regression\\rubik_four_turn_roundtrip_v0_1.json",
         "assets\\rules\\scenarios\\chess3d\\regression\\hodge_blocked_mirror_rollback_v0_1.json",
         "assets\\rules\\scenarios\\chess3d\\regression\\asgard_stack_fusion_anchor_v0_1.json",
-        "assets\\rules\\scenarios\\chess3d\\regression\\classic_turn_progression_v0_1.json"
+        "assets\\rules\\scenarios\\chess3d\\regression\\classic_turn_progression_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\classic_self_check_illegal_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\classic_king_cannot_move_into_check_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\classic_capture_checker_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\classic_block_sliding_check_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\classic_checkmate_micro_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\classic_stalemate_micro_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\single_side_king_safety_smoke_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\non_classic_outcome_isolation_v0_1.json"
     };
     for (const std::string& regressionFile : regressionFiles)
     {

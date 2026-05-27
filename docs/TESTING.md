@@ -55,8 +55,8 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - They are not a full chess engine correctness suite.
 - They do not prove search strength or GPU performance.
 - They do not validate final six-sided 3D chess laws; P2A validates only the single-side local rule core.
-- They do not prove full 3D king safety, checkmate, or stalemate yet.
-- They prove P2E CoreCell stack storage, P2F non-destructive fusion descriptors, P2G home-or-reserve capture routing, P2H runtimePartial Rubik layer turns for projected board plus whole CoreCell stacks, P2I action-history/reserve-restore contracts, and P2J Hodge projected composite move contracts. They do not prove destructive implosion behavior, contested anchor scoring, or full six-side king safety.
+- They now prove the P3A Classic/Single-Side king-safety kernel through focused check/checkmate/stalemate fixtures, but they are not a deep exhaustive endgame tablebase.
+- They prove P2E CoreCell stack storage, P2F non-destructive fusion descriptors, P2G home-or-reserve capture routing, P2H runtimePartial Rubik layer turns for projected board plus whole CoreCell stacks, P2I action-history/reserve-restore contracts, and P2J Hodge projected composite move contracts. They do not prove destructive implosion behavior, contested anchor scoring, or AI/search strength.
 - They do not implement or prove color/permutation, destructive transformation, final Volume-Surface 216 mechanics, full replay/import/export, online serialization, AI/search generation for layer turns or Hodge composite turns, GPU stack snapshots, or final Hodge mathematical formalism.
 - They do not automate WPF UI behavior yet.
 - They do not require or validate `rude-resource/`.
@@ -102,4 +102,22 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
 - state-hash no-mutation guarantees for perft/divide;
 - regression fixtures under `assets\rules\scenarios\chess3d\regression`.
 
-P2O diagnostics are deliberately small-depth CI checks. They are correctness smoke tests for action generation and transaction safety, not a replacement for future P3A full checkmate or P3B search validation.
+P2O diagnostics are deliberately small-depth CI checks. P3A extends them so Classic/Single-Side perft/divide count legal king-safe actions rather than pseudo-actions.
+
+## P3A King-Safety Tests
+
+`Chess3DEngineContractTests` now covers:
+
+- side king lookup through runtime check status;
+- pawn, rook, bishop/officer, queen, knight, and king attack-map smoke positions;
+- self-check rejection and no-mutation state hash behavior;
+- king move into attacked cell rejection;
+- legal capture of a checking piece;
+- legal blocking of a sliding rook check;
+- Classic checkmate and stalemate micro positions;
+- Single-Side king-safety smoke behavior;
+- non-classic outcome isolation for Asgard, Rubik, and Hodge;
+- legal action preview and `TryMakeMove` consistency;
+- `Chess3D_PerftActions` and `Chess3D_DivideActionsJson` no-mutation checks over legal actions.
+
+The P3A regression fixtures are copied into development output and `ProductionOutput`, then executed by the headless playthrough runner.
