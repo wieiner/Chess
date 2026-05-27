@@ -42,3 +42,5 @@ Expected runtime examples:
 - Missing OBJ files fall back to procedural primitives.
 - Missing MTL or texture files fall back to readable procedural materials.
 - `rude-resource/` remains ignored and is not part of this pipeline.
+
+P3B overlays are procedural WPF geometry and do not require new OBJ/MTL files. They layer on top of the canonical model catalog.

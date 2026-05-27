@@ -86,6 +86,11 @@ Last audited locally for P3A Classic/Single-Side king safety and outcomes.
 - `docs/CHESS3D_CHECKMATE_STALEMATE_SCOPE.md`: profile scope for checkmate/stalemate.
 - `docs/CHESS3D_LEGAL_MOVE_FILTER.md`: pseudo-legal to legal move filtering.
 - `docs/CHESS3D_P3A_REGRESSION_FIXTURES.md`: executable king-safety regression fixtures.
+- `docs/CHESS3D_P3B_VISUAL_PLAYABILITY_AUDIT.md`: visual/UI audit for P3B overlays and animations.
+- `docs/CHESS3D_STACK_FUSION_VISUALS.md`: UI overlay semantics for stacks, fusion, contested, anchors, and implosion progress.
+- `docs/CHESS3D_RUBIK_LAYER_TURN_ANIMATION.md`: Rubik layer-turn animation and state-safety contract.
+- `docs/CHESS3D_HODGE_MIRROR_ARROW_VISUALS.md`: Hodge primary/mirror arrow display.
+- `docs/CHESS3D_ACTION_ANIMATION_PIPELINE.md`: move/replay/layer/projection animation hints.
 
 ## Build-Verified
 
@@ -182,6 +187,7 @@ Portable outputs:
 
 - Six-sided 3D chess laws are still draft and JSON-driven.
 - Classic Six-Side now has runtime king safety, check, checkmate, and stalemate. Single-Side applies the same legal filter when a king is present.
+- Chess3DApp now overlays CoreCube cells, stack counts, fusion/contested/anchor markers, Hodge mirror arrows, Rubik layer pre-highlight, and short move/replay action flashes without changing native rules.
 - Final Asgard/Meru fusion physics are not implemented yet; P2F provides descriptor/progress state but not destructive transformation, visual effects, or full victory variants.
 - Runtime board projection remains one integer piece per cell for compatibility, while stack data exists as a Forbidden Core overlay.
 - Full reserve inventory UI, drag/drop restore, restore into core, and restore captures are not implemented yet.
@@ -243,6 +249,25 @@ Still deferred:
 - AI/search per profile;
 - rich animation and visualization;
 - online serialization/multiplayer authority.
+
+## P3B Status
+
+P3B improves visual playability without adding modes or changing RuleProfile semantics.
+
+Implemented:
+
+- UI-only visual descriptor/theme layer;
+- stack, fusion, contested, anchor, and checked-king overlays;
+- Rubik layer-turn pre-animation with input lock and one engine commit per quarter turn;
+- Hodge primary/mirror dotted arrows and blocked mirror style;
+- move and replay-step action flash;
+- visual diagnostics for model/fallback/overlay counts and animation state.
+
+Still deferred:
+
+- smooth mesh glide and cinematic capture/fusion effects;
+- full replay timeline;
+- automated WPF screenshot tests.
 
 Implemented:
 

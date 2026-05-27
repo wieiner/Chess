@@ -121,3 +121,15 @@ P2O diagnostics are deliberately small-depth CI checks. P3A extends them so Clas
 - `Chess3D_PerftActions` and `Chess3D_DivideActionsJson` no-mutation checks over legal actions.
 
 The P3A regression fixtures are copied into development output and `ProductionOutput`, then executed by the headless playthrough runner.
+
+## P3B Visual Playability Checks
+
+P3B remains mostly UI/manual because it is WPF visual feedback rather than native rule logic. Automated coverage comes from:
+
+- Release build of `ChessApp` and `Chess3DApp`;
+- existing Rubik four-turn roundtrip fixture;
+- existing Hodge blocked-mirror rollback fixture;
+- existing invalid-click no-mutation fixture;
+- contract tests proving layer turns, projection moves, stacks, fusion, replay, and save/load remain stable.
+
+Manual visual QA is listed in `CHESS3D_MANUAL_VISUAL_SMOKE_CHECKLIST.md`.

@@ -36,7 +36,13 @@ public partial class Chess3DWindow : Window
     private double _targetZ;
     private int _lastObjModels;
     private int _lastFallbackModels;
+    private int _lastOverlayModels;
     private bool _applyingNetworkMessage;
+    private bool _animationInProgress;
+    private readonly List<Chess3DVisualSegment> _actionFlashSegments = new();
+    private readonly List<Chess3DVisualSegment> _hodgePreviewSegments = new();
+    private int _animatedLayerAxis = -1;
+    private int _animatedLayer = -1;
     private readonly List<RuleProfileItem> _ruleProfiles = new();
     private readonly List<ScenarioItem> _scenarios = new();
     private string _lastUiInvalidReason = string.Empty;
@@ -409,8 +415,8 @@ public partial class Chess3DWindow : Window
         HeaderStatus.Text = $"Side {state.SideToMove}, pieces {state.PieceCount}, moves {state.LegalMoveCount}";
         RulesText.Text = $"Board {rules.Width}x{rules.Height}x{rules.Depth}, sides {rules.ActiveSideCount}, profile {(rules.MovementProfile == 0 ? "setup-only" : "draft3d")}, max {rules.MaxPiecesPerSide}/side, view {SelectedAxis()} {(IsAllLayersView() ? "all" : "slice")}, grid {SelectedGridMode()}\nRuleset {_engine.GetCurrentRulesetId()}, goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}, layer {_engine.GetLayerTurnProfileType()}, anchors {anchorCount}/{requiredAnchors}{fusionText}{reserveText}{layerTurnText}{projectionText}{actionText}{restoreText}{projectionErrorText}{gameOverText}{stackText}";
         InfoText.Text = _engine.GetLastInfo();
-        var visualDiagnostics = $"Piece set: {SelectedModelSetName()}\nOBJ loaded: {_lastObjModels}, fallback primitives: {_lastFallbackModels}\nMaterial: {_models.LastDiagnostics}\nLast invalid/click reason: {(string.IsNullOrWhiteSpace(_lastUiInvalidReason) ? _engine.GetLastInvalidActionReason() : _lastUiInvalidReason)}";
-        PositionText.Text = $"Models: {SelectedModelSetName()}, OBJ {_lastObjModels}, fallback {_lastFallbackModels}, hints {selectedMoveCount}\n{_engine.GetPositionText()}";
+        var visualDiagnostics = $"Piece set: {SelectedModelSetName()}\nOBJ loaded: {_lastObjModels}, fallback primitives: {_lastFallbackModels}, overlays: {_lastOverlayModels}\nAnimation: {(_animationInProgress ? "in progress" : "idle")}\nMaterial: {_models.LastDiagnostics}\nLast invalid/click reason: {(string.IsNullOrWhiteSpace(_lastUiInvalidReason) ? _engine.GetLastInvalidActionReason() : _lastUiInvalidReason)}";
+        PositionText.Text = $"Models: {SelectedModelSetName()}, OBJ {_lastObjModels}, fallback {_lastFallbackModels}, overlays {_lastOverlayModels}, hints {selectedMoveCount}\n{_engine.GetPositionText()}";
         VisualDiagnosticsText.Text = visualDiagnostics;
         RefreshControlCenterStatus(state, selectedMoveCount, anchorCount, requiredAnchors, knockback, layerTurn, restoreInfo, selectedPreview);
         RefreshActionLog();
@@ -440,7 +446,8 @@ public partial class Chess3DWindow : Window
             $"Selected: {selectedText}\n" +
             $"Active side: {state.SideToMove}, macro: {_engine.GetCurrentMacroPlayer()}, phase: {_engine.GetGamePhase()}, outcome: {_engine.GetGameOutcomeName(_engine.GetGameOutcome())}\n" +
             $"Legal moves from selected: {selectedMoveCount}, side legal actions: {_engine.GetSideLegalActionCount(state.SideToMove)}\n" +
-            $"Actions: {_engine.GetActionCount()}, last: {_engine.GetLastActionNotation()}";
+            $"Actions: {_engine.GetActionCount()}, last: {_engine.GetLastActionNotation()}\n" +
+            $"Visuals: overlays {_lastOverlayModels}, animation {(_animationInProgress ? "locked" : "ready")}";
         ReplayPanelText.Text =
             $"State hash: {_engine.GetStateHash()}\n" +
             $"Replay cursor: {_engine.GetReplayCursor()}/{_engine.GetReplayActionCount()}\n" +
@@ -518,12 +525,16 @@ public partial class Chess3DWindow : Window
         group.Children.Add(new DirectionalLight(Color.FromRgb(150, 174, 214), new Vector3D(3, -1, 3)));
         _lastObjModels = 0;
         _lastFallbackModels = 0;
+        _lastOverlayModels = 0;
         _hitSquares.Clear();
         var board = _engine.GetBoard();
+        var state = _engine.GetState();
         var selectedPreview = SelectedPreviewEntries();
+        PreviewHost.Background = new SolidColorBrush(Chess3DTheme.SceneBackground);
         foreach (var square in VisibleBoardSquares(board))
         {
             group.Children.Add(CreateTileModel(square));
+            AddModeOverlayModels(group, BuildCellVisualState(square, board, state, selectedPreview));
         }
 
         for (var index = 0; index < board.Length; ++index)
@@ -541,6 +552,7 @@ public partial class Chess3DWindow : Window
             var model = CreatePieceModel(piece, square);
             _hitSquares[model] = square;
             group.Children.Add(model);
+            AddStackAndFusionModels(group, BuildCellVisualState(square, board, state, selectedPreview));
         }
 
         if (MoveHintsEnabled())
@@ -563,9 +575,209 @@ public partial class Chess3DWindow : Window
             }
         }
 
+        AddLayerTurnOverlay(group);
+        AddHodgeArrowOverlays(group);
+        AddActionFlashOverlays(group);
+
         Preview3D.Children.Clear();
         Preview3D.Children.Add(new ModelVisual3D { Content = group });
         UpdateCamera();
+    }
+
+    private Chess3DCellVisualState BuildCellVisualState(Square3D square, int[] board, Chess3DStateDto state, IReadOnlyList<Chess3DLegalActionPreviewEntryDto> preview)
+    {
+        var piece = board[IndexOf(square.X, square.Y, square.Z)];
+        var previewEntry = preview.FirstOrDefault(entry => entry.ToX == square.X && entry.ToY == square.Y && entry.ToZ == square.Z);
+        var core = IsCoreCoordinate(square) && (_engine.IsCoreStackEnabled() || _engine.IsFusionEnabled() || _engine.GetGoalProfileType().Contains("centerAssembly", StringComparison.OrdinalIgnoreCase));
+        var stackCount = core ? _engine.GetCoreStackCount(square.X, square.Y, square.Z) : 0;
+        var fusionKind = core && _engine.IsFusionEnabled() ? _engine.GetCoreFusionKind(square.X, square.Y, square.Z) : 0;
+        return new Chess3DCellVisualState(
+            square.X,
+            square.Y,
+            square.Z,
+            piece,
+            _selectedSquare == square,
+            previewEntry.PieceCode != 0,
+            (previewEntry.Flags & PreviewFlagCapture) != 0,
+            core,
+            stackCount,
+            fusionKind,
+            core && _engine.IsCoreCellContested(square.X, square.Y, square.Z),
+            core && _engine.IsAnchoredCell(square.X, square.Y, square.Z),
+            IsCheckedKing(piece, state.SideToMove),
+            state.LastFromX == square.X && state.LastFromY == square.Y && state.LastFromZ == square.Z,
+            state.LastToX == square.X && state.LastToY == square.Y && state.LastToZ == square.Z);
+    }
+
+    private static bool IsCoreCoordinate(Square3D square)
+    {
+        return square.X is >= 2 and <= 5 && square.Y is >= 2 and <= 5 && square.Z is >= 2 and <= 5;
+    }
+
+    private void AddModeOverlayModels(Model3DGroup group, Chess3DCellVisualState state)
+    {
+        var square = new Square3D(state.X, state.Y, state.Z);
+        if (!SquareVisibleInCurrentView(square))
+        {
+            return;
+        }
+
+        if (state.IsCoreCell)
+        {
+            group.Children.Add(CreateCellOverlay(square, Chess3DTheme.CoreCell, 0.82, 0.045, -3.04));
+            _lastOverlayModels++;
+        }
+        if (state.IsAnchor)
+        {
+            group.Children.Add(CreateCellOverlay(square, Chess3DTheme.Anchor, 0.38, 0.07, -2.82));
+            _lastOverlayModels++;
+        }
+        if (state.IsKingInCheck)
+        {
+            group.Children.Add(CreateCellOverlay(square, Chess3DTheme.CaptureTarget, 0.86, 0.12, -2.66));
+            _lastOverlayModels++;
+        }
+    }
+
+    private void AddStackAndFusionModels(Model3DGroup group, Chess3DCellVisualState state)
+    {
+        var square = new Square3D(state.X, state.Y, state.Z);
+        if (!SquareVisibleInCurrentView(square))
+        {
+            return;
+        }
+
+        if (state.StackCount > 1)
+        {
+            var visibleBars = Math.Min(state.StackCount, 5);
+            for (var i = 0; i < visibleBars; ++i)
+            {
+                var material = ObjModelLibrary.CreateSurfaceMaterial(Chess3DTheme.StackBadge, 80);
+                group.Children.Add(new GeometryModel3D(CubeMesh(0.12, 0.12, 0.12), material)
+                {
+                    BackMaterial = material,
+                    Transform = new TranslateTransform3D(square.X - 3.12 + i * 0.12, square.Z - 2.52 + i * 0.04, square.Y - 3.12)
+                });
+                _lastOverlayModels++;
+            }
+        }
+
+        if (state.FusionKind > 1 || state.IsContested)
+        {
+            var color = FusionOverlayColor(state.FusionKind, state.IsContested);
+            group.Children.Add(CreateCellOverlay(square, color, state.FusionKind == 4 ? 0.92 : 0.74, 0.09, -2.74));
+            _lastOverlayModels++;
+        }
+    }
+
+    private static Color FusionOverlayColor(int fusionKind, bool contested)
+    {
+        if (contested || fusionKind == 5)
+        {
+            return Chess3DTheme.FusionContested;
+        }
+        return fusionKind switch
+        {
+            4 => Chess3DTheme.FusionRoyal,
+            6 or 7 => Chess3DTheme.FusionImplosion,
+            _ => Chess3DTheme.FusionFriendly
+        };
+    }
+
+    private GeometryModel3D CreateCellOverlay(Square3D square, Color color, double size, double height, double yOffset)
+    {
+        var material = ObjModelLibrary.CreateSurfaceMaterial(color, 75);
+        return new GeometryModel3D(CubeMesh(size, height, size), material)
+        {
+            BackMaterial = material,
+            Transform = new TranslateTransform3D(square.X - 3.5, square.Z + yOffset, square.Y - 3.5)
+        };
+    }
+
+    private void AddLayerTurnOverlay(Model3DGroup group)
+    {
+        var axis = _animatedLayerAxis >= 0 ? _animatedLayerAxis : (_engine.IsLayerTurnEnabled() ? SelectedLayerTurnAxis() : -1);
+        var layer = _animatedLayerAxis >= 0 ? _animatedLayer : SelectedLayerTurnLayer();
+        if (axis < 0 || layer is < 0 or > 7 || !_engine.IsLayerTurnEnabled())
+        {
+            return;
+        }
+
+        for (var z = 0; z < 8; ++z)
+        {
+            for (var y = 0; y < 8; ++y)
+            {
+                for (var x = 0; x < 8; ++x)
+                {
+                    var square = new Square3D(x, y, z);
+                    if (!LayerContains(axis, layer, square) || !SquareVisibleInCurrentView(square))
+                    {
+                        continue;
+                    }
+                    group.Children.Add(CreateCellOverlay(square, Chess3DTheme.RubikLayer, 0.7, _animationInProgress ? 0.11 : 0.045, -2.88));
+                    _lastOverlayModels++;
+                }
+            }
+        }
+    }
+
+    private static bool LayerContains(int axis, int layer, Square3D square)
+    {
+        return axis switch
+        {
+            2 => square.X == layer,
+            1 => square.Y == layer,
+            _ => square.Z == layer
+        };
+    }
+
+    private void AddHodgeArrowOverlays(Model3DGroup group)
+    {
+        if (!_engine.IsProjectionModeEnabled())
+        {
+            return;
+        }
+        foreach (var segment in _hodgePreviewSegments)
+        {
+            AddArrowDottedLine(group, segment);
+        }
+    }
+
+    private void AddActionFlashOverlays(Model3DGroup group)
+    {
+        foreach (var segment in _actionFlashSegments)
+        {
+            AddArrowDottedLine(group, segment);
+        }
+    }
+
+    private void AddArrowDottedLine(Model3DGroup group, Chess3DVisualSegment segment)
+    {
+        var steps = Math.Max(2, Math.Max(Math.Abs(segment.To.X - segment.From.X), Math.Max(Math.Abs(segment.To.Y - segment.From.Y), Math.Abs(segment.To.Z - segment.From.Z))) * 2);
+        var color = segment.IsBlocked
+            ? Chess3DTheme.HodgeBlockedArrow
+            : segment.IsPrimary
+                ? Chess3DTheme.HodgePrimaryArrow
+                : Chess3DTheme.HodgeMirrorArrow;
+        if (_actionFlashSegments.Contains(segment))
+        {
+            color = Chess3DTheme.ActionFlash;
+        }
+        var material = ObjModelLibrary.CreateSurfaceMaterial(color, 90);
+        for (var i = 0; i <= steps; ++i)
+        {
+            var t = steps == 0 ? 0 : (double)i / steps;
+            var x = segment.From.X + (segment.To.X - segment.From.X) * t;
+            var y = segment.From.Y + (segment.To.Y - segment.From.Y) * t;
+            var z = segment.From.Z + (segment.To.Z - segment.From.Z) * t;
+            var size = i == steps ? 0.18 : 0.1;
+            group.Children.Add(new GeometryModel3D(CubeMesh(size, size, size), material)
+            {
+                BackMaterial = material,
+                Transform = new TranslateTransform3D(x - 3.5, z - 2.36, y - 3.5)
+            });
+            _lastOverlayModels++;
+        }
     }
 
     private IEnumerable<Square3D> VisibleBoardSquares(int[] board)
@@ -767,8 +979,49 @@ public partial class Chess3DWindow : Window
         };
     }
 
+    private void ClearTransientVisualState(bool clearHodgePreview = true)
+    {
+        _selectedSquare = null;
+        _actionFlashSegments.Clear();
+        _animatedLayerAxis = -1;
+        _animatedLayer = -1;
+        _animationInProgress = false;
+        if (clearHodgePreview)
+        {
+            _hodgePreviewSegments.Clear();
+        }
+    }
+
+    private async void BeginActionFlash(IEnumerable<Chess3DVisualSegment> segments)
+    {
+        _actionFlashSegments.Clear();
+        _actionFlashSegments.AddRange(segments.Where(IsValidVisualSegment));
+        if (_actionFlashSegments.Count == 0)
+        {
+            return;
+        }
+        _animationInProgress = true;
+        RefreshPreview3D();
+        await Task.Delay(240);
+        _actionFlashSegments.Clear();
+        _animationInProgress = false;
+        RefreshAll();
+    }
+
+    private static bool IsValidVisualSegment(Chess3DVisualSegment segment)
+    {
+        static bool valid(Chess3DVisualPoint point) => point.X is >= 0 and <= 7 && point.Y is >= 0 and <= 7 && point.Z is >= 0 and <= 7;
+        return valid(segment.From) && valid(segment.To);
+    }
+
     private void Cell_Click(object sender, RoutedEventArgs e)
     {
+        if (_animationInProgress)
+        {
+            _lastUiInvalidReason = "Animation is in progress; click again after the board settles.";
+            RefreshStatus();
+            return;
+        }
         if (sender is not Button { Tag: Square3D square })
         {
             return;
@@ -791,7 +1044,7 @@ public partial class Chess3DWindow : Window
         {
             _engine.SetPiece(square.X, square.Y, square.Z, selectedType == 0 ? 0 : SelectedSide(), selectedType);
             _ = BroadcastBoard3DAsync();
-            _selectedSquare = null;
+            ClearTransientVisualState();
             _lastUiInvalidReason = string.Empty;
             RefreshAll();
             return;
@@ -807,7 +1060,7 @@ public partial class Chess3DWindow : Window
         {
             _engine.SetPiece(square.X, square.Y, square.Z, 0, 0);
             _ = BroadcastBoard3DAsync();
-            _selectedSquare = null;
+            ClearTransientVisualState();
             RefreshAll();
         }
     }
@@ -816,7 +1069,7 @@ public partial class Chess3DWindow : Window
     {
         _engine.Reset();
         _ = BroadcastBoard3DAsync();
-        _selectedSquare = null;
+        ClearTransientVisualState();
         RefreshAll();
     }
 
@@ -824,7 +1077,7 @@ public partial class Chess3DWindow : Window
     {
         _engine.Clear();
         _ = BroadcastBoard3DAsync();
-        _selectedSquare = null;
+        ClearTransientVisualState();
         RefreshAll();
     }
 
@@ -835,7 +1088,7 @@ public partial class Chess3DWindow : Window
         {
             _ = BroadcastMove3DAsync(move.FromX, move.FromY, move.FromZ, move.ToX, move.ToY, move.ToZ, move.PromotionType);
         }
-        _selectedSquare = null;
+        ClearTransientVisualState(clearHodgePreview: false);
         RefreshAll();
     }
 
@@ -849,7 +1102,7 @@ public partial class Chess3DWindow : Window
         }
         LoadRulesText(File.ReadAllText(path));
         _ = BroadcastBoard3DAsync();
-        _selectedSquare = null;
+        ClearTransientVisualState();
         RefreshAll();
     }
 
@@ -870,7 +1123,7 @@ public partial class Chess3DWindow : Window
                 RefreshAll();
                 return;
             }
-            _selectedSquare = null;
+            ClearTransientVisualState();
             RulesPathBox.Text = Path.GetRelativePath(AppContext.BaseDirectory, profile.Path);
             _ = BroadcastBoard3DAsync();
             RefreshAll();
@@ -901,7 +1154,7 @@ public partial class Chess3DWindow : Window
 
     private void ClearSelection_Click(object sender, RoutedEventArgs e)
     {
-        _selectedSquare = null;
+        ClearTransientVisualState();
         RefreshAll();
     }
 
@@ -913,21 +1166,56 @@ public partial class Chess3DWindow : Window
         {
             MessageBox.Show(this, $"Auto restore failed: {_engine.GetLastReserveRestoreInfo()}", "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Information);
         }
-        _selectedSquare = null;
+        ClearTransientVisualState();
         RefreshAll();
     }
 
-    private void RotateLayerTurn_Click(object sender, RoutedEventArgs e)
+    private async void RotateLayerTurn_Click(object sender, RoutedEventArgs e)
     {
         var axis = SelectedLayerTurnAxis();
         var layer = SelectedLayerTurnLayer();
         var quarterTurns = SelectedLayerTurnQuarterTurns();
+        await AnimateAndApplyLayerTurnAsync(axis, layer, quarterTurns, broadcast: false);
+    }
+
+    private async Task AnimateAndApplyLayerTurnAsync(int axis, int layer, int quarterTurns, bool broadcast)
+    {
+        if (_animationInProgress)
+        {
+            _lastUiInvalidReason = "Animation is in progress; wait for it to finish before another action.";
+            RefreshStatus();
+            return;
+        }
+        if (!_engine.CanRotateLayer(axis, layer, quarterTurns))
+        {
+            var last = _engine.GetLastLayerTurnInfo();
+            _lastUiInvalidReason = $"Layer turn rejected: {_engine.GetLayerTurnResultName(last.ResultCode)}";
+            MessageBox.Show(this, $"Layer turn failed: {_lastUiInvalidReason}", "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Information);
+            RefreshAll();
+            return;
+        }
+
+        _animationInProgress = true;
+        _animatedLayerAxis = axis;
+        _animatedLayer = layer;
+        RefreshAll();
+        await Task.Delay(320);
+
         if (!_engine.RotateLayer(axis, layer, quarterTurns))
         {
             var last = _engine.GetLastLayerTurnInfo();
+            _lastUiInvalidReason = $"Layer turn rejected: {_engine.GetLayerTurnResultName(last.ResultCode)}";
             MessageBox.Show(this, $"Layer turn failed: {_engine.GetLayerTurnResultName(last.ResultCode)}", "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Information);
         }
-        _selectedSquare = null;
+        else
+        {
+            _lastUiInvalidReason = string.Empty;
+            if (broadcast)
+            {
+                _ = BroadcastRotate3DAsync(axis, layer, quarterTurns);
+            }
+        }
+        ClearTransientVisualState(clearHodgePreview: false);
         RefreshAll();
     }
 
@@ -937,7 +1225,10 @@ public partial class Chess3DWindow : Window
         {
             return;
         }
+        _hodgePreviewSegments.Clear();
+        _hodgePreviewSegments.AddRange(BuildProjectionSegments(primarySide, from, to, markBlocked: false));
         HodgePanelText.Text = BuildProjectionPreview(primarySide, from, to);
+        RefreshPreview3D();
     }
 
     private void ApplyProjectedMove_Click(object sender, RoutedEventArgs e)
@@ -946,9 +1237,17 @@ public partial class Chess3DWindow : Window
         {
             return;
         }
+        var segments = BuildProjectionSegments(primarySide, from, to, markBlocked: false).ToArray();
         if (!_engine.TryMakeProjectedMove(primarySide, from.X, from.Y, from.Z, to.X, to.Y, to.Z, NativeChess3DEngine.Queen, out _))
         {
+            _hodgePreviewSegments.Clear();
+            _hodgePreviewSegments.AddRange(BuildProjectionSegments(primarySide, from, to, markBlocked: true));
             MessageBox.Show(this, $"Projected move rejected: {_engine.GetLastProjectionError()}", "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        else
+        {
+            BeginActionFlash(segments);
+            _hodgePreviewSegments.Clear();
         }
         _selectedSquare = null;
         RefreshAll();
@@ -1010,7 +1309,7 @@ public partial class Chess3DWindow : Window
             MessageBox.Show(this, $"Load failed: {_engine.GetLastReplayError()}", "Chess3D Save", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        _selectedSquare = null;
+        ClearTransientVisualState();
         RefreshAll();
     }
 
@@ -1043,7 +1342,7 @@ public partial class Chess3DWindow : Window
             MessageBox.Show(this, $"Import replay failed: {_engine.GetLastReplayError()}", "Chess3D Replay", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        _selectedSquare = null;
+        ClearTransientVisualState();
         RefreshAll();
     }
 
@@ -1052,6 +1351,18 @@ public partial class Chess3DWindow : Window
         if (!_engine.ReplayAction())
         {
             MessageBox.Show(this, $"Replay step failed: {_engine.GetLastReplayError()}", "Chess3D Replay", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        else
+        {
+            var state = _engine.GetState();
+            BeginActionFlash(new[]
+            {
+                new Chess3DVisualSegment(
+                    new Chess3DVisualPoint(state.LastFromX, state.LastFromY, state.LastFromZ),
+                    new Chess3DVisualPoint(state.LastToX, state.LastToY, state.LastToZ),
+                    IsPrimary: true,
+                    IsBlocked: false)
+            });
         }
         _selectedSquare = null;
         RefreshAll();
@@ -1063,7 +1374,7 @@ public partial class Chess3DWindow : Window
         {
             MessageBox.Show(this, $"Replay failed: {_engine.GetLastReplayError()}", "Chess3D Replay", MessageBoxButton.OK, MessageBoxImage.Information);
         }
-        _selectedSquare = null;
+        ClearTransientVisualState();
         RefreshAll();
     }
 
@@ -1083,7 +1394,7 @@ public partial class Chess3DWindow : Window
         RefreshAll();
     }
 
-    private void RubikRotate_Click(object sender, RoutedEventArgs e)
+    private async void RubikRotate_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button || !int.TryParse(button.Tag?.ToString(), out var turns))
         {
@@ -1093,12 +1404,13 @@ public partial class Chess3DWindow : Window
         var axis = SelectedRubikAxis();
         var layer = int.TryParse(RubikLayerBox.Text, out var rawLayer) ? Math.Clamp(rawLayer, 1, 8) - 1 : 0;
         RubikLayerBox.Text = (layer + 1).ToString();
-        if (_engine.RotateLayer(axis, layer, turns))
+        if (turns == 2)
         {
-            _selectedSquare = null;
-            _ = BroadcastRotate3DAsync(axis, layer, turns);
-            RefreshAll();
+            await AnimateAndApplyLayerTurnAsync(axis, layer, 1, broadcast: true);
+            await AnimateAndApplyLayerTurnAsync(axis, layer, 1, broadcast: true);
+            return;
         }
+        await AnimateAndApplyLayerTurnAsync(axis, layer, turns, broadcast: true);
     }
 
     private async void NetworkHost_Click(object sender, RoutedEventArgs e)
@@ -1235,6 +1547,12 @@ public partial class Chess3DWindow : Window
 
     private void Preview3D_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
+        if (_animationInProgress)
+        {
+            _lastUiInvalidReason = "Animation is in progress; click again after the board settles.";
+            RefreshStatus();
+            return;
+        }
         _dragging3D = true;
         _lastPoint = e.GetPosition(Preview3D);
         _dragStartPoint = _lastPoint;
@@ -1274,6 +1592,10 @@ public partial class Chess3DWindow : Window
 
     private void Preview3D_MouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
+        if (_animationInProgress)
+        {
+            return;
+        }
         var current = e.GetPosition(Preview3D);
         var isClick = Math.Abs(current.X - _dragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
             Math.Abs(current.Y - _dragStartPoint.Y) < SystemParameters.MinimumVerticalDragDistance;
@@ -1412,6 +1734,39 @@ public partial class Chess3DWindow : Window
             }
         }
         return string.Join(Environment.NewLine, lines);
+    }
+
+    private IEnumerable<Chess3DVisualSegment> BuildProjectionSegments(int primarySide, Square3D from, Square3D to, bool markBlocked)
+    {
+        yield return new Chess3DVisualSegment(ToVisualPoint(from), ToVisualPoint(to), IsPrimary: true, IsBlocked: markBlocked);
+        var macro = _engine.GetMacroPlayerForSide(primarySide);
+        if (macro <= 0)
+        {
+            yield break;
+        }
+
+        var count = _engine.GetProjectionCountForMacroPlayer(macro);
+        for (var i = 0; i < count; ++i)
+        {
+            var side = _engine.GetProjectionSide(macro, i);
+            if (side == primarySide)
+            {
+                continue;
+            }
+            if (_engine.TransformMoveBetweenSides(primarySide, side, from.X, from.Y, from.Z, to.X, to.Y, to.Z, out var mirrorFrom, out var mirrorTo))
+            {
+                yield return new Chess3DVisualSegment(
+                    new Chess3DVisualPoint(mirrorFrom.X, mirrorFrom.Y, mirrorFrom.Z),
+                    new Chess3DVisualPoint(mirrorTo.X, mirrorTo.Y, mirrorTo.Z),
+                    IsPrimary: false,
+                    IsBlocked: markBlocked);
+            }
+        }
+    }
+
+    private static Chess3DVisualPoint ToVisualPoint(Square3D square)
+    {
+        return new Chess3DVisualPoint(square.X, square.Y, square.Z);
     }
 
     private bool TryReadProjectionMove(out int primarySide, out Square3D from, out Square3D to)
@@ -1597,6 +1952,13 @@ public partial class Chess3DWindow : Window
 
     private void HandlePickedSquare(Square3D square)
     {
+        if (_animationInProgress)
+        {
+            _lastUiInvalidReason = "Animation is in progress; click again after the board settles.";
+            RefreshStatus();
+            return;
+        }
+
         if (_selectedSquare is Square3D from && from != square)
         {
             if (TryApplySelectedAction(from, square, broadcastNormalMove: true))
@@ -1633,15 +1995,23 @@ public partial class Chess3DWindow : Window
         {
             if (_engine.TryMakeProjectedMove(matching.Side, from.X, from.Y, from.Z, to.X, to.Y, to.Z, NativeChess3DEngine.Queen, out _))
             {
+                BeginActionFlash(BuildProjectionSegments(matching.Side, from, to, markBlocked: false));
+                _hodgePreviewSegments.Clear();
                 _lastUiInvalidReason = string.Empty;
                 return true;
             }
+            _hodgePreviewSegments.Clear();
+            _hodgePreviewSegments.AddRange(BuildProjectionSegments(matching.Side, from, to, markBlocked: true));
             _lastUiInvalidReason = $"Projected move rejected: {_engine.GetLastProjectionError()}";
             return false;
         }
 
         if (_engine.TryMakeMove(from.X, from.Y, from.Z, to.X, to.Y, to.Z, NativeChess3DEngine.Queen, out _))
         {
+            BeginActionFlash(new[]
+            {
+                new Chess3DVisualSegment(ToVisualPoint(from), ToVisualPoint(to), IsPrimary: true, IsBlocked: false)
+            });
             if (broadcastNormalMove)
             {
                 _ = BroadcastMove3DAsync(from.X, from.Y, from.Z, to.X, to.Y, to.Z, NativeChess3DEngine.Queen);

@@ -23,6 +23,7 @@
     </Compile>
     <Compile Include="..\ChessApp\NativeChess3DEngine.cs" Link="NativeChess3DEngine.cs" />
     <Compile Include="..\ChessApp\Chess3DNetworkEndpoint.cs" Link="Chess3DNetworkEndpoint.cs" />
+    <Compile Include="..\ChessApp\Chess3DVisualDescriptors.cs" Link="Chess3DVisualDescriptors.cs" />
     <Compile Include="..\ChessOnlineApp\Integrations\Chess3DInternetRelayClient.cs" Link="Chess3DInternetRelayClient.cs" />
     <Compile Include="..\ChessApp\ObjModelLibrary.cs" Link="ObjModelLibrary.cs" />
     <Compile Include="..\ChessApp\NativeGpuBackend.cs" Link="NativeGpuBackend.cs" />

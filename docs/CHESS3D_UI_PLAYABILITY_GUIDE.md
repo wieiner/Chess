@@ -54,3 +54,14 @@ Game-over profiles should block normal play actions until reset/load/replay. Cla
 ## P3A Check / Mate UI
 
 Classic and Single-Side now report runtime check truth where a king exists. The status area shows check, checkmate, stalemate, current side legal-action count, and last legality reason. A current-side king in check is highlighted in the board UI. Asgard, Rubik, and Hodge do not show Classic checkmate as their victory condition unless a future profile explicitly opts in.
+
+## P3B Visual Feedback
+
+The 3D viewport now adds mode-aware overlays:
+
+- Asgard/Rubik CoreCube cells, stack bars, fusion/contested markers, and anchors.
+- Rubik layer pre-highlight before the engine commits a quarter turn.
+- Hodge primary/mirror dotted arrows for projection preview and blocked mirrors.
+- Short source-to-target flashes for moves and replay steps.
+
+These hints are rebuilt from engine state after actions; they are not separate gameplay state.

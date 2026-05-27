@@ -142,13 +142,11 @@
 - Decide savegame format for profiles, board, stacks, fusion descriptors, reserve counts, visual asset set id, and history.
 - Add notation file export/import once syntax stabilizes beyond v0.1.
 
-### P2O - Rich Visualization And Animation
+### P2O - Product Playability And Rules Correctness Gate
 
-- Visualize multiple stack entries in one core cell.
-- Display fusion/contested/royal/implosion state directly in the board view.
-- Add animated Rubik layer turns.
-- Add Hodge projection group overlays and child-move paths.
-- Add safe editor workflows for stack inspection without changing fusion descriptors manually.
+- Completed: formal rule contract for the five existing RuleProfiles.
+- Completed: game phase/outcome/turn summary/allowed-action diagnostics.
+- Completed: shallow action perft/divide and regression playthrough fixtures.
 
 ### P3A - Full 3D King Safety / Check / Mate / Stalemate
 
@@ -157,10 +155,16 @@
 - Completed: legal action preview, `TryMakeMove`, side legal-action counts, and action perft/divide use king-safe legal actions for Classic/Single-Side.
 - Completed: Asgard/Rubik/Hodge outcome isolation remains intact.
 
-### P3B - AI/Search Integration Per Profile
+### P3B - Visual Playability Sprint Final
 
-- Next: visual playability sprint final for stack/fusion overlays, Rubik layer-turn animation, Hodge mirror arrows, and replay/action animation.
-- Later: integrate AI/search with normal moves, reserve restore, Rubik layer turns, and Hodge projected composite actions.
+- Completed: stack/fusion/contested/anchor overlays.
+- Completed: Rubik layer-turn pre-animation and input lock.
+- Completed: Hodge primary/mirror arrow hints.
+- Completed: move/replay action flash and visual diagnostics.
+
+### P3C - AI/Search Integration Per Profile
+
+- Integrate AI/search with normal moves, reserve restore, Rubik layer turns, and Hodge projected composite actions.
 
 ### P3 - Full Six-Side Gameplay And Hybrid Victory
 
@@ -206,8 +210,9 @@ Next:
 
 - P2O: richer visualization and animation.
 - P3A: completed Classic/Single-Side king safety/check/mate/stalemate.
-- P3B: AI/search per profile.
-- P3C: online serialization.
+- P3B: visual playability sprint final.
+- P3C: AI/search per profile.
+- P3D: online serialization.
 
 ## P2O - Product Playability And Rules Correctness Gate
 
@@ -225,3 +230,4 @@ Next:
 - P3B: visual playability sprint final for stacks, fusion, layer turns, Hodge mirrors, and replay/action animation.
 - P3C: AI/search integration per profile.
 - P3D: online serialization and multiplayer replay authority.
+- P3E: packaging/release polish and manual visual QA automation.

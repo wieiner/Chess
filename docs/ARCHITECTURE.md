@@ -106,6 +106,7 @@ P2O adds a profile-aware playability/rules diagnostic layer above the P2N replay
 
 - `GamePhase`, `GameOutcome`, current-turn summary, allowed action mask, and mode rule summary are exposed through append-only ABI.
 - Classic Six-Side now uses P3A runtime king safety for legal preview, move execution, check, checkmate, and stalemate. Single-Side uses the same filter when a king is present.
+- P3B visual overlays live in the WPF layer. They read existing ABI state and do not alter native rule semantics, save/replay formats, or action history.
 - Asgard/Rubik centerAssembly outcomes remain separate from checkmate.
 - Hodge uses macro-player/projection composite action semantics rather than side-only chess turns.
 - `Chess3D_PerftActions` and `Chess3D_DivideActionsJson` enumerate legal actions by profile for shallow diagnostic counts and never mutate the source state.

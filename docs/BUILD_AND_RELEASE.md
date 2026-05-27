@@ -92,7 +92,9 @@ ProductionOutput\Chess2D\Assets\Models
 ProductionOutput\Chess3D\Assets\Models
 ```
 
-`scripts\verify.ps1` checks representative Asgard, Rubik convergence, and Hodge Projection Duel profiles plus all P2K smoke and P2L playthrough scenario descriptors in both development and portable output. It also checks the P2M model manifest and representative OBJ/MTL assets in Chess2D and Chess3D outputs.
+`scripts\verify.ps1` checks representative Asgard, Rubik convergence, and Hodge Projection Duel profiles plus all P2K smoke, P2L playthrough, P2O, and P3A regression scenario descriptors in both development and portable output. It also checks the P2M model manifest and representative OBJ/MTL assets in Chess2D and Chess3D outputs.
+
+P3B visual overlays and animations are WPF code in `Chess3DApp`; they do not add package-time assets beyond the existing model/profile/scenario catalogs.
 
 ## Root Scripts
 

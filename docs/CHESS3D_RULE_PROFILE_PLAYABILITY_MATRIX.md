@@ -50,3 +50,13 @@ No sixth RuleProfile is introduced by P2O. Regression fixtures and playthroughs 
 | Asgard Convergence | Outcome remains centerAssembly; Classic checkmate is not applied. |
 | Rubik Convergence | Outcome remains centerAssembly plus layer-turn actions; Classic checkmate is not applied. |
 | Hodge Projection Duel | Macro-player projection remains separate; Classic checkmate is not applied. |
+
+## P3B Visual Exposure
+
+| Profile | P3B visual behavior |
+| --- | --- |
+| Classic Six-Side | Normal/capture targets, action flash, checked-king highlight. |
+| Single-Side Training | Training moves, action flash, checked-king highlight when relevant. |
+| Asgard Convergence | CoreCube, stack badges, fusion/contested/anchor overlays, reserve/capture status. |
+| Rubik Convergence | Asgard overlays plus layer pre-highlight before quarter turns. |
+| Hodge Projection Duel | Primary and mirror dotted arrows with blocked-mirror styling. |

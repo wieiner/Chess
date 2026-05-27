@@ -318,6 +318,12 @@ internal sealed class NativeChess3DEngine : IDisposable
         return Chess3D_GetRequiredAnchorCount(_handle, side);
     }
 
+    public bool IsAnchoredCell(int x, int y, int z)
+    {
+        ThrowIfDisposed();
+        return Chess3D_IsAnchoredCell(_handle, x, y, z) != 0;
+    }
+
     public bool IsGameOver()
     {
         ThrowIfDisposed();
@@ -340,6 +346,12 @@ internal sealed class NativeChess3DEngine : IDisposable
     {
         ThrowIfDisposed();
         return Chess3D_GetCoreStackCount(_handle, x, y, z);
+    }
+
+    public bool GetCoreStackEntry(int x, int y, int z, int stackIndex, out int side, out int pieceType, out int pieceCode, out int flags)
+    {
+        ThrowIfDisposed();
+        return Chess3D_GetCoreStackEntry(_handle, x, y, z, stackIndex, out side, out pieceType, out pieceCode, out flags) != 0;
     }
 
     public int GetProjectedPiece(int x, int y, int z)
@@ -851,6 +863,9 @@ internal sealed class NativeChess3DEngine : IDisposable
     private static extern int Chess3D_GetRequiredAnchorCount(IntPtr handle, int side);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_IsAnchoredCell(IntPtr handle, int x, int y, int z);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Chess3D_IsGameOver(IntPtr handle);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -861,6 +876,9 @@ internal sealed class NativeChess3DEngine : IDisposable
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Chess3D_GetCoreStackCount(IntPtr handle, int x, int y, int z);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetCoreStackEntry(IntPtr handle, int x, int y, int z, int stackIndex, out int side, out int pieceType, out int pieceCode, out int flags);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Chess3D_GetProjectedPiece(IntPtr handle, int x, int y, int z);

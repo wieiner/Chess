@@ -24,5 +24,18 @@ The Chess3D preview host uses a neutral gray background instead of near-black. T
 ## Where To Change
 
 - Shared material/color behavior: `src/ChessApp/ObjModelLibrary.cs`
+- Chess3D visual overlay colors: `src/ChessApp/Chess3DVisualDescriptors.cs`
 - Chess2D 3D scene lighting: `src/ChessApp/MainWindow.xaml.cs`
 - Chess3D scene lighting/background/status: `src/ChessApp/Chess3DWindow.xaml(.cs)`
+
+## P3B Overlay Palette
+
+P3B keeps overlays readable but restrained:
+
+- CoreCube: translucent blue.
+- Legal targets: cyan.
+- Captures/contested/check: red.
+- Friendly fusion: green.
+- Royal fusion/anchors/stacks: gold.
+- Hodge mirrors: violet/blue dotted paths.
+- Rubik layers: blue layer wash.
