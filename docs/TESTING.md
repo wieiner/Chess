@@ -133,3 +133,22 @@ P3B remains mostly UI/manual because it is WPF visual feedback rather than nativ
 - contract tests proving layer turns, projection moves, stacks, fusion, replay, and save/load remain stable.
 
 Manual visual QA is listed in `CHESS3D_MANUAL_VISUAL_SMOKE_CHECKLIST.md`.
+
+## P3C Visual RC Testing
+
+P3C keeps CI headless and avoids fragile pixel tests. Automated confidence comes from:
+
+- Release build of `ChessApp` and `Chess3DApp`;
+- existing legal-preview, save/load, replay, state-hash, Rubik, Hodge, stack/fusion, and king-safety contract tests;
+- regression fixtures for invalid click no-mutation, Rubik four-turn roundtrip, Hodge blocked mirror rollback, Asgard stack/fusion/anchor, and Classic king-safety.
+
+Manual QA is required for:
+
+- background and piece contrast;
+- camera presets and readability;
+- whether CoreCube/fusion/stack overlays obscure pieces;
+- Rubik layer pre-highlight timing;
+- Hodge arrow readability;
+- replay-step flash clarity.
+
+Use `docs\CHESS3D_VISUAL_RC_MANUAL_QA.md` for the release-candidate checklist.

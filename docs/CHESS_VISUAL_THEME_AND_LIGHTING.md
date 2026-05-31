@@ -39,3 +39,13 @@ P3B keeps overlays readable but restrained:
 - Royal fusion/anchors/stacks: gold.
 - Hodge mirrors: violet/blue dotted paths.
 - Rubik layers: blue layer wash.
+
+## P3C Readability Options
+
+P3C adds runtime-only WPF options:
+
+- neutral/light/dark background selector;
+- high-contrast fallback piece material toggle;
+- CoreCube, Hodge arrow, and Rubik layer overlay toggles.
+
+Neutral remains the default because black pieces must stay visible. The high-contrast toggle is a QA/debug aid and does not change engine state.

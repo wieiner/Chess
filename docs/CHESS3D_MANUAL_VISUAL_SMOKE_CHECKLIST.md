@@ -38,3 +38,11 @@ Run this checklist after a Release build.
 
 - Import or create a replay.
 - Use Replay Step and confirm a short source-to-target flash where the action has move coordinates.
+
+## P3C RC Addendum
+
+- Try camera presets: isometric, top, side, reset.
+- Toggle neutral/light/dark backgrounds and confirm black pieces remain visible.
+- Toggle high-contrast pieces and confirm the board is still readable.
+- Toggle CoreCube, Hodge arrows, and Rubik layer overlays and confirm only UI decoration changes.
+- Copy visual diagnostics and confirm the text includes visual mode, selection state, options, model diagnostics, overlay count, animation state, and last invalid reason.

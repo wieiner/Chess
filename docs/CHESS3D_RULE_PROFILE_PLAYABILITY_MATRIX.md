@@ -60,3 +60,13 @@ No sixth RuleProfile is introduced by P2O. Regression fixtures and playthroughs 
 | Asgard Convergence | CoreCube, stack badges, fusion/contested/anchor overlays, reserve/capture status. |
 | Rubik Convergence | Asgard overlays plus layer pre-highlight before quarter turns. |
 | Hodge Projection Duel | Primary and mirror dotted arrows with blocked-mirror styling. |
+
+## P3C Visual RC Polish
+
+| Profile | P3C visual RC behavior |
+| --- | --- |
+| Classic Six-Side | Explicit visual state, camera presets, check/outcome visibility, high-contrast material toggle. |
+| Single-Side Training | Training/sandbox visual language and clean preview focus. |
+| Asgard Convergence | Core/stack/fusion/reserve diagnostics and optional CoreCube overlay toggle. |
+| Rubik Convergence | Layer overlay toggle, pre-highlight/input lock, and diagnostics for layer action state. |
+| Hodge Projection Duel | Hodge arrow toggle, macro-player visual language, and blocked mirror visibility. |

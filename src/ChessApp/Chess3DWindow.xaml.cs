@@ -43,6 +43,8 @@ public partial class Chess3DWindow : Window
     private readonly List<Chess3DVisualSegment> _hodgePreviewSegments = new();
     private int _animatedLayerAxis = -1;
     private int _animatedLayer = -1;
+    private bool _replayStepping;
+    private Chess3DVisualStateSnapshot _visualState = Chess3DVisualStateSnapshot.Empty;
     private readonly List<RuleProfileItem> _ruleProfiles = new();
     private readonly List<ScenarioItem> _scenarios = new();
     private string _lastUiInvalidReason = string.Empty;
@@ -412,14 +414,124 @@ public partial class Chess3DWindow : Window
         var actionText = $", actions {_engine.GetActionCount()}{(string.IsNullOrWhiteSpace(lastAction) ? string.Empty : $" last {lastAction}")}";
         var restoreInfo = _engine.GetLastReserveRestoreInfo();
         var restoreText = string.IsNullOrWhiteSpace(restoreInfo) ? string.Empty : $", restore {restoreInfo}";
+        _visualState = BuildVisualStateSnapshot(state, selectedPreview, selectedMoveCount, knockback, layerTurn, restoreInfo);
         HeaderStatus.Text = $"Side {state.SideToMove}, pieces {state.PieceCount}, moves {state.LegalMoveCount}";
         RulesText.Text = $"Board {rules.Width}x{rules.Height}x{rules.Depth}, sides {rules.ActiveSideCount}, profile {(rules.MovementProfile == 0 ? "setup-only" : "draft3d")}, max {rules.MaxPiecesPerSide}/side, view {SelectedAxis()} {(IsAllLayersView() ? "all" : "slice")}, grid {SelectedGridMode()}\nRuleset {_engine.GetCurrentRulesetId()}, goal {_engine.GetGoalProfileType()}, capture {_engine.GetCaptureProfileType()}, occupancy {_engine.GetOccupancyProfileType()}, fusion {_engine.GetFusionProfileType()}, layer {_engine.GetLayerTurnProfileType()}, anchors {anchorCount}/{requiredAnchors}{fusionText}{reserveText}{layerTurnText}{projectionText}{actionText}{restoreText}{projectionErrorText}{gameOverText}{stackText}";
         InfoText.Text = _engine.GetLastInfo();
-        var visualDiagnostics = $"Piece set: {SelectedModelSetName()}\nOBJ loaded: {_lastObjModels}, fallback primitives: {_lastFallbackModels}, overlays: {_lastOverlayModels}\nAnimation: {(_animationInProgress ? "in progress" : "idle")}\nMaterial: {_models.LastDiagnostics}\nLast invalid/click reason: {(string.IsNullOrWhiteSpace(_lastUiInvalidReason) ? _engine.GetLastInvalidActionReason() : _lastUiInvalidReason)}";
+        var visualDiagnostics =
+            $"Visual state: {_visualState.ModeState} / {_visualState.SelectionState}, turn {_visualState.TurnState.CurrentTurnKind}, phase {_visualState.TurnState.GamePhase}, outcome {_visualState.TurnState.GameOutcome}\n" +
+            $"Options: background {_visualState.Options.BackgroundTheme}, high contrast {_visualState.Options.HighContrastPieces}, core {_visualState.Options.ShowCore}, Rubik {_visualState.Options.ShowRubikLayer}, Hodge {_visualState.Options.ShowHodgeArrows}\n" +
+            $"Piece set: {SelectedModelSetName()}\nOBJ loaded: {_lastObjModels}, fallback primitives: {_lastFallbackModels}, overlays: {_lastOverlayModels}\nAnimation: {(_animationInProgress ? "in progress" : "idle")}\nMaterial: {_models.LastDiagnostics}\nLast invalid/click reason: {_visualState.ActionState.LastInvalidReason}";
         PositionText.Text = $"Models: {SelectedModelSetName()}, OBJ {_lastObjModels}, fallback {_lastFallbackModels}, overlays {_lastOverlayModels}, hints {selectedMoveCount}\n{_engine.GetPositionText()}";
         VisualDiagnosticsText.Text = visualDiagnostics;
         RefreshControlCenterStatus(state, selectedMoveCount, anchorCount, requiredAnchors, knockback, layerTurn, restoreInfo, selectedPreview);
         RefreshActionLog();
+    }
+
+    private Chess3DVisualStateSnapshot BuildVisualStateSnapshot(Chess3DStateDto state,
+        IReadOnlyList<Chess3DLegalActionPreviewEntryDto> selectedPreview,
+        int selectedMoveCount,
+        (int CapturedPieceCode, int DestinationKind, int X, int Y, int Z) knockback,
+        (int Axis, int Layer, int QuarterTurns, int ResultCode) layerTurn,
+        string restoreInfo)
+    {
+        var invalidReason = string.IsNullOrWhiteSpace(_lastUiInvalidReason)
+            ? _engine.GetLastInvalidActionReason()
+            : _lastUiInvalidReason;
+        var selected = _selectedSquare;
+        var selectedPiece = selected is { } square ? _engine.GetPiece(square.X, square.Y, square.Z) : 0;
+        var selectionState = _animationInProgress
+            ? Chess3DVisualSelectionState.AnimationLocked
+            : _replayStepping
+                ? Chess3DVisualSelectionState.ReplayStepping
+                : !string.IsNullOrWhiteSpace(invalidReason)
+                    ? Chess3DVisualSelectionState.InvalidTarget
+                    : selected is null
+                        ? Chess3DVisualSelectionState.None
+                        : selectedMoveCount > 0
+                            ? Chess3DVisualSelectionState.ActionPreview
+                            : selectedPiece != 0
+                                ? Chess3DVisualSelectionState.PieceSelected
+                                : Chess3DVisualSelectionState.CellSelected;
+
+        var side = state.SideToMove;
+        var layerText = $"{AxisName(layerTurn.Axis)}{(layerTurn.Layer >= 0 ? layerTurn.Layer + 1 : 0)} {layerTurn.QuarterTurns:+0;-0;0} {_engine.GetLayerTurnResultName(layerTurn.ResultCode)}";
+        var captureText = $"{KnockbackDestinationName(knockback.DestinationKind)} {LabelForPiece(knockback.CapturedPieceCode)} {FormatCoordinate(knockback.X, knockback.Y, knockback.Z)}";
+        var options = CurrentVisualOptions();
+        var actionState = new Chess3DVisualActionState(
+            LastActionKind: _engine.GetActionCount() > 0 ? "recorded" : "none",
+            LastNotation: _engine.GetLastActionNotation(),
+            LastInvalidReason: invalidReason,
+            LastReplayError: _engine.GetLastReplayError(),
+            LastLayerTurnInfo: layerText,
+            LastProjectionError: _engine.GetLastProjectionError(),
+            LastCaptureInfo: captureText,
+            LastRestoreInfo: restoreInfo);
+        var turnState = new Chess3DVisualTurnState(
+            side,
+            _engine.GetCurrentMacroPlayer(),
+            _engine.GetCurrentTurnSummary(),
+            _engine.GetAllowedActionMask(),
+            _engine.GetGamePhase().ToString(),
+            _engine.GetGameOutcomeName(_engine.GetGameOutcome()),
+            _engine.GetCheckStatusSummary(side));
+        return new Chess3DVisualStateSnapshot(
+            selectionState,
+            CurrentVisualModeState(),
+            turnState,
+            actionState,
+            options,
+            selected?.X ?? -1,
+            selected?.Y ?? -1,
+            selected?.Z ?? -1,
+            selectedPreview.Count,
+            _lastOverlayModels,
+            _animationInProgress);
+    }
+
+    private Chess3DVisualModeState CurrentVisualModeState()
+    {
+        var rulesetId = _engine.GetCurrentRulesetId();
+        if (rulesetId.Contains("hodge", StringComparison.OrdinalIgnoreCase) || _engine.IsProjectionModeEnabled())
+        {
+            return Chess3DVisualModeState.Hodge;
+        }
+        if (rulesetId.Contains("rubik", StringComparison.OrdinalIgnoreCase) || _engine.IsLayerTurnEnabled())
+        {
+            return Chess3DVisualModeState.Rubik;
+        }
+        if (rulesetId.Contains("asgard", StringComparison.OrdinalIgnoreCase) ||
+            _engine.IsCoreStackEnabled() ||
+            _engine.IsFusionEnabled() ||
+            _engine.IsReserveEnabled())
+        {
+            return Chess3DVisualModeState.Asgard;
+        }
+        if (rulesetId.Contains("single-side", StringComparison.OrdinalIgnoreCase))
+        {
+            return Chess3DVisualModeState.SingleSide;
+        }
+        return Chess3DVisualModeState.Classic;
+    }
+
+    private Chess3DVisualOptions CurrentVisualOptions()
+    {
+        return new Chess3DVisualOptions(
+            ShowCore: ShowCoreOverlayBox?.IsChecked != false,
+            ShowHodgeArrows: ShowHodgeArrowsBox?.IsChecked != false,
+            ShowRubikLayer: ShowRubikLayerBox?.IsChecked != false,
+            HighContrastPieces: HighContrastBox?.IsChecked == true,
+            BackgroundTheme: (BackgroundThemeBox?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Neutral");
+    }
+
+    private Color CurrentSceneBackground()
+    {
+        return BackgroundThemeBox?.SelectedIndex switch
+        {
+            1 => Color.FromRgb(112, 118, 124),
+            2 => Color.FromRgb(34, 39, 45),
+            _ => Chess3DTheme.SceneBackground
+        };
     }
 
     private void RefreshControlCenterStatus(Chess3DStateDto state, int selectedMoveCount, int anchorCount, int requiredAnchors,
@@ -445,6 +557,7 @@ public partial class Chess3DWindow : Window
         CommonPanelText.Text =
             $"Selected: {selectedText}\n" +
             $"Active side: {state.SideToMove}, macro: {_engine.GetCurrentMacroPlayer()}, phase: {_engine.GetGamePhase()}, outcome: {_engine.GetGameOutcomeName(_engine.GetGameOutcome())}\n" +
+            $"Visual mode: {_visualState.ModeState}, selection: {_visualState.SelectionState}, {ModeVisualDescription(_visualState.ModeState)}\n" +
             $"Legal moves from selected: {selectedMoveCount}, side legal actions: {_engine.GetSideLegalActionCount(state.SideToMove)}\n" +
             $"Actions: {_engine.GetActionCount()}, last: {_engine.GetLastActionNotation()}\n" +
             $"Visuals: overlays {_lastOverlayModels}, animation {(_animationInProgress ? "locked" : "ready")}";
@@ -506,6 +619,19 @@ public partial class Chess3DWindow : Window
         };
     }
 
+    private static string ModeVisualDescription(Chess3DVisualModeState mode)
+    {
+        return mode switch
+        {
+            Chess3DVisualModeState.Classic => "classic legal moves, check marker, no core/layer/projection panels",
+            Chess3DVisualModeState.SingleSide => "training sandbox, clean move preview",
+            Chess3DVisualModeState.Asgard => "core/stack/fusion/anchor/reserve visual language",
+            Chess3DVisualModeState.Rubik => "Asgard visuals plus layer selector and layer highlight",
+            Chess3DVisualModeState.Hodge => "macro-player triads with primary and mirror arrows",
+            _ => "profile-driven visuals"
+        };
+    }
+
     private static string KnockbackDestinationName(int destinationKind)
     {
         return destinationKind switch
@@ -530,7 +656,7 @@ public partial class Chess3DWindow : Window
         var board = _engine.GetBoard();
         var state = _engine.GetState();
         var selectedPreview = SelectedPreviewEntries();
-        PreviewHost.Background = new SolidColorBrush(Chess3DTheme.SceneBackground);
+        PreviewHost.Background = new SolidColorBrush(CurrentSceneBackground());
         foreach (var square in VisibleBoardSquares(board))
         {
             group.Children.Add(CreateTileModel(square));
@@ -622,7 +748,7 @@ public partial class Chess3DWindow : Window
             return;
         }
 
-        if (state.IsCoreCell)
+        if (state.IsCoreCell && ShowCoreOverlayBox?.IsChecked != false)
         {
             group.Children.Add(CreateCellOverlay(square, Chess3DTheme.CoreCell, 0.82, 0.045, -3.04));
             _lastOverlayModels++;
@@ -696,6 +822,11 @@ public partial class Chess3DWindow : Window
 
     private void AddLayerTurnOverlay(Model3DGroup group)
     {
+        if (ShowRubikLayerBox?.IsChecked == false)
+        {
+            return;
+        }
+
         var axis = _animatedLayerAxis >= 0 ? _animatedLayerAxis : (_engine.IsLayerTurnEnabled() ? SelectedLayerTurnAxis() : -1);
         var layer = _animatedLayerAxis >= 0 ? _animatedLayer : SelectedLayerTurnLayer();
         if (axis < 0 || layer is < 0 or > 7 || !_engine.IsLayerTurnEnabled())
@@ -733,7 +864,7 @@ public partial class Chess3DWindow : Window
 
     private void AddHodgeArrowOverlays(Model3DGroup group)
     {
-        if (!_engine.IsProjectionModeEnabled())
+        if (!_engine.IsProjectionModeEnabled() || ShowHodgeArrowsBox?.IsChecked == false)
         {
             return;
         }
@@ -862,7 +993,9 @@ public partial class Chess3DWindow : Window
         var type = piece % 10;
         var relativePath = Path.Combine("Pieces", ObjModelLibrary.ModelFileNameForClassicPiece(type, side % 2 == 1));
         var mesh = _models.LoadMesh(relativePath);
-        var material = _models.CreatePieceMaterial(relativePath, side, type, PieceOpacity(square));
+        var material = HighContrastBox?.IsChecked == true
+            ? ObjModelLibrary.CreateFallbackPieceMaterial(side, PieceOpacity(square))
+            : _models.CreatePieceMaterial(relativePath, side, type, PieceOpacity(square));
         if (mesh != null)
         {
             _lastObjModels++;
@@ -986,10 +1119,24 @@ public partial class Chess3DWindow : Window
         _animatedLayerAxis = -1;
         _animatedLayer = -1;
         _animationInProgress = false;
+        _replayStepping = false;
         if (clearHodgePreview)
         {
             _hodgePreviewSegments.Clear();
         }
+    }
+
+    private void BeginVisualActionAnimation()
+    {
+        _animationInProgress = true;
+    }
+
+    private void EndVisualActionAnimation()
+    {
+        _animationInProgress = false;
+        _animatedLayerAxis = -1;
+        _animatedLayer = -1;
+        _replayStepping = false;
     }
 
     private async void BeginActionFlash(IEnumerable<Chess3DVisualSegment> segments)
@@ -1000,12 +1147,18 @@ public partial class Chess3DWindow : Window
         {
             return;
         }
-        _animationInProgress = true;
-        RefreshPreview3D();
-        await Task.Delay(240);
-        _actionFlashSegments.Clear();
-        _animationInProgress = false;
-        RefreshAll();
+        BeginVisualActionAnimation();
+        try
+        {
+            RefreshPreview3D();
+            await Task.Delay(240);
+        }
+        finally
+        {
+            _actionFlashSegments.Clear();
+            EndVisualActionAnimation();
+            RefreshAll();
+        }
     }
 
     private static bool IsValidVisualSegment(Chess3DVisualSegment segment)
@@ -1195,28 +1348,35 @@ public partial class Chess3DWindow : Window
             return;
         }
 
-        _animationInProgress = true;
+        BeginVisualActionAnimation();
         _animatedLayerAxis = axis;
         _animatedLayer = layer;
-        RefreshAll();
-        await Task.Delay(320);
+        try
+        {
+            RefreshAll();
+            await Task.Delay(320);
 
-        if (!_engine.RotateLayer(axis, layer, quarterTurns))
-        {
-            var last = _engine.GetLastLayerTurnInfo();
-            _lastUiInvalidReason = $"Layer turn rejected: {_engine.GetLayerTurnResultName(last.ResultCode)}";
-            MessageBox.Show(this, $"Layer turn failed: {_engine.GetLayerTurnResultName(last.ResultCode)}", "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-        else
-        {
-            _lastUiInvalidReason = string.Empty;
-            if (broadcast)
+            if (!_engine.RotateLayer(axis, layer, quarterTurns))
             {
-                _ = BroadcastRotate3DAsync(axis, layer, quarterTurns);
+                var last = _engine.GetLastLayerTurnInfo();
+                _lastUiInvalidReason = $"Layer turn rejected: {_engine.GetLayerTurnResultName(last.ResultCode)}";
+                MessageBox.Show(this, $"Layer turn failed: {_engine.GetLayerTurnResultName(last.ResultCode)}", "Cube Chess", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                _lastUiInvalidReason = string.Empty;
+                if (broadcast)
+                {
+                    _ = BroadcastRotate3DAsync(axis, layer, quarterTurns);
+                }
             }
         }
-        ClearTransientVisualState(clearHodgePreview: false);
-        RefreshAll();
+        finally
+        {
+            EndVisualActionAnimation();
+            ClearTransientVisualState(clearHodgePreview: false);
+            RefreshAll();
+        }
     }
 
     private void PreviewProjection_Click(object sender, RoutedEventArgs e)
@@ -1348,8 +1508,10 @@ public partial class Chess3DWindow : Window
 
     private void ReplayStep_Click(object sender, RoutedEventArgs e)
     {
+        _replayStepping = true;
         if (!_engine.ReplayAction())
         {
+            _replayStepping = false;
             MessageBox.Show(this, $"Replay step failed: {_engine.GetLastReplayError()}", "Chess3D Replay", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         else
@@ -1644,13 +1806,55 @@ public partial class Chess3DWindow : Window
 
     private void CameraCenter_Click(object sender, RoutedEventArgs e)
     {
+        SetCameraPreset(-36, 54, 13.5);
+    }
+
+    private void CameraIso_Click(object sender, RoutedEventArgs e)
+    {
+        SetCameraPreset(-36, 54, 13.5);
+    }
+
+    private void CameraTop_Click(object sender, RoutedEventArgs e)
+    {
+        SetCameraPreset(0, 82, 12.5);
+    }
+
+    private void CameraSide_Click(object sender, RoutedEventArgs e)
+    {
+        SetCameraPreset(0, 14, 14.5);
+    }
+
+    private void SetCameraPreset(double yaw, double pitch, double distance)
+    {
         _targetX = 0;
         _targetY = 0;
         _targetZ = 0;
-        _distance = 13.5;
-        _yaw = -36;
-        _pitch = 54;
+        _distance = distance;
+        _yaw = yaw;
+        _pitch = pitch;
         RefreshPreview3D();
+    }
+
+    private void VisualOptions_Changed(object sender, RoutedEventArgs e)
+    {
+        if (Preview3D != null)
+        {
+            RefreshAll();
+        }
+    }
+
+    private void RefreshVisualDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshAll();
+    }
+
+    private void CopyVisualDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        var text = VisualDiagnosticsText?.Text ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            Clipboard.SetText(text);
+        }
     }
 
     private int SelectedLayer()

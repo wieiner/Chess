@@ -112,3 +112,14 @@ P2O adds a profile-aware playability/rules diagnostic layer above the P2N replay
 - `Chess3D_PerftActions` and `Chess3D_DivideActionsJson` enumerate legal actions by profile for shallow diagnostic counts and never mutate the source state.
 
 This keeps rule diagnostics in the native engine while the WPF UI remains a consumer of summaries, previews, and action/replay APIs.
+
+## Chess3D Visual RC Layer
+
+P3C adds an explicit WPF-only visual state layer:
+
+- `Chess3DVisualStateSnapshot` records selection, mode, turn, action, options, overlay count, and animation lock state.
+- Runtime visual options change only rendering: background, high contrast, CoreCube overlay, Hodge arrows, and Rubik layer overlay.
+- Camera presets and visual diagnostics live in `Chess3DWindow`.
+- Native engine state remains authoritative for board, legal preview, stacks, fusion, reserve, action history, save/load/replay, and outcomes.
+
+This layer improves playability without creating a new mode or moving rules into UI code.

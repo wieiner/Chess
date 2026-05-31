@@ -163,3 +163,15 @@ P2O adds regression playthrough fixtures under:
 - `ProductionOutput\Chess3D\Assets\Rules3D\Scenarios\regression` in portable output
 
 `scripts\verify.ps1` checks representative regression files in both output locations. These fixtures are not RuleProfiles; they reproduce action/preview/replay bugs against the existing five modes.
+
+## P3C Visual RC Notes
+
+P3C adds no new production asset requirement. The visual state and option code is compiled into `ChessApp` and linked into `Chess3DApp`.
+
+Release verification still runs:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
+```
+
+Manual release QA should additionally follow `docs\CHESS3D_VISUAL_RC_MANUAL_QA.md`, because CI does not validate WPF frame readability, camera comfort, or color contrast.

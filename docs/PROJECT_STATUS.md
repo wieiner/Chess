@@ -285,3 +285,23 @@ Still deferred:
 - AI/search integration over profile-aware legal actions;
 - richer visualization/animation of stacks, fusion, Rubik turns, and Hodge mirrors;
 - online serialization and multiplayer authority rules.
+
+## P3C Status
+
+P3C polishes the Chess3D visual layer toward a release-candidate manual play loop. No new RuleProfile or gameplay mode was added.
+
+Implemented:
+
+- explicit UI-only visual state snapshot for mode, selection, turn, action, options, and animation state;
+- camera presets for isometric, top, side, and reset views;
+- runtime visual options for background theme, high-contrast pieces, CoreCube overlay, Hodge arrows, and Rubik layer overlay;
+- clearer visual diagnostics with active visual state, model/material diagnostics, overlay counts, animation lock state, and invalid reason;
+- short animation-controller contract for action flash, replay step hints, Hodge arrows, and Rubik layer pre-highlight;
+- mode-specific visual-language docs and a release-candidate manual QA checklist.
+
+Still deferred:
+
+- automated WPF screenshot/pixel QA;
+- richer mesh glide/capture/fusion cinematics;
+- AI/search per profile;
+- online multiplayer authority.

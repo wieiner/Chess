@@ -192,9 +192,31 @@
                             <Border Style="{StaticResource CommandGroupStyle}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="Camera" Style="{StaticResource CommandLabelStyle}" />
+                                    <Button Content="Iso" Click="CameraIso_Click" />
+                                    <Button Content="Top" Click="CameraTop_Click" />
+                                    <Button Content="Side" Click="CameraSide_Click" />
                                     <Button Content="Up" Tag="1" Click="CameraLift_Click" />
                                     <Button Content="Down" Tag="-1" Click="CameraLift_Click" />
-                                    <Button Content="Center" Click="CameraCenter_Click" />
+                                    <Button Content="Reset" Click="CameraCenter_Click" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource CommandGroupStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Visuals" Style="{StaticResource CommandLabelStyle}" />
+                                    <ComboBox x:Name="BackgroundThemeBox" Width="96" SelectedIndex="0" VerticalAlignment="Center" SelectionChanged="VisualOptions_Changed">
+                                        <ComboBoxItem Content="Neutral" />
+                                        <ComboBoxItem Content="Light" />
+                                        <ComboBoxItem Content="Dark" />
+                                    </ComboBox>
+                                    <CheckBox x:Name="HighContrastBox" Content="Contrast"
+                                              Checked="VisualOptions_Changed" Unchecked="VisualOptions_Changed" />
+                                    <CheckBox x:Name="ShowCoreOverlayBox" Content="Core" IsChecked="True"
+                                              Checked="VisualOptions_Changed" Unchecked="VisualOptions_Changed" />
+                                    <CheckBox x:Name="ShowHodgeArrowsBox" Content="Hodge" IsChecked="True"
+                                              Checked="VisualOptions_Changed" Unchecked="VisualOptions_Changed" />
+                                    <CheckBox x:Name="ShowRubikLayerBox" Content="Rubik" IsChecked="True"
+                                              Checked="VisualOptions_Changed" Unchecked="VisualOptions_Changed" />
                                 </StackPanel>
                             </Border>
                         </WrapPanel>
@@ -411,7 +433,13 @@
                     <TextBox x:Name="PositionText" MinHeight="170" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
                              Background="#1D2228" Foreground="{StaticResource TextBrush}" BorderBrush="#46505C" />
                     <Expander Header="Visual diagnostics" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,8,0,0">
-                        <TextBlock x:Name="VisualDiagnosticsText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                        <StackPanel Margin="0,8,0,0">
+                            <WrapPanel Margin="0,0,0,8">
+                                <Button Content="Refresh Visual Diagnostics" Click="RefreshVisualDiagnostics_Click" />
+                                <Button Content="Copy Visual Diagnostics" Click="CopyVisualDiagnostics_Click" />
+                            </WrapPanel>
+                            <TextBlock x:Name="VisualDiagnosticsText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
                     </Expander>
                 </StackPanel>
                 </ScrollViewer>

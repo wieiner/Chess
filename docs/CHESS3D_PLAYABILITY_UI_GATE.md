@@ -28,3 +28,15 @@ P2O exposes `GamePhase` and `GameOutcome` through ABI so the UI can show complet
 ## Deferred UI
 
 Animated Rubik turns, stack/fusion cinematic visualization, replay timeline controls, and AI/search panels remain later work.
+
+## P3C Visual RC Gate
+
+P3C adds a release-candidate visual control surface:
+
+- explicit visual state snapshot;
+- camera presets and readability toggles;
+- profile-gated overlay toggles;
+- visual diagnostics copy/refresh;
+- short animation lock contract for action flashes, replay step, Rubik layer highlight, and Hodge mirror paths.
+
+The gate remains honest: manual visual QA is required, and the engine is still the only authority for legal actions and outcomes.

@@ -231,3 +231,19 @@ Next:
 - P3C: AI/search integration per profile.
 - P3D: online serialization and multiplayer replay authority.
 - P3E: packaging/release polish and manual visual QA automation.
+
+## P3C - Visual Release Candidate Polish
+
+P3C is completed as the visual RC polish stage:
+
+- explicit UI visual state machine;
+- mode-specific visual language for Classic, Single, Asgard, Rubik, and Hodge;
+- camera/readability toggles, high-contrast pieces, and visual diagnostics polish;
+- short animation-controller contract for action/replay/Rubik/Hodge flashes;
+- manual visual RC QA checklist.
+
+Next:
+
+- P3D: AI/search integration per profile;
+- P3E: online serialization and multiplayer authority;
+- P3F: release packaging polish and optional automated visual smoke capture.

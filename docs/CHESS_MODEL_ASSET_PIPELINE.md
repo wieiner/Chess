@@ -44,3 +44,5 @@ Expected runtime examples:
 - `rude-resource/` remains ignored and is not part of this pipeline.
 
 P3B overlays are procedural WPF geometry and do not require new OBJ/MTL files. They layer on top of the canonical model catalog.
+
+P3C keeps that asset boundary. The visual diagnostics panel now surfaces active model set, OBJ/fallback model counts, overlay count, animation state, visual state, option state, and the last material/model diagnostic text. P3C does not add new model formats or automatically unpack ZIP archives.

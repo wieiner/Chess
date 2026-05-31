@@ -65,3 +65,15 @@ The 3D viewport now adds mode-aware overlays:
 - Short source-to-target flashes for moves and replay steps.
 
 These hints are rebuilt from engine state after actions; they are not separate gameplay state.
+
+## P3C Visual RC Controls
+
+The UI now exposes runtime-only visual controls:
+
+- camera presets: isometric, top, side, reset;
+- background theme: neutral, light, dark;
+- high-contrast pieces;
+- toggles for CoreCube overlay, Hodge arrows, and Rubik layer overlay;
+- refresh/copy visual diagnostics.
+
+These controls do not change engine state, RuleProfiles, save/replay data, or action history. They only affect the WPF view.
