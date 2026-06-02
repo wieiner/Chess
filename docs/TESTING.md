@@ -56,8 +56,8 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - They do not prove search strength or GPU performance.
 - They do not validate final six-sided 3D chess laws; P2A validates only the single-side local rule core.
 - They now prove the P3A Classic/Single-Side king-safety kernel through focused check/checkmate/stalemate fixtures, but they are not a deep exhaustive endgame tablebase.
-- They prove P2E CoreCell stack storage, P2F non-destructive fusion descriptors, P2G home-or-reserve capture routing, P2H runtimePartial Rubik layer turns for projected board plus whole CoreCell stacks, P2I action-history/reserve-restore contracts, and P2J Hodge projected composite move contracts. They do not prove destructive implosion behavior, contested anchor scoring, or AI/search strength.
-- They do not implement or prove color/permutation, destructive transformation, final Volume-Surface 216 mechanics, full replay/import/export, online serialization, AI/search generation for layer turns or Hodge composite turns, GPU stack snapshots, or final Hodge mathematical formalism.
+- They prove P2E CoreCell stack storage, P2F non-destructive fusion descriptors, P2G home-or-reserve capture routing, P2H runtimePartial Rubik layer turns for projected board plus whole CoreCell stacks, P2I action-history/reserve-restore contracts, P2J Hodge projected composite move contracts, and P3D profile-aware AI candidate/search/apply smoke contracts. They do not prove destructive implosion behavior, contested anchor scoring, or deep AI/search strength.
+- They do not implement or prove color/permutation, destructive transformation, final Volume-Surface 216 mechanics, online serialization, GPU stack snapshots, final Hodge mathematical formalism, or tournament-strength AI.
 - They do not automate WPF UI behavior yet.
 - They do not require or validate `rude-resource/`.
 
@@ -152,3 +152,17 @@ Manual QA is required for:
 - replay-step flash clarity.
 
 Use `docs\CHESS3D_VISUAL_RC_MANUAL_QA.md` for the release-candidate checklist.
+
+## P3D AI/Search Testing
+
+P3D remains headless in CI. Automated coverage includes:
+
+- AI candidate generation for all five real Chess3D RuleProfiles;
+- no-mutation checks for candidate build and search using state hash/action count;
+- Classic/Single-Side search over king-safe legal moves;
+- Asgard reserve-restore candidate visibility;
+- Rubik layer-turn candidate visibility;
+- Hodge projected composite candidate/search/apply behavior;
+- runnable regression fixtures under `assets\rules\scenarios\chess3d\regression`.
+
+The tests intentionally verify integration and legality boundaries, not playing strength.

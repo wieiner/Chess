@@ -701,6 +701,58 @@ internal sealed class NativeChess3DEngine : IDisposable
         return ReadString((buffer, capacity) => Chess3D_GetLastPerftError(_handle, buffer, capacity));
     }
 
+    public int BuildAiActionCandidates(int sideOrMacroPlayer = 0)
+    {
+        ThrowIfDisposed();
+        return Chess3D_BuildAiActionCandidates(_handle, sideOrMacroPlayer);
+    }
+
+    public Chess3DAiActionDto[] GetAiActionCandidates()
+    {
+        ThrowIfDisposed();
+        var count = Chess3D_GetAiActionCandidateCount(_handle);
+        if (count <= 0)
+        {
+            return Array.Empty<Chess3DAiActionDto>();
+        }
+        var actions = new Chess3DAiActionDto[count];
+        for (var i = 0; i < count; ++i)
+        {
+            Chess3D_GetAiActionCandidate(_handle, i, out actions[i]);
+        }
+        return actions;
+    }
+
+    public bool SearchBestAiAction(int depth, int nodeLimit, int timeLimitMs, out Chess3DAiActionDto action)
+    {
+        ThrowIfDisposed();
+        return Chess3D_SearchBestAiAction(_handle, depth, nodeLimit, timeLimitMs, out action) != 0;
+    }
+
+    public bool ApplyAiAction(Chess3DAiActionDto action)
+    {
+        ThrowIfDisposed();
+        return Chess3D_ApplyAiAction(_handle, ref action) != 0;
+    }
+
+    public bool MakeBestProfileAction(int depth, int nodeLimit, int timeLimitMs, out Chess3DAiActionDto action)
+    {
+        ThrowIfDisposed();
+        return Chess3D_MakeBestProfileAction(_handle, depth, nodeLimit, timeLimitMs, out action) != 0;
+    }
+
+    public string GetLastAiSearchSummaryJson()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetLastAiSearchSummaryJson(_handle, buffer, capacity), 4096);
+    }
+
+    public string GetLastAiSearchError()
+    {
+        ThrowIfDisposed();
+        return ReadString((buffer, capacity) => Chess3D_GetLastAiSearchError(_handle, buffer, capacity));
+    }
+
     public void Dispose()
     {
         if (_handle != IntPtr.Zero)
@@ -1050,6 +1102,30 @@ internal sealed class NativeChess3DEngine : IDisposable
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Chess3D_GetLastPerftError(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_BuildAiActionCandidates(IntPtr handle, int sideOrMacroPlayer);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetAiActionCandidateCount(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_GetAiActionCandidate(IntPtr handle, int index, out Chess3DAiActionDto action);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_SearchBestAiAction(IntPtr handle, int depth, int nodeLimit, int timeLimitMs, out Chess3DAiActionDto action);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_ApplyAiAction(IntPtr handle, ref Chess3DAiActionDto action);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess3D_MakeBestProfileAction(IntPtr handle, int depth, int nodeLimit, int timeLimitMs, out Chess3DAiActionDto action);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastAiSearchSummaryJson(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Chess3D_GetLastAiSearchError(IntPtr handle, StringBuilder buffer, int capacity);
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -1115,4 +1191,30 @@ internal struct Chess3DLegalActionPreviewEntryDto
     public int CapturedPieceCode;
     public int Side;
     public int ReasonCode;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct Chess3DAiActionDto
+{
+    public int Kind;
+    public int Side;
+    public int MacroPlayer;
+    public int FromX;
+    public int FromY;
+    public int FromZ;
+    public int ToX;
+    public int ToY;
+    public int ToZ;
+    public int PromotionType;
+    public int ReservePieceType;
+    public int RestoreX;
+    public int RestoreY;
+    public int RestoreZ;
+    public int Axis;
+    public int Layer;
+    public int QuarterTurns;
+    public int PrimarySide;
+    public int Score;
+    public int Flags;
+    public int ResultCode;
 }

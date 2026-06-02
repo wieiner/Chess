@@ -1,0 +1,14 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "single-side-ai-smoke-v0.1",
+  "profileFile": "single_side_3d_v0_1.json",
+  "rulesetId": "single-side-3d-8x8x8-v0.1",
+  "purpose": "Single-Side Training exposes legal move candidates to AI/search.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "buildAiCandidates", "minCount": 1 },
+    { "type": "assertAiCandidateKind", "kind": 1 },
+    { "type": "searchBestAiNoMutation", "depth": 1, "nodeLimit": 128, "timeLimitMs": 100 }
+  ]
+}

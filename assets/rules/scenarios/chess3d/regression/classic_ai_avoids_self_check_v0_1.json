@@ -1,0 +1,22 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "classic-ai-avoids-self-check-v0.1",
+  "profileFile": "classic_six_side_3d_v0_1.json",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "AI/search candidate generation uses Classic king-safe legal actions and does not mutate state.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "clearBoard" },
+    { "type": "setPiece", "side": 1, "pieceType": 6, "x": 0, "y": 0, "z": 0 },
+    { "type": "setPiece", "side": 1, "pieceType": 4, "x": 0, "y": 0, "z": 1 },
+    { "type": "setPiece", "side": 2, "pieceType": 4, "x": 0, "y": 0, "z": 7 },
+    { "type": "rememberStateHash", "name": "before" },
+    { "type": "expectMoveFail", "fromX": 0, "fromY": 0, "fromZ": 1, "toX": 1, "toY": 0, "toZ": 1 },
+    { "type": "searchBestAiNoMutation", "depth": 1, "nodeLimit": 128, "timeLimitMs": 100 },
+    { "type": "assertStateHashEqualsRemembered", "name": "before" }
+  ],
+  "knownLimitations": [
+    "This verifies legality/no-mutation, not deep tactical strength."
+  ]
+}

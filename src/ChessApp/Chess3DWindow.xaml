@@ -387,6 +387,28 @@
                         </Border>
                     </Expander>
 
+                    <Expander Header="AI / Search" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
+                        <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CommandBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
+                            <StackPanel>
+                                <WrapPanel>
+                                    <TextBlock Text="Depth" Style="{StaticResource CommandLabelStyle}" Margin="0,0,6,0" />
+                                    <TextBox x:Name="AiDepthBox" Width="36" Text="1" VerticalAlignment="Center" />
+                                    <TextBlock Text="Nodes" Style="{StaticResource CommandLabelStyle}" Margin="8,0,6,0" />
+                                    <TextBox x:Name="AiNodeLimitBox" Width="64" Text="512" VerticalAlignment="Center" />
+                                    <TextBlock Text="ms" Style="{StaticResource CommandLabelStyle}" Margin="8,0,6,0" />
+                                    <TextBox x:Name="AiTimeLimitBox" Width="52" Text="250" VerticalAlignment="Center" />
+                                </WrapPanel>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button Content="Candidates" Click="BuildAiCandidates_Click" />
+                                    <Button Content="Search Best" Click="SearchBestAiAction_Click" />
+                                    <Button Content="Make AI Move" Click="MakeBestAiAction_Click" />
+                                    <Button Content="Copy Summary" Click="CopyAiSearchSummary_Click" />
+                                </WrapPanel>
+                                <TextBlock x:Name="AiSearchText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
                     <Expander Header="Scenario Smoke Pack" Foreground="{StaticResource MutedTextBrush}" Background="Transparent" BorderBrush="{StaticResource CommandBorderBrush}" Margin="0,0,0,10">
                         <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CommandBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,6,0,0">
                             <StackPanel>

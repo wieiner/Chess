@@ -91,6 +91,31 @@ struct Chess3DLegalActionPreviewEntryDto
     int side;
     int reasonCode;
 };
+
+struct Chess3DAiActionDto
+{
+    int kind;
+    int side;
+    int macroPlayer;
+    int fromX;
+    int fromY;
+    int fromZ;
+    int toX;
+    int toY;
+    int toZ;
+    int promotionType;
+    int reservePieceType;
+    int restoreX;
+    int restoreY;
+    int restoreZ;
+    int axis;
+    int layer;
+    int quarterTurns;
+    int primarySide;
+    int score;
+    int flags;
+    int resultCode;
+};
 #pragma pack(pop)
 
 CHESS3D_API void* Chess3D_Create();
@@ -237,5 +262,13 @@ CHESS3D_API int Chess3D_GetStateHash(void* handle, char* buffer, int capacity);
 CHESS3D_API long long Chess3D_PerftActions(void* handle, int depth);
 CHESS3D_API int Chess3D_DivideActionsJson(void* handle, int depth, char* buffer, int capacity);
 CHESS3D_API int Chess3D_GetLastPerftError(void* handle, char* buffer, int capacity);
+CHESS3D_API int Chess3D_BuildAiActionCandidates(void* handle, int sideOrMacroPlayer);
+CHESS3D_API int Chess3D_GetAiActionCandidateCount(void* handle);
+CHESS3D_API int Chess3D_GetAiActionCandidate(void* handle, int index, Chess3DAiActionDto* action);
+CHESS3D_API int Chess3D_SearchBestAiAction(void* handle, int depth, int nodeLimit, int timeLimitMs, Chess3DAiActionDto* action);
+CHESS3D_API int Chess3D_ApplyAiAction(void* handle, const Chess3DAiActionDto* action);
+CHESS3D_API int Chess3D_MakeBestProfileAction(void* handle, int depth, int nodeLimit, int timeLimitMs, Chess3DAiActionDto* action);
+CHESS3D_API int Chess3D_GetLastAiSearchSummaryJson(void* handle, char* buffer, int capacity);
+CHESS3D_API int Chess3D_GetLastAiSearchError(void* handle, char* buffer, int capacity);
 CHESS3D_API int Chess3D_GetPositionText(void* handle, char* buffer, int capacity);
 CHESS3D_API int Chess3D_GetLastInfo(void* handle, char* buffer, int capacity);

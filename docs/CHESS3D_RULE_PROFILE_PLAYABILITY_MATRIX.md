@@ -39,6 +39,18 @@ These files are scenarios, not additional RuleProfiles. The real Chess3D RulePro
 | Rubik Convergence | centerAssembly plus layer-turn action status | shallow action perft/divide includes layer turns | not applicable/deferred |
 | Hodge Projection Duel | macro-player projection status | shallow action perft/divide includes projected composite candidates | deferred |
 
+## P3D AI/Search Status
+
+| Profile | AI/search candidate surface |
+| --- | --- |
+| Classic Six-Side | King-safe normal moves and captures. |
+| Single-Side Training | King-safe legal moves when a king is present; training profile remains sandbox-oriented. |
+| Asgard / Meru | Normal moves plus legal reserve restores; evaluation can see anchors, fusion descriptors, implosion progress, contested cells, and reserve counts. |
+| Rubik Convergence | Asgard-style candidates plus ritual layer turns when enabled by profile. |
+| Hodge Projection Duel | Projected composite moves for the active macro-player; each candidate is one all-or-nothing action. |
+
+P3D does not add a sixth profile and does not change victory semantics.
+
 No sixth RuleProfile is introduced by P2O. Regression fixtures and playthroughs remain test data.
 
 ## P3A King-Safety Status

@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P3A Classic/Single-Side king safety and outcomes.
+Last audited locally for P3D profile-aware Chess3D AI/search integration.
 
 ## Exists
 
@@ -91,6 +91,13 @@ Last audited locally for P3A Classic/Single-Side king safety and outcomes.
 - `docs/CHESS3D_RUBIK_LAYER_TURN_ANIMATION.md`: Rubik layer-turn animation and state-safety contract.
 - `docs/CHESS3D_HODGE_MIRROR_ARROW_VISUALS.md`: Hodge primary/mirror arrow display.
 - `docs/CHESS3D_ACTION_ANIMATION_PIPELINE.md`: move/replay/layer/projection animation hints.
+- `docs/CHESS3D_P3D_AI_SEARCH_AUDIT.md`: audit of action/search boundaries before P3D.
+- `docs/CHESS3D_AI_ACTION_MODEL.md`: unified profile-aware AI action descriptor.
+- `docs/CHESS3D_AI_SEARCH_ABI.md`: append-only AI candidate/search/apply ABI.
+- `docs/CHESS3D_AI_EVALUATION.md`: deterministic v0.1 evaluation signals.
+- `docs/CHESS3D_PROFILE_AWARE_SEARCH.md`: Classic/Single, Asgard, Rubik, and Hodge search boundaries.
+- `docs/CHESS3D_AI_UI.md`: compact Chess3D AI/Search panel.
+- `docs/CHESS3D_AI_REGRESSION_FIXTURES.md`: runnable AI/search regression fixtures.
 
 ## Build-Verified
 
@@ -191,7 +198,7 @@ Portable outputs:
 - Final Asgard/Meru fusion physics are not implemented yet; P2F provides descriptor/progress state but not destructive transformation, visual effects, or full victory variants.
 - Runtime board projection remains one integer piece per cell for compatibility, while stack data exists as a Forbidden Core overlay.
 - Full reserve inventory UI, drag/drop restore, restore into core, and restore captures are not implemented yet.
-- Rubik layer turns are implemented as runtimePartial ritual actions for Rubik convergence, and P2K exposes basic controls. Animation, replay/import/export, online serialization, AI/search generation, and GPU stack snapshots are still draft.
+- Rubik layer turns are implemented as runtimePartial ritual actions for Rubik convergence, and P3D can enumerate them as profile-aware AI candidates. Online serialization and GPU stack snapshots remain draft.
 - 3D relay/web-platform contract is a documented client-side foundation, not a hosted production service.
 - Rubik arbitrary-state solving beyond trusted move history remains future work.
 - UI smoke tests are still manual.
@@ -206,7 +213,7 @@ Portable outputs:
 - Full UI automation tests are not present yet.
 - GPU parity/performance needs more benchmark baselines on real target hardware.
 - The project currently relies on local Visual Studio/MSBuild and vcpkg environment availability.
-- Recommended next stage is P3B visual playability: stack/fusion overlays, Rubik layer-turn animation, Hodge mirror arrows, and replay/action animation.
+- Recommended next stage is P3E online serialization and multiplayer authority, with P3F packaging/release polish after that.
 ## P2N Status
 
 P2N adds reproducibility to the existing five Chess3D modes. No sixth mode was added.
@@ -246,8 +253,7 @@ Implemented:
 
 Still deferred:
 
-- AI/search per profile;
-- rich animation and visualization;
+- deep/strong AI search;
 - online serialization/multiplayer authority.
 
 ## P3B Status
@@ -281,8 +287,7 @@ Implemented:
 
 Still deferred:
 
-- broader AI/search validation over the new king-safe legal action layer;
-- AI/search integration over profile-aware legal actions;
+- deeper AI/search strength validation over the new profile-aware action layer;
 - richer visualization/animation of stacks, fusion, Rubik turns, and Hodge mirrors;
 - online serialization and multiplayer authority rules.
 
@@ -303,5 +308,25 @@ Still deferred:
 
 - automated WPF screenshot/pixel QA;
 - richer mesh glide/capture/fusion cinematics;
-- AI/search per profile;
 - online multiplayer authority.
+
+## P3D Status
+
+P3D adds profile-aware AI/search integration without adding a new mode.
+
+Implemented:
+
+- append-only `Chess3DAiActionDto` and candidate/search/apply ABI;
+- candidates generated from existing legal profile actions;
+- Classic/Single-Side search over king-safe legal moves;
+- Asgard reserve restore candidates and core/fusion-aware static evaluation signals;
+- Rubik layer-turn candidates when `ritualTurn` is enabled;
+- Hodge projected composite candidates as one all-or-nothing action;
+- compact Chess3D AI/Search UI panel;
+- headless regression fixtures for AI no-mutation and profile isolation.
+
+Still deferred:
+
+- deep search strength, transposition tables, opening books, and quiescence;
+- GPU/CUDA search;
+- online AI authority/synchronization.

@@ -88,7 +88,7 @@
 - Completed: fusion, anchors, implosion progress, and compatible victory recompute after turns.
 - Completed: reserve counts remain unaffected by turns.
 - Completed: append-only layer-turn ABI, C# wrapper/status, JSON/schema updates, and contract tests.
-- Deferred: king-safety hardening after rotations, notation/replay, online serialization, AI/search generation, UI animation, and GPU stack snapshots.
+- Deferred at P2H: king-safety hardening after rotations, notation/replay, online serialization, UI animation, and GPU stack snapshots. P3D later added profile-aware AI/search candidates.
 
 ### P2I - Action History, Notation, And Reserve Restore
 
@@ -108,7 +108,7 @@
 - Completed: runtime all-or-nothing projected composite move for two macro-players with three projections each.
 - Completed: action history/notation for `HPD` composite moves.
 - Completed: C# status wrapper for projection mode and last projection error.
-- Deferred: projection-specific UI controls, replay/import/export, online serialization, AI/search integration, and full 3D checkmate hardening.
+- Deferred at P2J: projection-specific UI controls, replay/import/export, online serialization, and full 3D checkmate hardening. P3D later added profile-aware AI/search integration.
 
 ### P2K - Playable Control Center
 
@@ -162,9 +162,17 @@
 - Completed: Hodge primary/mirror arrow hints.
 - Completed: move/replay action flash and visual diagnostics.
 
-### P3C - AI/Search Integration Per Profile
+### P3C - Visual Release Candidate Polish
 
-- Integrate AI/search with normal moves, reserve restore, Rubik layer turns, and Hodge projected composite actions.
+- Completed: explicit visual state machine and mode-specific visual language.
+- Completed: camera/readability toggles, high-contrast pieces, and visual diagnostics polish.
+
+### P3D - AI/Search Integration Per Profile
+
+- Completed: append-only profile-aware AI action/candidate/search/apply ABI.
+- Completed: search candidates for normal moves, reserve restore, Rubik layer turns, and Hodge projected composite actions.
+- Completed: shallow deterministic search summary JSON, C# wrappers, UI panel, and regression fixtures.
+- Deferred: deep search strength, AI/search UI timeline, GPU search, and online AI authority.
 
 ### P3 - Full Six-Side Gameplay And Hybrid Victory
 
@@ -211,8 +219,9 @@ Next:
 - P2O: richer visualization and animation.
 - P3A: completed Classic/Single-Side king safety/check/mate/stalemate.
 - P3B: visual playability sprint final.
-- P3C: AI/search per profile.
-- P3D: online serialization.
+- P3C: visual release-candidate polish.
+- P3D: AI/search per profile.
+- P3E: online serialization.
 
 ## P2O - Product Playability And Rules Correctness Gate
 
@@ -228,9 +237,10 @@ P2O is completed in the runtime plan:
 Next:
 
 - P3B: visual playability sprint final for stacks, fusion, layer turns, Hodge mirrors, and replay/action animation.
-- P3C: AI/search integration per profile.
-- P3D: online serialization and multiplayer replay authority.
-- P3E: packaging/release polish and manual visual QA automation.
+- P3C: visual release-candidate polish.
+- P3D: AI/search integration per profile.
+- P3E: online serialization and multiplayer replay authority.
+- P3F: packaging/release polish and manual visual QA automation.
 
 ## P3C - Visual Release Candidate Polish
 
@@ -244,6 +254,17 @@ P3C is completed as the visual RC polish stage:
 
 Next:
 
-- P3D: AI/search integration per profile;
+- P3D: AI/search integration per profile completed;
 - P3E: online serialization and multiplayer authority;
 - P3F: release packaging polish and optional automated visual smoke capture.
+
+## P3D - AI/Search Integration Per Profile
+
+P3D is completed as the first profile-aware Chess3D search layer:
+
+- AI candidates are generated from existing legal profile actions.
+- Classic/Single-Side candidates are king-safe.
+- Asgard candidates include legal reserve restore where available.
+- Rubik candidates include legal layer turns.
+- Hodge candidates include projected composite moves as one all-or-nothing action.
+- Search is shallow, deterministic, bounded, and non-mutating until an explicit apply/make call.

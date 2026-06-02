@@ -27,6 +27,8 @@ Divide makes move-generation bugs reproducible: it lists first-ply actions and t
 
 For Classic/Single-Side after P3A, divide roots are filtered through the king-safety legal move layer. Self-check and king-into-check roots should not appear in the JSON.
 
+P3D uses the same root-action surface for AI candidates. Divide stays an explainability diagnostic; AI search adds scoring and best-action selection.
+
 ## Limits
 
 Depth is intentionally capped at 3 for v0.1. Larger exhaustive search belongs to later AI/search tooling.

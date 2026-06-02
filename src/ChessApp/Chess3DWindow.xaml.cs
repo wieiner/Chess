@@ -565,6 +565,14 @@ public partial class Chess3DWindow : Window
             $"State hash: {_engine.GetStateHash()}\n" +
             $"Replay cursor: {_engine.GetReplayCursor()}/{_engine.GetReplayActionCount()}\n" +
             $"Last replay error: {(_engine.GetLastReplayError().Length == 0 ? "-" : _engine.GetLastReplayError())}";
+        if (AiSearchText != null)
+        {
+            var aiError = _engine.GetLastAiSearchError();
+            var summary = _engine.GetLastAiSearchSummaryJson();
+            AiSearchText.Text = string.IsNullOrWhiteSpace(summary) && string.IsNullOrWhiteSpace(aiError)
+                ? "Profile-aware AI is ready. Search uses legal actions for the active mode."
+                : $"{(string.IsNullOrWhiteSpace(aiError) ? "AI search ready." : $"AI error: {aiError}")}\n{summary}";
+        }
         TurnSummaryText.Text = $"{_engine.GetCurrentTurnSummary()}\n{_engine.GetCheckStatusSummary(state.SideToMove)}";
         InvalidReasonText.Text = string.IsNullOrWhiteSpace(_lastUiInvalidReason)
             ? _engine.GetLastInvalidActionReason()
@@ -1556,6 +1564,66 @@ public partial class Chess3DWindow : Window
         RefreshAll();
     }
 
+    private void BuildAiCandidates_Click(object sender, RoutedEventArgs e)
+    {
+        var count = _engine.BuildAiActionCandidates();
+        var first = _engine.GetAiActionCandidates().FirstOrDefault();
+        AiSearchText.Text = count > 0
+            ? $"AI candidates: {count}\nTop: {FormatAiAction(first)}\n{_engine.GetLastAiSearchSummaryJson()}"
+            : $"AI candidates: 0\n{_engine.GetLastAiSearchError()}";
+        RefreshAll();
+    }
+
+    private void SearchBestAiAction_Click(object sender, RoutedEventArgs e)
+    {
+        if (_engine.SearchBestAiAction(SelectedAiDepth(), SelectedAiNodeLimit(), SelectedAiTimeLimitMs(), out var action))
+        {
+            AiSearchText.Text = $"Best action: {FormatAiAction(action)}\n{_engine.GetLastAiSearchSummaryJson()}";
+        }
+        else
+        {
+            AiSearchText.Text = $"AI search failed: {_engine.GetLastAiSearchError()}\n{_engine.GetLastAiSearchSummaryJson()}";
+        }
+        RefreshAll();
+    }
+
+    private void MakeBestAiAction_Click(object sender, RoutedEventArgs e)
+    {
+        if (_animationInProgress)
+        {
+            _lastUiInvalidReason = "Animation is in progress; wait before asking AI to move.";
+            RefreshStatus();
+            return;
+        }
+
+        if (_engine.MakeBestProfileAction(SelectedAiDepth(), SelectedAiNodeLimit(), SelectedAiTimeLimitMs(), out var action))
+        {
+            AiSearchText.Text = $"AI played: {FormatAiAction(action)}\n{_engine.GetLastAiSearchSummaryJson()}";
+            var segments = BuildAiActionSegments(action).ToArray();
+            if (segments.Length > 0)
+            {
+                BeginActionFlash(segments);
+            }
+            _selectedSquare = null;
+            _lastUiInvalidReason = string.Empty;
+        }
+        else
+        {
+            _lastUiInvalidReason = _engine.GetLastAiSearchError();
+            MessageBox.Show(this, $"AI move failed: {_lastUiInvalidReason}", "Chess3D AI", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        RefreshAll();
+    }
+
+    private void CopyAiSearchSummary_Click(object sender, RoutedEventArgs e)
+    {
+        var summary = _engine.GetLastAiSearchSummaryJson();
+        if (!string.IsNullOrWhiteSpace(summary))
+        {
+            Clipboard.SetText(summary);
+        }
+    }
+
     private async void RubikRotate_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button || !int.TryParse(button.Tag?.ToString(), out var turns))
@@ -2417,6 +2485,47 @@ public partial class Chess3DWindow : Window
             return Math.Clamp(type, Pawn, King);
         }
         return Pawn;
+    }
+
+    private int SelectedAiDepth()
+    {
+        return int.TryParse(AiDepthBox?.Text, out var depth) ? Math.Clamp(depth, 1, 3) : 1;
+    }
+
+    private int SelectedAiNodeLimit()
+    {
+        return int.TryParse(AiNodeLimitBox?.Text, out var nodes) ? Math.Clamp(nodes, 1, 100000) : 512;
+    }
+
+    private int SelectedAiTimeLimitMs()
+    {
+        return int.TryParse(AiTimeLimitBox?.Text, out var ms) ? Math.Clamp(ms, 1, 30000) : 250;
+    }
+
+    private string FormatAiAction(Chess3DAiActionDto action)
+    {
+        return action.Kind switch
+        {
+            1 => $"MOVE S{action.Side} {FormatCoordinate(action.FromX, action.FromY, action.FromZ)} -> {FormatCoordinate(action.ToX, action.ToY, action.ToZ)} score {action.Score}",
+            2 => $"LAYER {AxisName(action.Axis)}[{action.Layer + 1}] {action.QuarterTurns:+0;-0;0} score {action.Score}",
+            3 => $"RESTORE S{action.Side} {LabelForPiece(action.Side * 10 + action.ReservePieceType)} -> {FormatCoordinate(action.RestoreX, action.RestoreY, action.RestoreZ)} score {action.Score}",
+            5 => $"HPD M{action.MacroPlayer} primary S{action.PrimarySide} {FormatCoordinate(action.FromX, action.FromY, action.FromZ)} -> {FormatCoordinate(action.ToX, action.ToY, action.ToZ)} score {action.Score}",
+            _ => $"ACTION kind {action.Kind} score {action.Score}"
+        };
+    }
+
+    private IEnumerable<Chess3DVisualSegment> BuildAiActionSegments(Chess3DAiActionDto action)
+    {
+        if (action.Kind is 1 or 5 &&
+            action.FromX >= 0 && action.FromY >= 0 && action.FromZ >= 0 &&
+            action.ToX >= 0 && action.ToY >= 0 && action.ToZ >= 0)
+        {
+            yield return new Chess3DVisualSegment(
+                new Chess3DVisualPoint(action.FromX, action.FromY, action.FromZ),
+                new Chess3DVisualPoint(action.ToX, action.ToY, action.ToZ),
+                IsPrimary: true,
+                IsBlocked: false);
+        }
     }
 
     private int SelectedProjectionPrimarySide()

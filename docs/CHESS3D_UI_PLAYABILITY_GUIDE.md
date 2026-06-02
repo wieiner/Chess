@@ -77,3 +77,14 @@ The UI now exposes runtime-only visual controls:
 - refresh/copy visual diagnostics.
 
 These controls do not change engine state, RuleProfiles, save/replay data, or action history. They only affect the WPF view.
+
+## P3D AI / Search Controls
+
+The UI now exposes a compact AI / Search panel:
+
+- `Candidates` builds the current profile-aware candidate list without mutating state.
+- `Search Best` searches within depth/node/time limits and shows summary JSON.
+- `Make AI Move` applies the best profile-aware action through the native engine.
+- `Copy Summary` copies the last AI search summary.
+
+The panel respects the active RuleProfile: Classic/Single use king-safe moves, Asgard can include reserve restore, Rubik can include layer turns, and Hodge can include projected composite moves.

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cctype>
 #include <cstdint>
 #include <cstring>
@@ -348,6 +349,9 @@ struct Game
     std::string replayInitialSaveJson;
     std::string lastReplayError;
     std::vector<LegalActionPreviewEntry> selectionPreview;
+    std::vector<Chess3DAiActionDto> aiCandidates;
+    std::string lastAiSearchSummaryJson;
+    std::string lastAiSearchError;
     std::string lastReserveRestoreInfo;
     std::string lastProjectionError;
     std::string lastInvalidActionReason;
@@ -357,6 +361,8 @@ struct Game
     std::string lastProfileLoadError;
     std::string lastInfo = "3D module ready.";
 };
+
+struct DiagnosticAction;
 
 int nextSide(const Rules& rules, int side);
 void recomputeAnchors(Game& game);
@@ -374,6 +380,7 @@ std::vector<Vec3> perpendicularOffsets(Vec3 forward);
 bool isKingSafetyEnforcedProfile(const Rules& rules);
 int findKingSquare(const Position& pos, int side);
 int sideLegalMoveCount(const Game& game, int side);
+std::vector<DiagnosticAction> enumerateDiagnosticActions(const Game& game);
 
 bool inside(int x, int y, int z)
 {
@@ -4319,6 +4326,448 @@ std::string divideActionsJson(Game& game, int depth, std::string& error)
     return out.str();
 }
 
+int actorSignFor(const Game& game, int side, int rootSide, int rootMacro)
+{
+    if (side < 1 || side > 6)
+    {
+        return 0;
+    }
+    if (rootMacro > 0 && isProjectionModeEnabled(game.rules))
+    {
+        const int macro = macroPlayerForSide(game.rules, side);
+        if (macro == 0)
+        {
+            return 0;
+        }
+        return macro == rootMacro ? 1 : -1;
+    }
+    return side == rootSide ? 1 : -1;
+}
+
+int materialValueForType(int type)
+{
+    if (type == King)
+    {
+        return 20000;
+    }
+    if (type >= Pawn && type <= Queen)
+    {
+        return Material[static_cast<std::size_t>(type)];
+    }
+    return 0;
+}
+
+int evaluateProfileStateForActor(const Game& game, int rootSide, int rootMacro)
+{
+    const int outcome = gameOutcome(game);
+    if (outcome == GameOutcomeCheckmateDraft || outcome == GameOutcomeCenterAssemblyComplete)
+    {
+        const int winner = winnerSideFor(game);
+        if (winner != 0)
+        {
+            return actorSignFor(game, winner, rootSide, rootMacro) > 0 ? 1000000 : -1000000;
+        }
+    }
+    if (outcome == GameOutcomeStalemateDraft)
+    {
+        return 0;
+    }
+
+    int score = 0;
+    const bool stackEnabled = isCoreStackEnabled(game.rules);
+    for (int i = 0; i < CellCount; ++i)
+    {
+        if (stackEnabled && isInsideCore(game.rules, i))
+        {
+            const auto& stack = game.coreStacks[static_cast<std::size_t>(i)];
+            for (const CoreStackEntry& entry : stack)
+            {
+                const int sign = actorSignFor(game, entry.side, rootSide, rootMacro);
+                const int center = 21 - (std::abs(xOf(i) - 3) + std::abs(yOf(i) - 3) + std::abs(zOf(i) - 3)) * 2;
+                score += sign * (materialValueForType(entry.pieceType) + center);
+            }
+            continue;
+        }
+
+        const int piece = game.pos.board[static_cast<std::size_t>(i)];
+        if (piece == Empty)
+        {
+            continue;
+        }
+        const int sign = actorSignFor(game, pieceSide(piece), rootSide, rootMacro);
+        const int center = 21 - (std::abs(xOf(i) - 3) + std::abs(yOf(i) - 3) + std::abs(zOf(i) - 3)) * 2;
+        score += sign * (materialValueForType(pieceType(piece)) + center);
+    }
+
+    for (int side = 1; side <= 6; ++side)
+    {
+        const int sign = actorSignFor(game, side, rootSide, rootMacro);
+        if (sign == 0)
+        {
+            continue;
+        }
+        score += sign * game.anchorCounts[side] * 80;
+        score += sign * game.sideFusionCounts[side] * 25;
+        score += sign * game.sideRoyalPairCounts[side] * 60;
+        score += sign * game.sideImplosionProgress[side] * 8;
+        score -= sign * game.sideContestedCounts[side] * 15;
+        for (int type = Pawn; type <= King; ++type)
+        {
+            score += sign * game.reserveCounts[side][type] * (materialValueForType(type) / 4);
+        }
+    }
+
+    Game mobilityCopy = game;
+    const int mobility = static_cast<int>(enumerateDiagnosticActions(mobilityCopy).size());
+    const int actorSide = game.pos.sideToMove;
+    score += actorSignFor(game, actorSide, rootSide, rootMacro) * mobility * 3;
+    return score;
+}
+
+Chess3DAiActionDto diagnosticActionToAiDto(const Game& game, const DiagnosticAction& action)
+{
+    Chess3DAiActionDto dto{};
+    dto.kind = action.actionKind;
+    dto.side = action.side != 0 ? action.side : game.pos.sideToMove;
+    dto.macroPlayer = isProjectionModeEnabled(game.rules) ? macroPlayerForSide(game.rules, dto.side) : 0;
+    dto.fromX = dto.fromY = dto.fromZ = -1;
+    dto.toX = dto.toY = dto.toZ = -1;
+    dto.restoreX = dto.restoreY = dto.restoreZ = -1;
+    dto.axis = action.axis;
+    dto.layer = action.layer;
+    dto.quarterTurns = action.quarterTurns;
+    dto.reservePieceType = action.pieceType;
+    dto.promotionType = Queen;
+    dto.primarySide = action.actionKind == ActionProjectionCompositeMove ? action.side : 0;
+    dto.resultCode = 1;
+    if (action.from >= 0 && action.from < CellCount)
+    {
+        dto.fromX = xOf(action.from);
+        dto.fromY = yOf(action.from);
+        dto.fromZ = zOf(action.from);
+    }
+    if (action.to >= 0 && action.to < CellCount)
+    {
+        dto.toX = xOf(action.to);
+        dto.toY = yOf(action.to);
+        dto.toZ = zOf(action.to);
+        if (action.actionKind == ActionReserveRestore)
+        {
+            dto.restoreX = dto.toX;
+            dto.restoreY = dto.toY;
+            dto.restoreZ = dto.toZ;
+        }
+    }
+    if (action.actionKind == ActionLayerTurn)
+    {
+        dto.flags |= ActionFlagWasLayerTurn;
+    }
+    else if (action.actionKind == ActionReserveRestore)
+    {
+        dto.flags |= ActionFlagWasReserveRestore;
+    }
+    else if (action.actionKind == ActionProjectionCompositeMove)
+    {
+        dto.flags |= ActionFlagWasProjection;
+    }
+    return dto;
+}
+
+bool aiDtoToDiagnosticAction(const Chess3DAiActionDto& dto, DiagnosticAction& action, std::string& error)
+{
+    action = DiagnosticAction{};
+    action.actionKind = dto.kind;
+    action.side = dto.kind == ActionProjectionCompositeMove ? dto.primarySide : dto.side;
+    if (action.side == 0)
+    {
+        action.side = dto.side;
+    }
+    action.axis = dto.axis;
+    action.layer = dto.layer;
+    action.quarterTurns = dto.quarterTurns;
+    action.pieceType = dto.reservePieceType;
+    if (dto.kind == ActionMove || dto.kind == ActionProjectionCompositeMove)
+    {
+        if (!inside(dto.fromX, dto.fromY, dto.fromZ) || !inside(dto.toX, dto.toY, dto.toZ))
+        {
+            error = "AI action rejected: move coordinates are out of bounds.";
+            return false;
+        }
+        action.from = indexOf(dto.fromX, dto.fromY, dto.fromZ);
+        action.to = indexOf(dto.toX, dto.toY, dto.toZ);
+    }
+    else if (dto.kind == ActionReserveRestore)
+    {
+        const int x = dto.restoreX >= 0 ? dto.restoreX : dto.toX;
+        const int y = dto.restoreY >= 0 ? dto.restoreY : dto.toY;
+        const int z = dto.restoreZ >= 0 ? dto.restoreZ : dto.toZ;
+        if (!inside(x, y, z))
+        {
+            error = "AI action rejected: reserve restore target is out of bounds.";
+            return false;
+        }
+        action.to = indexOf(x, y, z);
+    }
+    else if (dto.kind == ActionLayerTurn)
+    {
+        if (!isValidLayerTurnAxis(dto.axis) || !isValidLayerTurnLayer(dto.layer) || !isValidLayerTurnQuarterTurns(dto.quarterTurns))
+        {
+            error = "AI action rejected: layer turn fields are invalid.";
+            return false;
+        }
+    }
+    else
+    {
+        error = "AI action rejected: unsupported action kind.";
+        return false;
+    }
+    action.label = diagnosticActionLabel(action);
+    return true;
+}
+
+bool applyAiActionToGame(Game& game, const Chess3DAiActionDto& dto, std::string& error)
+{
+    DiagnosticAction action{};
+    if (!aiDtoToDiagnosticAction(dto, action, error))
+    {
+        return false;
+    }
+    Game before = game;
+    if (!applyDiagnosticAction(game, action, error))
+    {
+        const std::string failure = error;
+        game = std::move(before);
+        game.lastAiSearchError = failure;
+        game.lastInvalidActionReason = failure;
+        return false;
+    }
+    game.lastAiSearchError.clear();
+    return true;
+}
+
+struct AiSearchContext
+{
+    int nodes = 0;
+    int nodeLimit = 512;
+    int timeLimitMs = 250;
+    bool stopped = false;
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+};
+
+bool aiSearchShouldStop(AiSearchContext& context)
+{
+    if (context.nodeLimit > 0 && context.nodes >= context.nodeLimit)
+    {
+        context.stopped = true;
+        return true;
+    }
+    if (context.timeLimitMs > 0)
+    {
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - context.start).count();
+        if (elapsed >= context.timeLimitMs)
+        {
+            context.stopped = true;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isRootActorToMove(const Game& game, int rootSide, int rootMacro)
+{
+    if (rootMacro > 0 && isProjectionModeEnabled(game.rules))
+    {
+        return macroPlayerForSide(game.rules, game.pos.sideToMove) == rootMacro;
+    }
+    return game.pos.sideToMove == rootSide;
+}
+
+int searchAiScore(Game& game, int depth, int rootSide, int rootMacro, AiSearchContext& context)
+{
+    if (depth <= 0 || game.gameOver || aiSearchShouldStop(context))
+    {
+        return evaluateProfileStateForActor(game, rootSide, rootMacro);
+    }
+
+    const auto actions = enumerateDiagnosticActions(game);
+    if (actions.empty())
+    {
+        return evaluateProfileStateForActor(game, rootSide, rootMacro);
+    }
+
+    const bool maximizing = isRootActorToMove(game, rootSide, rootMacro);
+    int best = maximizing ? -Infinity : Infinity;
+    for (const DiagnosticAction& action : actions)
+    {
+        if (aiSearchShouldStop(context))
+        {
+            break;
+        }
+        Game child = game;
+        std::string error;
+        if (!applyDiagnosticAction(child, action, error))
+        {
+            continue;
+        }
+        ++context.nodes;
+        const int score = searchAiScore(child, depth - 1, rootSide, rootMacro, context);
+        best = maximizing ? std::max(best, score) : std::min(best, score);
+    }
+    if (best == -Infinity || best == Infinity)
+    {
+        return evaluateProfileStateForActor(game, rootSide, rootMacro);
+    }
+    return best;
+}
+
+std::string aiSummaryJson(const Game& game, int depth, int nodeLimit, int timeLimitMs, int nodes, bool stopped, const Chess3DAiActionDto* best)
+{
+    std::ostringstream out;
+    out << "{\n"
+        << "  \"format\": \"chess3d-ai-search-summary\",\n"
+        << "  \"version\": \"0.1\",\n"
+        << "  \"rulesetId\": \"" << jsonEscape(game.rules.rulesetId) << "\",\n"
+        << "  \"depth\": " << depth << ",\n"
+        << "  \"nodeLimit\": " << nodeLimit << ",\n"
+        << "  \"timeLimitMs\": " << timeLimitMs << ",\n"
+        << "  \"nodes\": " << nodes << ",\n"
+        << "  \"stopped\": " << (stopped ? "true" : "false") << ",\n"
+        << "  \"candidateCount\": " << game.aiCandidates.size();
+    if (best != nullptr)
+    {
+        out << ",\n  \"best\": {"
+            << "\"kind\":" << best->kind
+            << ",\"side\":" << best->side
+            << ",\"macroPlayer\":" << best->macroPlayer
+            << ",\"from\":[" << best->fromX << "," << best->fromY << "," << best->fromZ << "]"
+            << ",\"to\":[" << best->toX << "," << best->toY << "," << best->toZ << "]"
+            << ",\"axis\":" << best->axis
+            << ",\"layer\":" << best->layer
+            << ",\"quarterTurns\":" << best->quarterTurns
+            << ",\"score\":" << best->score
+            << "}";
+    }
+    out << "\n}";
+    return out.str();
+}
+
+int buildAiCandidates(Game& game, int sideOrMacroPlayer)
+{
+    Game scoped = game;
+    if (isProjectionModeEnabled(scoped.rules))
+    {
+        if (sideOrMacroPlayer >= 1 && sideOrMacroPlayer <= scoped.rules.projectionMacroPlayerCount)
+        {
+            scoped.pos.sideToMove = scoped.rules.projectionGroups[sideOrMacroPlayer][0];
+        }
+    }
+    else if (sideOrMacroPlayer >= 1 && sideOrMacroPlayer <= scoped.rules.activeSideCount)
+    {
+        scoped.pos.sideToMove = sideOrMacroPlayer;
+    }
+
+    const int rootSide = scoped.pos.sideToMove;
+    const int rootMacro = isProjectionModeEnabled(scoped.rules) ? macroPlayerForSide(scoped.rules, rootSide) : 0;
+    const auto actions = enumerateDiagnosticActions(scoped);
+    game.aiCandidates.clear();
+    game.aiCandidates.reserve(actions.size());
+    for (const DiagnosticAction& action : actions)
+    {
+        Chess3DAiActionDto dto = diagnosticActionToAiDto(scoped, action);
+        Game child = scoped;
+        std::string error;
+        if (applyAiActionToGame(child, dto, error))
+        {
+            dto.score = evaluateProfileStateForActor(child, rootSide, rootMacro);
+        }
+        else
+        {
+            dto.resultCode = 0;
+            dto.score = -Infinity;
+        }
+        game.aiCandidates.push_back(dto);
+    }
+    std::stable_sort(game.aiCandidates.begin(), game.aiCandidates.end(), [](const Chess3DAiActionDto& a, const Chess3DAiActionDto& b)
+    {
+        if (a.score != b.score) return a.score > b.score;
+        if (a.kind != b.kind) return a.kind < b.kind;
+        if (a.side != b.side) return a.side < b.side;
+        if (a.fromZ != b.fromZ) return a.fromZ < b.fromZ;
+        if (a.fromY != b.fromY) return a.fromY < b.fromY;
+        if (a.fromX != b.fromX) return a.fromX < b.fromX;
+        if (a.toZ != b.toZ) return a.toZ < b.toZ;
+        if (a.toY != b.toY) return a.toY < b.toY;
+        return a.toX < b.toX;
+    });
+    std::ostringstream summary;
+    summary << "{\n  \"format\": \"chess3d-ai-candidates\",\n"
+        << "  \"version\": \"0.1\",\n"
+        << "  \"rulesetId\": \"" << jsonEscape(scoped.rules.rulesetId) << "\",\n"
+        << "  \"side\": " << rootSide << ",\n"
+        << "  \"macroPlayer\": " << rootMacro << ",\n"
+        << "  \"candidateCount\": " << game.aiCandidates.size() << "\n}";
+    game.lastAiSearchSummaryJson = summary.str();
+    game.lastAiSearchError = game.aiCandidates.empty() ? "AI candidate generation found no legal actions." : "";
+    return static_cast<int>(game.aiCandidates.size());
+}
+
+bool searchBestAiAction(Game& game, int depth, int nodeLimit, int timeLimitMs, Chess3DAiActionDto& best, std::string& error)
+{
+    const int searchDepth = std::clamp(depth, 1, 3);
+    const int effectiveNodeLimit = nodeLimit <= 0 ? 512 : std::clamp(nodeLimit, 1, 100000);
+    const int effectiveTimeLimit = timeLimitMs <= 0 ? 250 : std::clamp(timeLimitMs, 1, 30000);
+    buildAiCandidates(game, 0);
+    if (game.aiCandidates.empty())
+    {
+        error = game.lastAiSearchError.empty() ? "AI search found no legal actions." : game.lastAiSearchError;
+        game.lastAiSearchSummaryJson = aiSummaryJson(game, searchDepth, effectiveNodeLimit, effectiveTimeLimit, 0, false, nullptr);
+        return false;
+    }
+
+    const int rootSide = game.pos.sideToMove;
+    const int rootMacro = isProjectionModeEnabled(game.rules) ? macroPlayerForSide(game.rules, rootSide) : 0;
+    AiSearchContext context{};
+    context.nodeLimit = effectiveNodeLimit;
+    context.timeLimitMs = effectiveTimeLimit;
+
+    bool found = false;
+    int bestScore = -Infinity;
+    Chess3DAiActionDto bestLocal = game.aiCandidates.front();
+    for (Chess3DAiActionDto candidate : game.aiCandidates)
+    {
+        if (aiSearchShouldStop(context))
+        {
+            break;
+        }
+        Game child = game;
+        std::string applyError;
+        if (!applyAiActionToGame(child, candidate, applyError))
+        {
+            continue;
+        }
+        ++context.nodes;
+        const int score = searchAiScore(child, searchDepth - 1, rootSide, rootMacro, context);
+        candidate.score = score;
+        if (!found || score > bestScore)
+        {
+            found = true;
+            bestScore = score;
+            bestLocal = candidate;
+        }
+    }
+    if (!found)
+    {
+        error = "AI search could not apply any candidate action.";
+        game.lastAiSearchSummaryJson = aiSummaryJson(game, searchDepth, effectiveNodeLimit, effectiveTimeLimit, context.nodes, context.stopped, nullptr);
+        return false;
+    }
+    best = bestLocal;
+    game.lastAiSearchSummaryJson = aiSummaryJson(game, searchDepth, effectiveNodeLimit, effectiveTimeLimit, context.nodes, context.stopped, &best);
+    game.lastAiSearchError.clear();
+    return true;
+}
+
 Game* asGame(void* handle)
 {
     return static_cast<Game*>(handle);
@@ -6236,6 +6685,110 @@ CHESS3D_API int Chess3D_GetLastPerftError(void* handle, char* buffer, int capaci
 {
     auto* game = asGame(handle);
     return game != nullptr ? copyString(game->lastPerftError, buffer, capacity) : copyString("", buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_BuildAiActionCandidates(void* handle, int sideOrMacroPlayer)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    return buildAiCandidates(*game, sideOrMacroPlayer);
+}
+
+CHESS3D_API int Chess3D_GetAiActionCandidateCount(void* handle)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? static_cast<int>(game->aiCandidates.size()) : 0;
+}
+
+CHESS3D_API int Chess3D_GetAiActionCandidate(void* handle, int index, Chess3DAiActionDto* action)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || action == nullptr || index < 0 || index >= static_cast<int>(game->aiCandidates.size()))
+    {
+        return 0;
+    }
+    *action = game->aiCandidates[static_cast<std::size_t>(index)];
+    return 1;
+}
+
+CHESS3D_API int Chess3D_SearchBestAiAction(void* handle, int depth, int nodeLimit, int timeLimitMs, Chess3DAiActionDto* action)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    Chess3DAiActionDto best{};
+    std::string error;
+    if (!searchBestAiAction(*game, depth, nodeLimit, timeLimitMs, best, error))
+    {
+        game->lastAiSearchError = error;
+        return 0;
+    }
+    if (action != nullptr)
+    {
+        *action = best;
+    }
+    return 1;
+}
+
+CHESS3D_API int Chess3D_ApplyAiAction(void* handle, const Chess3DAiActionDto* action)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || action == nullptr)
+    {
+        return 0;
+    }
+    std::string error;
+    if (!applyAiActionToGame(*game, *action, error))
+    {
+        game->lastAiSearchError = error.empty() ? game->lastAiSearchError : error;
+        return 0;
+    }
+    game->lastInfo = "3D AI action applied.";
+    return 1;
+}
+
+CHESS3D_API int Chess3D_MakeBestProfileAction(void* handle, int depth, int nodeLimit, int timeLimitMs, Chess3DAiActionDto* action)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr)
+    {
+        return 0;
+    }
+    Chess3DAiActionDto best{};
+    std::string error;
+    if (!searchBestAiAction(*game, depth, nodeLimit, timeLimitMs, best, error))
+    {
+        game->lastAiSearchError = error;
+        return 0;
+    }
+    if (!applyAiActionToGame(*game, best, error))
+    {
+        game->lastAiSearchError = error;
+        return 0;
+    }
+    if (action != nullptr)
+    {
+        *action = best;
+    }
+    game->lastInfo = "3D AI best profile action applied.";
+    return 1;
+}
+
+CHESS3D_API int Chess3D_GetLastAiSearchSummaryJson(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->lastAiSearchSummaryJson, buffer, capacity) : copyString("", buffer, capacity);
+}
+
+CHESS3D_API int Chess3D_GetLastAiSearchError(void* handle, char* buffer, int capacity)
+{
+    auto* game = asGame(handle);
+    return game != nullptr ? copyString(game->lastAiSearchError, buffer, capacity) : copyString("", buffer, capacity);
 }
 
 CHESS3D_API int Chess3D_GetPositionText(void* handle, char* buffer, int capacity)

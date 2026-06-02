@@ -1,0 +1,27 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "asgard-ai-reserve-restore-smoke-v0.1",
+  "profileFile": "asgard_convergence_3d_v0_1.json",
+  "rulesetId": "asgard-convergence-3d-8x8x8-v0.1",
+  "purpose": "Asgard AI candidate generation includes legal reserve restore candidates.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "clearBoard" },
+    { "type": "setPiece", "side": 2, "pieceType": 1, "x": 4, "y": 5, "z": 7 },
+    { "type": "setPiece", "side": 2, "pieceType": 1, "x": 3, "y": 5, "z": 7 },
+    { "type": "setPiece", "side": 2, "pieceType": 1, "x": 5, "y": 4, "z": 7 },
+    { "type": "setPiece", "side": 2, "pieceType": 1, "x": 2, "y": 4, "z": 7 },
+    { "type": "setPiece", "side": 2, "pieceType": 1, "x": 5, "y": 3, "z": 7 },
+    { "type": "setPiece", "side": 2, "pieceType": 1, "x": 2, "y": 3, "z": 7 },
+    { "type": "setPiece", "side": 2, "pieceType": 1, "x": 4, "y": 2, "z": 7 },
+    { "type": "setPiece", "side": 2, "pieceType": 1, "x": 3, "y": 2, "z": 7 },
+    { "type": "setPiece", "side": 1, "pieceType": 4, "x": 0, "y": 0, "z": 0 },
+    { "type": "setPiece", "side": 2, "pieceType": 1, "x": 0, "y": 0, "z": 3 },
+    { "type": "move", "fromX": 0, "fromY": 0, "fromZ": 0, "toX": 0, "toY": 0, "toZ": 3 },
+    { "type": "clearCell", "x": 4, "y": 5, "z": 7 },
+    { "type": "assertReserveCount", "side": 2, "pieceType": 1, "count": 1 },
+    { "type": "buildAiCandidates", "minCount": 1 },
+    { "type": "assertAiCandidateKind", "kind": 3 }
+  ]
+}

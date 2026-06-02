@@ -65,3 +65,14 @@ This document is the P2O rule contract for the five existing Chess3D profiles. I
 - Preview is non-mutating.
 - Save/load/replay must preserve profile-specific state.
 - Scenario and regression JSON files are executable test artifacts, not RuleProfiles.
+
+## P3D AI/Search Applicability
+
+AI/search consumes each profile's legal action surface; it is not a new mode:
+
+- Classic and Single-Side search over king-safe legal moves.
+- Asgard search can include reserve restore and evaluates core/fusion/anchor progress as non-destructive signals.
+- Rubik search can include ritual layer turns when the profile enables them.
+- Hodge search treats primary plus mirror moves as one projected composite action.
+
+Search does not change victory semantics and does not add a sixth Chess3D RuleProfile.

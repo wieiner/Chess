@@ -72,9 +72,9 @@ P2K adds the playable Chess3D control center in the WPF app. It does not move ru
 
 P2M hardens the WPF side of that boundary. Chess3D target clicks now match exact legal-preview entries before dispatching an action. Normal moves still call `TryMakeMove`; Hodge projected target clicks call the projected-move ABI; Rubik layer turns and reserve restore remain panel-driven actions.
 
-This is still not final Asgard fusion physics. Destructive implosion, color/permutation state, online serialization, AI/search generation for layer turns, UI animation, full replay/import/export, and GPU stack snapshots remain later stages.
+This is still not final Asgard fusion physics. Destructive implosion, color/permutation state, online serialization, and GPU stack snapshots remain later stages. P3D adds shallow profile-aware AI/search integration over existing legal actions, including layer turns and Hodge composites, but not deep/strong search.
 
-The engine still reserves side ids `1..6`. Six-sided chess should be built by mapping this local rule core to each cube face through coordinate transforms, rather than inventing six unrelated movement systems. Hodge Projection Duel now uses those same face-frame transforms for triune mirror moves. Rubik-style ritual turns are runtimePartial board/stack transforms for Rubik convergence; P2I/P2J notation is a replay foundation, while full online sync and search integration remain separate boundaries.
+The engine still reserves side ids `1..6`. Six-sided chess should be built by mapping this local rule core to each cube face through coordinate transforms, rather than inventing six unrelated movement systems. Hodge Projection Duel now uses those same face-frame transforms for triune mirror moves. Rubik-style ritual turns are runtimePartial board/stack transforms for Rubik convergence; P2I/P2J notation is a replay foundation, P3D search consumes those profile-aware actions, and full online sync remains a separate boundary.
 
 ### Online/Integration Boundary
 
@@ -123,3 +123,14 @@ P3C adds an explicit WPF-only visual state layer:
 - Native engine state remains authoritative for board, legal preview, stacks, fusion, reserve, action history, save/load/replay, and outcomes.
 
 This layer improves playability without creating a new mode or moving rules into UI code.
+
+## Chess3D AI/Search Layer
+
+P3D keeps search in the native Chess3D engine and exposes it through append-only ABI:
+
+- candidate generation reuses the profile-aware legal diagnostic action layer;
+- search runs on copied game state and must not mutate state hash or action history;
+- apply/make routes through existing action functions so notation/replay/history remain authoritative;
+- the WPF AI panel is a consumer of native summaries, not a rule engine.
+
+This layer intentionally avoids external engines, CUDA requirements, and new RuleProfiles.

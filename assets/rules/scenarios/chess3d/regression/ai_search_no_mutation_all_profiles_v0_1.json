@@ -1,0 +1,18 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "ai-search-no-mutation-all-profiles-v0.1",
+  "profileFile": "classic_six_side_3d_v0_1.json",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "Representative no-mutation AI/search fixture. Contract tests also loop over all five profiles.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "rememberStateHash", "name": "before" },
+    { "type": "buildAiCandidates", "minCount": 1 },
+    { "type": "searchBestAiNoMutation", "depth": 1, "nodeLimit": 128, "timeLimitMs": 100 },
+    { "type": "assertStateHashEqualsRemembered", "name": "before" }
+  ],
+  "knownLimitations": [
+    "This file is one runnable fixture; the native contract suite loops over every profile."
+  ]
+}
