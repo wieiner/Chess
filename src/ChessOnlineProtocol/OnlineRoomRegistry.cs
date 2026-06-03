@@ -255,6 +255,7 @@ public sealed class OnlineRoomRegistry
                 var rejected = Reject(envelope, OnlineRejectReasons.StaleStateHash, "Client expected hash does not match authoritative state.");
                 rejected.Envelope.MessageType = OnlineMessageTypes.ResyncRequired;
                 rejected.Snapshot = table.Session.CreateSnapshot(table.RoomId, table.TableId, table.ServerSeq);
+                _diagnostics.ResyncCount++;
                 return rejected;
             }
 
@@ -296,6 +297,7 @@ public sealed class OnlineRoomRegistry
             _diagnostics.LastAcceptedAction = actionEvent.Notation;
             _diagnostics.LastStateHash = table.LastStateHash;
             _diagnostics.ActionLogLength = table.ActionLog.Count;
+            _diagnostics.AcceptedActionCount++;
             return Reply(OnlineMessageTypes.ActionAccepted, envelope, action: command, actionLog: new OnlineActionLogChunk
             {
                 RoomId = table.RoomId,
@@ -354,14 +356,26 @@ public sealed class OnlineRoomRegistry
                 RoomCount = _rooms.Count,
                 TableCount = _rooms.Values.Sum(r => r.Tables.Count),
                 ConnectionCount = _rooms.Values.Sum(r => r.Players.Count),
+                ActiveConnectionCount = _diagnostics.ActiveConnectionCount,
                 LastServerSeq = _diagnostics.LastServerSeq,
                 LastAcceptedAction = _diagnostics.LastAcceptedAction,
                 LastRejectReason = _diagnostics.LastRejectReason,
                 LastStateHash = _diagnostics.LastStateHash,
                 LastSnapshotBytes = _diagnostics.LastSnapshotBytes,
                 ActionLogLength = _diagnostics.ActionLogLength,
-                ProtocolErrorCount = _diagnostics.ProtocolErrorCount
+                ProtocolErrorCount = _diagnostics.ProtocolErrorCount,
+                AcceptedActionCount = _diagnostics.AcceptedActionCount,
+                RejectedActionCount = _diagnostics.RejectedActionCount,
+                ResyncCount = _diagnostics.ResyncCount
             };
+        }
+    }
+
+    public void SetActiveConnectionCount(int count)
+    {
+        lock (_gate)
+        {
+            _diagnostics.ActiveConnectionCount = Math.Max(0, count);
         }
     }
 
@@ -413,6 +427,7 @@ public sealed class OnlineRoomRegistry
     {
         _diagnostics.LastRejectReason = reasonCode;
         _diagnostics.ProtocolErrorCount++;
+        _diagnostics.RejectedActionCount++;
         return Reply(OnlineMessageTypes.ActionRejected, request, error: OnlineProtocolJson.Error(reasonCode, reasonText, stateHash, serverSeq));
     }
 

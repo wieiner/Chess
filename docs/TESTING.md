@@ -25,6 +25,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1
 - `tests\RubikEngineContractTests`: calls `RubikEngine.dll` through its public C ABI.
 - `tests\GpuBackendContractTests`: calls `ChessGpuBackend.dll` through its public C ABI.
 - `tests\ChessOnlineContractTests`: exercises the managed P3E online protocol/domain layer against `Chess3DEngine.dll`.
+- `tests\ChessOnlineSignalRContractTests`: starts the P3F hosted server in-process and exercises the SignalR transport against the P3E authority registry.
 
 Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only when all assertions pass. The tests are native console executables and do not require WPF or any UI session.
 
@@ -51,6 +52,7 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - Rubik size, state, rotation, scramble, reverse-history solve, and manual-state ABI calls still work.
 - GPU backend CPU/Auto paths work without CUDA, and Direct3D/CUDA absence is handled as non-fatal where appropriate.
 - P3E online authority tests validate protocol roundtrip/rejection, exact five-profile catalog, room/table/seat flows, server-side action validation, stale-hash resync, snapshots, action-log chunks, action-log replay hash equality, and online fixture parsing.
+- P3F SignalR tests validate local hosted startup/health, hub protocol rejection, room/table/seat fanout, duplicate seat races, accepted action broadcasts, wrong actor rejection, stale hash resync, reconnect snapshots, Rubik/Hodge profile actions, malformed/oversized message handling, diagnostics without secrets, and SignalR fixture parsing.
 
 ## What They Do Not Guarantee
 
@@ -87,6 +89,23 @@ The next recommended testing milestone is P2N: save/load/replay/export/import te
 - online fixture JSON under `assets\rules\scenarios\chess3d\online`.
 
 `scripts/verify.ps1` also checks that representative online protocol/profile/scenario assets are copied to `ChessOnlineApp` development output and `ProductionOutput\ChessOnlineIntegrations`.
+
+## P3F Hosted SignalR Tests
+
+`ChessOnlineSignalRContractTests` covers:
+
+- in-process Kestrel startup and clean shutdown;
+- `/healthz/live`, `/healthz/ready`, and `/chess3d/diagnostics`;
+- SignalR `Hello` and reconnect session-token smoke behavior;
+- room/table/seat authority through the hub;
+- accepted Classic action broadcast to the table group;
+- wrong actor rejection and stale hash resync;
+- Rubik layer turn and Hodge composite action acceptance through existing registry/engine paths;
+- duplicate seat and parallel submit concurrency checks;
+- malformed/oversized message rejection without leaking exception details;
+- SignalR fixture JSON under `assets\rules\scenarios\chess3d\signalr`.
+
+The suite has no UI dependency, no internet dependency, no CUDA dependency, and leaves no hosted server process running after completion.
 
 ## UI Smoke Tests
 

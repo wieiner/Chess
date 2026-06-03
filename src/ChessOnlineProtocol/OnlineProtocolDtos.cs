@@ -24,6 +24,7 @@ public static class OnlineMessageTypes
     public const string SubmitAction = "SubmitAction";
     public const string RequestSnapshot = "RequestSnapshot";
     public const string RequestActionLog = "RequestActionLog";
+    public const string RequestDiagnostics = "RequestDiagnostics";
     public const string Ping = "Ping";
     public const string ChatMessage = "ChatMessage";
     public const string Welcome = "Welcome";
@@ -42,6 +43,7 @@ public static class OnlineMessageTypes
     public const string ResyncRequired = "ResyncRequired";
     public const string Pong = "Pong";
     public const string Error = "Error";
+    public const string Diagnostics = "Diagnostics";
     public const string ChatBroadcast = "ChatBroadcast";
 }
 
@@ -89,6 +91,7 @@ public sealed class OnlineMessageEnvelope
     public string TableId { get; set; } = "";
     public string ClientId { get; set; } = "";
     public string PlayerId { get; set; } = "";
+    public string SessionToken { get; set; } = "";
     public long ClientSeq { get; set; }
     public long ServerSeq { get; set; }
     public string SentAtUtc { get; set; } = "";
@@ -102,6 +105,7 @@ public sealed class OnlineProtocolMessage
     public OnlineTableCommand? Table { get; set; }
     public OnlineSnapshot? Snapshot { get; set; }
     public OnlineActionLogChunk? ActionLog { get; set; }
+    public OnlineDiagnostics? Diagnostics { get; set; }
     public OnlineError? Error { get; set; }
     public string Text { get; set; } = "";
 }
@@ -201,6 +205,7 @@ public sealed class OnlineDiagnostics
     public int RoomCount { get; set; }
     public int TableCount { get; set; }
     public int ConnectionCount { get; set; }
+    public int ActiveConnectionCount { get; set; }
     public long LastServerSeq { get; set; }
     public string LastAcceptedAction { get; set; } = "";
     public string LastRejectReason { get; set; } = "";
@@ -208,6 +213,9 @@ public sealed class OnlineDiagnostics
     public int LastSnapshotBytes { get; set; }
     public int ActionLogLength { get; set; }
     public int ProtocolErrorCount { get; set; }
+    public int AcceptedActionCount { get; set; }
+    public int RejectedActionCount { get; set; }
+    public int ResyncCount { get; set; }
 }
 
 [JsonSerializable(typeof(OnlineProtocolMessage))]

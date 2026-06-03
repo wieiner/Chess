@@ -1,0 +1,1 @@
+{"format":"chess3d-signalr-regression","version":"0.1","scenarioId":"signalr-hello-connect-v0.1","purpose":"Connect to hosted hub and receive Welcome/session token.","expected":"ReceiveWelcome"}

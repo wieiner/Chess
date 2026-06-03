@@ -318,6 +318,29 @@
                         <Button Content="Diagnostics" Click="P3EDiagnostics_Click" />
                     </StackPanel>
                     <TextBlock x:Name="P3EStatusText" Foreground="#AFC0D0" Margin="0,10,0,0" TextWrapping="Wrap" />
+                    <Separator Margin="0,18,0,14" Background="#2B3746" />
+                    <TextBlock Text="P3F hosted SignalR transport" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="Hosted/local SignalR prototype over the same P3E authority registry. Start ChessOnlineServer separately, then connect here. No production auth, no matchmaking, no cloud deployment." Foreground="#AFC0D0" TextWrapping="Wrap" Margin="0,4,0,10" />
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Hub URL" Width="64" />
+                        <TextBox x:Name="P3FServerUrlBox" Text="http://127.0.0.1:5077/chess3d/relay" Width="330" />
+                        <Button Content="Connect" Click="P3FConnect_Click" />
+                        <Button Content="Disconnect" Click="P3FDisconnect_Click" />
+                        <Button Content="Hello" Click="P3FHello_Click" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button Content="Hub Create Room" Click="P3FCreateRoom_Click" />
+                        <Button Content="Hub Create Table" Click="P3FCreateTable_Click" />
+                        <Button Content="Hub Join Seat" Click="P3FJoinSeat_Click" />
+                        <Button Content="Hub Ready + Start" Click="P3FReadyStart_Click" />
+                        <Button Content="Hub Submit Move" Click="P3FSubmitMove_Click" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button Content="Hub Snapshot" Click="P3FSnapshot_Click" />
+                        <Button Content="Hub Action Log" Click="P3FActionLog_Click" />
+                        <Button Content="Hub Diagnostics" Click="P3FDiagnostics_Click" />
+                        <TextBlock x:Name="P3FStatusText" Foreground="#AFC0D0" Margin="8,0,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
                 </StackPanel>
             </TabItem>
         </TabControl>

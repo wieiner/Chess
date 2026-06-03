@@ -1,0 +1,1 @@
+{"format":"chess3d-signalr-regression","version":"0.1","scenarioId":"signalr-asgard-restore-smoke-v0.1","rulesetId":"asgard-convergence-3d-8x8x8-v0.1","purpose":"Asgard reserve/restore remains routed through authority when command is legal.","status":"descriptor"}

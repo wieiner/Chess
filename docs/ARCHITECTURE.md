@@ -147,4 +147,16 @@ P3E adds `src/ChessOnlineProtocol` as a managed protocol/domain layer above the 
 - Snapshots embed existing Chess3D savegame JSON and deterministic state hash.
 - Action-log chunks expose accepted server-sequenced events for reconnect/replay tests.
 
-The client is never the source of truth. `ChessOnlineApp` only exercises the authority contract locally; it does not implement hosted multiplayer, auth, matchmaking, durable storage, anti-cheat, or a binary network protocol. The five real Chess3D RuleProfiles remain the only modes.
+The client is never the source of truth. The five real Chess3D RuleProfiles remain the only modes.
+
+## Chess3D Hosted SignalR Transport Layer
+
+P3F adds `src/ChessOnlineServer` as a local hosted ASP.NET Core/SignalR transport over the P3E registry:
+
+- `/chess3d/relay` exposes hub methods for the existing protocol operations.
+- SignalR groups fan out room/table events after registry-authorized membership.
+- `/healthz/live`, `/healthz/ready`, and `/chess3d/diagnostics` expose local server state.
+- `ChessOnlineApp` can connect to the hosted server from its `3D Relay` tab.
+- `ChessOnlineSignalRContractTests` starts the server in-process and shuts it down without orphan processes.
+
+SignalR is not rule authority, identity authority, or durable storage. Production auth, public matchmaking, persistence, Redis/Azure SignalR backplane, complete anti-cheat, and binary protocol remain later work.

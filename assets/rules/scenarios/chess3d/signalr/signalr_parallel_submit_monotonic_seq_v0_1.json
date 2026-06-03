@@ -1,0 +1,1 @@
+{"format":"chess3d-signalr-regression","version":"0.1","scenarioId":"signalr-parallel-submit-monotonic-seq-v0.1","purpose":"Parallel SubmitAction keeps unique monotonic serverSeq values.","expected":"monotonic serverSeq"}

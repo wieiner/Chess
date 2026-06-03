@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using ChessApp;
 using ChessOnlineProtocol;
+using Microsoft.AspNetCore.SignalR.Client;
 
 namespace ChessOnlineApp;
 
@@ -15,6 +16,8 @@ public partial class MainWindow : Window
     private readonly OnlineRoomRegistry _p3eRegistry;
     private IcsTextChessClient? _icsClient;
     private Chess3DInternetRelayClient? _relayClient;
+    private HubConnection? _p3fConnection;
+    private string _p3fSessionToken = "";
 
     public MainWindow()
     {
@@ -33,6 +36,10 @@ public partial class MainWindow : Window
     {
         _icsClient?.Dispose();
         _relayClient?.Dispose();
+        if (_p3fConnection != null)
+        {
+            _p3fConnection.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
         base.OnClosed(e);
     }
 
@@ -363,6 +370,132 @@ public partial class MainWindow : Window
         Log(json);
     }
 
+    private async void P3FConnect_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_p3fConnection != null)
+            {
+                await _p3fConnection.DisposeAsync();
+            }
+
+            _p3fConnection = new HubConnectionBuilder()
+                .WithUrl(P3FServerUrlBox.Text.Trim())
+                .Build();
+            RegisterP3FEvents(_p3fConnection);
+            await _p3fConnection.StartAsync();
+            P3FStatusText.Text = "SignalR connected.";
+            Log("P3F SignalR connected.");
+        }
+        catch (Exception ex)
+        {
+            P3FStatusText.Text = $"SignalR connect failed: {ex.Message}";
+            Log(P3FStatusText.Text);
+        }
+    }
+
+    private async void P3FDisconnect_Click(object sender, RoutedEventArgs e)
+    {
+        if (_p3fConnection == null)
+        {
+            return;
+        }
+        await _p3fConnection.DisposeAsync();
+        _p3fConnection = null;
+        P3FStatusText.Text = "SignalR disconnected.";
+        Log("P3F SignalR disconnected.");
+    }
+
+    private async void P3FHello_Click(object sender, RoutedEventArgs e)
+    {
+        var result = await P3FInvokeAsync("Hello", P3FMessage(OnlineMessageTypes.Hello));
+        if (!string.IsNullOrWhiteSpace(result.Envelope.SessionToken))
+        {
+            _p3fSessionToken = result.Envelope.SessionToken;
+        }
+    }
+
+    private async void P3FCreateRoom_Click(object sender, RoutedEventArgs e)
+    {
+        var message = P3FMessage(OnlineMessageTypes.CreateRoom);
+        message.Room = new OnlineRoomCommand
+        {
+            RoomId = P3ERoomBox.Text.Trim(),
+            DisplayName = P3ERoomBox.Text.Trim(),
+            MaxTables = 8
+        };
+        await P3FInvokeAsync("CreateRoom", message);
+    }
+
+    private async void P3FCreateTable_Click(object sender, RoutedEventArgs e)
+    {
+        await EnsureP3FHelloAsync();
+        await P3FInvokeAsync("JoinRoom", P3FMessage(OnlineMessageTypes.JoinRoom));
+        var message = P3FMessage(OnlineMessageTypes.CreateTable);
+        message.Table = new OnlineTableCommand
+        {
+            TableId = P3ETableBox.Text.Trim(),
+            RulesetId = SelectedP3ERuleset()
+        };
+        await P3FInvokeAsync("CreateTable", message);
+    }
+
+    private async void P3FJoinSeat_Click(object sender, RoutedEventArgs e)
+    {
+        await EnsureP3FHelloAsync();
+        await P3FInvokeAsync("JoinRoom", P3FMessage(OnlineMessageTypes.JoinRoom));
+        var message = P3FMessage(OnlineMessageTypes.JoinTableSeat);
+        message.Table = new OnlineTableCommand { SeatIndex = ReadInt(P3ESeatBox, 1, 1, 6) };
+        await P3FInvokeAsync("JoinTableSeat", message);
+    }
+
+    private async void P3FReadyStart_Click(object sender, RoutedEventArgs e)
+    {
+        var ready = P3FMessage(OnlineMessageTypes.Ready);
+        ready.Table = new OnlineTableCommand { Ready = true };
+        await P3FInvokeAsync("Ready", ready);
+        await P3FInvokeAsync("StartGame", P3FMessage(OnlineMessageTypes.StartGame));
+    }
+
+    private async void P3FSubmitMove_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryParseCell(P3EFromBox.Text, out var from) || !TryParseCell(P3EToBox.Text, out var to))
+        {
+            Log("P3F move text must be x,y,z.");
+            return;
+        }
+
+        var message = P3FMessage(OnlineMessageTypes.SubmitAction);
+        var seat = ReadInt(P3ESeatBox, 1, 1, 6);
+        message.Action = new OnlineActionCommand
+        {
+            ActionKind = OnlineActionKinds.NormalMove,
+            ActorSide = seat,
+            FromX = from.X,
+            FromY = from.Y,
+            FromZ = from.Z,
+            ToX = to.X,
+            ToY = to.Y,
+            ToZ = to.Z
+        };
+        await P3FInvokeAsync("SubmitAction", message);
+    }
+
+    private async void P3FSnapshot_Click(object sender, RoutedEventArgs e)
+    {
+        await P3FInvokeAsync("RequestSnapshot", P3FMessage(OnlineMessageTypes.RequestSnapshot));
+    }
+
+    private async void P3FActionLog_Click(object sender, RoutedEventArgs e)
+    {
+        await P3FInvokeAsync("RequestActionLog", P3FMessage(OnlineMessageTypes.RequestActionLog));
+    }
+
+    private async void P3FDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        await P3FInvokeAsync("Diagnostics", P3FMessage(OnlineMessageTypes.RequestDiagnostics));
+    }
+
     private async Task SaveRelayProfileAsync(Uri uri, string source)
     {
         var seat = ReadInt(RelaySeatBox, 1, 0, 6);
@@ -388,6 +521,123 @@ public partial class MainWindow : Window
             // Existing room is fine for the local harness.
         }
         _p3eRegistry.JoinRoom(P3EEnvelope(OnlineMessageTypes.JoinRoom));
+    }
+
+    private async Task EnsureP3FHelloAsync()
+    {
+        if (_p3fConnection == null || _p3fConnection.State != HubConnectionState.Connected)
+        {
+            await Dispatcher.InvokeAsync(() => P3FStatusText.Text = "Connect to SignalR first.");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_p3fSessionToken))
+        {
+            var result = await P3FInvokeAsync("Hello", P3FMessage(OnlineMessageTypes.Hello));
+            _p3fSessionToken = result.Envelope.SessionToken;
+        }
+    }
+
+    private void RegisterP3FEvents(HubConnection connection)
+    {
+        var events = new[]
+        {
+            "ReceiveWelcome",
+            "ReceiveRoomCreated",
+            "ReceiveRoomJoined",
+            "ReceiveRoomLeft",
+            "ReceiveRoomList",
+            "ReceiveTableCreated",
+            "ReceiveTableState",
+            "ReceiveSeatAssigned",
+            "ReceiveGameStarted",
+            "ReceiveActionAccepted",
+            "ReceiveActionRejected",
+            "ReceiveAuthoritativeSnapshot",
+            "ReceiveActionLogChunk",
+            "ReceiveResyncRequired",
+            "ReceivePong",
+            "ReceiveError",
+            "ReceiveDiagnostics"
+        };
+        foreach (var eventName in events)
+        {
+            connection.On<OnlineProtocolMessage>(eventName, message => Dispatcher.Invoke(() => LogP3FResult(eventName, message)));
+        }
+        connection.Closed += error =>
+        {
+            Dispatcher.Invoke(() =>
+            {
+                P3FStatusText.Text = error == null ? "SignalR closed." : $"SignalR closed: {error.Message}";
+                Log(P3FStatusText.Text);
+            });
+            return Task.CompletedTask;
+        };
+    }
+
+    private async Task<OnlineProtocolMessage> P3FInvokeAsync(string methodName, OnlineProtocolMessage message)
+    {
+        if (_p3fConnection == null || _p3fConnection.State != HubConnectionState.Connected)
+        {
+            var error = $"SignalR is not connected. Start ChessOnlineServer and click Connect.";
+            P3FStatusText.Text = error;
+            Log(error);
+            return new OnlineProtocolMessage { Error = OnlineProtocolJson.Error(OnlineRejectReasons.IllegalAction, error) };
+        }
+
+        try
+        {
+            var result = await _p3fConnection.InvokeAsync<OnlineProtocolMessage>(methodName, message);
+            LogP3FResult(methodName, result);
+            if (!string.IsNullOrWhiteSpace(result.Envelope.SessionToken))
+            {
+                _p3fSessionToken = result.Envelope.SessionToken;
+            }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            P3FStatusText.Text = $"{methodName} failed: {ex.Message}";
+            Log(P3FStatusText.Text);
+            return new OnlineProtocolMessage { Error = OnlineProtocolJson.Error(OnlineRejectReasons.InternalError, ex.Message) };
+        }
+    }
+
+    private OnlineProtocolMessage P3FMessage(string messageType)
+    {
+        var message = new OnlineProtocolMessage
+        {
+            Envelope = P3EEnvelope(messageType)
+        };
+        message.Envelope.SessionToken = _p3fSessionToken;
+        return message;
+    }
+
+    private void LogP3FResult(string label, OnlineProtocolMessage message)
+    {
+        var summary = message.Error is { ReasonCode.Length: > 0 } error
+            ? $"P3F {label}: {message.Envelope.MessageType} {error.ReasonCode} {error.ReasonText}"
+            : $"P3F {label}: {message.Envelope.MessageType} seq={message.Envelope.ServerSeq}";
+        P3FStatusText.Text = summary;
+        Log(summary);
+        if (!string.IsNullOrWhiteSpace(message.Envelope.SessionToken))
+        {
+            Log("P3F session token received for local reconnect; token is not printed.");
+        }
+        if (message.Snapshot != null)
+        {
+            Log($"P3F snapshot hash {message.Snapshot.StateHash}, actions {message.Snapshot.ActionCount}");
+        }
+        if (message.ActionLog?.Events.Count > 0)
+        {
+            foreach (var actionEvent in message.ActionLog.Events)
+            {
+                Log($"P3F event #{actionEvent.ServerSeq}: {actionEvent.Notation} hash={actionEvent.StateHashAfter}");
+            }
+        }
+        if (message.Diagnostics != null)
+        {
+            Log(JsonSerializer.Serialize(message.Diagnostics, OnlineProtocolJson.Options));
+        }
     }
 
     private OnlineMessageEnvelope P3EEnvelope(string messageType)

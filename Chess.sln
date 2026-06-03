@@ -39,7 +39,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChessOnlineApp", "src\Chess
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChessOnlineProtocol", "src\ChessOnlineProtocol\ChessOnlineProtocol.csproj", "{D55C97E8-7F46-4C06-9D6E-1FE2D4B9E351}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChessOnlineServer", "src\ChessOnlineServer\ChessOnlineServer.csproj", "{F637F7F8-AB88-4BB1-A9AF-59B54753D887}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChessOnlineContractTests", "tests\ChessOnlineContractTests\ChessOnlineContractTests.csproj", "{214456E6-AE1F-4DC2-8B8B-7CC3919C36B3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChessOnlineSignalRContractTests", "tests\ChessOnlineSignalRContractTests\ChessOnlineSignalRContractTests.csproj", "{C4E7C946-0A2C-4B20-9F6D-A477FB23EA88}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -89,10 +93,18 @@ Global
 		{D55C97E8-7F46-4C06-9D6E-1FE2D4B9E351}.Debug|x64.Build.0 = Debug|x64
 		{D55C97E8-7F46-4C06-9D6E-1FE2D4B9E351}.Release|x64.ActiveCfg = Release|x64
 		{D55C97E8-7F46-4C06-9D6E-1FE2D4B9E351}.Release|x64.Build.0 = Release|x64
+		{F637F7F8-AB88-4BB1-A9AF-59B54753D887}.Debug|x64.ActiveCfg = Debug|x64
+		{F637F7F8-AB88-4BB1-A9AF-59B54753D887}.Debug|x64.Build.0 = Debug|x64
+		{F637F7F8-AB88-4BB1-A9AF-59B54753D887}.Release|x64.ActiveCfg = Release|x64
+		{F637F7F8-AB88-4BB1-A9AF-59B54753D887}.Release|x64.Build.0 = Release|x64
 		{214456E6-AE1F-4DC2-8B8B-7CC3919C36B3}.Debug|x64.ActiveCfg = Debug|x64
 		{214456E6-AE1F-4DC2-8B8B-7CC3919C36B3}.Debug|x64.Build.0 = Debug|x64
 		{214456E6-AE1F-4DC2-8B8B-7CC3919C36B3}.Release|x64.ActiveCfg = Release|x64
 		{214456E6-AE1F-4DC2-8B8B-7CC3919C36B3}.Release|x64.Build.0 = Release|x64
+		{C4E7C946-0A2C-4B20-9F6D-A477FB23EA88}.Debug|x64.ActiveCfg = Debug|x64
+		{C4E7C946-0A2C-4B20-9F6D-A477FB23EA88}.Debug|x64.Build.0 = Debug|x64
+		{C4E7C946-0A2C-4B20-9F6D-A477FB23EA88}.Release|x64.ActiveCfg = Release|x64
+		{C4E7C946-0A2C-4B20-9F6D-A477FB23EA88}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

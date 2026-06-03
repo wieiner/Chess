@@ -1,0 +1,1 @@
+{"format":"chess3d-signalr-regression","version":"0.1","scenarioId":"signalr-hodge-composite-v0.1","rulesetId":"hodge-projection-duel-3d-8x8x8-v0.1","purpose":"Submit Hodge projected composite over hosted hub.","expected":"HPD action accepted"}

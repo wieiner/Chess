@@ -16,6 +16,7 @@ Each message uses:
 - `roomId`
 - `tableId`
 - `playerId`
+- `sessionToken`
 - `sentUtc`
 - `payload`
 
@@ -34,8 +35,10 @@ Supported message families include:
 - diagnosticsRequest / diagnostics
 - resyncRequired / error
 
+P3F adds the optional `sessionToken` envelope field for local hosted reconnect smoke tests. It is a development session token, not production authentication.
+
 Unknown future properties in known DTOs are ignored by `System.Text.Json`, but unknown `messageType` values are rejected.
 
 ## Versioning
 
-P3E only accepts `protocolVersion = 0.1`. Future versions should be additive or negotiated before dispatch.
+P3E/P3F only accept `protocolVersion = 0.1`. Future versions should be additive or negotiated before dispatch.

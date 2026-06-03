@@ -1,0 +1,1 @@
+{"format":"chess3d-signalr-regression","version":"0.1","scenarioId":"signalr-table-start-classic-v0.1","rulesetId":"classic-six-side-3d-8x8x8-v0.1","purpose":"Create Classic table, join seat, ready, start, and receive snapshot.","expected":"GameStarted"}

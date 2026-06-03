@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("All", "Chess2D", "Chess3D", "Rubik", "Online", "Benchmark2D", "ChessOnline", "Chess2DBenchmark")]
+    [ValidateSet("All", "Chess2D", "Chess3D", "Rubik", "Online", "ChessOnlineServer", "Benchmark2D", "ChessOnline", "Chess2DBenchmark")]
     [string]$Product = "All",
 
     [switch]$CleanOnly,
@@ -37,7 +37,20 @@ function Remove-SafeDirectory([string]$RelativePath) {
     $target = Resolve-UnderRoot (Join-Path $Root $RelativePath)
     if (Test-Path -LiteralPath $target) {
         Write-Host "Removing $RelativePath"
-        Remove-Item -LiteralPath $target -Recurse -Force
+        $lastError = $null
+        for ($attempt = 1; $attempt -le 5; $attempt++) {
+            try {
+                Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction Stop
+                return
+            }
+            catch {
+                $lastError = $_
+                [System.GC]::Collect()
+                [System.GC]::WaitForPendingFinalizers()
+                Start-Sleep -Milliseconds (200 * $attempt)
+            }
+        }
+        throw $lastError
     }
 }
 
@@ -57,6 +70,8 @@ function Clean-Outputs {
         "src\ChessOnlineApp\obj",
         "src\ChessOnlineProtocol\bin",
         "src\ChessOnlineProtocol\obj",
+        "src\ChessOnlineServer\bin",
+        "src\ChessOnlineServer\obj",
         "src\RubikApp\bin",
         "src\RubikApp\obj",
         "src\Chess2DBenchmark\obj",
@@ -133,7 +148,7 @@ function Build-Solution {
     Write-Step "Building solution Release x64"
     $msbuild = Resolve-MSBuild
     $solution = Join-Path $Root "Chess.sln"
-    & $msbuild $solution "/restore" "/m" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal"
+    & $msbuild $solution "/restore" "/m" "/nr:false" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal"
     if ($LASTEXITCODE -ne 0) {
         throw "MSBuild failed with exit code $LASTEXITCODE."
     }
@@ -269,7 +284,7 @@ function Write-Launcher([string]$Directory, [string]$FileName, [string]$ExeName,
 
 function Product-List {
     if ($Product -eq "All") {
-        return @("Chess2D", "Chess3D", "Rubik", "Online", "Benchmark2D")
+        return @("Chess2D", "Chess3D", "Rubik", "Online", "ChessOnlineServer", "Benchmark2D")
     }
     if ($Product -eq "ChessOnline") {
         return @("Online")
@@ -308,6 +323,11 @@ function Publish-Products {
                 Copy-FilteredDirectory (Join-Path $Root "src\ChessOnlineApp\bin\x64\Release\net8.0-windows") $dst
                 Write-Launcher $dst "run_online.bat" "ChessOnlineApp.exe"
             }
+            "ChessOnlineServer" {
+                $dst = Join-Path $ProductionRoot "ChessOnlineServer"
+                Copy-FilteredDirectory (Join-Path $Root "src\ChessOnlineServer\bin\x64\Release\net8.0-windows") $dst
+                Write-Launcher $dst "run_chess_online_server.bat" "ChessOnlineServer.exe" -Console
+            }
             "Benchmark2D" {
                 $dst = Join-Path $ProductionRoot "Chess2DBenchmark"
                 Copy-SelectedFiles (Join-Path $Root "bin\x64\Release") $dst @(
@@ -338,6 +358,7 @@ Products:
 - Chess2D\ChessApp.exe
 - Chess3D\Chess3DApp.exe
 - ChessOnlineIntegrations\ChessOnlineApp.exe
+- ChessOnlineServer\ChessOnlineServer.exe
 - Rubik\RubikApp.exe
 - Chess2DBenchmark\Chess2DBenchmark.exe
 

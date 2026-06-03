@@ -1,0 +1,1 @@
+{"format":"chess3d-signalr-regression","version":"0.1","scenarioId":"signalr-classic-action-accept-broadcast-v0.1","rulesetId":"classic-six-side-3d-8x8x8-v0.1","purpose":"Submit authoritative Classic action and receive table broadcast.","expected":"ReceiveActionAccepted"}

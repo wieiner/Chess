@@ -1,8 +1,8 @@
 # Project Status
 
-Last audited locally for P3D.1 profile-aware Chess3D AI/search hardening.
+Last audited locally for P3F hosted SignalR transport prototype.
 
-P3E adds a local/in-process Chess3D online authority contract: protocol DTOs, room/table/seat registry, authoritative action validation, snapshot/resync, action-log chunks, OnlineApp UI hooks, online fixtures, and packaging checks. It does not add a sixth Chess3D RuleProfile.
+P3F adds a local hosted SignalR transport over the P3E Chess3D online authority contract: ASP.NET Core server, `/chess3d/relay` hub, health/diagnostic endpoints, reconnect session-token smoke behavior, SignalR fixtures, UI controls, tests, and packaging checks. It does not add a sixth Chess3D RuleProfile and does not make online play production-ready.
 
 ## Exists
 
@@ -101,9 +101,12 @@ P3E adds a local/in-process Chess3D online authority contract: protocol DTOs, ro
 - `docs/CHESS3D_AI_UI.md`: compact Chess3D AI/Search panel.
 - `docs/CHESS3D_AI_REGRESSION_FIXTURES.md`: runnable AI/search regression fixtures.
 - `src/ChessOnlineProtocol`: managed P3E protocol/domain layer for local authoritative Chess3D online smoke tests.
+- `src/ChessOnlineServer`: local hosted ASP.NET Core/SignalR transport prototype over the P3E registry.
 - `tests/ChessOnlineContractTests`: headless tests for protocol JSON, room/table authority, snapshots, action-log replay, and online fixture parsing.
+- `tests/ChessOnlineSignalRContractTests`: headless in-process Kestrel/SignalR transport tests.
 - `assets/rules/online`: P3E protocol schema descriptors.
 - `assets/rules/scenarios/chess3d/online`: P3E online regression fixture descriptors.
+- `assets/rules/scenarios/chess3d/signalr`: P3F SignalR regression fixture descriptors.
 - `docs/CHESS3D_P3E_ONLINE_AUTHORITY_AUDIT.md`: audit of the online authority boundary.
 - `docs/CHESS3D_ONLINE_PROTOCOL_PRINCIPLES.md`: protocol id/version and server-authority principles.
 - `docs/CHESS3D_ONLINE_MESSAGE_SCHEMA.md`: message envelope and DTO schema notes.
@@ -117,14 +120,26 @@ P3E adds a local/in-process Chess3D online authority contract: protocol DTOs, ro
 - `docs/CHESS3D_ONLINE_REGRESSION_FIXTURES.md`: online fixture catalog.
 - `docs/CHESS3D_ONLINE_PACKAGING.md`: dev/portable output checks.
 - `docs/CHESS3D_ONLINE_DIAGNOSTICS.md`: authority diagnostics counters.
+- `docs/CHESS3D_P3F_HOSTED_TRANSPORT_AUDIT.md`: hosted transport boundary audit.
+- `docs/CHESS3D_P3F_HOSTED_TRANSPORT_CONTRACT.md`: local hosted transport contract.
+- `docs/CHESS3D_SIGNALR_HUB_CONTRACT.md`: hub methods/events/group semantics.
+- `docs/CHESS3D_SIGNALR_CONNECTION_IDENTITY.md`: local reconnect identity model.
+- `docs/CHESS3D_ONLINE_CONCURRENCY_MODEL.md`: registry and connection concurrency model.
+- `docs/CHESS3D_SIGNALR_CLIENT_UI.md`: hosted transport UI notes.
+- `docs/CHESS3D_HOSTED_SERVER_LIFECYCLE.md`: server run/health/package lifecycle.
+- `docs/CHESS3D_SIGNALR_SECURITY_BASELINE.md`: hosted prototype security scope.
+- `docs/CHESS3D_SIGNALR_HEALTH_AND_DIAGNOSTICS.md`: health endpoints and counters.
+- `docs/CHESS3D_SIGNALR_REGRESSION_FIXTURES.md`: SignalR fixture catalog.
+- `docs/CHESS3D_SIGNALR_CONFIGURATION.md`: hosted server options.
+- `docs/CHESS3D_SIGNALR_LOGGING.md`: local logging boundaries.
 
 ## Build-Verified
 
 - `Release|x64` solution build works without requiring CUDA Toolkit MSBuild integration.
 - The default solution configuration intentionally skips `ChessCudaBackend`; CUDA remains an optional backend built separately.
-- Packaging creates `ProductionOutput` folders for all user-facing products.
+- Packaging creates `ProductionOutput` folders for all user-facing products and the local `ChessOnlineServer`.
 - `scripts/verify.ps1` runs release packaging plus contract tests.
-- Contract tests cover `ChessEngine.dll`, `Chess3DEngine.dll`, `RubikEngine.dll`, and `ChessGpuBackend.dll`.
+- Contract tests cover `ChessEngine.dll`, `Chess3DEngine.dll`, `RubikEngine.dll`, `ChessGpuBackend.dll`, the P3E online registry, and the P3F SignalR hosted transport.
 - GitHub Actions `Windows Build` is green. The default branch is `main`; the workflow also listens to `master` for compatibility with older references.
 - CI verifies a clean checkout, Release x64 build, production packaging, contract tests, `Chess2DBenchmark --quick`, and the baseline without CUDA.
 - Online contract tests now cover `ChessOnlineProtocol` and the local authoritative registry.

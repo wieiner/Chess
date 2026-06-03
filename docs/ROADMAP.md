@@ -176,13 +176,24 @@
 - Completed: server-side validation through the existing Chess3D engine action paths.
 - Completed: snapshot/resync, action-log chunks, state-hash checks, diagnostics, and online regression fixtures.
 - Completed: minimal ChessOnlineApp local authority panel and production packaging checks.
-- Deferred: hosted SignalR transport, production auth, public matchmaking, durable persistence, anti-cheat completeness, binary protocol, and online-native ABI.
+- Deferred: production auth, public matchmaking, durable persistence, anti-cheat completeness, binary protocol, and online-native ABI.
+
+### P3F - Hosted SignalR Transport Prototype
+
+- Completed: local ASP.NET Core `ChessOnlineServer`.
+- Completed: SignalR hub at `/chess3d/relay` using the P3E protocol DTOs.
+- Completed: hub methods/events for hello, rooms, tables, seats, ready/start, submit action, snapshot, action log, ping, and diagnostics.
+- Completed: local reconnect session-token smoke behavior.
+- Completed: health endpoints and diagnostics without session-token exposure.
+- Completed: in-process SignalR contract tests for startup, protocol rejection, authority flow, reconnect, concurrency, malformed/oversized messages, and fixtures.
+- Completed: ChessOnlineApp hosted transport panel and production packaging checks.
+- Deferred: production identity, durable sessions, public matchmaking, DB persistence, Redis/Azure SignalR, complete anti-cheat, online replay UX, and spectator UX.
 
 ### Next
 
-- P3F: hosted transport prototype with the same authority registry, likely SignalR.
 - P4A: production identity/session persistence if online play becomes a real product surface.
 - P4B: online replay export/import and spectator/reconnect UX.
+- P4C: production hosting/backplane/matchmaking decision.
 - Completed: Rubik layer-turn pre-animation and input lock.
 - Completed: Hodge primary/mirror arrow hints.
 - Completed: move/replay action flash and visual diagnostics.
@@ -206,11 +217,12 @@
 - Harden six-side full gameplay and hybrid checkmate/centerAssembly victory.
 - Synchronize profiles, stacks, anchors, fusion, and layer turns in online play.
 
-## P4 - Online Relay Server for `chess3d.relay.v1`
+## P4 - Production Online Hardening for `chess3d.relay.v1`
 
-- Build the hosted room/relay service for 3D chess.
-- Support six clients per table and bridge groups between six-player tables.
-- Formalize sync, move, rotate, chat, reconnect, and authority messages.
+- Replace P3F local session tokens with production identity/session persistence.
+- Add durable rooms/tables or explicit stateless lifecycle rules.
+- Decide whether to use Redis/Azure SignalR/backplane.
+- Add public matchmaking and spectator/reconnect UX only after auth and persistence are defined.
 
 ## P5 - Asset Pipeline
 

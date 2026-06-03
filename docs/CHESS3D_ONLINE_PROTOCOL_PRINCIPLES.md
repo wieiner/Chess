@@ -23,4 +23,8 @@ P3E is a JSON relay contract. It is meant to be readable, deterministic, and eas
 
 ## Transport
 
-The current implementation is in-process. A SignalR hub can fan out the same DTOs later, but SignalR groups must not become rule authority. The authoritative registry remains the validator.
+P3E introduced the in-process authority contract. P3F adds a hosted local SignalR prototype over the same DTOs and registry.
+
+SignalR is only transport/fanout. SignalR groups are not authorization, not durable room state, and not the source of truth. `OnlineRoomRegistry` remains the validator for seats, ready/start, actions, snapshots, resync, and action logs.
+
+P3F is still not public production multiplayer. Production auth, matchmaking, persistence, complete anti-cheat, Redis/Azure SignalR backplane, and binary/UDP protocols remain future work.

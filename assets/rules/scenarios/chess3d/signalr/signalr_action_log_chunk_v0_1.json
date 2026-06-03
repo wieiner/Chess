@@ -1,0 +1,1 @@
+{"format":"chess3d-signalr-regression","version":"0.1","scenarioId":"signalr-action-log-chunk-v0.1","purpose":"Request ordered online action log chunk after accepted action.","expected":"ActionLogChunk"}

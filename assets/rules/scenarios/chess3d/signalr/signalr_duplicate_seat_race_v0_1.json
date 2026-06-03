@@ -1,0 +1,1 @@
+{"format":"chess3d-signalr-regression","version":"0.1","scenarioId":"signalr-duplicate-seat-race-v0.1","purpose":"Parallel duplicate seat joins produce exactly one winner.","expected":"one SeatAssigned"}

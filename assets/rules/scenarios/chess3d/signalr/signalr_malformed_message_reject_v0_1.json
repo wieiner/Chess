@@ -1,0 +1,1 @@
+{"format":"chess3d-signalr-regression","version":"0.1","scenarioId":"signalr-malformed-message-reject-v0.1","purpose":"Wrong protocol or oversized hosted message returns stable public error.","expectedRejectReason":"wrongProtocol or oversizedMessage"}

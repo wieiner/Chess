@@ -73,7 +73,7 @@ function Build-TestProject([string]$ProjectPath) {
         throw "Contract test project is missing: $ProjectPath"
     }
     $msbuild = Resolve-MSBuild
-    Invoke-Checked { & $msbuild $ProjectPath "/m" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal" } "Contract test build failed: $ProjectPath"
+    Invoke-Checked { & $msbuild $ProjectPath "/m" "/nr:false" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal" } "Contract test build failed: $ProjectPath"
 }
 
 function Invoke-TestExecutable([string]$Name, [string]$ExePath, [string[]]$Arguments) {
@@ -100,7 +100,7 @@ try {
     if (-not $SkipSolutionBuild) {
         Write-Step "Build solution Release x64"
         $msbuild = Resolve-MSBuild
-        Invoke-Checked { & $msbuild ".\Chess.sln" "/restore" "/m" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal" } "Solution build failed."
+        Invoke-Checked { & $msbuild ".\Chess.sln" "/restore" "/m" "/nr:false" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal" } "Solution build failed."
     }
 
     $tests = @(
@@ -108,7 +108,8 @@ try {
         @{ Name = "Chess3DEngineContractTests"; Project = "tests\Chess3DEngineContractTests\Chess3DEngineContractTests.vcxproj"; Exe = "tests\bin\x64\Release\Chess3DEngineContractTests\Chess3DEngineContractTests.exe" },
         @{ Name = "RubikEngineContractTests"; Project = "tests\RubikEngineContractTests\RubikEngineContractTests.vcxproj"; Exe = "tests\bin\x64\Release\RubikEngineContractTests\RubikEngineContractTests.exe" },
         @{ Name = "GpuBackendContractTests"; Project = "tests\GpuBackendContractTests\GpuBackendContractTests.vcxproj"; Exe = "tests\bin\x64\Release\GpuBackendContractTests\GpuBackendContractTests.exe" },
-        @{ Name = "ChessOnlineContractTests"; Project = "tests\ChessOnlineContractTests\ChessOnlineContractTests.csproj"; Exe = "tests\ChessOnlineContractTests\bin\x64\Release\net8.0-windows\ChessOnlineContractTests.exe" }
+        @{ Name = "ChessOnlineContractTests"; Project = "tests\ChessOnlineContractTests\ChessOnlineContractTests.csproj"; Exe = "tests\ChessOnlineContractTests\bin\x64\Release\net8.0-windows\ChessOnlineContractTests.exe" },
+        @{ Name = "ChessOnlineSignalRContractTests"; Project = "tests\ChessOnlineSignalRContractTests\ChessOnlineSignalRContractTests.csproj"; Exe = "tests\ChessOnlineSignalRContractTests\bin\x64\Release\net8.0-windows\ChessOnlineSignalRContractTests.exe" }
     )
 
     Write-Step "Build contract tests"

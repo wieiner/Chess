@@ -1,0 +1,1 @@
+{"format":"chess3d-signalr-regression","version":"0.1","scenarioId":"signalr-room-create-join-v0.1","purpose":"Create room and join authorized room group.","expected":"RoomCreated and RoomJoined"}

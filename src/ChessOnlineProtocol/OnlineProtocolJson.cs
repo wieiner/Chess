@@ -26,6 +26,7 @@ public static class OnlineProtocolJson
         OnlineMessageTypes.SubmitAction,
         OnlineMessageTypes.RequestSnapshot,
         OnlineMessageTypes.RequestActionLog,
+        OnlineMessageTypes.RequestDiagnostics,
         OnlineMessageTypes.Ping,
         OnlineMessageTypes.ChatMessage,
         OnlineMessageTypes.Welcome,
@@ -44,6 +45,7 @@ public static class OnlineProtocolJson
         OnlineMessageTypes.ResyncRequired,
         OnlineMessageTypes.Pong,
         OnlineMessageTypes.Error,
+        OnlineMessageTypes.Diagnostics,
         OnlineMessageTypes.ChatBroadcast
     };
 

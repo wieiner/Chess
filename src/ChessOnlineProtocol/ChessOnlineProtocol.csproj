@@ -11,13 +11,5 @@
 
   <ItemGroup>
     <Compile Include="..\ChessApp\NativeChess3DEngine.cs" Link="NativeChess3DEngine.cs" />
-    <ProjectReference Include="..\Chess3DEngine\Chess3DEngine.vcxproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
-
-  <Target Name="CopyNative3DEngine" AfterTargets="Build">
-    <PropertyGroup>
-      <ThreeDEnginePath>$(MSBuildThisFileDirectory)..\..\bin\$(Platform)\$(Configuration)\Chess3DEngine.dll</ThreeDEnginePath>
-    </PropertyGroup>
-    <Copy SourceFiles="$(ThreeDEnginePath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('$(ThreeDEnginePath)')" />
-  </Target>
 </Project>

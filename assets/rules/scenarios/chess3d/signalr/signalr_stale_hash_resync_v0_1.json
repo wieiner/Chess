@@ -1,0 +1,1 @@
+{"format":"chess3d-signalr-regression","version":"0.1","scenarioId":"signalr-stale-hash-resync-v0.1","purpose":"Reject stale expected hash and send authoritative snapshot.","expected":"ReceiveResyncRequired"}
