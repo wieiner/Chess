@@ -13,5 +13,18 @@
 
   <ItemGroup>
     <Compile Include="..\ChessApp\Chess3DNetworkEndpoint.cs" Link="Integrations\Chess3DNetworkEndpoint.cs" />
+    <ProjectReference Include="..\ChessOnlineProtocol\ChessOnlineProtocol.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\assets\rules\profiles\**\*.*" Link="Assets\Rules3D\Profiles\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\assets\rules\online\**\*.*" Link="Assets\Rules3D\Online\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\assets\rules\scenarios\chess3d\online\**\*.*" Link="Assets\Rules3D\OnlineScenarios\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 </Project>

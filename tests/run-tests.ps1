@@ -107,7 +107,8 @@ try {
         @{ Name = "ChessEngineContractTests"; Project = "tests\ChessEngineContractTests\ChessEngineContractTests.vcxproj"; Exe = "tests\bin\x64\Release\ChessEngineContractTests\ChessEngineContractTests.exe" },
         @{ Name = "Chess3DEngineContractTests"; Project = "tests\Chess3DEngineContractTests\Chess3DEngineContractTests.vcxproj"; Exe = "tests\bin\x64\Release\Chess3DEngineContractTests\Chess3DEngineContractTests.exe" },
         @{ Name = "RubikEngineContractTests"; Project = "tests\RubikEngineContractTests\RubikEngineContractTests.vcxproj"; Exe = "tests\bin\x64\Release\RubikEngineContractTests\RubikEngineContractTests.exe" },
-        @{ Name = "GpuBackendContractTests"; Project = "tests\GpuBackendContractTests\GpuBackendContractTests.vcxproj"; Exe = "tests\bin\x64\Release\GpuBackendContractTests\GpuBackendContractTests.exe" }
+        @{ Name = "GpuBackendContractTests"; Project = "tests\GpuBackendContractTests\GpuBackendContractTests.vcxproj"; Exe = "tests\bin\x64\Release\GpuBackendContractTests\GpuBackendContractTests.exe" },
+        @{ Name = "ChessOnlineContractTests"; Project = "tests\ChessOnlineContractTests\ChessOnlineContractTests.csproj"; Exe = "tests\ChessOnlineContractTests\bin\x64\Release\net8.0-windows\ChessOnlineContractTests.exe" }
     )
 
     Write-Step "Build contract tests"

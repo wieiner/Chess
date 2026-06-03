@@ -19,3 +19,7 @@ The panel shows the best action in readable form and the native summary JSON. P3
 ## Scope
 
 The UI does not add a new mode, search timeline, or AI-vs-AI scheduler. It exposes the new native search ABI for manual play and regression reproduction.
+
+## P3E Online Boundary
+
+P3E can build an AI candidate command in the local authority harness for smoke tests, but remote/server AI play is not enabled as a product feature. Production multiplayer AI scheduling, AI seats, and hosted search policies remain future work.

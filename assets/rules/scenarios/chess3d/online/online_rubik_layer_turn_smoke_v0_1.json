@@ -1,0 +1,14 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-rubik-layer-turn-smoke-v0.1",
+  "rulesetId": "rubik-convergence-3d-8x8x8-v0.1",
+  "action": {
+    "actionKind": "RubikLayerTurn",
+    "actorSide": 1,
+    "axis": 0,
+    "layer": 0,
+    "quarterTurns": 1
+  },
+  "expected": ["ActionAccepted", "reserve unaffected", "serverSeq increments"]
+}

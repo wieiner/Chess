@@ -1,0 +1,8 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-asgard-restore-smoke-v0.1",
+  "rulesetId": "asgard-convergence-3d-8x8x8-v0.1",
+  "purpose": "Asgard table starts under server authority; reserve restore commands are validated by engine legality.",
+  "expected": ["GameStarted", "ReserveRestore validated server-side"]
+}

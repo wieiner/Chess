@@ -1,0 +1,7 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-reconnect-resync-v0.1",
+  "purpose": "Reconnect is modeled as rejoining room/table membership then requesting snapshot/action log.",
+  "expected": ["RoomJoined", "AuthoritativeSnapshot", "ActionLogChunk"]
+}

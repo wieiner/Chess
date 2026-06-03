@@ -175,3 +175,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
 ```
 
 Manual release QA should additionally follow `docs\CHESS3D_VISUAL_RC_MANUAL_QA.md`, because CI does not validate WPF frame readability, camera comfort, or color contrast.
+
+## P3E Online Authority Packaging
+
+P3E adds `src\ChessOnlineProtocol` and `tests\ChessOnlineContractTests`. `ChessOnlineProtocol` is a managed class library copied with `ChessOnlineApp`; it does not require cloud services or CUDA.
+
+`ChessOnlineApp` now copies:
+
+- `Assets\Rules3D\Profiles`
+- `Assets\Rules3D\Online`
+- `Assets\Rules3D\OnlineScenarios`
+
+`ProductionOutput\ChessOnlineIntegrations` carries the same online protocol/schema/scenario assets. `scripts\verify.ps1` checks representative files so CI catches missing protocol assets before artifact upload.

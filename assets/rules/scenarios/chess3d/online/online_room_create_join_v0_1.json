@@ -1,0 +1,7 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-room-create-join-v0.1",
+  "purpose": "Create a local authority room and join it as a test player.",
+  "expected": ["RoomCreated", "RoomJoined"]
+}

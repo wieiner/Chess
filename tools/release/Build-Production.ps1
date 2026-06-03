@@ -55,6 +55,8 @@ function Clean-Outputs {
         "src\Chess3DApp\obj",
         "src\ChessOnlineApp\bin",
         "src\ChessOnlineApp\obj",
+        "src\ChessOnlineProtocol\bin",
+        "src\ChessOnlineProtocol\obj",
         "src\RubikApp\bin",
         "src\RubikApp\obj",
         "src\Chess2DBenchmark\obj",

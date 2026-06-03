@@ -135,3 +135,16 @@ P3D keeps search in the native Chess3D engine and exposes it through append-only
 - the WPF AI panel is a consumer of native summaries, not a rule engine.
 
 This layer intentionally avoids external engines, CUDA requirements, online authority, and new RuleProfiles. Transposition-table storage remains future work; P3D.1 reports `ttHits` as telemetry-compatible zero rather than pretending a TT exists.
+
+## Chess3D Online Authority Layer
+
+P3E adds `src/ChessOnlineProtocol` as a managed protocol/domain layer above the existing native engine. It is intentionally app-level and append-only:
+
+- `OnlineProtocolJson` owns the JSON envelope for `chess3d.relay.v1` / `0.1`.
+- `OnlineRoomRegistry` owns local room/table/seat state.
+- `OnlineGameSession` owns one authoritative `Chess3DEngine` instance per started table.
+- Accepted commands call existing engine actions: normal move, reserve restore, Rubik layer turn, or Hodge projected move.
+- Snapshots embed existing Chess3D savegame JSON and deterministic state hash.
+- Action-log chunks expose accepted server-sequenced events for reconnect/replay tests.
+
+The client is never the source of truth. `ChessOnlineApp` only exercises the authority contract locally; it does not implement hosted multiplayer, auth, matchmaking, durable storage, anti-cheat, or a binary network protocol. The five real Chess3D RuleProfiles remain the only modes.

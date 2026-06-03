@@ -1,0 +1,7 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-malformed-message-reject-v0.1",
+  "purpose": "Malformed JSON is rejected with stable invalidJson reason.",
+  "expected": ["invalidJson", "no exception leak"]
+}

@@ -1,0 +1,7 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-unknown-future-field-tolerated-v0.1",
+  "purpose": "Unknown future JSON fields are tolerated for forward compatibility.",
+  "expected": ["message accepted", "futureField ignored"]
+}

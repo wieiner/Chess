@@ -37,6 +37,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RubikApp", "src\RubikApp\Ru
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChessOnlineApp", "src\ChessOnlineApp\ChessOnlineApp.csproj", "{6DB0D2D8-1C48-453F-8A2B-65BB542F7C31}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChessOnlineProtocol", "src\ChessOnlineProtocol\ChessOnlineProtocol.csproj", "{D55C97E8-7F46-4C06-9D6E-1FE2D4B9E351}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChessOnlineContractTests", "tests\ChessOnlineContractTests\ChessOnlineContractTests.csproj", "{214456E6-AE1F-4DC2-8B8B-7CC3919C36B3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -81,6 +85,14 @@ Global
 		{6DB0D2D8-1C48-453F-8A2B-65BB542F7C31}.Debug|x64.Build.0 = Debug|x64
 		{6DB0D2D8-1C48-453F-8A2B-65BB542F7C31}.Release|x64.ActiveCfg = Release|x64
 		{6DB0D2D8-1C48-453F-8A2B-65BB542F7C31}.Release|x64.Build.0 = Release|x64
+		{D55C97E8-7F46-4C06-9D6E-1FE2D4B9E351}.Debug|x64.ActiveCfg = Debug|x64
+		{D55C97E8-7F46-4C06-9D6E-1FE2D4B9E351}.Debug|x64.Build.0 = Debug|x64
+		{D55C97E8-7F46-4C06-9D6E-1FE2D4B9E351}.Release|x64.ActiveCfg = Release|x64
+		{D55C97E8-7F46-4C06-9D6E-1FE2D4B9E351}.Release|x64.Build.0 = Release|x64
+		{214456E6-AE1F-4DC2-8B8B-7CC3919C36B3}.Debug|x64.ActiveCfg = Debug|x64
+		{214456E6-AE1F-4DC2-8B8B-7CC3919C36B3}.Debug|x64.Build.0 = Debug|x64
+		{214456E6-AE1F-4DC2-8B8B-7CC3919C36B3}.Release|x64.ActiveCfg = Release|x64
+		{214456E6-AE1F-4DC2-8B8B-7CC3919C36B3}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

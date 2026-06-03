@@ -1,0 +1,8 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-classic-wrong-actor-reject-v0.1",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "A client that does not own the active seat cannot submit an authoritative action.",
+  "expected": ["ActionRejected", "wrongActor or playerNotSeated", "state unchanged"]
+}

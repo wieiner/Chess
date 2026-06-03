@@ -280,6 +280,44 @@
                         <Button Content="Connect" Click="RelayConnect_Click" />
                         <Button Content="Save profile" Click="SaveRelayProfile_Click" />
                     </StackPanel>
+                    <Separator Margin="0,18,0,14" Background="#2B3746" />
+                    <TextBlock Text="P3E local authority contract" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="Local/in-process server-authoritative room/table harness. It validates commands through Chess3DEngine and emits authoritative snapshots/events; it is not hosted production auth or matchmaking." Foreground="#AFC0D0" TextWrapping="Wrap" Margin="0,4,0,10" />
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Room" Width="48" />
+                        <TextBox x:Name="P3ERoomBox" Text="local-room" Width="130" />
+                        <TextBlock Text="Table" Margin="12,0,0,0" />
+                        <TextBox x:Name="P3ETableBox" Text="table-1" Width="110" />
+                        <TextBlock Text="Player" Margin="12,0,0,0" />
+                        <TextBox x:Name="P3EPlayerBox" Text="player-1" Width="120" />
+                        <TextBlock Text="Seat" Margin="12,0,0,0" />
+                        <TextBox x:Name="P3ESeatBox" Text="1" Width="48" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <TextBlock Text="Profile" Width="48" />
+                        <ComboBox x:Name="P3EProfileBox" Width="300" SelectedIndex="0">
+                            <ComboBoxItem Content="classic-six-side-3d-8x8x8-v0.1" />
+                            <ComboBoxItem Content="single-side-3d-8x8x8-v0.1" />
+                            <ComboBoxItem Content="asgard-convergence-3d-8x8x8-v0.1" />
+                            <ComboBoxItem Content="rubik-convergence-3d-8x8x8-v0.1" />
+                            <ComboBoxItem Content="hodge-projection-duel-3d-8x8x8-v0.1" />
+                        </ComboBox>
+                        <Button Content="Create Room" Click="P3ECreateRoom_Click" />
+                        <Button Content="Create Table" Click="P3ECreateTable_Click" />
+                        <Button Content="Join Seat" Click="P3EJoinSeat_Click" />
+                        <Button Content="Ready + Start" Click="P3EReadyStart_Click" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <TextBlock Text="Move" Width="48" />
+                        <TextBox x:Name="P3EFromBox" Text="3,3,0" Width="90" />
+                        <TextBlock Text="->" Margin="6,0" />
+                        <TextBox x:Name="P3EToBox" Text="3,3,1" Width="90" />
+                        <Button Content="Submit Move" Click="P3ESubmitMove_Click" />
+                        <Button Content="Snapshot" Click="P3ESnapshot_Click" />
+                        <Button Content="Action Log" Click="P3EActionLog_Click" />
+                        <Button Content="Diagnostics" Click="P3EDiagnostics_Click" />
+                    </StackPanel>
+                    <TextBlock x:Name="P3EStatusText" Foreground="#AFC0D0" Margin="0,10,0,0" TextWrapping="Wrap" />
                 </StackPanel>
             </TabItem>
         </TabControl>

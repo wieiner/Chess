@@ -1,0 +1,7 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-action-log-replay-hash-v0.1",
+  "purpose": "Server action log events replay to the same final state hash.",
+  "expected": ["ActionLogChunk", "stateHashAfter equals replay hash"]
+}

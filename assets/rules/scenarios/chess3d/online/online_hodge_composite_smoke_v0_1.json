@@ -1,0 +1,14 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-hodge-composite-smoke-v0.1",
+  "rulesetId": "hodge-projection-duel-3d-8x8x8-v0.1",
+  "action": {
+    "actionKind": "HodgeProjectedMove",
+    "macroPlayer": 1,
+    "primarySide": 1,
+    "from": [3, 3, 0],
+    "to": [3, 3, 1]
+  },
+  "expected": ["ActionAccepted", "HPD notation", "all-or-nothing"]
+}

@@ -1,0 +1,82 @@
+{
+  "schemaId": "chess3d-relay-v0.1",
+  "protocolId": "chess3d.relay.v1",
+  "protocolVersion": "0.1",
+  "format": "schema-like-json",
+  "envelopeRequired": [
+    "protocolId",
+    "protocolVersion",
+    "messageType",
+    "messageId",
+    "clientId"
+  ],
+  "messageTypes": {
+    "client": [
+      "Hello",
+      "CreateRoom",
+      "JoinRoom",
+      "LeaveRoom",
+      "ListRooms",
+      "CreateTable",
+      "JoinTableSeat",
+      "LeaveTableSeat",
+      "Ready",
+      "StartGame",
+      "SubmitAction",
+      "RequestSnapshot",
+      "RequestActionLog",
+      "Ping",
+      "ChatMessage"
+    ],
+    "server": [
+      "Welcome",
+      "RoomCreated",
+      "RoomJoined",
+      "RoomLeft",
+      "RoomList",
+      "TableCreated",
+      "TableState",
+      "SeatAssigned",
+      "GameStarted",
+      "ActionAccepted",
+      "ActionRejected",
+      "AuthoritativeSnapshot",
+      "ActionLogChunk",
+      "ResyncRequired",
+      "Pong",
+      "Error",
+      "ChatBroadcast"
+    ]
+  },
+  "actionKinds": [
+    "NormalMove",
+    "ReserveRestore",
+    "RubikLayerTurn",
+    "HodgeProjectedMove",
+    "AiActionRequest",
+    "Resign",
+    "OfferDraw"
+  ],
+  "rejectReasons": [
+    "invalidJson",
+    "oversizedMessage",
+    "wrongProtocol",
+    "unsupportedVersion",
+    "unknownMessageType",
+    "missingRequiredField",
+    "roomNotFound",
+    "tableNotFound",
+    "seatOccupied",
+    "playerNotSeated",
+    "wrongActor",
+    "tableNotInGame",
+    "unsupportedRuleset",
+    "unsupportedAction",
+    "illegalAction",
+    "staleStateHash",
+    "internalError"
+  ],
+  "maxMessageBytes": 65536,
+  "unknownFutureFields": "tolerated",
+  "sourceOfTruth": "server"
+}

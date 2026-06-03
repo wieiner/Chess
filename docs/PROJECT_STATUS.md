@@ -2,6 +2,8 @@
 
 Last audited locally for P3D.1 profile-aware Chess3D AI/search hardening.
 
+P3E adds a local/in-process Chess3D online authority contract: protocol DTOs, room/table/seat registry, authoritative action validation, snapshot/resync, action-log chunks, OnlineApp UI hooks, online fixtures, and packaging checks. It does not add a sixth Chess3D RuleProfile.
+
 ## Exists
 
 - `Chess.sln` with separate native engine, GPU backend, optional CUDA backend, WPF apps, online hub, Rubik app, and benchmark projects.
@@ -98,6 +100,23 @@ Last audited locally for P3D.1 profile-aware Chess3D AI/search hardening.
 - `docs/CHESS3D_PROFILE_AWARE_SEARCH.md`: Classic/Single, Asgard, Rubik, and Hodge search boundaries.
 - `docs/CHESS3D_AI_UI.md`: compact Chess3D AI/Search panel.
 - `docs/CHESS3D_AI_REGRESSION_FIXTURES.md`: runnable AI/search regression fixtures.
+- `src/ChessOnlineProtocol`: managed P3E protocol/domain layer for local authoritative Chess3D online smoke tests.
+- `tests/ChessOnlineContractTests`: headless tests for protocol JSON, room/table authority, snapshots, action-log replay, and online fixture parsing.
+- `assets/rules/online`: P3E protocol schema descriptors.
+- `assets/rules/scenarios/chess3d/online`: P3E online regression fixture descriptors.
+- `docs/CHESS3D_P3E_ONLINE_AUTHORITY_AUDIT.md`: audit of the online authority boundary.
+- `docs/CHESS3D_ONLINE_PROTOCOL_PRINCIPLES.md`: protocol id/version and server-authority principles.
+- `docs/CHESS3D_ONLINE_MESSAGE_SCHEMA.md`: message envelope and DTO schema notes.
+- `docs/CHESS3D_ONLINE_ACTION_COMMANDS.md`: authoritative command validation contract.
+- `docs/CHESS3D_ONLINE_SERIALIZATION.md`: JSON serialization and savegame snapshot usage.
+- `docs/CHESS3D_ONLINE_ROOM_TABLE_STATE.md`: room/table/seat state model.
+- `docs/CHESS3D_ONLINE_SNAPSHOT_RESYNC.md`: snapshot/resync behavior.
+- `docs/CHESS3D_ONLINE_ACTION_LOG.md`: server sequence and action-log chunks.
+- `docs/CHESS3D_ONLINE_SECURITY_BASELINE.md`: explicit security limits.
+- `docs/CHESS3D_ONLINE_UI.md`: local OnlineApp authority panel.
+- `docs/CHESS3D_ONLINE_REGRESSION_FIXTURES.md`: online fixture catalog.
+- `docs/CHESS3D_ONLINE_PACKAGING.md`: dev/portable output checks.
+- `docs/CHESS3D_ONLINE_DIAGNOSTICS.md`: authority diagnostics counters.
 
 ## Build-Verified
 
@@ -108,6 +127,7 @@ Last audited locally for P3D.1 profile-aware Chess3D AI/search hardening.
 - Contract tests cover `ChessEngine.dll`, `Chess3DEngine.dll`, `RubikEngine.dll`, and `ChessGpuBackend.dll`.
 - GitHub Actions `Windows Build` is green. The default branch is `main`; the workflow also listens to `master` for compatibility with older references.
 - CI verifies a clean checkout, Release x64 build, production packaging, contract tests, `Chess2DBenchmark --quick`, and the baseline without CUDA.
+- Online contract tests now cover `ChessOnlineProtocol` and the local authoritative registry.
 - Chess3D contract tests now include P2A single-side setup, movement, capture, promotion, and JSON metadata smoke checks.
 - Chess3D contract tests now validate the P2B profile JSON files and schema-level profile fields.
 - Chess3D contract tests now validate P2C occupancy/fusion/corePhysics profile fields as data contracts.

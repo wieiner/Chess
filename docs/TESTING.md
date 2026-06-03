@@ -24,6 +24,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1
 - `tests\Chess3DEngineContractTests`: calls `Chess3DEngine.dll` through its public C ABI.
 - `tests\RubikEngineContractTests`: calls `RubikEngine.dll` through its public C ABI.
 - `tests\GpuBackendContractTests`: calls `ChessGpuBackend.dll` through its public C ABI.
+- `tests\ChessOnlineContractTests`: exercises the managed P3E online protocol/domain layer against `Chess3DEngine.dll`.
 
 Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only when all assertions pass. The tests are native console executables and do not require WPF or any UI session.
 
@@ -49,6 +50,7 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - `scripts/verify.ps1` also checks that `Assets/Models/piece_sets.json` and representative OBJ/MTL assets are copied into Chess2D and Chess3D development output and portable `ProductionOutput`.
 - Rubik size, state, rotation, scramble, reverse-history solve, and manual-state ABI calls still work.
 - GPU backend CPU/Auto paths work without CUDA, and Direct3D/CUDA absence is handled as non-fatal where appropriate.
+- P3E online authority tests validate protocol roundtrip/rejection, exact five-profile catalog, room/table/seat flows, server-side action validation, stale-hash resync, snapshots, action-log chunks, action-log replay hash equality, and online fixture parsing.
 
 ## What They Do Not Guarantee
 
@@ -68,6 +70,23 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 CUDA is optional. Contract tests must pass without `ChessCudaBackend.dll`. If CUDA is built and placed next to `ChessGpuBackend.dll`, the GPU backend may use it, but absence of CUDA is not a test failure.
 
 The next recommended testing milestone is P2N: save/load/replay/export/import tests over P2I/P2J/P2K/P2L action history, playthrough descriptors, and P2M visual asset metadata.
+
+## P3E Online Authority Tests
+
+`ChessOnlineContractTests` covers:
+
+- protocol envelope roundtrip and future-field tolerance;
+- wrong protocol, unknown message type, malformed/oversized message rejection;
+- room creation, room join, table creation, seat claiming, duplicate-seat rejection, ready/start;
+- wrong actor rejection and stale hash `ResyncRequired`;
+- accepted Classic normal move;
+- Rubik layer-turn acceptance only in the Rubik profile;
+- Hodge projected composite acceptance through engine candidates;
+- snapshot savegame hash roundtrip;
+- authoritative online action-log replay to the same final hash;
+- online fixture JSON under `assets\rules\scenarios\chess3d\online`.
+
+`scripts/verify.ps1` also checks that representative online protocol/profile/scenario assets are copied to `ChessOnlineApp` development output and `ProductionOutput\ChessOnlineIntegrations`.
 
 ## UI Smoke Tests
 

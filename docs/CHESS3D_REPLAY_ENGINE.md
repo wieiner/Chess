@@ -27,3 +27,9 @@ Errors are reported as readable `lastReplayError` strings. The engine restores p
 ## P3A King Safety
 
 Replay uses the same `TryMakeMove` path as live play. Classic/Single-Side replay actions are rejected if they leave the own king in check, move the king into attack, or try to continue after a game-over outcome. Checkmate/stalemate positions replay to the same state hash as the original game when the action sequence is valid.
+
+## P3E Online Replay
+
+The online authority exposes accepted `OnlineActionEvent` records in server-sequence order. P3E tests replay those events by applying the same command fields to a clean authoritative engine session and comparing the final state hash with the snapshot hash.
+
+This is not a new replay file format. It is a multiplayer wrapper around the existing Chess3D replay/save/hash contract.

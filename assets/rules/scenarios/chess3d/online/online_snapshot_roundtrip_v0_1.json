@@ -1,0 +1,7 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-snapshot-roundtrip-v0.1",
+  "purpose": "AuthoritativeSnapshot uses existing savegame JSON and reloads to the same state hash.",
+  "expected": ["AuthoritativeSnapshot", "stateHash stable after LoadSaveGameJson"]
+}

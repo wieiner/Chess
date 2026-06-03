@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>ChessOnlineContractTests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ChessOnlineProtocol\ChessOnlineProtocol.csproj" />
+    <ProjectReference Include="..\..\src\Chess3DEngine\Chess3DEngine.vcxproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <Target Name="CopyNative3DEngine" AfterTargets="Build">
+    <PropertyGroup>
+      <ThreeDEnginePath>$(MSBuildThisFileDirectory)..\..\bin\$(Platform)\$(Configuration)\Chess3DEngine.dll</ThreeDEnginePath>
+    </PropertyGroup>
+    <Copy SourceFiles="$(ThreeDEnginePath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('$(ThreeDEnginePath)')" />
+  </Target>
+</Project>

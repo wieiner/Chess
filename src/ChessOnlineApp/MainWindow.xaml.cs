@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using ChessApp;
+using ChessOnlineProtocol;
 
 namespace ChessOnlineApp;
 
@@ -10,18 +12,21 @@ public partial class MainWindow : Window
 {
     private readonly IIntegrationAccountStore _accountStore = new JsonIntegrationAccountStore();
     private readonly ObservableCollection<IntegrationAccountProfile> _accountProfiles = new();
+    private readonly OnlineRoomRegistry _p3eRegistry;
     private IcsTextChessClient? _icsClient;
     private Chess3DInternetRelayClient? _relayClient;
 
     public MainWindow()
     {
         InitializeComponent();
+        _p3eRegistry = new OnlineRoomRegistry(ResolveP3EProfileRoot());
         PortalGrid.ItemsSource = ChessPortalRegistry.All;
         AccountListBox.ItemsSource = _accountProfiles;
         AccountStorePathText.Text = $"Store: {_accountStore.StorePath}";
         PortalGrid.SelectedIndex = 0;
         _ = ReloadAccountsAsync();
         Log("Online hub started. Main chess boards are intentionally separate.");
+        P3EStatusText.Text = "P3E local authority harness idle.";
     }
 
     protected override void OnClosed(EventArgs e)
@@ -268,6 +273,96 @@ public partial class MainWindow : Window
         await SaveRelayProfileAsync(uri, "manual 3D relay profile");
     }
 
+    private void P3ECreateRoom_Click(object sender, RoutedEventArgs e)
+    {
+        var envelope = P3EEnvelope(OnlineMessageTypes.CreateRoom);
+        var result = _p3eRegistry.CreateRoom(envelope, new OnlineRoomCommand
+        {
+            RoomId = P3ERoomBox.Text.Trim(),
+            DisplayName = P3ERoomBox.Text.Trim(),
+            MaxTables = 8
+        });
+        LogP3EResult("CreateRoom", result);
+    }
+
+    private void P3ECreateTable_Click(object sender, RoutedEventArgs e)
+    {
+        EnsureP3ERoomJoined();
+        var envelope = P3EEnvelope(OnlineMessageTypes.CreateTable);
+        var result = _p3eRegistry.CreateTable(envelope, new OnlineTableCommand
+        {
+            TableId = P3ETableBox.Text.Trim(),
+            RulesetId = SelectedP3ERuleset()
+        });
+        LogP3EResult("CreateTable", result);
+    }
+
+    private void P3EJoinSeat_Click(object sender, RoutedEventArgs e)
+    {
+        EnsureP3ERoomJoined();
+        var envelope = P3EEnvelope(OnlineMessageTypes.JoinTableSeat);
+        var result = _p3eRegistry.JoinTableSeat(envelope, new OnlineTableCommand
+        {
+            SeatIndex = ReadInt(P3ESeatBox, 1, 1, 6)
+        });
+        LogP3EResult("JoinSeat", result);
+    }
+
+    private void P3EReadyStart_Click(object sender, RoutedEventArgs e)
+    {
+        EnsureP3ERoomJoined();
+        var ready = _p3eRegistry.Ready(P3EEnvelope(OnlineMessageTypes.Ready), new OnlineTableCommand
+        {
+            Ready = true
+        });
+        LogP3EResult("Ready", ready);
+        var started = _p3eRegistry.StartGame(P3EEnvelope(OnlineMessageTypes.StartGame));
+        LogP3EResult("StartGame", started);
+    }
+
+    private void P3ESubmitMove_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryParseCell(P3EFromBox.Text, out var from) || !TryParseCell(P3EToBox.Text, out var to))
+        {
+            Log("P3E move text must be x,y,z.");
+            return;
+        }
+
+        var seat = ReadInt(P3ESeatBox, 1, 1, 6);
+        var result = _p3eRegistry.SubmitAction(P3EEnvelope(OnlineMessageTypes.SubmitAction), new OnlineActionCommand
+        {
+            ActionKind = OnlineActionKinds.NormalMove,
+            ActorSide = seat,
+            FromX = from.X,
+            FromY = from.Y,
+            FromZ = from.Z,
+            ToX = to.X,
+            ToY = to.Y,
+            ToZ = to.Z
+        });
+        LogP3EResult("SubmitMove", result);
+    }
+
+    private void P3ESnapshot_Click(object sender, RoutedEventArgs e)
+    {
+        var result = _p3eRegistry.RequestSnapshot(P3EEnvelope(OnlineMessageTypes.RequestSnapshot));
+        LogP3EResult("Snapshot", result);
+    }
+
+    private void P3EActionLog_Click(object sender, RoutedEventArgs e)
+    {
+        var result = _p3eRegistry.RequestActionLog(P3EEnvelope(OnlineMessageTypes.RequestActionLog));
+        LogP3EResult("ActionLog", result);
+    }
+
+    private void P3EDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        var diagnostics = _p3eRegistry.GetDiagnostics();
+        var json = JsonSerializer.Serialize(diagnostics, OnlineProtocolJson.Options);
+        P3EStatusText.Text = json;
+        Log(json);
+    }
+
     private async Task SaveRelayProfileAsync(Uri uri, string source)
     {
         var seat = ReadInt(RelaySeatBox, 1, 0, 6);
@@ -279,6 +374,101 @@ public partial class MainWindow : Window
             group,
             hasSecret: !string.IsNullOrWhiteSpace(RelayTokenBox.Password));
         await SaveProfileAsync(profile, source);
+    }
+
+    private void EnsureP3ERoomJoined()
+    {
+        var create = _p3eRegistry.CreateRoom(P3EEnvelope(OnlineMessageTypes.CreateRoom), new OnlineRoomCommand
+        {
+            RoomId = P3ERoomBox.Text.Trim(),
+            DisplayName = P3ERoomBox.Text.Trim()
+        });
+        if (create.Error?.ReasonCode is not null && create.Error.ReasonCode != OnlineRejectReasons.None)
+        {
+            // Existing room is fine for the local harness.
+        }
+        _p3eRegistry.JoinRoom(P3EEnvelope(OnlineMessageTypes.JoinRoom));
+    }
+
+    private OnlineMessageEnvelope P3EEnvelope(string messageType)
+    {
+        return new OnlineMessageEnvelope
+        {
+            MessageType = messageType,
+            MessageId = Guid.NewGuid().ToString("N"),
+            RoomId = P3ERoomBox.Text.Trim(),
+            TableId = P3ETableBox.Text.Trim(),
+            ClientId = "online-app-local",
+            PlayerId = string.IsNullOrWhiteSpace(P3EPlayerBox.Text) ? "player-1" : P3EPlayerBox.Text.Trim(),
+            ClientSeq = DateTime.UtcNow.Ticks,
+            SentAtUtc = DateTime.UtcNow.ToString("O")
+        };
+    }
+
+    private string SelectedP3ERuleset()
+    {
+        if (P3EProfileBox.SelectedItem is ComboBoxItem item && item.Content is string text)
+        {
+            return text;
+        }
+        return "classic-six-side-3d-8x8x8-v0.1";
+    }
+
+    private void LogP3EResult(string label, OnlineProtocolMessage message)
+    {
+        var summary = message.Error is { ReasonCode.Length: > 0 } error
+            ? $"{label}: {message.Envelope.MessageType} {error.ReasonCode} {error.ReasonText}"
+            : $"{label}: {message.Envelope.MessageType} seq={message.Envelope.ServerSeq}";
+        P3EStatusText.Text = summary;
+        Log(summary);
+        if (message.Snapshot != null)
+        {
+            Log($"P3E snapshot hash {message.Snapshot.StateHash}, actions {message.Snapshot.ActionCount}");
+        }
+        if (message.ActionLog?.Events.Count > 0)
+        {
+            foreach (var actionEvent in message.ActionLog.Events)
+            {
+                Log($"P3E event #{actionEvent.ServerSeq}: {actionEvent.Notation} hash={actionEvent.StateHashAfter}");
+            }
+        }
+    }
+
+    private static string ResolveP3EProfileRoot()
+    {
+        var outputRoot = Path.Combine(AppContext.BaseDirectory, "Assets", "Rules3D", "Profiles");
+        if (Directory.Exists(outputRoot))
+        {
+            return outputRoot;
+        }
+
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null)
+        {
+            var candidate = Path.Combine(dir.FullName, "assets", "rules", "profiles");
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+            dir = dir.Parent;
+        }
+
+        return outputRoot;
+    }
+
+    private static bool TryParseCell(string text, out (int X, int Y, int Z) cell)
+    {
+        cell = default;
+        var parts = text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 3 ||
+            !int.TryParse(parts[0], out var x) ||
+            !int.TryParse(parts[1], out var y) ||
+            !int.TryParse(parts[2], out var z))
+        {
+            return false;
+        }
+        cell = (x, y, z);
+        return x >= 0 && x < 8 && y >= 0 && y < 8 && z >= 0 && z < 8;
     }
 
     private async Task SaveProfileAsync(IntegrationAccountProfile profile, string source)

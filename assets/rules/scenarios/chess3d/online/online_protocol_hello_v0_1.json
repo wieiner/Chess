@@ -1,0 +1,8 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-protocol-hello-v0.1",
+  "purpose": "Hello envelope roundtrips and returns Welcome.",
+  "protocolId": "chess3d.relay.v1",
+  "expected": ["Welcome", "protocolVersion=0.1"]
+}

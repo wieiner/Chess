@@ -158,6 +158,31 @@
 ### P3B - Visual Playability Sprint Final
 
 - Completed: stack/fusion/contested/anchor overlays.
+
+### P3C - Visual RC / Interaction Polish
+
+- Completed: runtime-only visual options and diagnostics for camera, theme, overlays, and high-contrast pieces.
+
+### P3D - Profile-Aware AI / Search
+
+- Completed: profile-aware candidate generation for Classic, Single-Side, Asgard, Rubik, and Hodge.
+- Completed: native search/apply ABI that routes through existing action semantics.
+- Completed: P3D.1 iterative deepening, alpha-beta hardening, deterministic ordering, bounded quiescence-lite, and summary JSON v2.
+
+### P3E - Online Serialization And Multiplayer Authority Contract
+
+- Completed: managed protocol DTOs and JSON envelope for `chess3d.relay.v1` / `0.1`.
+- Completed: in-process authoritative room/table/seat registry.
+- Completed: server-side validation through the existing Chess3D engine action paths.
+- Completed: snapshot/resync, action-log chunks, state-hash checks, diagnostics, and online regression fixtures.
+- Completed: minimal ChessOnlineApp local authority panel and production packaging checks.
+- Deferred: hosted SignalR transport, production auth, public matchmaking, durable persistence, anti-cheat completeness, binary protocol, and online-native ABI.
+
+### Next
+
+- P3F: hosted transport prototype with the same authority registry, likely SignalR.
+- P4A: production identity/session persistence if online play becomes a real product surface.
+- P4B: online replay export/import and spectator/reconnect UX.
 - Completed: Rubik layer-turn pre-animation and input lock.
 - Completed: Hodge primary/mirror arrow hints.
 - Completed: move/replay action flash and visual diagnostics.

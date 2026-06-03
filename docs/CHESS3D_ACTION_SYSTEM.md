@@ -44,3 +44,14 @@ After successful actions, the engine keeps these layers consistent:
 - anchors and implosion progress;
 - victory state;
 - action history and last-action notation.
+
+## P3E Online Authority
+
+P3E does not add engine action kinds. The online authority submits the same existing action kinds to the server-side engine session:
+
+- `normalMove` -> move/action history;
+- `rubikLayerTurn` -> layer action history;
+- `hodgeProjectedMove` -> `HPD` composite action history;
+- `reserveRestore` -> restore action history.
+
+Online action events wrap accepted engine actions with `serverSeq`, actor, state hash before/after, and notation. Rejected online commands are not recorded in engine action history.

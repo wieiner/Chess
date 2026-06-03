@@ -1,0 +1,7 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-stale-hash-resync-v0.1",
+  "purpose": "A stale expectedStateHashBefore produces ResyncRequired and authoritative snapshot.",
+  "expected": ["ResyncRequired", "staleStateHash", "AuthoritativeSnapshot"]
+}

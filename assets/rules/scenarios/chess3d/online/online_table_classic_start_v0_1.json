@@ -1,0 +1,8 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-table-classic-start-v0.1",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "Create a Classic table, join a seat, ready, and start authoritative game state.",
+  "expected": ["TableCreated", "SeatAssigned", "GameStarted", "AuthoritativeSnapshot"]
+}

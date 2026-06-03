@@ -1,0 +1,13 @@
+{
+  "format": "chess3d-online-regression",
+  "version": "0.1",
+  "scenarioId": "online-classic-move-accept-v0.1",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "action": {
+    "actionKind": "NormalMove",
+    "actorSide": 1,
+    "from": [3, 3, 0],
+    "to": [3, 3, 1]
+  },
+  "expected": ["ActionAccepted", "serverSeq=1", "stateHashAfter"]
+}

@@ -88,3 +88,16 @@ The UI now exposes a compact AI / Search panel:
 - `Copy Summary` copies the last AI search summary.
 
 The panel respects the active RuleProfile: Classic/Single use king-safe moves, Asgard can include reserve restore, Rubik can include layer turns, and Hodge can include projected composite moves.
+
+## P3E Online Authority Panel
+
+`ChessOnlineApp` now includes a small local `3D Relay` authority panel. It is not a full hosted lobby. It lets testers:
+
+- choose one of the five Chess3D RuleProfiles;
+- create room/table state;
+- join a side or macro-player seat;
+- ready/start an authoritative table;
+- submit a normal coordinate move;
+- request snapshot, action log, and diagnostics.
+
+For Rubik and Hodge actions the headless tests exercise the authority contract directly. The UI panel stays intentionally compact until hosted transport and multiplayer UX are introduced.
