@@ -1,6 +1,6 @@
 # Chess3D AI UI
 
-P3D adds a compact AI / Search panel to the Chess3D control center.
+P3D adds a compact AI / Search panel to the Chess3D control center. P3D.1 keeps the same panel and makes bounded search/apply operations asynchronous so the WPF UI stays responsive during deeper searches.
 
 ## Controls
 
@@ -14,7 +14,7 @@ P3D adds a compact AI / Search panel to the Chess3D control center.
 
 ## Display
 
-The panel shows the best action in readable form and the native summary JSON. Existing action log, state hash, visual refresh, and invalid reason panels remain the source of truth for committed state.
+The panel shows the best action in readable form and the native summary JSON. P3D.1 summary JSON includes completed depth, nodes, qnodes, cutoffs, elapsed time, stopped reason, and compact best-action text. Existing action log, state hash, visual refresh, and invalid reason panels remain the source of truth for committed state.
 
 ## Scope
 

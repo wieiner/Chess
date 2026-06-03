@@ -29,6 +29,8 @@ For Classic/Single-Side after P3A, divide roots are filtered through the king-sa
 
 P3D uses the same root-action surface for AI candidates. Divide stays an explainability diagnostic; AI search adds scoring and best-action selection.
 
+P3D.1 keeps divide as a legal-action diagnostic. The strengthened AI search adds ordering, alpha-beta, iterative deepening, and bounded quiescence-lite around the same root-action surface; divide itself does not mutate state and does not become a strength benchmark.
+
 ## Limits
 
 Depth is intentionally capped at 3 for v0.1. Larger exhaustive search belongs to later AI/search tooling.

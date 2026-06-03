@@ -166,3 +166,18 @@ P3D remains headless in CI. Automated coverage includes:
 - runnable regression fixtures under `assets\rules\scenarios\chess3d\regression`.
 
 The tests intentionally verify integration and legality boundaries, not playing strength.
+
+## P3D.1 Search Hardening Testing
+
+P3D.1 adds regression coverage for the strengthened search loop:
+
+- iterative depth-2 Classic search with no state-hash or action-history mutation;
+- clean node-limit stop reporting with the previous state preserved;
+- deterministic candidate ordering for Single-Side and profile smoke paths;
+- summary JSON v2 fields including completed depth, nodes, qnodes, cutoffs, stopped reason, and compact best-action text;
+- budget-gated quiescence-lite smoke around tactical capture/recapture-style positions;
+- Asgard anchor/fusion/reserve evaluation smoke without stack mutation;
+- Rubik layer-turn ordering and four-turn state consistency;
+- Hodge macro-player search and all-or-nothing timeout/no-partial-apply behavior.
+
+The P3D.1 tests still do not claim tournament strength, opening-book quality, GPU search, or online AI authority.

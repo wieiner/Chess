@@ -1,0 +1,14 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "classic-ai-node-limit-smoke-v0.1",
+  "profileFile": "classic_six_side_3d_v0_1.json",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "Tiny node limit returns clean nodeLimit telemetry without changing board/action history.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "rememberStateHash", "name": "before" },
+    { "type": "searchBestAiSummaryNoMutation", "depth": 3, "nodeLimit": 1, "timeLimitMs": 1000, "expectSuccess": 0, "summaryContains": "nodeLimit" },
+    { "type": "assertStateHashEqualsRemembered", "name": "before" }
+  ]
+}

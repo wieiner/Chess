@@ -1,6 +1,6 @@
 # Chess3D Profile-Aware Search
 
-The P3D search layer uses existing profile semantics rather than adding a generic chess-only move generator.
+The P3D search layer uses existing profile semantics rather than adding a generic chess-only move generator. P3D.1 hardens that layer with iterative deepening, alpha-beta discipline, deterministic ordering, bounded quiescence-lite, and summary JSON v2.
 
 ## Classic / Single-Side
 
@@ -21,3 +21,7 @@ Hodge candidates are all-or-nothing projected composite moves for the current ma
 ## Isolation
 
 Asgard, Rubik, and Hodge do not inherit Classic checkmate as a victory condition. Classic and Single-Side do not inherit Asgard core/fusion, Rubik layer turns, or Hodge projection.
+
+## P3D.1 Guarantees
+
+Candidate generation and search remain non-mutating. Only explicit `ApplyAiAction` and `MakeBestProfileAction` calls commit through existing legal runtime paths. There is still no external engine, opening book, GPU search, online authority, or transposition-table implementation.

@@ -1,0 +1,16 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "ai-search-repeated-no-history-growth-v0.1",
+  "profileFile": "classic_six_side_3d_v0_1.json",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "Repeated SearchBest calls do not append action history.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "assertActionCount", "count": 0 },
+    { "type": "searchBestAiSummaryNoMutation", "depth": 2, "nodeLimit": 2048, "timeLimitMs": 1000, "summaryContains": "p3d1-search-summary-v0.1" },
+    { "type": "searchBestAiSummaryNoMutation", "depth": 2, "nodeLimit": 2048, "timeLimitMs": 1000, "summaryContains": "p3d1-search-summary-v0.1" },
+    { "type": "assertActionCount", "count": 0 }
+  ]
+}
+

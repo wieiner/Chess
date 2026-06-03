@@ -4547,11 +4547,46 @@ bool applyAiActionToGame(Game& game, const Chess3DAiActionDto& dto, std::string&
 
 struct AiSearchContext
 {
-    int nodes = 0;
+    int requestedDepth = 1;
+    int effectiveDepth = 1;
     int nodeLimit = 512;
     int timeLimitMs = 250;
+    int nodes = 0;
+    int qnodes = 0;
+    int leafCount = 0;
+    int terminalNodes = 0;
+    int staticEvalNodes = 0;
+    int cutoffs = 0;
+    int ttHits = 0;
+    int candidateCount = 0;
+    int orderedCandidateCount = 0;
+    int completedDepth = 0;
+    int bestScore = 0;
+    bool quiescenceEnabled = true;
     bool stopped = false;
+    std::string stoppedReason = "completed";
+    std::string error;
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+};
+
+struct AiSearchOptions
+{
+    bool iterativeDeepening = true;
+    bool alphaBeta = true;
+    bool moveOrdering = true;
+    bool quiescenceLite = true;
+    bool transpositionTable = false;
+    int maxQuiescenceDepth = 2;
+    int maxDepthClamp = 4;
+};
+
+struct AiSearchResult
+{
+    bool success = false;
+    Chess3DAiActionDto best{};
+    int score = 0;
+    int completedDepth = 0;
+    std::string compactText;
 };
 
 bool aiSearchShouldStop(AiSearchContext& context)
@@ -4559,6 +4594,19 @@ bool aiSearchShouldStop(AiSearchContext& context)
     if (context.nodeLimit > 0 && context.nodes >= context.nodeLimit)
     {
         context.stopped = true;
+        if (context.stoppedReason == "completed")
+        {
+            context.stoppedReason = "nodeLimit";
+        }
+        return true;
+    }
+    if (context.nodeLimit > 0 && context.qnodes >= context.nodeLimit * 4)
+    {
+        context.stopped = true;
+        if (context.stoppedReason == "completed")
+        {
+            context.stoppedReason = "nodeLimit";
+        }
         return true;
     }
     if (context.timeLimitMs > 0)
@@ -4568,10 +4616,37 @@ bool aiSearchShouldStop(AiSearchContext& context)
         if (elapsed >= context.timeLimitMs)
         {
             context.stopped = true;
+            if (context.stoppedReason == "completed")
+            {
+                context.stoppedReason = "timeLimit";
+            }
             return true;
         }
     }
     return false;
+}
+
+bool aiEnterNode(AiSearchContext& context, bool quiescence)
+{
+    if (aiSearchShouldStop(context))
+    {
+        return false;
+    }
+    if (quiescence)
+    {
+        ++context.qnodes;
+    }
+    else
+    {
+        ++context.nodes;
+    }
+    return !aiSearchShouldStop(context);
+}
+
+long long aiElapsedMs(const AiSearchContext& context)
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - context.start).count();
 }
 
 bool isRootActorToMove(const Game& game, int rootSide, int rootMacro)
@@ -4583,16 +4658,204 @@ bool isRootActorToMove(const Game& game, int rootSide, int rootMacro)
     return game.pos.sideToMove == rootSide;
 }
 
-int searchAiScore(Game& game, int depth, int rootSide, int rootMacro, AiSearchContext& context)
+std::string aiActionCompactText(const Chess3DAiActionDto& action)
 {
-    if (depth <= 0 || game.gameOver || aiSearchShouldStop(context))
+    std::ostringstream out;
+    if (action.kind == ActionMove)
+    {
+        out << "MOVE S" << action.side << " "
+            << coordText(action.fromX, action.fromY, action.fromZ) << "->"
+            << coordText(action.toX, action.toY, action.toZ);
+    }
+    else if (action.kind == ActionProjectionCompositeMove)
+    {
+        out << "HPD M" << action.macroPlayer << " S" << action.primarySide << " "
+            << coordText(action.fromX, action.fromY, action.fromZ) << "->"
+            << coordText(action.toX, action.toY, action.toZ);
+    }
+    else if (action.kind == ActionLayerTurn)
+    {
+        out << "LAYER " << layerTurnAxisName(action.axis) << "[" << action.layer << "]"
+            << layerTurnSign(action.quarterTurns);
+    }
+    else if (action.kind == ActionReserveRestore)
+    {
+        out << "RESTORE S" << action.side << " " << pieceName(makePiece(action.side, action.reservePieceType))
+            << "->" << coordText(action.restoreX, action.restoreY, action.restoreZ);
+    }
+    else
+    {
+        out << "none";
+    }
+    return out.str();
+}
+
+int projectedPieceAt(const Game& game, int cell)
+{
+    if (cell < 0 || cell >= CellCount)
+    {
+        return Empty;
+    }
+    if (isCoreStackEnabled(game.rules) && isInsideCore(game.rules, cell))
+    {
+        return projectedPiece(game, cell);
+    }
+    return game.pos.board[static_cast<std::size_t>(cell)];
+}
+
+bool isCaptureAction(const Game& game, const DiagnosticAction& action)
+{
+    if (action.actionKind != ActionMove || action.to < 0 || action.to >= CellCount)
+    {
+        return false;
+    }
+    const int movingSide = action.side != 0 ? action.side : game.pos.sideToMove;
+    const int target = projectedPieceAt(game, action.to);
+    return target != Empty && pieceSide(target) != movingSide;
+}
+
+int captureOrderingBonus(const Game& game, const DiagnosticAction& action)
+{
+    if (!isCaptureAction(game, action))
+    {
+        return 0;
+    }
+    const int target = projectedPieceAt(game, action.to);
+    const int attacker = action.from >= 0 && action.from < CellCount ? projectedPieceAt(game, action.from) : Empty;
+    return 5000 + materialValueForType(pieceType(target)) - (attacker == Empty ? 0 : materialValueForType(pieceType(attacker)) / 10);
+}
+
+int actionOrderingBonus(const Game& game, const DiagnosticAction& action)
+{
+    int bonus = captureOrderingBonus(game, action);
+    if (action.actionKind == ActionReserveRestore)
+    {
+        bonus += materialValueForType(action.pieceType) / 3 + 700;
+    }
+    else if (action.actionKind == ActionProjectionCompositeMove)
+    {
+        bonus += 450;
+    }
+    else if (action.actionKind == ActionLayerTurn)
+    {
+        bonus += 150;
+    }
+    if (action.to >= 0 && action.to < CellCount)
+    {
+        const int distance = std::abs(xOf(action.to) - 3) + std::abs(yOf(action.to) - 3) + std::abs(zOf(action.to) - 3);
+        bonus += std::max(0, 24 - distance * 3);
+        if (isInsideCore(game.rules, action.to))
+        {
+            bonus += 80;
+        }
+    }
+    return bonus;
+}
+
+bool actionTieLess(const Chess3DAiActionDto& a, const Chess3DAiActionDto& b)
+{
+    if (a.kind != b.kind) return a.kind < b.kind;
+    if (a.side != b.side) return a.side < b.side;
+    if (a.macroPlayer != b.macroPlayer) return a.macroPlayer < b.macroPlayer;
+    if (a.primarySide != b.primarySide) return a.primarySide < b.primarySide;
+    if (a.fromZ != b.fromZ) return a.fromZ < b.fromZ;
+    if (a.fromY != b.fromY) return a.fromY < b.fromY;
+    if (a.fromX != b.fromX) return a.fromX < b.fromX;
+    if (a.toZ != b.toZ) return a.toZ < b.toZ;
+    if (a.toY != b.toY) return a.toY < b.toY;
+    if (a.toX != b.toX) return a.toX < b.toX;
+    if (a.axis != b.axis) return a.axis < b.axis;
+    if (a.layer != b.layer) return a.layer < b.layer;
+    if (a.quarterTurns != b.quarterTurns) return a.quarterTurns < b.quarterTurns;
+    if (a.reservePieceType != b.reservePieceType) return a.reservePieceType < b.reservePieceType;
+    return false;
+}
+
+std::vector<DiagnosticAction> orderedDiagnosticActions(const Game& game, const std::vector<DiagnosticAction>& actions, int rootSide, int rootMacro)
+{
+    struct OrderedAction
+    {
+        DiagnosticAction action;
+        int score = 0;
+        Chess3DAiActionDto dto{};
+    };
+    std::vector<OrderedAction> ordered;
+    ordered.reserve(actions.size());
+    for (const DiagnosticAction& action : actions)
+    {
+        OrderedAction item{};
+        item.action = action;
+        item.dto = diagnosticActionToAiDto(game, action);
+        item.score = actionOrderingBonus(game, action);
+        Game child = game;
+        std::string error;
+        if (applyAiActionToGame(child, item.dto, error))
+        {
+            item.score += evaluateProfileStateForActor(child, rootSide, rootMacro) / 32;
+        }
+        ordered.push_back(std::move(item));
+    }
+    std::stable_sort(ordered.begin(), ordered.end(), [](const OrderedAction& a, const OrderedAction& b)
+    {
+        if (a.score != b.score) return a.score > b.score;
+        return actionTieLess(a.dto, b.dto);
+    });
+    std::vector<DiagnosticAction> result;
+    result.reserve(ordered.size());
+    for (const OrderedAction& item : ordered)
+    {
+        result.push_back(item.action);
+    }
+    return result;
+}
+
+bool isQuiescenceTacticalAction(const Game& game, const DiagnosticAction& action)
+{
+    if (action.actionKind == ActionMove)
+    {
+        return isCaptureAction(game, action);
+    }
+    if (action.actionKind == ActionReserveRestore)
+    {
+        return true;
+    }
+    return false;
+}
+
+int quiescenceAiScore(Game& game, int qdepth, int alpha, int beta, int rootSide, int rootMacro, AiSearchContext& context);
+
+int alphaBetaAiScore(Game& game, int depth, int alpha, int beta, int rootSide, int rootMacro, AiSearchContext& context)
+{
+    if (!aiEnterNode(context, false))
     {
         return evaluateProfileStateForActor(game, rootSide, rootMacro);
     }
+    if (game.gameOver)
+    {
+        ++context.terminalNodes;
+        ++context.leafCount;
+        return evaluateProfileStateForActor(game, rootSide, rootMacro);
+    }
+    if (depth <= 0)
+    {
+        if (context.quiescenceEnabled)
+        {
+            return quiescenceAiScore(game, 2, alpha, beta, rootSide, rootMacro, context);
+        }
+        ++context.staticEvalNodes;
+        ++context.leafCount;
+        return evaluateProfileStateForActor(game, rootSide, rootMacro);
+    }
+    if (aiSearchShouldStop(context))
+    {
+        ++context.staticEvalNodes;
+        return evaluateProfileStateForActor(game, rootSide, rootMacro);
+    }
 
-    const auto actions = enumerateDiagnosticActions(game);
+    const auto actions = orderedDiagnosticActions(game, enumerateDiagnosticActions(game), rootSide, rootMacro);
     if (actions.empty())
     {
+        ++context.leafCount;
         return evaluateProfileStateForActor(game, rootSide, rootMacro);
     }
 
@@ -4610,43 +4873,146 @@ int searchAiScore(Game& game, int depth, int rootSide, int rootMacro, AiSearchCo
         {
             continue;
         }
-        ++context.nodes;
-        const int score = searchAiScore(child, depth - 1, rootSide, rootMacro, context);
-        best = maximizing ? std::max(best, score) : std::min(best, score);
+        const int score = alphaBetaAiScore(child, depth - 1, alpha, beta, rootSide, rootMacro, context);
+        if (maximizing)
+        {
+            best = std::max(best, score);
+            alpha = std::max(alpha, best);
+        }
+        else
+        {
+            best = std::min(best, score);
+            beta = std::min(beta, best);
+        }
+        if (beta <= alpha)
+        {
+            ++context.cutoffs;
+            break;
+        }
     }
     if (best == -Infinity || best == Infinity)
     {
+        ++context.staticEvalNodes;
         return evaluateProfileStateForActor(game, rootSide, rootMacro);
     }
     return best;
 }
 
-std::string aiSummaryJson(const Game& game, int depth, int nodeLimit, int timeLimitMs, int nodes, bool stopped, const Chess3DAiActionDto* best)
+int quiescenceAiScore(Game& game, int qdepth, int alpha, int beta, int rootSide, int rootMacro, AiSearchContext& context)
+{
+    if (!aiEnterNode(context, true))
+    {
+        return evaluateProfileStateForActor(game, rootSide, rootMacro);
+    }
+    int standPat = evaluateProfileStateForActor(game, rootSide, rootMacro);
+    ++context.staticEvalNodes;
+    if (qdepth <= 0 || game.gameOver || aiSearchShouldStop(context))
+    {
+        ++context.leafCount;
+        return standPat;
+    }
+
+    const bool maximizing = isRootActorToMove(game, rootSide, rootMacro);
+    int best = standPat;
+    if (maximizing)
+    {
+        alpha = std::max(alpha, standPat);
+    }
+    else
+    {
+        beta = std::min(beta, standPat);
+    }
+    if (beta <= alpha)
+    {
+        ++context.cutoffs;
+        return best;
+    }
+
+    std::vector<DiagnosticAction> tactical;
+    for (const DiagnosticAction& action : enumerateDiagnosticActions(game))
+    {
+        if (isQuiescenceTacticalAction(game, action))
+        {
+            tactical.push_back(action);
+        }
+    }
+    tactical = orderedDiagnosticActions(game, tactical, rootSide, rootMacro);
+    for (const DiagnosticAction& action : tactical)
+    {
+        if (aiSearchShouldStop(context))
+        {
+            break;
+        }
+        Game child = game;
+        std::string error;
+        if (!applyDiagnosticAction(child, action, error))
+        {
+            continue;
+        }
+        const int score = quiescenceAiScore(child, qdepth - 1, alpha, beta, rootSide, rootMacro, context);
+        if (maximizing)
+        {
+            best = std::max(best, score);
+            alpha = std::max(alpha, best);
+        }
+        else
+        {
+            best = std::min(best, score);
+            beta = std::min(beta, best);
+        }
+        if (beta <= alpha)
+        {
+            ++context.cutoffs;
+            break;
+        }
+    }
+    return best;
+}
+
+std::string aiSummaryJson(const Game& game, const AiSearchContext& context, const Chess3DAiActionDto* best)
 {
     std::ostringstream out;
+    const int bestScore = best != nullptr ? best->score : 0;
     out << "{\n"
         << "  \"format\": \"chess3d-ai-search-summary\",\n"
-        << "  \"version\": \"0.1\",\n"
+        << "  \"version\": \"p3d1-search-summary-v0.1\",\n"
         << "  \"rulesetId\": \"" << jsonEscape(game.rules.rulesetId) << "\",\n"
-        << "  \"depth\": " << depth << ",\n"
-        << "  \"nodeLimit\": " << nodeLimit << ",\n"
-        << "  \"timeLimitMs\": " << timeLimitMs << ",\n"
-        << "  \"nodes\": " << nodes << ",\n"
-        << "  \"stopped\": " << (stopped ? "true" : "false") << ",\n"
-        << "  \"candidateCount\": " << game.aiCandidates.size();
+        << "  \"profileKind\": \"" << jsonEscape(game.rules.goalProfileType) << "\",\n"
+        << "  \"requestedDepth\": " << context.requestedDepth << ",\n"
+        << "  \"effectiveDepth\": " << context.effectiveDepth << ",\n"
+        << "  \"completedDepth\": " << context.completedDepth << ",\n"
+        << "  \"nodeLimit\": " << context.nodeLimit << ",\n"
+        << "  \"timeLimitMs\": " << context.timeLimitMs << ",\n"
+        << "  \"elapsedMs\": " << aiElapsedMs(context) << ",\n"
+        << "  \"nodes\": " << context.nodes << ",\n"
+        << "  \"qnodes\": " << context.qnodes << ",\n"
+        << "  \"cutoffs\": " << context.cutoffs << ",\n"
+        << "  \"ttHits\": " << context.ttHits << ",\n"
+        << "  \"candidateCount\": " << context.candidateCount << ",\n"
+        << "  \"orderedCandidateCount\": " << context.orderedCandidateCount << ",\n"
+        << "  \"bestScore\": " << bestScore << ",\n"
+        << "  \"stoppedReason\": \"" << jsonEscape(context.stoppedReason) << "\",\n"
+        << "  \"error\": \"" << jsonEscape(context.error) << "\",\n"
+        << "  \"stopped\": " << (context.stopped ? "true" : "false");
     if (best != nullptr)
     {
-        out << ",\n  \"best\": {"
+        out << ",\n  \"bestAction\": {"
             << "\"kind\":" << best->kind
             << ",\"side\":" << best->side
             << ",\"macroPlayer\":" << best->macroPlayer
             << ",\"from\":[" << best->fromX << "," << best->fromY << "," << best->fromZ << "]"
             << ",\"to\":[" << best->toX << "," << best->toY << "," << best->toZ << "]"
+            << ",\"restore\":[" << best->restoreX << "," << best->restoreY << "," << best->restoreZ << "]"
             << ",\"axis\":" << best->axis
             << ",\"layer\":" << best->layer
             << ",\"quarterTurns\":" << best->quarterTurns
             << ",\"score\":" << best->score
+            << ",\"compactText\":\"" << jsonEscape(aiActionCompactText(*best)) << "\""
             << "}";
+    }
+    else
+    {
+        out << ",\n  \"bestAction\": null";
     }
     out << "\n}";
     return out.str();
@@ -4679,7 +5045,7 @@ int buildAiCandidates(Game& game, int sideOrMacroPlayer)
         std::string error;
         if (applyAiActionToGame(child, dto, error))
         {
-            dto.score = evaluateProfileStateForActor(child, rootSide, rootMacro);
+            dto.score = evaluateProfileStateForActor(child, rootSide, rootMacro) + actionOrderingBonus(scoped, action);
         }
         else
         {
@@ -4702,43 +5068,36 @@ int buildAiCandidates(Game& game, int sideOrMacroPlayer)
     });
     std::ostringstream summary;
     summary << "{\n  \"format\": \"chess3d-ai-candidates\",\n"
-        << "  \"version\": \"0.1\",\n"
+        << "  \"version\": \"p3d1-candidates-v0.1\",\n"
         << "  \"rulesetId\": \"" << jsonEscape(scoped.rules.rulesetId) << "\",\n"
         << "  \"side\": " << rootSide << ",\n"
         << "  \"macroPlayer\": " << rootMacro << ",\n"
-        << "  \"candidateCount\": " << game.aiCandidates.size() << "\n}";
+        << "  \"candidateCount\": " << game.aiCandidates.size() << ",\n"
+        << "  \"orderedCandidateCount\": " << game.aiCandidates.size();
+    if (!game.aiCandidates.empty())
+    {
+        summary << ",\n  \"topCandidateCompact\": \"" << jsonEscape(aiActionCompactText(game.aiCandidates.front())) << "\"";
+    }
+    summary << "\n}";
     game.lastAiSearchSummaryJson = summary.str();
     game.lastAiSearchError = game.aiCandidates.empty() ? "AI candidate generation found no legal actions." : "";
     return static_cast<int>(game.aiCandidates.size());
 }
 
-bool searchBestAiAction(Game& game, int depth, int nodeLimit, int timeLimitMs, Chess3DAiActionDto& best, std::string& error)
+bool searchRootDepth(const Game& game, const std::vector<Chess3DAiActionDto>& candidates, int depth, int rootSide, int rootMacro,
+    AiSearchContext& context, Chess3DAiActionDto& best, int& bestScore)
 {
-    const int searchDepth = std::clamp(depth, 1, 3);
-    const int effectiveNodeLimit = nodeLimit <= 0 ? 512 : std::clamp(nodeLimit, 1, 100000);
-    const int effectiveTimeLimit = timeLimitMs <= 0 ? 250 : std::clamp(timeLimitMs, 1, 30000);
-    buildAiCandidates(game, 0);
-    if (game.aiCandidates.empty())
-    {
-        error = game.lastAiSearchError.empty() ? "AI search found no legal actions." : game.lastAiSearchError;
-        game.lastAiSearchSummaryJson = aiSummaryJson(game, searchDepth, effectiveNodeLimit, effectiveTimeLimit, 0, false, nullptr);
-        return false;
-    }
-
-    const int rootSide = game.pos.sideToMove;
-    const int rootMacro = isProjectionModeEnabled(game.rules) ? macroPlayerForSide(game.rules, rootSide) : 0;
-    AiSearchContext context{};
-    context.nodeLimit = effectiveNodeLimit;
-    context.timeLimitMs = effectiveTimeLimit;
-
     bool found = false;
-    int bestScore = -Infinity;
-    Chess3DAiActionDto bestLocal = game.aiCandidates.front();
-    for (Chess3DAiActionDto candidate : game.aiCandidates)
+    int localBestScore = -Infinity;
+    Chess3DAiActionDto localBest{};
+    int alpha = -Infinity;
+    constexpr int beta = Infinity;
+
+    for (Chess3DAiActionDto candidate : candidates)
     {
         if (aiSearchShouldStop(context))
         {
-            break;
+            return false;
         }
         Game child = game;
         std::string applyError;
@@ -4746,24 +5105,122 @@ bool searchBestAiAction(Game& game, int depth, int nodeLimit, int timeLimitMs, C
         {
             continue;
         }
-        ++context.nodes;
-        const int score = searchAiScore(child, searchDepth - 1, rootSide, rootMacro, context);
+        const int score = alphaBetaAiScore(child, depth - 1, alpha, beta, rootSide, rootMacro, context);
+        if (context.stopped)
+        {
+            return false;
+        }
         candidate.score = score;
-        if (!found || score > bestScore)
+        if (!found || score > localBestScore || (score == localBestScore && actionTieLess(candidate, localBest)))
         {
             found = true;
-            bestScore = score;
-            bestLocal = candidate;
+            localBestScore = score;
+            localBest = candidate;
         }
+        alpha = std::max(alpha, localBestScore);
     }
+
     if (!found)
     {
-        error = "AI search could not apply any candidate action.";
-        game.lastAiSearchSummaryJson = aiSummaryJson(game, searchDepth, effectiveNodeLimit, effectiveTimeLimit, context.nodes, context.stopped, nullptr);
         return false;
     }
-    best = bestLocal;
-    game.lastAiSearchSummaryJson = aiSummaryJson(game, searchDepth, effectiveNodeLimit, effectiveTimeLimit, context.nodes, context.stopped, &best);
+    best = localBest;
+    bestScore = localBestScore;
+    return true;
+}
+
+bool searchBestAiAction(Game& game, int depth, int nodeLimit, int timeLimitMs, Chess3DAiActionDto& best, std::string& error)
+{
+    const AiSearchOptions options{};
+    const int searchDepth = std::clamp(depth, 1, options.maxDepthClamp);
+    const int effectiveNodeLimit = nodeLimit <= 0 ? 512 : std::clamp(nodeLimit, 1, 100000);
+    const int effectiveTimeLimit = timeLimitMs <= 0 ? 250 : std::clamp(timeLimitMs, 1, 30000);
+    buildAiCandidates(game, 0);
+    if (game.aiCandidates.empty())
+    {
+        error = game.lastAiSearchError.empty() ? "AI search found no legal actions." : game.lastAiSearchError;
+        AiSearchContext noCandidates{};
+        noCandidates.requestedDepth = depth;
+        noCandidates.effectiveDepth = searchDepth;
+        noCandidates.nodeLimit = effectiveNodeLimit;
+        noCandidates.timeLimitMs = effectiveTimeLimit;
+        noCandidates.stoppedReason = "noCandidates";
+        noCandidates.error = error;
+        game.lastAiSearchSummaryJson = aiSummaryJson(game, noCandidates, nullptr);
+        return false;
+    }
+
+    const int rootSide = game.pos.sideToMove;
+    const int rootMacro = isProjectionModeEnabled(game.rules) ? macroPlayerForSide(game.rules, rootSide) : 0;
+    AiSearchContext context{};
+    context.requestedDepth = depth;
+    context.effectiveDepth = searchDepth;
+    context.nodeLimit = effectiveNodeLimit;
+    context.timeLimitMs = effectiveTimeLimit;
+    context.quiescenceEnabled = searchDepth > 1 && effectiveNodeLimit >= 512 && effectiveTimeLimit >= 200;
+    context.candidateCount = static_cast<int>(game.aiCandidates.size());
+    context.orderedCandidateCount = static_cast<int>(game.aiCandidates.size());
+
+    AiSearchResult lastCompleted{};
+    for (int currentDepth = 1; currentDepth <= searchDepth; ++currentDepth)
+    {
+        if (aiSearchShouldStop(context))
+        {
+            break;
+        }
+        if (currentDepth == 1)
+        {
+            if (context.nodeLimit <= 1)
+            {
+                context.stopped = true;
+                context.stoppedReason = "nodeLimit";
+                break;
+            }
+            lastCompleted.success = true;
+            lastCompleted.best = game.aiCandidates.front();
+            lastCompleted.score = lastCompleted.best.score;
+            lastCompleted.completedDepth = 1;
+            lastCompleted.compactText = aiActionCompactText(lastCompleted.best);
+            context.completedDepth = 1;
+            context.bestScore = lastCompleted.score;
+            ++context.nodes;
+            continue;
+        }
+        Chess3DAiActionDto depthBest{};
+        int depthScore = -Infinity;
+        if (!searchRootDepth(game, game.aiCandidates, currentDepth, rootSide, rootMacro, context, depthBest, depthScore))
+        {
+            break;
+        }
+        lastCompleted.success = true;
+        lastCompleted.best = depthBest;
+        lastCompleted.score = depthScore;
+        lastCompleted.completedDepth = currentDepth;
+        lastCompleted.compactText = aiActionCompactText(depthBest);
+        context.completedDepth = currentDepth;
+        context.bestScore = depthScore;
+    }
+
+    if (!lastCompleted.success)
+    {
+        if (context.stoppedReason == "completed")
+        {
+            context.stoppedReason = context.stopped ? context.stoppedReason : "error";
+        }
+        error = context.stopped ? "AI search stopped before completing depth 1." : "AI search could not apply any candidate action.";
+        context.error = error;
+        game.lastAiSearchSummaryJson = aiSummaryJson(game, context, nullptr);
+        return false;
+    }
+
+    best = lastCompleted.best;
+    best.score = lastCompleted.score;
+    if (context.stoppedReason == "completed" && context.completedDepth < searchDepth)
+    {
+        context.stoppedReason = context.stopped ? context.stoppedReason : "partial";
+    }
+    context.error.clear();
+    game.lastAiSearchSummaryJson = aiSummaryJson(game, context, &best);
     game.lastAiSearchError.clear();
     return true;
 }

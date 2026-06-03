@@ -1,6 +1,6 @@
 # Chess3D AI Search ABI
 
-P3D adds append-only native exports. Existing ABI remains unchanged.
+P3D adds append-only native exports. Existing ABI remains unchanged. P3D.1 hardens the implementation behind those same exports without changing `Chess3DAiActionDto`.
 
 ## Candidate ABI
 
@@ -23,8 +23,8 @@ Search is non-mutating. Apply commits one action through the existing runtime pa
 - `Chess3D_GetLastAiSearchSummaryJson(handle, buffer, capacity)`
 - `Chess3D_GetLastAiSearchError(handle, buffer, capacity)`
 
-The summary JSON reports ruleset id, depth, node/time limits, node count, stopped flag, candidate count, and best-action details.
+The P3D.1 summary JSON reports ruleset id, requested/effective/completed depth, node/time limits, elapsed time, nodes, qnodes, cutoffs, `ttHits`, candidate count, ordered candidate count, stopped reason, error text, best score, and compact best-action details.
 
 ## Limits
 
-Depth is clamped to a small v0.1 range. This is an integration and correctness layer, not a tournament-strength engine.
+Depth is clamped to a small v0.1 range. Searches use iterative deepening and return the last completed depth when a deeper search hits a node/time limit. This is an integration and correctness layer, not a tournament-strength engine.

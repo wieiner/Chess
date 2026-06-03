@@ -1,0 +1,14 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "classic-ai-iterative-depth2-smoke-v0.1",
+  "profileFile": "classic_six_side_3d_v0_1.json",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "Classic profile depth-2 AI search completes a bounded iterative search without mutating state.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "rememberStateHash", "name": "before" },
+    { "type": "searchBestAiSummaryNoMutation", "depth": 2, "nodeLimit": 4096, "timeLimitMs": 1000, "summaryContains": "completedDepth" },
+    { "type": "assertStateHashEqualsRemembered", "name": "before" }
+  ]
+}

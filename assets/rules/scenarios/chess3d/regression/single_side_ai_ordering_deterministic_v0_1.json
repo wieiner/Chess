@@ -1,0 +1,16 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "single-side-ai-ordering-deterministic-v0.1",
+  "profileFile": "single_side_3d_v0_1.json",
+  "rulesetId": "single-side-3d-8x8x8-v0.1",
+  "purpose": "Single-Side candidate ordering is stable across repeated generation.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "rememberStateHash", "name": "before" },
+    { "type": "assertAiCandidateOrderStable" },
+    { "type": "searchBestAiSummaryNoMutation", "depth": 2, "nodeLimit": 2048, "timeLimitMs": 1000, "summaryContains": "p3d1-search-summary-v0.1" },
+    { "type": "assertStateHashEqualsRemembered", "name": "before" }
+  ]
+}
+

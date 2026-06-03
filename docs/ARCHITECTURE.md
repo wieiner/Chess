@@ -130,7 +130,8 @@ P3D keeps search in the native Chess3D engine and exposes it through append-only
 
 - candidate generation reuses the profile-aware legal diagnostic action layer;
 - search runs on copied game state and must not mutate state hash or action history;
+- P3D.1 adds iterative deepening, alpha-beta hardening, deterministic ordering, bounded quiescence-lite, and summary JSON v2 behind the same AI action ABI;
 - apply/make routes through existing action functions so notation/replay/history remain authoritative;
 - the WPF AI panel is a consumer of native summaries, not a rule engine.
 
-This layer intentionally avoids external engines, CUDA requirements, and new RuleProfiles.
+This layer intentionally avoids external engines, CUDA requirements, online authority, and new RuleProfiles. Transposition-table storage remains future work; P3D.1 reports `ttHits` as telemetry-compatible zero rather than pretending a TT exists.

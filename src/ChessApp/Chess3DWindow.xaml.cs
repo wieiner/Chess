@@ -1574,20 +1574,32 @@ public partial class Chess3DWindow : Window
         RefreshAll();
     }
 
-    private void SearchBestAiAction_Click(object sender, RoutedEventArgs e)
+    private async void SearchBestAiAction_Click(object sender, RoutedEventArgs e)
     {
-        if (_engine.SearchBestAiAction(SelectedAiDepth(), SelectedAiNodeLimit(), SelectedAiTimeLimitMs(), out var action))
+        SetAiSearchButtonsEnabled(false);
+        try
         {
-            AiSearchText.Text = $"Best action: {FormatAiAction(action)}\n{_engine.GetLastAiSearchSummaryJson()}";
+            var depth = SelectedAiDepth();
+            var nodeLimit = SelectedAiNodeLimit();
+            var timeLimit = SelectedAiTimeLimitMs();
+            var result = await Task.Run(() =>
+            {
+                var ok = _engine.SearchBestAiAction(depth, nodeLimit, timeLimit, out var action);
+                return (ok, action, error: _engine.GetLastAiSearchError(), summary: _engine.GetLastAiSearchSummaryJson());
+            });
+
+            AiSearchText.Text = result.ok
+                ? $"Best action: {FormatAiAction(result.action)}\n{result.summary}"
+                : $"AI search failed: {result.error}\n{result.summary}";
         }
-        else
+        finally
         {
-            AiSearchText.Text = $"AI search failed: {_engine.GetLastAiSearchError()}\n{_engine.GetLastAiSearchSummaryJson()}";
+            SetAiSearchButtonsEnabled(true);
+            RefreshAll();
         }
-        RefreshAll();
     }
 
-    private void MakeBestAiAction_Click(object sender, RoutedEventArgs e)
+    private async void MakeBestAiAction_Click(object sender, RoutedEventArgs e)
     {
         if (_animationInProgress)
         {
@@ -1596,23 +1608,40 @@ public partial class Chess3DWindow : Window
             return;
         }
 
-        if (_engine.MakeBestProfileAction(SelectedAiDepth(), SelectedAiNodeLimit(), SelectedAiTimeLimitMs(), out var action))
+        SetAiSearchButtonsEnabled(false);
+        try
         {
-            AiSearchText.Text = $"AI played: {FormatAiAction(action)}\n{_engine.GetLastAiSearchSummaryJson()}";
-            var segments = BuildAiActionSegments(action).ToArray();
-            if (segments.Length > 0)
+            var depth = SelectedAiDepth();
+            var nodeLimit = SelectedAiNodeLimit();
+            var timeLimit = SelectedAiTimeLimitMs();
+            var result = await Task.Run(() =>
             {
-                BeginActionFlash(segments);
+                var ok = _engine.MakeBestProfileAction(depth, nodeLimit, timeLimit, out var action);
+                return (ok, action, error: _engine.GetLastAiSearchError(), summary: _engine.GetLastAiSearchSummaryJson());
+            });
+
+            if (result.ok)
+            {
+                AiSearchText.Text = $"AI played: {FormatAiAction(result.action)}\n{result.summary}";
+                var segments = BuildAiActionSegments(result.action).ToArray();
+                if (segments.Length > 0)
+                {
+                    BeginActionFlash(segments);
+                }
+                _selectedSquare = null;
+                _lastUiInvalidReason = string.Empty;
             }
-            _selectedSquare = null;
-            _lastUiInvalidReason = string.Empty;
+            else
+            {
+                _lastUiInvalidReason = result.error;
+                MessageBox.Show(this, $"AI move failed: {_lastUiInvalidReason}", "Chess3D AI", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
-        else
+        finally
         {
-            _lastUiInvalidReason = _engine.GetLastAiSearchError();
-            MessageBox.Show(this, $"AI move failed: {_lastUiInvalidReason}", "Chess3D AI", MessageBoxButton.OK, MessageBoxImage.Information);
+            SetAiSearchButtonsEnabled(true);
+            RefreshAll();
         }
-        RefreshAll();
     }
 
     private void CopyAiSearchSummary_Click(object sender, RoutedEventArgs e)
@@ -2489,7 +2518,7 @@ public partial class Chess3DWindow : Window
 
     private int SelectedAiDepth()
     {
-        return int.TryParse(AiDepthBox?.Text, out var depth) ? Math.Clamp(depth, 1, 3) : 1;
+        return int.TryParse(AiDepthBox?.Text, out var depth) ? Math.Clamp(depth, 1, 4) : 1;
     }
 
     private int SelectedAiNodeLimit()
@@ -2500,6 +2529,14 @@ public partial class Chess3DWindow : Window
     private int SelectedAiTimeLimitMs()
     {
         return int.TryParse(AiTimeLimitBox?.Text, out var ms) ? Math.Clamp(ms, 1, 30000) : 250;
+    }
+
+    private void SetAiSearchButtonsEnabled(bool enabled)
+    {
+        if (AiCandidatesButton != null) AiCandidatesButton.IsEnabled = enabled;
+        if (AiSearchButton != null) AiSearchButton.IsEnabled = enabled;
+        if (AiMakeMoveButton != null) AiMakeMoveButton.IsEnabled = enabled;
+        if (AiCopySummaryButton != null) AiCopySummaryButton.IsEnabled = enabled;
     }
 
     private string FormatAiAction(Chess3DAiActionDto action)

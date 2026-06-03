@@ -790,6 +790,34 @@ std::string ReadDivideActionsJson(void* game, int depth)
     return std::string(buffer.data());
 }
 
+std::string ReadAiSearchSummaryJson(void* game)
+{
+    std::vector<char> buffer(65536);
+    const int needed = Chess3D_GetLastAiSearchSummaryJson(game, buffer.data(), static_cast<int>(buffer.size()));
+    if (needed <= 0)
+    {
+        return {};
+    }
+    if (needed > static_cast<int>(buffer.size()))
+    {
+        buffer.assign(static_cast<std::size_t>(needed), '\0');
+        Chess3D_GetLastAiSearchSummaryJson(game, buffer.data(), static_cast<int>(buffer.size()));
+    }
+    return std::string(buffer.data());
+}
+
+std::string EncodeAiActionForTest(const Chess3DAiActionDto& action)
+{
+    std::ostringstream out;
+    out << action.kind << ':' << action.side << ':' << action.macroPlayer << ':'
+        << action.primarySide << ':' << action.fromX << ',' << action.fromY << ',' << action.fromZ
+        << "->" << action.toX << ',' << action.toY << ',' << action.toZ
+        << ":r" << action.restoreX << ',' << action.restoreY << ',' << action.restoreZ
+        << ":l" << action.axis << ',' << action.layer << ',' << action.quarterTurns
+        << ":p" << action.reservePieceType;
+    return out.str();
+}
+
 std::string JsonEscapeForTest(const std::string& value)
 {
     std::string out;
@@ -1236,6 +1264,58 @@ bool RunPlaythroughFile(void* game, const std::string& path, std::string& error)
             if (ReadStateHash(game) != before || Chess3D_GetActionCount(game) != actionsBefore)
             {
                 return fail("searchBestAiNoMutation mutated state or action history");
+            }
+        }
+        else if (type == "searchBestAiSummaryNoMutation")
+        {
+            const std::string before = ReadStateHash(game);
+            const int actionsBefore = Chess3D_GetActionCount(game);
+            Chess3DAiActionDto best{};
+            const int depth = IntValue(step, "depth", 1);
+            const int nodeLimit = IntValue(step, "nodeLimit", 128);
+            const int timeLimitMs = IntValue(step, "timeLimitMs", 100);
+            const bool expectSuccess = IntValue(step, "expectSuccess", 1) != 0;
+            const int result = Chess3D_SearchBestAiAction(game, depth, nodeLimit, timeLimitMs, &best);
+            if ((result != 0) != expectSuccess)
+            {
+                return fail("searchBestAiSummaryNoMutation unexpected search result");
+            }
+            if (ReadStateHash(game) != before || Chess3D_GetActionCount(game) != actionsBefore)
+            {
+                return fail("searchBestAiSummaryNoMutation mutated state or action history");
+            }
+            const std::string summary = ReadAiSearchSummaryJson(game);
+            const std::string required = ExtractStringValue(step, "summaryContains");
+            if (summary.find("p3d1-search-summary-v0.1") == std::string::npos ||
+                (!required.empty() && summary.find(required) == std::string::npos))
+            {
+                return fail("searchBestAiSummaryNoMutation summary assertion failed");
+            }
+        }
+        else if (type == "assertAiCandidateOrderStable")
+        {
+            const int sideOrMacroPlayer = IntValue(step, "sideOrMacroPlayer", 0);
+            const int countA = Chess3D_BuildAiActionCandidates(game, sideOrMacroPlayer);
+            std::vector<std::string> first;
+            for (int candidateIndex = 0; candidateIndex < countA; ++candidateIndex)
+            {
+                Chess3DAiActionDto candidate{};
+                Chess3D_GetAiActionCandidate(game, candidateIndex, &candidate);
+                first.push_back(EncodeAiActionForTest(candidate));
+            }
+            const int countB = Chess3D_BuildAiActionCandidates(game, sideOrMacroPlayer);
+            if (countA != countB)
+            {
+                return fail("assertAiCandidateOrderStable count changed");
+            }
+            for (int candidateIndex = 0; candidateIndex < countB; ++candidateIndex)
+            {
+                Chess3DAiActionDto candidate{};
+                Chess3D_GetAiActionCandidate(game, candidateIndex, &candidate);
+                if (first[static_cast<std::size_t>(candidateIndex)] != EncodeAiActionForTest(candidate))
+                {
+                    return fail("assertAiCandidateOrderStable order changed");
+                }
             }
         }
         else if (type == "makeBestAiAction")
@@ -3216,6 +3296,70 @@ int main()
             "AI candidate/search no-mutation: " + label);
     }
 
+    test.Check(Chess3D_LoadRuleProfileJson(game, classicProfile.c_str()) == 1, "P3D.1 iterative search loads classic");
+    Chess3D_Reset(game);
+    const std::string p3d1ClassicHash = ReadStateHash(game);
+    const int p3d1ClassicActions = Chess3D_GetActionCount(game);
+    Chess3DAiActionDto depth2Best{};
+    test.Check(Chess3D_SearchBestAiAction(game, 2, 4096, 1000, &depth2Best) == 1 &&
+        ReadStateHash(game) == p3d1ClassicHash &&
+        Chess3D_GetActionCount(game) == p3d1ClassicActions,
+        "P3D.1 depth-2 iterative search is non-mutating");
+    const std::string depth2Summary = ReadAiSearchSummaryJson(game);
+    test.Check(depth2Summary.find("p3d1-search-summary-v0.1") != std::string::npos &&
+        depth2Summary.find("\"completedDepth\": 2") != std::string::npos &&
+        depth2Summary.find("\"qnodes\":") != std::string::npos &&
+        depth2Summary.find("\"cutoffs\":") != std::string::npos &&
+        depth2Summary.find("\"bestAction\":") != std::string::npos,
+        "P3D.1 summary JSON v2 exposes completed depth, qnodes, cutoffs, and best action");
+    int qnodes = -1;
+    int cutoffs = -1;
+    test.Check(ExtractIntValue(depth2Summary, "qnodes", qnodes) && qnodes >= 0 &&
+        ExtractIntValue(depth2Summary, "cutoffs", cutoffs) && cutoffs >= 0,
+        "P3D.1 qnode and cutoff counters are parseable and non-negative");
+
+    Chess3DAiActionDto limitedBest{};
+    const std::string limitHash = ReadStateHash(game);
+    const int limitActions = Chess3D_GetActionCount(game);
+    const int limitResult = Chess3D_SearchBestAiAction(game, 3, 1, 1000, &limitedBest);
+    const std::string limitSummary = ReadAiSearchSummaryJson(game);
+    test.Check(limitResult == 0 &&
+        ReadStateHash(game) == limitHash &&
+        Chess3D_GetActionCount(game) == limitActions &&
+        limitSummary.find("\"stoppedReason\": \"nodeLimit\"") != std::string::npos,
+        "P3D.1 tiny node limit fails cleanly without mutation and reports nodeLimit");
+
+    test.Check(Chess3D_BuildAiActionCandidates(game, 0) > 0, "P3D.1 deterministic ordering builds candidates A");
+    std::vector<std::string> orderedA;
+    for (int i = 0; i < Chess3D_GetAiActionCandidateCount(game); ++i)
+    {
+        Chess3DAiActionDto candidate{};
+        Chess3D_GetAiActionCandidate(game, i, &candidate);
+        orderedA.push_back(EncodeAiActionForTest(candidate));
+    }
+    test.Check(Chess3D_BuildAiActionCandidates(game, 0) == static_cast<int>(orderedA.size()), "P3D.1 deterministic ordering builds candidates B");
+    bool sameOrder = true;
+    for (int i = 0; i < Chess3D_GetAiActionCandidateCount(game); ++i)
+    {
+        Chess3DAiActionDto candidate{};
+        Chess3D_GetAiActionCandidate(game, i, &candidate);
+        sameOrder = sameOrder && orderedA[static_cast<std::size_t>(i)] == EncodeAiActionForTest(candidate);
+    }
+    test.Check(sameOrder, "P3D.1 candidate ordering is deterministic");
+
+    test.Check(Chess3D_LoadRuleProfileJson(game, hodgeProfile.c_str()) == 1, "P3D.1 Hodge summary loads profile");
+    Chess3D_Clear(game);
+    Chess3D_SetPiece(game, 3, 3, 0, 1, Pawn);
+    Chess3D_SetPiece(game, 3, 0, 3, 3, Pawn);
+    Chess3D_SetPiece(game, 0, 3, 3, 5, Pawn);
+    const std::string hodgeP3D1Hash = ReadStateHash(game);
+    test.Check(Chess3D_SearchBestAiAction(game, 2, 2048, 1000, &depth2Best) == 1 &&
+        depth2Best.kind == ActionProjectionCompositeMove &&
+        ReadStateHash(game) == hodgeP3D1Hash,
+        "P3D.1 Hodge depth-2 search keeps projected composite all-or-nothing and non-mutating");
+    test.Check(ReadAiSearchSummaryJson(game).find("HPD") != std::string::npos,
+        "P3D.1 Hodge summary includes compact HPD best action");
+
     const std::array<std::string, 5> playthroughFiles = {
         "assets\\rules\\scenarios\\chess3d\\classic_six_side_playthrough_v0_1.json",
         "assets\\rules\\scenarios\\chess3d\\single_side_training_playthrough_v0_1.json",
@@ -3230,7 +3374,7 @@ int main()
             "headless playthrough PASS: " + playthroughFile + (playthroughError.empty() ? "" : " :: " + playthroughError));
     }
 
-    const std::array<std::string, 23> regressionFiles = {
+    const std::array<std::string, 35> regressionFiles = {
         "assets\\rules\\scenarios\\chess3d\\regression\\invalid_click_no_mutation_v0_1.json",
         "assets\\rules\\scenarios\\chess3d\\regression\\rubik_four_turn_roundtrip_v0_1.json",
         "assets\\rules\\scenarios\\chess3d\\regression\\hodge_blocked_mirror_rollback_v0_1.json",
@@ -3253,7 +3397,19 @@ int main()
         "assets\\rules\\scenarios\\chess3d\\regression\\rubik_ai_four_turn_no_regression_v0_1.json",
         "assets\\rules\\scenarios\\chess3d\\regression\\hodge_ai_projected_candidate_smoke_v0_1.json",
         "assets\\rules\\scenarios\\chess3d\\regression\\hodge_ai_blocked_projection_no_mutation_v0_1.json",
-        "assets\\rules\\scenarios\\chess3d\\regression\\ai_search_no_mutation_all_profiles_v0_1.json"
+        "assets\\rules\\scenarios\\chess3d\\regression\\ai_search_no_mutation_all_profiles_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\classic_ai_iterative_depth2_smoke_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\classic_ai_node_limit_smoke_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\classic_ai_quiescence_capture_recapture_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\single_side_ai_ordering_deterministic_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\asgard_ai_anchor_eval_smoke_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\asgard_ai_tt_or_hash_no_mutation_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\rubik_ai_layer_turn_ordering_smoke_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\rubik_ai_search_does_not_break_four_turn_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\hodge_ai_macro_eval_smoke_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\hodge_ai_timeout_no_partial_apply_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\ai_summary_json_v2_all_profiles_v0_1.json",
+        "assets\\rules\\scenarios\\chess3d\\regression\\ai_search_repeated_no_history_growth_v0_1.json"
     };
     for (const std::string& regressionFile : regressionFiles)
     {

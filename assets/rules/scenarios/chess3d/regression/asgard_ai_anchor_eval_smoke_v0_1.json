@@ -1,0 +1,20 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "asgard-ai-anchor-eval-smoke-v0.1",
+  "profileFile": "asgard_convergence_3d_v0_1.json",
+  "rulesetId": "asgard-convergence-3d-8x8x8-v0.1",
+  "purpose": "Asgard search sees stack/anchor/fusion progress as evaluation signals without destructive fusion.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "clearBoard" },
+    { "type": "pushCore", "side": 1, "pieceType": 1, "x": 2, "y": 2, "z": 2 },
+    { "type": "pushCore", "side": 1, "pieceType": 2, "x": 2, "y": 2, "z": 2 },
+    { "type": "assertStackCount", "x": 2, "y": 2, "z": 2, "exactCount": 2 },
+    { "type": "assertFusionKind", "x": 2, "y": 2, "z": 2, "kind": 2 },
+    { "type": "rememberStateHash", "name": "before" },
+    { "type": "searchBestAiSummaryNoMutation", "depth": 2, "nodeLimit": 2048, "timeLimitMs": 1000, "summaryContains": "asgard-convergence" },
+    { "type": "assertStateHashEqualsRemembered", "name": "before" }
+  ]
+}
+

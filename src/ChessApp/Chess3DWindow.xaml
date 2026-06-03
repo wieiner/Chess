@@ -399,10 +399,10 @@
                                     <TextBox x:Name="AiTimeLimitBox" Width="52" Text="250" VerticalAlignment="Center" />
                                 </WrapPanel>
                                 <WrapPanel Margin="0,8,0,0">
-                                    <Button Content="Candidates" Click="BuildAiCandidates_Click" />
-                                    <Button Content="Search Best" Click="SearchBestAiAction_Click" />
-                                    <Button Content="Make AI Move" Click="MakeBestAiAction_Click" />
-                                    <Button Content="Copy Summary" Click="CopyAiSearchSummary_Click" />
+                                    <Button x:Name="AiCandidatesButton" Content="Candidates" Click="BuildAiCandidates_Click" />
+                                    <Button x:Name="AiSearchButton" Content="Search Best" Click="SearchBestAiAction_Click" />
+                                    <Button x:Name="AiMakeMoveButton" Content="Make AI Move" Click="MakeBestAiAction_Click" />
+                                    <Button x:Name="AiCopySummaryButton" Content="Copy Summary" Click="CopyAiSearchSummary_Click" />
                                 </WrapPanel>
                                 <TextBlock x:Name="AiSearchText" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
                             </StackPanel>

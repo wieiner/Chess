@@ -172,7 +172,8 @@
 - Completed: append-only profile-aware AI action/candidate/search/apply ABI.
 - Completed: search candidates for normal moves, reserve restore, Rubik layer turns, and Hodge projected composite actions.
 - Completed: shallow deterministic search summary JSON, C# wrappers, UI panel, and regression fixtures.
-- Deferred: deep search strength, AI/search UI timeline, GPU search, and online AI authority.
+- Completed in P3D.1: iterative deepening, alpha-beta hardening, deterministic move ordering, bounded quiescence-lite, summary JSON v2, async WPF search/apply calls, and expanded no-mutation regression fixtures.
+- Deferred: tournament-strength evaluation, transposition-table storage, AI/search UI timeline, GPU search, and online AI authority.
 
 ### P3 - Full Six-Side Gameplay And Hybrid Victory
 
@@ -221,6 +222,7 @@ Next:
 - P3B: visual playability sprint final.
 - P3C: visual release-candidate polish.
 - P3D: AI/search per profile.
+- P3D.1: search correctness and strength gate.
 - P3E: online serialization.
 
 ## P2O - Product Playability And Rules Correctness Gate
@@ -239,6 +241,7 @@ Next:
 - P3B: visual playability sprint final for stacks, fusion, layer turns, Hodge mirrors, and replay/action animation.
 - P3C: visual release-candidate polish.
 - P3D: AI/search integration per profile.
+- P3D.1: search correctness and strength gate.
 - P3E: online serialization and multiplayer replay authority.
 - P3F: packaging/release polish and manual visual QA automation.
 
@@ -255,6 +258,7 @@ P3C is completed as the visual RC polish stage:
 Next:
 
 - P3D: AI/search integration per profile completed;
+- P3D.1: search correctness and strength gate completed;
 - P3E: online serialization and multiplayer authority;
 - P3F: release packaging polish and optional automated visual smoke capture.
 
@@ -268,3 +272,15 @@ P3D is completed as the first profile-aware Chess3D search layer:
 - Rubik candidates include legal layer turns.
 - Hodge candidates include projected composite moves as one all-or-nothing action.
 - Search is shallow, deterministic, bounded, and non-mutating until an explicit apply/make call.
+
+## P3D.1 - Search Correctness And Strength Gate
+
+P3D.1 is completed as a hardening pass over the existing search layer:
+
+- iterative deepening tracks requested, effective, and completed depth;
+- alpha-beta copy-state search is used beyond the fast depth-1 root path;
+- deterministic move ordering keeps candidate summaries and regression output stable;
+- bounded quiescence-lite extends tactical capture/restore leaves only when budgets allow;
+- summary JSON v2 reports nodes, qnodes, cutoffs, stopped reason, best score, and compact best-action text;
+- WPF Search Best and Make AI Move are asynchronous and leave rules in the native engine;
+- all five real Chess3D RuleProfiles remain isolated, and no sixth mode is added.

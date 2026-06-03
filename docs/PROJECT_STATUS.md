@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited locally for P3D profile-aware Chess3D AI/search integration.
+Last audited locally for P3D.1 profile-aware Chess3D AI/search hardening.
 
 ## Exists
 
@@ -328,5 +328,27 @@ Implemented:
 Still deferred:
 
 - deep search strength, transposition tables, opening books, and quiescence;
+- GPU/CUDA search;
+- online AI authority/synchronization.
+
+## P3D.1 Status
+
+P3D.1 hardens the P3D search layer without changing the five-rule-profile model and without changing the `Chess3DAiActionDto` ABI layout.
+
+Implemented:
+
+- iterative deepening with completed-depth fallback under node/time pressure;
+- alpha-beta copy-state search for depths beyond the fast depth-1 root smoke path;
+- deterministic candidate ordering for stable regression output;
+- bounded quiescence-lite for tactical capture/restore extensions when budgets allow;
+- summary JSON v2 with requested/effective/completed depth, nodes, qnodes, cutoffs, stopped reason, best score, and compact best-action text;
+- asynchronous WPF Search Best / Make AI Move handling so deeper bounded searches do not freeze the control center;
+- headless P3D.1 regression fixtures for node limits, summary JSON v2, ordering determinism, no-history-growth, Rubik, Asgard, and Hodge isolation.
+
+Still deferred:
+
+- tournament-strength evaluation;
+- real transposition-table storage;
+- opening books;
 - GPU/CUDA search;
 - online AI authority/synchronization.

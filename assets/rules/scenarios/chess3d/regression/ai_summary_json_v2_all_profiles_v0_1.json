@@ -1,0 +1,13 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "ai-summary-json-v2-all-profiles-v0.1",
+  "profileFile": "classic_six_side_3d_v0_1.json",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "Representative summary JSON v2 fixture. Contract tests loop over all five profiles.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "searchBestAiSummaryNoMutation", "depth": 2, "nodeLimit": 2048, "timeLimitMs": 1000, "summaryContains": "p3d1-search-summary-v0.1" }
+  ]
+}
+

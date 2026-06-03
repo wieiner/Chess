@@ -1,0 +1,19 @@
+{
+  "format": "chess3d-playthrough",
+  "version": "0.1",
+  "scenarioId": "classic-ai-quiescence-capture-recapture-v0.1",
+  "profileFile": "classic_six_side_3d_v0_1.json",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "A tactical capture position exercises quiescence-lite counters without mutation.",
+  "steps": [
+    { "type": "loadProfile" },
+    { "type": "clearBoard" },
+    { "type": "setPiece", "side": 1, "pieceType": 6, "x": 0, "y": 0, "z": 0 },
+    { "type": "setPiece", "side": 2, "pieceType": 6, "x": 7, "y": 7, "z": 7 },
+    { "type": "setPiece", "side": 1, "pieceType": 4, "x": 1, "y": 1, "z": 1 },
+    { "type": "setPiece", "side": 2, "pieceType": 1, "x": 1, "y": 1, "z": 4 },
+    { "type": "rememberStateHash", "name": "before" },
+    { "type": "searchBestAiSummaryNoMutation", "depth": 2, "nodeLimit": 2048, "timeLimitMs": 1000, "summaryContains": "qnodes" },
+    { "type": "assertStateHashEqualsRemembered", "name": "before" }
+  ]
+}
