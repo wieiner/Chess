@@ -173,3 +173,21 @@
 - concrete files affected: `src/ChessOnlineServer/Chess3DRelayHub.cs`, `tests/ChessOnlineSignalRContractTests/Program.cs`, `docs/CHESS3D_MATCHMAKING_DURABILITY_AUDIT.md`
 - risk: persistence must remain a side effect after a successful match, not a second authority source for gameplay
 - test/verify plan: targeted SignalR contract test checks persisted matched room/table/seats and last-known table, then full CI
+
+## Phase 07 - Game Mode Consistency Refresh
+
+- topic: real Chess3D RuleProfile count
+- internet/source researched: local `assets\rules\profiles` audit, runtime profile tests, and existing playability/product docs
+- key finding: the folder contains five real profile JSON files plus `chess3d_rule_profile.schema.json`, which is a schema artifact and not a sixth mode
+- decision for this repo: document exactly five Chess3D modes and state that scenarios, schemas, deployment fixtures, and online fixtures are not modes
+- concrete files affected: `docs/CHESS3D_MODE_CONSISTENCY_AUDIT.md`, `docs/CHESS3D_MODE_FEATURE_MATRIX.md`
+- risk: product docs can accidentally inflate mode count when fixture/schema JSON files are counted as gameplay profiles
+- test/verify plan: docs sanity with `git diff --check`; existing contract tests already assert exactly five real profiles
+
+- topic: cross-mode capability consistency
+- internet/source researched: local audits of `CHESS3D_PRODUCT_SURFACE_MAP.md`, `CHESS3D_RULE_PROFILE_PLAYABILITY_MATRIX.md`, `CHESS3D_MODE_CAPABILITIES_MATRIX.md`, profile JSON, and online tests
+- key finding: Classic, Single-Side, Asgard, Rubik, and Hodge have distinct profile-gated capabilities across UI, replay, AI/search, and online action authority
+- decision for this repo: add a consolidated matrix covering movement, capture, victory, reserve, stack, fusion, layer turns, projection, AI, online, snapshot, replay, and matchmaking status
+- concrete files affected: `docs/CHESS3D_MODE_FEATURE_MATRIX.md`
+- risk: infrastructure phases can make Asgard/Rubik/Hodge look like server features instead of product modes
+- test/verify plan: docs-only phase; no gameplay rules change
