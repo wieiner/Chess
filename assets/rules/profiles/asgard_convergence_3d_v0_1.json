@@ -137,7 +137,7 @@
     "type": "none"
   },
   "knownLimitations": [
-    "Reserve restore is not implemented.",
+    "Reserve restore is implemented only for matching free home slots; restore into core, restore-capture, and rich inventory UI remain deferred.",
     "P2G knockback/reserve runtime stores reserve as side/type counts without unique piece ids.",
     "Six-side target projection uses P2E CoreCell stack-aware anchors but remains fusion-limited.",
     "Checkmate is optional and not hardened for this profile.",

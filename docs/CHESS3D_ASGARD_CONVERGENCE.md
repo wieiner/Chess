@@ -136,3 +136,7 @@ Asgard remains one profile, not the default meaning of all Chess3D. In P2L the U
 ## P2O Rule-Gate Note
 
 P2O keeps Asgard's outcome tied to `centerAssembly`/anchor completion, not Classic checkmate. The rule summary reports king safety as not applicable/deferred for this profile. Action perft/divide can enumerate shallow Asgard legal actions for diagnostics, including profile-enabled reserve restore candidates, but it does not implement destructive implosion or contested-anchor scoring.
+
+## P4C Deepening Note
+
+P4C phase 08 audits Asgard as a product mode with runtimePartial core/fusion/reserve behavior. The base Asgard profile remains separate from Rubik and Hodge: Rubik layer-turn commands and Hodge projected-move commands must reject without mutating Asgard state. Future Asgard deepening is tracked in `CHESS3D_ASGARD_DEEPENING_PLAN.md`; destructive fusion, destructive implosion, contested-anchor scoring, dislodging, and rich reserve inventory are still deferred.

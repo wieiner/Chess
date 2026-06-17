@@ -191,3 +191,21 @@
 - concrete files affected: `docs/CHESS3D_MODE_FEATURE_MATRIX.md`
 - risk: infrastructure phases can make Asgard/Rubik/Hodge look like server features instead of product modes
 - test/verify plan: docs-only phase; no gameplay rules change
+
+## Phase 08 - Asgard Deepening Plan
+
+- topic: Asgard runtime boundary
+- internet/source researched: local audit of `asgard_convergence_3d_v0_1.json`, Asgard/core/fusion docs, Chess3D contract tests, online authority tests, and AI/search docs
+- key finding: Asgard already has runtime CoreCell stacks, stack-aware anchors, fusion descriptors, implosion progress, knockback/reserve, reserve restore to free home slots, action history, replay/save coverage, and online authority smoke; final destructive fusion/implosion, contested anchor scoring, dislodging, balance, and rich UI remain deferred
+- decision for this repo: keep Asgard in descriptor/runtimePartial mode for P4C and define the deepening plan instead of changing game physics
+- concrete files affected: `docs/CHESS3D_ASGARD_RULE_CONSISTENCY_AUDIT.md`, `docs/CHESS3D_ASGARD_DEEPENING_PLAN.md`, `docs/CHESS3D_ASGARD_ONLINE_TEST_MATRIX.md`, `assets/rules/profiles/asgard_convergence_3d_v0_1.json`
+- risk: metadata can drift and make reserve restore or fusion look more complete than they are
+- test/verify plan: add profile-isolation online authority checks for Asgard rejecting Rubik/Hodge commands without mutation; run targeted online contract tests, run-tests, and verify
+
+- topic: Asgard online and AI smoke coverage
+- internet/source researched: local audit of `ChessOnlineContractTests`, `ChessOnlineSignalRContractTests`, `Chess3DEngineContractTests`, online scenario descriptors, and AI regression fixtures
+- key finding: Asgard online startup, matchmaking snapshot, reserve/restore fixture parsing, and AI reserve/fusion smoke coverage already exist, but the explicit Asgard rejection of Rubik/Hodge command kinds was not covered in the online contract test
+- decision for this repo: add a small no-mutation isolation test in `ChessOnlineContractTests` and record the broader online matrix in docs
+- concrete files affected: `tests/ChessOnlineContractTests/Program.cs`, `docs/CHESS3D_ASGARD_ONLINE_TEST_MATRIX.md`
+- risk: online tests must keep using authority APIs and must not bypass profile-gated engine behavior
+- test/verify plan: targeted `ChessOnlineContractTests`, then `tests/run-tests.ps1 -SkipBenchmark`, then full verify

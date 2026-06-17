@@ -143,6 +143,7 @@ static void AuthorityProfileSmokeTests(ContractTest test, string profileRoot)
 {
     SmokeStartProfile(test, profileRoot, "single-side-3d-8x8x8-v0.1", 1);
     SmokeStartProfile(test, profileRoot, "asgard-convergence-3d-8x8x8-v0.1", 1);
+    AsgardProfileIsolationTests(test, profileRoot);
 
     var rubik = StartedRegistry(profileRoot, "room-rubik", "rubik", "rubik-convergence-3d-8x8x8-v0.1", 1, out var rubikEnv);
     var layer = rubik.SubmitAction(rubikEnv(OnlineMessageTypes.SubmitAction), new OnlineActionCommand
@@ -173,6 +174,45 @@ static void AuthorityProfileSmokeTests(ContractTest test, string profileRoot)
         QuarterTurns = 1
     });
     test.Check(disabledLayer.Error?.ReasonCode == OnlineRejectReasons.IllegalAction, "Classic rejects Rubik layer turn command");
+}
+
+static void AsgardProfileIsolationTests(ContractTest test, string profileRoot)
+{
+    var asgard = StartedRegistry(profileRoot, "room-asgard-isolation", "asgard-isolation", "asgard-convergence-3d-8x8x8-v0.1", 1, out var asgardEnv);
+    var initial = asgard.RequestSnapshot(asgardEnv(OnlineMessageTypes.RequestSnapshot)).Snapshot?.StateHash ?? "";
+
+    var rubikAction = asgard.SubmitAction(asgardEnv(OnlineMessageTypes.SubmitAction), new OnlineActionCommand
+    {
+        ActionKind = OnlineActionKinds.RubikLayerTurn,
+        ActorSide = 1,
+        Axis = 0,
+        Layer = 0,
+        QuarterTurns = 1,
+        ExpectedStateHashBefore = initial
+    });
+    var afterRubikReject = asgard.RequestSnapshot(asgardEnv(OnlineMessageTypes.RequestSnapshot)).Snapshot?.StateHash ?? "";
+    test.Check(rubikAction.Error?.ReasonCode == OnlineRejectReasons.IllegalAction &&
+        afterRubikReject == initial, "Asgard rejects Rubik layer turn without mutating state");
+
+    var hodgeAction = asgard.SubmitAction(asgardEnv(OnlineMessageTypes.SubmitAction), new OnlineActionCommand
+    {
+        ActionKind = OnlineActionKinds.HodgeProjectedMove,
+        ActorSide = 1,
+        MacroPlayer = 1,
+        FromX = 3,
+        FromY = 3,
+        FromZ = 0,
+        ToX = 3,
+        ToY = 3,
+        ToZ = 1,
+        ExpectedStateHashBefore = initial
+    });
+    var afterHodgeReject = asgard.RequestSnapshot(asgardEnv(OnlineMessageTypes.RequestSnapshot)).Snapshot?.StateHash ?? "";
+    test.Check(hodgeAction.Error?.ReasonCode == OnlineRejectReasons.IllegalAction &&
+        afterHodgeReject == initial, "Asgard rejects Hodge projected move without mutating state");
+
+    var aiCandidate = asgard.BuildFirstAiCandidateCommand("room-asgard-isolation", "asgard-isolation");
+    test.Check(aiCandidate != null, "Asgard online authority exposes at least one profile-aware AI candidate");
 }
 
 static void SnapshotAndReplayTests(ContractTest test, string profileRoot)
