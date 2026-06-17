@@ -107,6 +107,22 @@ The next recommended testing milestone is P2N: save/load/replay/export/import te
 
 The suite has no UI dependency, no internet dependency, no CUDA dependency, and leaves no hosted server process running after completion.
 
+## P4A Identity / Persistence Tests
+
+`ChessOnlineSignalRContractTests` also starts an auth-required hosted server with temporary JSON store and Data Protection key-ring paths. It verifies:
+
+- register issues protected access and refresh tokens;
+- diagnostics do not expose tokens or password hashes;
+- anonymous mutating commands are rejected when auth is required;
+- authenticated envelopes cannot spoof another `playerId`;
+- authenticated room/table/start/action flow still reaches the P3E authority registry;
+- refresh token works, logout revokes it, and rejected refresh is stable;
+- the JSON store persists account, session, and accepted action-log event records.
+
+Identity and persistence fixture descriptors live under `assets\rules\scenarios\chess3d\identity` and `assets\rules\scenarios\chess3d\persistence`. They are not new game modes.
+
+`scripts\verify.ps1` checks representative identity/persistence descriptors in development and portable output, and rejects generated runtime stores, key files, certificates, token files, and other secret-like artifacts in `ProductionOutput`.
+
 ## UI Smoke Tests
 
 UI smoke tests are currently manual. P2M improves click dispatch and visual diagnostics in C# and keeps both WPF apps compiling against the shared OBJ/material loader, but there is still no automated WPF click-through test. The next useful layer is a small launcher/screenshot check for `ChessApp.exe`, `Chess3DApp.exe`, `RubikApp.exe`, and `ChessOnlineApp.exe`.

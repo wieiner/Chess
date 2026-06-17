@@ -43,6 +43,34 @@ public sealed class OnlineHubConnectionRegistry
         }
     }
 
+    public OnlineConnectionSession HelloAuthenticated(string connectionId, OnlineMessageEnvelope envelope, string playerId, string sessionId)
+    {
+        lock (_gate)
+        {
+            if (_bySessionToken.TryGetValue(sessionId, out var existing))
+            {
+                existing.ConnectionIds.Add(connectionId);
+                existing.IsConnected = true;
+                existing.LastSeenUtc = DateTime.UtcNow;
+                _byConnection[connectionId] = existing;
+                return existing.Clone();
+            }
+
+            var session = new OnlineConnectionSession
+            {
+                ClientId = string.IsNullOrWhiteSpace(envelope.ClientId) ? $"client-{Guid.NewGuid():N}" : envelope.ClientId.Trim(),
+                PlayerId = playerId.Trim(),
+                SessionToken = sessionId.Trim(),
+                IsConnected = true,
+                LastSeenUtc = DateTime.UtcNow
+            };
+            session.ConnectionIds.Add(connectionId);
+            _byConnection[connectionId] = session;
+            _bySessionToken[session.SessionToken] = session;
+            return session.Clone();
+        }
+    }
+
     public bool CanReconnect(string playerId, string sessionToken)
     {
         lock (_gate)

@@ -106,6 +106,8 @@ ProductionOutput\ChessOnlineServer\Assets\Rules3D\Profiles
 ProductionOutput\ChessOnlineServer\Assets\Rules3D\Online
 ProductionOutput\ChessOnlineServer\Assets\Rules3D\OnlineScenarios
 ProductionOutput\ChessOnlineServer\Assets\Rules3D\SignalRScenarios
+ProductionOutput\ChessOnlineServer\Assets\Rules3D\IdentityScenarios
+ProductionOutput\ChessOnlineServer\Assets\Rules3D\PersistenceScenarios
 ```
 
 It is a local hosted prototype. It does not include production auth, database persistence, cloud configuration, or public matchmaking.
@@ -157,7 +159,7 @@ After successful verification, CI uploads `ProductionOutput` as the short-retent
 `rude-resource/` is a local ignored resource archive and is absent on CI. `scripts\verify.ps1` checks the ignore rule through the probe path `rude-resource/.verify-ignore-probe`, without creating that file.
 
 CUDA remains optional in CI and in the default local build. After P2M, the same verification pipeline also covers Rubik convergence layer turns, action history, deterministic notation, reserve restore contracts, Hodge Projection Duel composite-turn contracts, legal action preview contracts, scenario smoke/playthrough descriptors, packaging of the Chess3D control-center assets, and packaging of the canonical OBJ/MTL model catalog.
-P3F extends verification to build/package `ChessOnlineServer`, copy SignalR scenario descriptors, and run `ChessOnlineSignalRContractTests`.
+P3F extends verification to build/package `ChessOnlineServer`, copy SignalR scenario descriptors, and run `ChessOnlineSignalRContractTests`. P4A extends the same path with identity/persistence descriptors and verifies that generated stores, Data Protection keys, certificates, token files, and other runtime secret-like artifacts are not present in `ProductionOutput`.
 ## P2N Packaging Notes
 
 Save/replay code does not add required runtime data files beyond the existing RuleProfile and scenario assets.

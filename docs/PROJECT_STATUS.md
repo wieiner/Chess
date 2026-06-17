@@ -1,8 +1,8 @@
 # Project Status
 
-Last audited locally for P3F hosted SignalR transport prototype.
+Last audited locally for P4A production-oriented identity/session/persistence baseline.
 
-P3F adds a local hosted SignalR transport over the P3E Chess3D online authority contract: ASP.NET Core server, `/chess3d/relay` hub, health/diagnostic endpoints, reconnect session-token smoke behavior, SignalR fixtures, UI controls, tests, and packaging checks. It does not add a sixth Chess3D RuleProfile and does not make online play production-ready.
+P4A adds a local production-oriented identity/session/persistence layer around the P3E/P3F online authority contract: persistent player accounts, password hashing, protected access/refresh tokens, authenticated SignalR player identity, durable session records, JSON persistence baseline, identity/persistence fixtures, tests, and packaging checks. It does not add a sixth Chess3D RuleProfile and does not make online play a public production service.
 
 ## Exists
 
@@ -16,6 +16,7 @@ P3F adds a local hosted SignalR transport over the P3E Chess3D online authority 
 - `src/Chess3DApp`: separate 3D chess WPF app.
 - `src/RubikApp`: separate Rubik WPF app.
 - `src/ChessOnlineApp`: separate online integrations hub.
+- `src/ChessOnlinePersistence`: local provider-style account/session/room/table/action-log persistence baseline.
 - `src/Chess2DBenchmark`: 2D chess benchmark console executable.
 - `tools/release/Build-Production.ps1`: central production packaging script.
 - `tests/run-tests.ps1`: contract-test runner for native engine and GPU ABI smoke checks.

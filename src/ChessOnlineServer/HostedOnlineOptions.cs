@@ -21,6 +21,10 @@ public sealed class HostedOnlineOptions
     public int MaxMessageLogLength { get; set; } = 512;
     public bool DiagnosticsEnabled { get; set; } = true;
     public string ProfileRoot { get; set; } = "";
+    public HostedAuthOptions Auth { get; set; } = new();
+    public HostedPersistenceOptions Persistence { get; set; } = new();
+    public HostedDataProtectionOptions DataProtection { get; set; } = new();
+    public HostedSecurityOptions Security { get; set; } = new();
 
     public void Normalize()
     {
@@ -41,5 +45,83 @@ public sealed class HostedOnlineOptions
         MaxTablesPerRoom = Math.Clamp(MaxTablesPerRoom, 1, 1000);
         MaxConnections = Math.Clamp(MaxConnections, 1, 10000);
         MaxMessageLogLength = Math.Clamp(MaxMessageLogLength, 8, 100000);
+        Auth.Normalize();
+        Persistence.Normalize();
+        DataProtection.Normalize();
+        Security.Normalize();
+    }
+}
+
+public sealed class HostedAuthOptions
+{
+    public bool EnableAuthentication { get; set; } = false;
+    public bool AllowDevAnonymousSessions { get; set; } = true;
+    public int AccessTokenMinutes { get; set; } = 30;
+    public int RefreshTokenDays { get; set; } = 14;
+    public bool RequireHttpsForTokens { get; set; } = false;
+
+    public void Normalize()
+    {
+        AccessTokenMinutes = Math.Clamp(AccessTokenMinutes, 1, 24 * 60);
+        RefreshTokenDays = Math.Clamp(RefreshTokenDays, 1, 365);
+    }
+}
+
+public sealed class HostedPersistenceOptions
+{
+    public string Provider { get; set; } = "json";
+    public string StorePath { get; set; } = "";
+    public bool AutoCreate { get; set; } = true;
+    public bool RestoreRoomsOnStartup { get; set; } = false;
+
+    public void Normalize()
+    {
+        Provider = string.IsNullOrWhiteSpace(Provider) ? "json" : Provider.Trim();
+        if (string.IsNullOrWhiteSpace(StorePath))
+        {
+            StorePath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Chess3D",
+                "online-dev",
+                "chess3d-online-store.json");
+        }
+    }
+}
+
+public sealed class HostedDataProtectionOptions
+{
+    public string ApplicationName { get; set; } = "Chess3D.Online";
+    public string KeyRingPath { get; set; } = "";
+
+    public void Normalize()
+    {
+        if (string.IsNullOrWhiteSpace(ApplicationName))
+        {
+            ApplicationName = "Chess3D.Online";
+        }
+        if (string.IsNullOrWhiteSpace(KeyRingPath))
+        {
+            KeyRingPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Chess3D",
+                "online-dev",
+                "keys");
+        }
+    }
+}
+
+public sealed class HostedSecurityOptions
+{
+    public int PasswordMinLength { get; set; } = 8;
+    public int PasswordMaxLength { get; set; } = 256;
+    public int MaxLoginAttempts { get; set; } = 5;
+    public int LockoutMinutes { get; set; } = 5;
+
+    public void Normalize()
+    {
+        PasswordMinLength = Math.Clamp(PasswordMinLength, 6, 128);
+        PasswordMaxLength = Math.Clamp(PasswordMaxLength, PasswordMinLength, 4096);
+        MaxLoginAttempts = Math.Clamp(MaxLoginAttempts, 1, 100);
+        LockoutMinutes = Math.Clamp(LockoutMinutes, 1, 1440);
     }
 }

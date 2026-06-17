@@ -129,6 +129,8 @@ try {
     Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Assets\Rules3D\Profiles\classic_six_side_3d_v0_1.json"
     Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Assets\Rules3D\Online\schemas\chess3d_relay_v0_1.schema.json"
     Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Assets\Rules3D\SignalRScenarios\signalr_hello_connect_v0_1.json"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Assets\Rules3D\IdentityScenarios\identity_register_login_v0_1.json"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Assets\Rules3D\PersistenceScenarios\persistence_room_table_action_log_v0_1.json"
     Assert-File "bin\x64\Release\Chess2DBenchmark.exe"
     Assert-File "src\ChessApp\bin\x64\Release\net8.0-windows\Assets\Models\piece_sets.json"
     Assert-File "src\ChessApp\bin\x64\Release\net8.0-windows\Assets\Models\default\Pieces\white_pawn.obj"
@@ -179,6 +181,8 @@ try {
     Assert-File "ProductionOutput\ChessOnlineServer\Assets\Rules3D\Profiles\classic_six_side_3d_v0_1.json"
     Assert-File "ProductionOutput\ChessOnlineServer\Assets\Rules3D\Online\schemas\chess3d_relay_v0_1.schema.json"
     Assert-File "ProductionOutput\ChessOnlineServer\Assets\Rules3D\SignalRScenarios\signalr_hello_connect_v0_1.json"
+    Assert-File "ProductionOutput\ChessOnlineServer\Assets\Rules3D\IdentityScenarios\identity_register_login_v0_1.json"
+    Assert-File "ProductionOutput\ChessOnlineServer\Assets\Rules3D\PersistenceScenarios\persistence_room_table_action_log_v0_1.json"
     Assert-File "ProductionOutput\Chess2DBenchmark\Chess2DBenchmark.exe"
     Assert-File "ProductionOutput\Chess2D\Assets\Models\piece_sets.json"
     Assert-File "ProductionOutput\Chess2D\Assets\Models\default\Pieces\white_pawn.obj"
@@ -229,6 +233,25 @@ try {
     if ($badPortableFiles) {
         $badPortableFiles | Select-Object -ExpandProperty FullName
         throw "ProductionOutput contains build intermediates or debug leftovers."
+    }
+
+    $secretExtensions = @(".db", ".sqlite", ".sqlite3", ".key", ".pfx", ".pem")
+    $secretNamePatterns = @("*.secrets", "*password*", "*token*", "key-*.xml", "chess3d-online-store.json")
+    $secretPortableFiles = Get-ChildItem -LiteralPath (Join-Path $Root "ProductionOutput") -Recurse -File | Where-Object {
+        $extension = $_.Extension.ToLowerInvariant()
+        if ($secretExtensions -contains $extension) {
+            return $true
+        }
+        foreach ($pattern in $secretNamePatterns) {
+            if ($_.Name -like $pattern) {
+                return $true
+            }
+        }
+        return $false
+    }
+    if ($secretPortableFiles) {
+        $secretPortableFiles | Select-Object -ExpandProperty FullName
+        throw "ProductionOutput contains runtime secret, database, token, or key artifacts."
     }
 
     Write-Step "Contract tests"

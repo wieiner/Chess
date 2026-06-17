@@ -1,3 +1,7 @@
+using System.Security.Claims;
+using System.Text.Json;
+using ChessOnlinePersistence.Entities;
+using ChessOnlinePersistence.Repositories;
 using ChessOnlineProtocol;
 using Microsoft.AspNetCore.SignalR;
 
@@ -7,17 +11,23 @@ public sealed class Chess3DRelayHub : Hub
 {
     private readonly OnlineRoomRegistry _registry;
     private readonly OnlineHubConnectionRegistry _connections;
+    private readonly IOnlineRoomPersistenceStore _roomStore;
+    private readonly IOnlineSessionStore _sessionStore;
     private readonly HostedOnlineOptions _options;
     private readonly ILogger<Chess3DRelayHub> _logger;
 
     public Chess3DRelayHub(
         OnlineRoomRegistry registry,
         OnlineHubConnectionRegistry connections,
+        IOnlineRoomPersistenceStore roomStore,
+        IOnlineSessionStore sessionStore,
         HostedOnlineOptions options,
         ILogger<Chess3DRelayHub> logger)
     {
         _registry = registry;
         _connections = connections;
+        _roomStore = roomStore;
+        _sessionStore = sessionStore;
         _options = options;
         _logger = logger;
     }
@@ -47,6 +57,12 @@ public sealed class Chess3DRelayHub : Hub
             await SendCaller("ReceiveError", error);
             return error;
         }
+        var authError = ValidateAuthenticatedEnvelope(message.Envelope);
+        if (authError != null)
+        {
+            await SendCaller("ReceiveError", authError);
+            return authError;
+        }
         if (!string.IsNullOrWhiteSpace(message.Envelope.SessionToken) &&
             !_connections.CanReconnect(message.Envelope.PlayerId, message.Envelope.SessionToken))
         {
@@ -55,7 +71,9 @@ public sealed class Chess3DRelayHub : Hub
             return invalid;
         }
 
-        var session = _connections.Hello(Context.ConnectionId, message.Envelope);
+        var session = AuthenticatedPlayerId() is { Length: > 0 } playerId && AuthenticatedSessionId() is { Length: > 0 } authSessionId
+            ? _connections.HelloAuthenticated(Context.ConnectionId, message.Envelope, playerId, authSessionId)
+            : _connections.Hello(Context.ConnectionId, message.Envelope);
         _registry.SetActiveConnectionCount(_connections.ActiveConnectionCount);
         var result = _registry.Hello(WithSession(message.Envelope, session));
         result.Envelope.PlayerId = session.PlayerId;
@@ -83,6 +101,10 @@ public sealed class Chess3DRelayHub : Hub
             command.RoomId = message.Envelope.RoomId;
         }
         var result = InvokeRegistry(message, OnlineMessageTypes.CreateRoom, env => _registry.CreateRoom(env, command));
+        if (result.Envelope.MessageType == OnlineMessageTypes.RoomCreated)
+        {
+            await PersistRoom(result);
+        }
         await SendCaller(result.Envelope.MessageType == OnlineMessageTypes.RoomCreated ? "ReceiveRoomCreated" : "ReceiveError", result);
         return result;
     }
@@ -93,6 +115,7 @@ public sealed class Chess3DRelayHub : Hub
         if (result.Envelope.MessageType == OnlineMessageTypes.RoomJoined)
         {
             _connections.SetMembership(Context.ConnectionId, result.Envelope.RoomId);
+            await PersistSessionMembership(result.Envelope.RoomId, "", 0);
             await Groups.AddToGroupAsync(Context.ConnectionId, RoomGroup(result.Envelope.RoomId));
             await Clients.Group(RoomGroup(result.Envelope.RoomId)).SendAsync("ReceiveRoomJoined", result);
         }
@@ -126,6 +149,7 @@ public sealed class Chess3DRelayHub : Hub
         var result = InvokeRegistry(message, OnlineMessageTypes.CreateTable, env => _registry.CreateTable(env, message.Table ?? new OnlineTableCommand()));
         if (result.Envelope.MessageType == OnlineMessageTypes.TableCreated)
         {
+            await PersistTable(result);
             await Clients.Group(RoomGroup(result.Envelope.RoomId)).SendAsync("ReceiveTableCreated", result);
         }
         else
@@ -141,6 +165,8 @@ public sealed class Chess3DRelayHub : Hub
         if (result.Envelope.MessageType == OnlineMessageTypes.SeatAssigned)
         {
             _connections.SetMembership(Context.ConnectionId, result.Envelope.RoomId, result.Envelope.TableId);
+            await PersistSeat(result);
+            await PersistSessionMembership(result.Envelope.RoomId, result.Envelope.TableId, result.Table?.SeatIndex ?? 0);
             await Groups.AddToGroupAsync(Context.ConnectionId, TableGroup(result.Envelope.TableId));
             await Clients.Group(TableGroup(result.Envelope.TableId)).SendAsync("ReceiveSeatAssigned", result);
             await Clients.Group(TableGroup(result.Envelope.TableId)).SendAsync("ReceiveTableState", result);
@@ -166,6 +192,10 @@ public sealed class Chess3DRelayHub : Hub
     public async Task<OnlineProtocolMessage> Ready(OnlineProtocolMessage message)
     {
         var result = InvokeRegistry(message, OnlineMessageTypes.Ready, env => _registry.Ready(env, message.Table ?? new OnlineTableCommand()));
+        if (result.Envelope.MessageType == OnlineMessageTypes.TableState)
+        {
+            await PersistSeat(result);
+        }
         await SendToTableOrCaller(result, "ReceiveTableState");
         return result;
     }
@@ -175,6 +205,7 @@ public sealed class Chess3DRelayHub : Hub
         var result = InvokeRegistry(message, OnlineMessageTypes.StartGame, env => _registry.StartGame(env));
         if (result.Envelope.MessageType == OnlineMessageTypes.GameStarted)
         {
+            await PersistTable(result);
             await Clients.Group(TableGroup(result.Envelope.TableId)).SendAsync("ReceiveGameStarted", result);
             await Clients.Group(TableGroup(result.Envelope.TableId)).SendAsync("ReceiveAuthoritativeSnapshot", result);
         }
@@ -190,6 +221,7 @@ public sealed class Chess3DRelayHub : Hub
         var result = InvokeRegistry(message, OnlineMessageTypes.SubmitAction, env => _registry.SubmitAction(env, message.Action ?? new OnlineActionCommand()));
         if (result.Envelope.MessageType == OnlineMessageTypes.ActionAccepted)
         {
+            await PersistAcceptedAction(result);
             await Clients.Group(TableGroup(result.Envelope.TableId)).SendAsync("ReceiveActionAccepted", result);
         }
         else if (result.Envelope.MessageType == OnlineMessageTypes.ResyncRequired)
@@ -249,6 +281,11 @@ public sealed class Chess3DRelayHub : Hub
             {
                 return error;
             }
+            var authError = ValidateAuthenticatedEnvelope(message.Envelope);
+            if (authError != null)
+            {
+                return authError;
+            }
             if (!_connections.AllowCommand(Context.ConnectionId, _options.RateLimitPermitLimit, _options.RateLimitWindowSeconds))
             {
                 return Error(message.Envelope, OnlineRejectReasons.IllegalAction, "Rate limit exceeded.");
@@ -286,12 +323,147 @@ public sealed class Chess3DRelayHub : Hub
 
     private OnlineMessageEnvelope CurrentEnvelope(OnlineMessageEnvelope envelope)
     {
+        var playerId = AuthenticatedPlayerId();
+        var sessionId = AuthenticatedSessionId();
+        if (!string.IsNullOrWhiteSpace(playerId) && !string.IsNullOrWhiteSpace(sessionId))
+        {
+            envelope.PlayerId = playerId;
+            envelope.SessionToken = sessionId;
+        }
         if (_connections.TryGet(Context.ConnectionId, out var session))
         {
             return WithSession(envelope, session);
         }
         return envelope;
     }
+
+    private OnlineProtocolMessage? ValidateAuthenticatedEnvelope(OnlineMessageEnvelope envelope)
+    {
+        if (!_options.Auth.EnableAuthentication)
+        {
+            return null;
+        }
+
+        var playerId = AuthenticatedPlayerId();
+        if (!string.IsNullOrWhiteSpace(playerId))
+        {
+            if (!string.IsNullOrWhiteSpace(envelope.PlayerId) &&
+                !string.Equals(envelope.PlayerId, playerId, StringComparison.OrdinalIgnoreCase))
+            {
+                return Error(envelope, OnlineRejectReasons.IllegalAction, "Authenticated player does not match message envelope.");
+            }
+            return null;
+        }
+
+        return _options.Auth.AllowDevAnonymousSessions
+            ? null
+            : Error(envelope, OnlineRejectReasons.IllegalAction, "Authentication is required.");
+    }
+
+    private string AuthenticatedPlayerId() => Context.User?.FindFirst("playerId")?.Value
+        ?? Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+        ?? "";
+
+    private string AuthenticatedSessionId() => Context.User?.FindFirst("sessionId")?.Value ?? "";
+
+    private async Task PersistSessionMembership(string roomId, string tableId, int seatIndex)
+    {
+        var sessionId = AuthenticatedSessionId();
+        if (!string.IsNullOrWhiteSpace(sessionId))
+        {
+            await _sessionStore.UpdateLastSeenAsync(sessionId, roomId, tableId, seatIndex);
+        }
+    }
+
+    private async Task PersistTable(OnlineProtocolMessage result)
+    {
+        var snapshot = result.Snapshot;
+        var tableId = result.Envelope.TableId;
+        if (string.IsNullOrWhiteSpace(tableId))
+        {
+            tableId = result.Table?.TableId ?? "";
+        }
+        if (string.IsNullOrWhiteSpace(tableId))
+        {
+            return;
+        }
+        await _roomStore.UpsertTableAsync(new PersistentTableEntity
+        {
+            RoomId = result.Envelope.RoomId,
+            TableId = PersistenceTableKey(result.Envelope.RoomId, tableId),
+            RulesetId = result.Table?.RulesetId ?? snapshot?.RulesetId ?? "",
+            ProfileKind = result.Table?.RulesetId ?? snapshot?.RulesetId ?? "",
+            State = result.Envelope.MessageType,
+            ServerSeq = snapshot?.ServerSeq ?? result.Envelope.ServerSeq,
+            StateHash = snapshot?.StateHash ?? "",
+            SaveGameJson = snapshot?.SaveGameJson ?? "",
+            CreatedAtUtc = DateTime.UtcNow,
+            StartedAtUtc = result.Envelope.MessageType == OnlineMessageTypes.GameStarted ? DateTime.UtcNow : null,
+            LastUpdatedAtUtc = DateTime.UtcNow
+        });
+    }
+
+    private async Task PersistRoom(OnlineProtocolMessage result)
+    {
+        var roomId = result.Room?.RoomId ?? result.Envelope.RoomId;
+        if (string.IsNullOrWhiteSpace(roomId))
+        {
+            return;
+        }
+        await _roomStore.UpsertRoomAsync(new PersistentRoomEntity
+        {
+            RoomId = roomId,
+            DisplayName = result.Room?.DisplayName ?? roomId,
+            CreatedAtUtc = DateTime.UtcNow,
+            OwnerPlayerId = result.Envelope.PlayerId,
+            State = result.Envelope.MessageType,
+            LastServerSeq = result.Envelope.ServerSeq,
+            LastUpdatedAtUtc = DateTime.UtcNow
+        });
+    }
+
+    private async Task PersistSeat(OnlineProtocolMessage result)
+    {
+        if (result.Table == null || string.IsNullOrWhiteSpace(result.Envelope.TableId))
+        {
+            return;
+        }
+        await _roomStore.UpsertSeatAsync(new PersistentSeatEntity
+        {
+            TableId = PersistenceTableKey(result.Envelope.RoomId, result.Envelope.TableId),
+            SeatIndex = result.Table.SeatIndex,
+            SideId = result.Table.SeatIndex,
+            MacroPlayer = 0,
+            PlayerId = result.Envelope.PlayerId,
+            IsReady = result.Table.Ready,
+            IsConnected = true,
+            LastSeenAtUtc = DateTime.UtcNow
+        });
+    }
+
+    private async Task PersistAcceptedAction(OnlineProtocolMessage result)
+    {
+        if (result.ActionLog?.Events.Count > 0)
+        {
+            foreach (var actionEvent in result.ActionLog.Events)
+            {
+                await _roomStore.AppendActionAsync(new PersistentActionLogEntity
+                {
+                    TableId = PersistenceTableKey(result.Envelope.RoomId, result.Envelope.TableId),
+                    ServerSeq = actionEvent.ServerSeq,
+                    ActionIndex = actionEvent.ActionIndex,
+                    ActorPlayerId = actionEvent.PlayerId,
+                    ActionKind = actionEvent.ActionKind,
+                    ActionJson = JsonSerializer.Serialize(actionEvent.Command, OnlineProtocolJson.Options),
+                    Notation = actionEvent.Notation,
+                    StateHashAfter = actionEvent.StateHashAfter,
+                    CreatedAtUtc = DateTime.UtcNow
+                });
+            }
+        }
+    }
+
+    private static string PersistenceTableKey(string roomId, string tableId) => $"{roomId.Trim()}/{tableId.Trim()}";
 
     private static OnlineMessageEnvelope WithSession(OnlineMessageEnvelope envelope, OnlineConnectionSession session)
     {

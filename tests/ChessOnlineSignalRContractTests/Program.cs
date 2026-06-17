@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text.Json;
 using ChessOnlineProtocol;
@@ -16,6 +17,7 @@ try
     var port = FindFreePort();
     var url = $"http://127.0.0.1:{port}";
     var hubUrl = $"{url}/chess3d/relay";
+    var serverTempRoot = Path.Combine(Path.GetTempPath(), "chess3d-p4a-signalr-tests", Guid.NewGuid().ToString("N"));
 
     await using var app = ChessOnlineServerHost.BuildApp(Array.Empty<string>(), options =>
     {
@@ -23,6 +25,8 @@ try
         options.ProfileRoot = profileRoot;
         options.RateLimitPermitLimit = 500;
         options.MaxReceiveMessageBytes = 65536;
+        options.Persistence.StorePath = Path.Combine(serverTempRoot, "store", "online-store.json");
+        options.DataProtection.KeyRingPath = Path.Combine(serverTempRoot, "keys");
     });
     await app.StartAsync();
 
@@ -33,7 +37,10 @@ try
     await ReconnectTests(test, hubUrl, profileRoot);
     await ConcurrencyTests(test, hubUrl, profileRoot);
     await SecurityTests(test, hubUrl);
+    await AuthPersistenceTests(test, root, profileRoot);
     FixtureParseTests(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "signalr"));
+    FixtureParseTestsWithFormat(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "identity"), "chess3d-identity-regression", "Identity fixture");
+    FixtureParseTestsWithFormat(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "persistence"), "chess3d-persistence-regression", "Persistence fixture");
 
     await app.StopAsync();
     return test.Finish();
@@ -257,7 +264,109 @@ static async Task SecurityTests(ContractTest test, string hubUrl)
     }
 }
 
+static async Task AuthPersistenceTests(ContractTest test, string root, string profileRoot)
+{
+    var port = FindFreePort();
+    var url = $"http://127.0.0.1:{port}";
+    var hubUrl = $"{url}/chess3d/relay";
+    var tempRoot = Path.Combine(Path.GetTempPath(), "chess3d-p4a-tests", Guid.NewGuid().ToString("N"));
+    var storePath = Path.Combine(tempRoot, "store", "online-store.json");
+    var keyPath = Path.Combine(tempRoot, "keys");
+
+    await using var app = ChessOnlineServerHost.BuildApp(Array.Empty<string>(), options =>
+    {
+        options.HostUrls = url;
+        options.ProfileRoot = profileRoot;
+        options.RateLimitPermitLimit = 500;
+        options.Auth.EnableAuthentication = true;
+        options.Auth.AllowDevAnonymousSessions = false;
+        options.Auth.AccessTokenMinutes = 5;
+        options.Auth.RefreshTokenDays = 1;
+        options.Persistence.StorePath = storePath;
+        options.DataProtection.KeyRingPath = keyPath;
+    });
+    await app.StartAsync();
+
+    using var http = new HttpClient { BaseAddress = new Uri(url) };
+    var register = await http.PostAsJsonAsync("/api/auth/register", new AuthRegisterRequest
+    {
+        UserName = "p4a-user",
+        DisplayName = "P4A User",
+        Password = "correct horse battery staple",
+        ClientName = "contract-test"
+    });
+    var token = await register.Content.ReadFromJsonAsync<AuthTokenResponse>();
+    test.Check(register.IsSuccessStatusCode && token?.Success == true &&
+        !string.IsNullOrWhiteSpace(token.AccessToken) &&
+        !string.IsNullOrWhiteSpace(token.RefreshToken), "P4A register issues protected access and refresh tokens");
+
+    var diagnostics = await http.GetStringAsync("/chess3d/diagnostics");
+    test.Check(!diagnostics.Contains("accessToken", StringComparison.OrdinalIgnoreCase) &&
+        !diagnostics.Contains("refreshToken", StringComparison.OrdinalIgnoreCase) &&
+        !diagnostics.Contains("passwordHash", StringComparison.OrdinalIgnoreCase), "P4A diagnostics do not expose credentials");
+
+    await using var anonymous = NewClient(hubUrl);
+    await anonymous.StartAsync();
+    var anonResult = await anonymous.InvokeAsync<OnlineProtocolMessage>("CreateRoom", Message(OnlineMessageTypes.CreateRoom, "anon", "", "auth-room", ""));
+    test.Check(anonResult.Error?.ReasonCode == OnlineRejectReasons.IllegalAction, "P4A auth-required server rejects anonymous mutating command");
+
+    await using var spoof = NewAuthenticatedClient(hubUrl, token!.AccessToken);
+    await spoof.StartAsync();
+    var spoofed = await spoof.InvokeAsync<OnlineProtocolMessage>("Hello", Message(OnlineMessageTypes.Hello, "auth-client", "other-player"));
+    test.Check(spoofed.Error?.ReasonCode == OnlineRejectReasons.IllegalAction, "P4A authenticated hub rejects spoofed playerId envelope");
+
+    await using var client = NewAuthenticatedClient(hubUrl, token.AccessToken);
+    await client.StartAsync();
+    var hello = await client.InvokeAsync<OnlineProtocolMessage>("Hello", Message(OnlineMessageTypes.Hello, "auth-client", token.PlayerId));
+    test.Check(hello.Envelope.MessageType == OnlineMessageTypes.Welcome &&
+        hello.Envelope.PlayerId == token.PlayerId &&
+        hello.Envelope.SessionToken == token.SessionId, "P4A Hello derives player and session from authenticated token");
+
+    await client.InvokeAsync<OnlineProtocolMessage>("CreateRoom", Message(OnlineMessageTypes.CreateRoom, "auth-client", token.PlayerId, "auth-room", ""));
+    await client.InvokeAsync<OnlineProtocolMessage>("JoinRoom", Message(OnlineMessageTypes.JoinRoom, "auth-client", token.PlayerId, "auth-room", ""));
+    var table = Message(OnlineMessageTypes.CreateTable, "auth-client", token.PlayerId, "auth-room", "");
+    table.Table = new OnlineTableCommand { TableId = "auth-table", RulesetId = "classic-six-side-3d-8x8x8-v0.1" };
+    test.Check((await client.InvokeAsync<OnlineProtocolMessage>("CreateTable", table)).Envelope.MessageType == OnlineMessageTypes.TableCreated,
+        "P4A authenticated client creates table");
+    var seat = Message(OnlineMessageTypes.JoinTableSeat, "auth-client", token.PlayerId, "auth-room", "auth-table");
+    seat.Table = new OnlineTableCommand { SeatIndex = 1 };
+    await client.InvokeAsync<OnlineProtocolMessage>("JoinTableSeat", seat);
+    var ready = Message(OnlineMessageTypes.Ready, "auth-client", token.PlayerId, "auth-room", "auth-table");
+    ready.Table = new OnlineTableCommand { Ready = true };
+    await client.InvokeAsync<OnlineProtocolMessage>("Ready", ready);
+    await client.InvokeAsync<OnlineProtocolMessage>("StartGame", Message(OnlineMessageTypes.StartGame, "auth-client", token.PlayerId, "auth-room", "auth-table"));
+
+    var helper = StartedRegistry(profileRoot, "auth-helper-room", "auth-helper-table", "classic-six-side-3d-8x8x8-v0.1", 1);
+    var command = helper.BuildFirstLegalNormalMoveCommand("auth-helper-room", "auth-helper-table", 1);
+    var action = Message(OnlineMessageTypes.SubmitAction, "auth-client", token.PlayerId, "auth-room", "auth-table");
+    action.Action = command;
+    var accepted = await client.InvokeAsync<OnlineProtocolMessage>("SubmitAction", action);
+    test.Check(accepted.Envelope.MessageType == OnlineMessageTypes.ActionAccepted, "P4A authenticated SubmitAction reaches authority registry");
+
+    var refresh = await http.PostAsJsonAsync("/api/auth/refresh", new AuthRefreshRequest { RefreshToken = token.RefreshToken });
+    var refreshed = await refresh.Content.ReadFromJsonAsync<AuthTokenResponse>();
+    test.Check(refresh.IsSuccessStatusCode && refreshed?.Success == true &&
+        !string.IsNullOrWhiteSpace(refreshed.AccessToken), "P4A refresh token issues new access token");
+
+    await http.PostAsJsonAsync("/api/auth/logout", new AuthRefreshRequest { RefreshToken = token.RefreshToken });
+    var rejectedRefresh = await http.PostAsJsonAsync("/api/auth/refresh", new AuthRefreshRequest { RefreshToken = token.RefreshToken });
+    test.Check(rejectedRefresh.StatusCode == HttpStatusCode.Unauthorized, "P4A logout revokes refresh session");
+
+    var storeJson = File.ReadAllText(storePath);
+    using var storeDoc = JsonDocument.Parse(storeJson);
+    test.Check(storeDoc.RootElement.GetProperty("players").GetArrayLength() == 1, "P4A JSON store persists account");
+    test.Check(storeDoc.RootElement.GetProperty("sessions").GetArrayLength() == 1, "P4A JSON store persists durable session");
+    test.Check(storeDoc.RootElement.GetProperty("actions").GetArrayLength() >= 1, "P4A JSON store persists accepted action log event");
+
+    await app.StopAsync();
+}
+
 static void FixtureParseTests(ContractTest test, string fixtureRoot)
+{
+    FixtureParseTestsWithFormat(test, fixtureRoot, "chess3d-signalr-regression", "SignalR fixture");
+}
+
+static void FixtureParseTestsWithFormat(ContractTest test, string fixtureRoot, string expectedFormat, string label)
 {
     var expected = new[]
     {
@@ -277,13 +386,20 @@ static void FixtureParseTests(ContractTest test, string fixtureRoot)
         "signalr_malformed_message_reject_v0_1.json",
         "signalr_diagnostics_no_secret_v0_1.json"
     };
-    foreach (var file in expected)
+    var files = expectedFormat == "chess3d-signalr-regression"
+        ? expected
+        : Directory.Exists(fixtureRoot)
+            ? Directory.GetFiles(fixtureRoot, "*.json").Select(Path.GetFileName).Where(f => f != null).Cast<string>().OrderBy(f => f).ToArray()
+            : Array.Empty<string>();
+    test.Check(files.Length > 0, $"{label} directory has fixtures");
+
+    foreach (var file in files)
     {
         var path = Path.Combine(fixtureRoot, file);
         test.Check(File.Exists(path), $"SignalR fixture exists: {file}");
         using var doc = JsonDocument.Parse(File.ReadAllText(path));
         test.Check(doc.RootElement.TryGetProperty("format", out var format) &&
-            format.GetString() == "chess3d-signalr-regression", $"SignalR fixture parses: {file}");
+            format.GetString() == expectedFormat, $"{label} parses: {file}");
     }
 }
 
@@ -352,6 +468,13 @@ static HubConnection NewClient(string hubUrl)
 {
     return new HubConnectionBuilder()
         .WithUrl(hubUrl)
+        .Build();
+}
+
+static HubConnection NewAuthenticatedClient(string hubUrl, string accessToken)
+{
+    return new HubConnectionBuilder()
+        .WithUrl(hubUrl, options => options.AccessTokenProvider = () => Task.FromResult<string?>(accessToken))
         .Build();
 }
 

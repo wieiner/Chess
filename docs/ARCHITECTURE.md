@@ -159,4 +159,11 @@ P3F adds `src/ChessOnlineServer` as a local hosted ASP.NET Core/SignalR transpor
 - `ChessOnlineApp` can connect to the hosted server from its `3D Relay` tab.
 - `ChessOnlineSignalRContractTests` starts the server in-process and shuts it down without orphan processes.
 
-SignalR is not rule authority, identity authority, or durable storage. Production auth, public matchmaking, persistence, Redis/Azure SignalR backplane, complete anti-cheat, and binary protocol remain later work.
+SignalR is not rule authority. P4A adds a production-oriented local identity/session/persistence baseline around this transport:
+
+- `ChessOnlinePersistence` stores player accounts, password hashes, sessions, rooms, tables, seats, and accepted action events through provider-style interfaces.
+- `ChessOnlineServer.Security` protects access/refresh tokens with ASP.NET Data Protection.
+- authenticated hub mode derives player identity from bearer session claims and rejects spoofed envelope player ids.
+- development anonymous sessions remain explicitly available for local smoke flow.
+
+Public matchmaking, cloud deployment, Redis/Azure SignalR backplane, OAuth, complete anti-cheat, and binary protocol remain later work.

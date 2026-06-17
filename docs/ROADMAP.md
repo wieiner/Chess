@@ -191,8 +191,8 @@
 
 ### Next
 
-- P4A: production identity/session persistence if online play becomes a real product surface.
-- P4B: online replay export/import and spectator/reconnect UX.
+- P4A: completed production-oriented local identity/session/persistence baseline.
+- P4B: reconnect/spectator UX and persisted room/table restore policy.
 - P4C: production hosting/backplane/matchmaking decision.
 - Completed: Rubik layer-turn pre-animation and input lock.
 - Completed: Hodge primary/mirror arrow hints.
@@ -219,7 +219,8 @@
 
 ## P4 - Production Online Hardening for `chess3d.relay.v1`
 
-- Replace P3F local session tokens with production identity/session persistence.
+- Completed P4A: replace dev-only session smoke with optional authenticated local identity/session baseline.
+- Completed P4A: persistent player accounts, durable sessions, Data Protection protected access/refresh tokens, server-derived SignalR player identity, JSON persistence provider, and identity/persistence fixtures.
 - Add durable rooms/tables or explicit stateless lifecycle rules.
 - Decide whether to use Redis/Azure SignalR/backplane.
 - Add public matchmaking and spectator/reconnect UX only after auth and persistence are defined.

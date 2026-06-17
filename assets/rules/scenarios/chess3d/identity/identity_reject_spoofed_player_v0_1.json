@@ -1,0 +1,15 @@
+{
+  "format": "chess3d-identity-regression",
+  "version": "0.1",
+  "scenarioId": "identity-reject-spoofed-player-v0.1",
+  "displayName": "P4A authenticated player identity is server-derived",
+  "purpose": "Verify that a SignalR message envelope cannot claim a different playerId than the authenticated bearer session.",
+  "expected": {
+    "spoofedEnvelopePlayerId": "rejected",
+    "reason": "illegalAction",
+    "authoritativePlayerSource": "authenticated session"
+  },
+  "knownLimitations": [
+    "Development anonymous sessions can remain enabled only by explicit local option."
+  ]
+}

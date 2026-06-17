@@ -1,0 +1,18 @@
+{
+  "format": "chess3d-persistence-regression",
+  "version": "0.1",
+  "scenarioId": "persistence-room-table-action-log-v0.1",
+  "displayName": "P4A room/table/action-log persistence smoke",
+  "purpose": "Verify that successful authoritative online room/table/seat/action results are mirrored into the local persistence provider.",
+  "expected": {
+    "roomPersisted": true,
+    "tablePersisted": true,
+    "seatPersisted": true,
+    "acceptedActionPersisted": true,
+    "eventHashChained": true
+  },
+  "knownLimitations": [
+    "The P3E authority registry remains source of truth for rules and validation.",
+    "P4A does not restore in-memory games from persistence by default."
+  ]
+}

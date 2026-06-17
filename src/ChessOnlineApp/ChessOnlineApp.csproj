@@ -30,6 +30,12 @@
     <Content Include="..\..\assets\rules\scenarios\chess3d\signalr\**\*.*" Link="Assets\Rules3D\SignalRScenarios\%(RecursiveDir)%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\..\assets\rules\scenarios\chess3d\identity\**\*.*" Link="Assets\Rules3D\IdentityScenarios\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\assets\rules\scenarios\chess3d\persistence\**\*.*" Link="Assets\Rules3D\PersistenceScenarios\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <Target Name="CopyNative3DEngine" AfterTargets="Build">

@@ -1,0 +1,16 @@
+{
+  "format": "chess3d-identity-regression",
+  "version": "0.1",
+  "scenarioId": "identity-register-login-v0.1",
+  "displayName": "P4A identity register/login smoke",
+  "purpose": "Verify that local production-oriented identity creates persistent players, hashes passwords, and returns protected session tokens.",
+  "expected": {
+    "register": "success",
+    "login": "success",
+    "diagnosticsExposeSecrets": false
+  },
+  "knownLimitations": [
+    "No OAuth, email confirmation, public matchmaking, or cloud account system in P4A.",
+    "The local JSON store is a provider baseline, not a public production database recommendation."
+  ]
+}

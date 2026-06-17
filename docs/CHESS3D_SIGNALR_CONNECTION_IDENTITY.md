@@ -1,12 +1,14 @@
 # Chess3D SignalR Connection Identity
 
-P3F uses development session identity for reconnect smoke tests.
+P3F uses development session identity for reconnect smoke tests. P4A adds optional authenticated session identity for production-oriented local runs.
 
 ## Identity Pieces
 
 - `connectionId`: SignalR transport connection id.
 - `sessionToken`: opaque local reconnect token returned by `Hello`.
 - `playerId`: protocol actor id used by the authority registry.
+- `accessToken`: P4A Data Protection protected bearer token used by SignalR clients when authentication is enabled.
+- `refreshToken`: P4A protected token whose hash is stored in the durable session record.
 
 ## Reconnect
 
@@ -16,5 +18,4 @@ Invalid tokens are rejected cleanly.
 
 ## Limits
 
-The session token is not production authentication. It is not an account credential, not a secret suitable for logging, and not a durable identity. P4 work must replace or wrap this with production identity/session persistence before public multiplayer.
-
+The development session token is not production authentication. In P4A authenticated mode, the hub derives `playerId` from the protected bearer session and rejects envelopes that claim a different player. This still does not make the server a public production deployment: OAuth, cloud hosting, matchmaking, and internet hardening remain future work.
