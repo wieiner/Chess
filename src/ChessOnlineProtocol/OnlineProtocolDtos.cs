@@ -25,6 +25,10 @@ public static class OnlineMessageTypes
     public const string RequestSnapshot = "RequestSnapshot";
     public const string RequestActionLog = "RequestActionLog";
     public const string RequestDiagnostics = "RequestDiagnostics";
+    public const string JoinMatchmaking = "JoinMatchmaking";
+    public const string CancelMatchmaking = "CancelMatchmaking";
+    public const string GetMatchmakingStatus = "GetMatchmakingStatus";
+    public const string ListMatchmakingQueues = "ListMatchmakingQueues";
     public const string Ping = "Ping";
     public const string ChatMessage = "ChatMessage";
     public const string Welcome = "Welcome";
@@ -45,6 +49,11 @@ public static class OnlineMessageTypes
     public const string Error = "Error";
     public const string Diagnostics = "Diagnostics";
     public const string ChatBroadcast = "ChatBroadcast";
+    public const string MatchmakingJoined = "MatchmakingJoined";
+    public const string MatchmakingCancelled = "MatchmakingCancelled";
+    public const string MatchmakingStatus = "MatchmakingStatus";
+    public const string MatchFound = "MatchFound";
+    public const string MatchmakingError = "MatchmakingError";
 }
 
 public static class OnlineActionKinds
@@ -78,6 +87,8 @@ public static class OnlineRejectReasons
     public const string IllegalAction = "illegalAction";
     public const string StaleStateHash = "staleStateHash";
     public const string InternalError = "internalError";
+    public const string AlreadyQueued = "alreadyQueued";
+    public const string NotQueued = "notQueued";
 }
 
 public sealed class OnlineMessageEnvelope
@@ -105,9 +116,47 @@ public sealed class OnlineProtocolMessage
     public OnlineTableCommand? Table { get; set; }
     public OnlineSnapshot? Snapshot { get; set; }
     public OnlineActionLogChunk? ActionLog { get; set; }
+    public OnlineMatchmakingCommand? Matchmaking { get; set; }
+    public OnlineMatchmakingStatus? MatchmakingStatus { get; set; }
     public OnlineDiagnostics? Diagnostics { get; set; }
     public OnlineError? Error { get; set; }
     public string Text { get; set; } = "";
+}
+
+public sealed class OnlineMatchmakingCommand
+{
+    public string TicketId { get; set; } = "";
+    public string RequestedRulesetId { get; set; } = "";
+    public int PreferredSeat { get; set; }
+    public int ExpireSeconds { get; set; } = 120;
+}
+
+public sealed class OnlineMatchmakingStatus
+{
+    public string TicketId { get; set; } = "";
+    public string PlayerId { get; set; } = "";
+    public string RequestedRulesetId { get; set; } = "";
+    public string State { get; set; } = "";
+    public string RoomId { get; set; } = "";
+    public string TableId { get; set; } = "";
+    public int SeatIndex { get; set; }
+    public int QueueCount { get; set; }
+    public string ErrorCode { get; set; } = "";
+    public string ErrorText { get; set; } = "";
+    public List<OnlineMatchmakingTicket> Tickets { get; set; } = new();
+}
+
+public sealed class OnlineMatchmakingTicket
+{
+    public string TicketId { get; set; } = "";
+    public string PlayerId { get; set; } = "";
+    public string RequestedRulesetId { get; set; } = "";
+    public string State { get; set; } = "";
+    public string RoomId { get; set; } = "";
+    public string TableId { get; set; } = "";
+    public int SeatIndex { get; set; }
+    public string CreatedAtUtc { get; set; } = "";
+    public string ExpiresAtUtc { get; set; } = "";
 }
 
 public sealed class OnlineRoomCommand
@@ -224,6 +273,9 @@ public sealed class OnlineDiagnostics
 [JsonSerializable(typeof(OnlineActionEvent))]
 [JsonSerializable(typeof(OnlineSnapshot))]
 [JsonSerializable(typeof(OnlineActionLogChunk))]
+[JsonSerializable(typeof(OnlineMatchmakingCommand))]
+[JsonSerializable(typeof(OnlineMatchmakingStatus))]
+[JsonSerializable(typeof(OnlineMatchmakingTicket))]
 [JsonSerializable(typeof(OnlineDiagnostics))]
 internal partial class OnlineProtocolJsonContext : JsonSerializerContext
 {

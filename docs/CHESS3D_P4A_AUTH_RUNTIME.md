@@ -39,3 +39,5 @@ Production-like local mode:
 ```
 
 P4A does not add OAuth, email confirmation, or public account recovery.
+
+P4B uses this authenticated hub identity for matchmaking. In auth-required mode, anonymous queue joins and spoofed player ids are rejected before a matchmaking ticket is created.

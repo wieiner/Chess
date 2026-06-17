@@ -1,0 +1,16 @@
+[Unit]
+Description=ChessOnlineServer
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/chess-online-server
+ExecStart=/opt/chess-online-server/ChessOnlineServer --urls http://127.0.0.1:5077
+Restart=on-failure
+RestartSec=5
+User=chess
+Group=chess
+Environment=ASPNETCORE_ENVIRONMENT=Production
+
+[Install]
+WantedBy=multi-user.target

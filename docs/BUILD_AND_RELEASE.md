@@ -205,3 +205,16 @@ P3E adds `src\ChessOnlineProtocol` and `tests\ChessOnlineContractTests`. `ChessO
 - `Assets\Rules3D\OnlineScenarios`
 
 `ProductionOutput\ChessOnlineIntegrations` carries the same online protocol/schema/scenario assets. `scripts\verify.ps1` checks representative files so CI catches missing protocol assets before artifact upload.
+
+## P4B Online Server Deployment Assets
+
+P4B extends `ProductionOutput\ChessOnlineServer` with:
+
+- `appsettings.Production.sample.json`
+- `Assets\Rules3D\MatchmakingScenarios`
+- `Assets\Rules3D\AsgardOnlineScenarios`
+- `Assets\Rules3D\DeploymentScenarios`
+- `Deploy\linux`
+- `Deploy\windows`
+
+These files are templates and descriptors only. The package must not contain runtime data stores, tokens, key rings, certificates, or private keys. Linux deployment files are included as scaffolding; real Linux runtime execution remains deferred until the server no longer depends on the Windows native engine build.

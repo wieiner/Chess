@@ -22,3 +22,5 @@ Only accepted authoritative results are persisted. Rejected commands do not beco
 Action log persistence includes a simple SHA-256 event hash chained from the previous event for the same persisted table key. This is a diagnostic integrity fingerprint, not a cryptographic anti-cheat guarantee.
 
 Generated stores and Data Protection keys are runtime artifacts and must not be committed or shipped in portable `ProductionOutput`.
+
+P4B matchmaking tickets are intentionally in-memory MVP state. They are not persisted by `JsonOnlineStore`; matched games still use the existing room/table/action persistence path after the authoritative table exists.

@@ -320,7 +320,7 @@
                     <TextBlock x:Name="P3EStatusText" Foreground="#AFC0D0" Margin="0,10,0,0" TextWrapping="Wrap" />
                     <Separator Margin="0,18,0,14" Background="#2B3746" />
                     <TextBlock Text="P3F hosted SignalR transport" FontSize="16" FontWeight="SemiBold" />
-                    <TextBlock Text="Hosted/local SignalR prototype over the same P3E authority registry. Start ChessOnlineServer separately, then connect here. No production auth, no matchmaking, no cloud deployment." Foreground="#AFC0D0" TextWrapping="Wrap" Margin="0,4,0,10" />
+                    <TextBlock Text="Hosted/local SignalR server over the same P3E authority registry. P4B adds authenticated matchmaking MVP for single-server smoke; it is still not public ranked matchmaking or cloud deployment." Foreground="#AFC0D0" TextWrapping="Wrap" Margin="0,4,0,10" />
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Hub URL" Width="64" />
                         <TextBox x:Name="P3FServerUrlBox" Text="http://127.0.0.1:5077/chess3d/relay" Width="330" />
@@ -340,6 +340,19 @@
                         <Button Content="Hub Action Log" Click="P3FActionLog_Click" />
                         <Button Content="Hub Diagnostics" Click="P3FDiagnostics_Click" />
                         <TextBlock x:Name="P3FStatusText" Foreground="#AFC0D0" Margin="8,0,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <TextBlock Text="Matchmaking" Width="88" />
+                        <ComboBox x:Name="P3FMatchmakingProfileBox" Width="300" SelectedIndex="0">
+                            <ComboBoxItem Content="classic-six-side-3d-8x8x8-v0.1" />
+                            <ComboBoxItem Content="single-side-3d-8x8x8-v0.1" />
+                            <ComboBoxItem Content="asgard-convergence-3d-8x8x8-v0.1" />
+                            <ComboBoxItem Content="rubik-convergence-3d-8x8x8-v0.1" />
+                            <ComboBoxItem Content="hodge-projection-duel-3d-8x8x8-v0.1" />
+                        </ComboBox>
+                        <Button Content="Join Queue" Click="P3FJoinMatchmaking_Click" />
+                        <Button Content="Cancel Queue" Click="P3FCancelMatchmaking_Click" />
+                        <Button Content="Queue Status" Click="P3FMatchmakingStatus_Click" />
                     </StackPanel>
                 </StackPanel>
             </TabItem>

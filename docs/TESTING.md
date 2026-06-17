@@ -235,3 +235,16 @@ P3D.1 adds regression coverage for the strengthened search loop:
 - Hodge macro-player search and all-or-nothing timeout/no-partial-apply behavior.
 
 The P3D.1 tests still do not claim tournament strength, opening-book quality, GPU search, or online AI authority.
+
+## P4B Matchmaking And Deployment Testing
+
+`ChessOnlineSignalRContractTests` now also covers:
+
+- anonymous matchmaking rejection on an auth-required server;
+- authenticated matchmaking join/status/cancel-shaped responses;
+- duplicate queue ticket rejection;
+- exact-profile match-found creation;
+- Asgard matchmaking room/table start and legal action acceptance;
+- parsing of matchmaking, Asgard-online, and deployment scenario descriptors.
+
+`scripts\verify.ps1` additionally checks that OnlineServer development output and `ProductionOutput\ChessOnlineServer` include the P4B scenarios, production sample config, and deploy templates.

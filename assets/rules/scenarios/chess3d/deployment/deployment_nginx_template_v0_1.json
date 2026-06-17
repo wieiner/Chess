@@ -1,0 +1,16 @@
+{
+  "format": "chess3d-deployment-regression",
+  "version": "0.1",
+  "scenarioId": "deployment-nginx-template-v0.1",
+  "displayName": "Linux reverse-proxy template packaging smoke",
+  "purpose": "Verify deployment templates are packaged without secrets and document Linux portability status.",
+  "expectedFiles": [
+    "Deploy/linux/chessonline-server.service.template",
+    "Deploy/linux/nginx-chessonline.conf.template",
+    "Deploy/linux/nginx-chessonline-https-snippet.template"
+  ],
+  "knownLimitations": [
+    "ChessOnlineServer currently targets net8.0-windows and uses the Windows native Chess3DEngine DLL.",
+    "Linux runtime execution is documented as deferred until the native engine boundary is portable."
+  ]
+}

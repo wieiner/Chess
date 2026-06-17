@@ -3,6 +3,7 @@ using System.Text.Json;
 using ChessOnlinePersistence.Entities;
 using ChessOnlinePersistence.Repositories;
 using ChessOnlineProtocol;
+using ChessOnlineServer.Matchmaking;
 using Microsoft.AspNetCore.SignalR;
 
 namespace ChessOnlineServer;
@@ -11,6 +12,7 @@ public sealed class Chess3DRelayHub : Hub
 {
     private readonly OnlineRoomRegistry _registry;
     private readonly OnlineHubConnectionRegistry _connections;
+    private readonly OnlineMatchmakingService _matchmaking;
     private readonly IOnlineRoomPersistenceStore _roomStore;
     private readonly IOnlineSessionStore _sessionStore;
     private readonly HostedOnlineOptions _options;
@@ -19,6 +21,7 @@ public sealed class Chess3DRelayHub : Hub
     public Chess3DRelayHub(
         OnlineRoomRegistry registry,
         OnlineHubConnectionRegistry connections,
+        OnlineMatchmakingService matchmaking,
         IOnlineRoomPersistenceStore roomStore,
         IOnlineSessionStore sessionStore,
         HostedOnlineOptions options,
@@ -26,6 +29,7 @@ public sealed class Chess3DRelayHub : Hub
     {
         _registry = registry;
         _connections = connections;
+        _matchmaking = matchmaking;
         _roomStore = roomStore;
         _sessionStore = sessionStore;
         _options = options;
@@ -273,6 +277,96 @@ public sealed class Chess3DRelayHub : Hub
         return result;
     }
 
+    public async Task<OnlineProtocolMessage> JoinMatchmaking(OnlineProtocolMessage message)
+    {
+        if (!Validate(message, OnlineMessageTypes.JoinMatchmaking, out var error))
+        {
+            await SendCaller("ReceiveError", error);
+            return error;
+        }
+        var authError = ValidateAuthenticatedEnvelope(message.Envelope);
+        if (authError != null)
+        {
+            await SendCaller("ReceiveError", authError);
+            return authError;
+        }
+        var envelope = CurrentEnvelope(message.Envelope);
+        var result = _matchmaking.Join(envelope.PlayerId, envelope.ClientId, message.Matchmaking ?? new OnlineMatchmakingCommand(), _registry, _options.ProfileRoot);
+        var response = MatchmakingReply(result.MessageType, envelope, result.Status, result.ErrorCode, result.ErrorText);
+        if (result.MessageType == OnlineMessageTypes.MatchFound)
+        {
+            foreach (var ticket in result.MatchedTickets)
+            {
+                if (_connections.TryGetByPlayerId(ticket.PlayerId, out var session))
+                {
+                    foreach (var connectionId in session.ConnectionIds)
+                    {
+                        _connections.SetMembership(connectionId, result.RoomId, result.TableId);
+                        await Groups.AddToGroupAsync(connectionId, RoomGroup(result.RoomId));
+                        await Groups.AddToGroupAsync(connectionId, TableGroup(result.TableId));
+                    }
+                }
+            }
+            await Clients.Group(TableGroup(result.TableId)).SendAsync("ReceiveMatchFound", response);
+        }
+        else
+        {
+            await SendCaller(result.MessageType == OnlineMessageTypes.MatchmakingError ? "ReceiveMatchmakingError" : "ReceiveMatchmakingStatus", response);
+        }
+        return response;
+    }
+
+    public async Task<OnlineProtocolMessage> CancelMatchmaking(OnlineProtocolMessage message)
+    {
+        if (!Validate(message, OnlineMessageTypes.CancelMatchmaking, out var error))
+        {
+            await SendCaller("ReceiveError", error);
+            return error;
+        }
+        var authError = ValidateAuthenticatedEnvelope(message.Envelope);
+        if (authError != null)
+        {
+            await SendCaller("ReceiveError", authError);
+            return authError;
+        }
+        var envelope = CurrentEnvelope(message.Envelope);
+        var result = _matchmaking.Cancel(envelope.PlayerId);
+        var response = MatchmakingReply(result.MessageType, envelope, result.Status, result.ErrorCode, result.ErrorText);
+        await SendCaller(result.MessageType == OnlineMessageTypes.MatchmakingError ? "ReceiveMatchmakingError" : "ReceiveMatchmakingCancelled", response);
+        return response;
+    }
+
+    public async Task<OnlineProtocolMessage> GetMatchmakingStatus(OnlineProtocolMessage message)
+    {
+        if (!Validate(message, OnlineMessageTypes.GetMatchmakingStatus, out var error))
+        {
+            await SendCaller("ReceiveError", error);
+            return error;
+        }
+        var authError = ValidateAuthenticatedEnvelope(message.Envelope);
+        if (authError != null)
+        {
+            await SendCaller("ReceiveError", authError);
+            return authError;
+        }
+        var envelope = CurrentEnvelope(message.Envelope);
+        var response = MatchmakingReply(OnlineMessageTypes.MatchmakingStatus, envelope, _matchmaking.Status(envelope.PlayerId));
+        await SendCaller("ReceiveMatchmakingStatus", response);
+        return response;
+    }
+
+    public async Task<OnlineProtocolMessage> ListMatchmakingQueues(OnlineProtocolMessage message)
+    {
+        if (!Validate(message, OnlineMessageTypes.ListMatchmakingQueues, out var error))
+        {
+            await SendCaller("ReceiveError", error);
+            return error;
+        }
+        var response = MatchmakingReply(OnlineMessageTypes.MatchmakingStatus, CurrentEnvelope(message.Envelope), _matchmaking.QueueSummary());
+        await SendCaller("ReceiveMatchmakingStatus", response);
+        return response;
+    }
+
     private OnlineProtocolMessage InvokeRegistry(OnlineProtocolMessage message, string expectedType, Func<OnlineMessageEnvelope, OnlineProtocolMessage> call)
     {
         try
@@ -509,6 +603,30 @@ public sealed class Chess3DRelayHub : Hub
             },
             Text = text
         };
+    }
+
+    private static OnlineProtocolMessage MatchmakingReply(string messageType, OnlineMessageEnvelope request, OnlineMatchmakingStatus status, string errorCode = "", string errorText = "")
+    {
+        var reply = new OnlineProtocolMessage
+        {
+            Envelope = new OnlineMessageEnvelope
+            {
+                MessageType = messageType,
+                MessageId = Guid.NewGuid().ToString("N"),
+                CorrelationId = request.MessageId,
+                ClientId = "server",
+                PlayerId = request.PlayerId,
+                RoomId = status.RoomId,
+                TableId = status.TableId,
+                SentAtUtc = DateTime.UtcNow.ToString("O")
+            },
+            MatchmakingStatus = status
+        };
+        if (!string.IsNullOrWhiteSpace(errorCode))
+        {
+            reply.Error = OnlineProtocolJson.Error(errorCode, errorText);
+        }
+        return reply;
     }
 
     private async Task SendToTableOrCaller(OnlineProtocolMessage result, string eventName)

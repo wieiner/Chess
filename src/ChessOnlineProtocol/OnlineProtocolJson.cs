@@ -27,6 +27,10 @@ public static class OnlineProtocolJson
         OnlineMessageTypes.RequestSnapshot,
         OnlineMessageTypes.RequestActionLog,
         OnlineMessageTypes.RequestDiagnostics,
+        OnlineMessageTypes.JoinMatchmaking,
+        OnlineMessageTypes.CancelMatchmaking,
+        OnlineMessageTypes.GetMatchmakingStatus,
+        OnlineMessageTypes.ListMatchmakingQueues,
         OnlineMessageTypes.Ping,
         OnlineMessageTypes.ChatMessage,
         OnlineMessageTypes.Welcome,
@@ -46,7 +50,12 @@ public static class OnlineProtocolJson
         OnlineMessageTypes.Pong,
         OnlineMessageTypes.Error,
         OnlineMessageTypes.Diagnostics,
-        OnlineMessageTypes.ChatBroadcast
+        OnlineMessageTypes.ChatBroadcast,
+        OnlineMessageTypes.MatchmakingJoined,
+        OnlineMessageTypes.MatchmakingCancelled,
+        OnlineMessageTypes.MatchmakingStatus,
+        OnlineMessageTypes.MatchFound,
+        OnlineMessageTypes.MatchmakingError
     };
 
     public static string Serialize(OnlineProtocolMessage message)

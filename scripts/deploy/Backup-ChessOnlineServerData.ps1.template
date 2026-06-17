@@ -1,0 +1,10 @@
+param(
+    [string]$DataRoot = "Data",
+    [string]$BackupRoot = "Backups"
+)
+
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$target = Join-Path $BackupRoot "chessonline-data-$stamp"
+New-Item -ItemType Directory -Force -Path $target | Out-Null
+Copy-Item -LiteralPath $DataRoot -Destination $target -Recurse -Force
+Write-Host "Backed up runtime data to $target. Keep backups out of git."

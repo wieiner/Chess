@@ -1,0 +1,6 @@
+param(
+    [string]$ServiceName = "ChessOnlineServer"
+)
+
+Write-Host "Stop and remove $ServiceName according to the service manager used during install."
+Write-Host "Back up Data\ before deleting any runtime state."

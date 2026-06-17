@@ -1,0 +1,14 @@
+{
+  "format": "chess3d-matchmaking-regression",
+  "version": "0.1",
+  "scenarioId": "matchmaking-profile-isolation-v0.1",
+  "displayName": "Different RuleProfiles do not cross-match",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "Matchmaking queues are keyed by exact rulesetId; scenario/playthrough JSON is not a game mode.",
+  "expected": {
+    "classicQueued": true,
+    "hodgeQueued": true,
+    "crossProfileMatch": false,
+    "realChess3DRuleProfileCount": 5
+  }
+}

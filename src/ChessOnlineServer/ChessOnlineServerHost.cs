@@ -1,6 +1,7 @@
 using ChessOnlineProtocol;
 using ChessOnlinePersistence;
 using ChessOnlinePersistence.Repositories;
+using ChessOnlineServer.Matchmaking;
 using ChessOnlineServer.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
@@ -59,6 +60,7 @@ public static class ChessOnlineServerHost
         builder.Services.AddSingleton<OnlineTokenService>();
         builder.Services.AddSingleton(new OnlineRoomRegistry(options.ProfileRoot));
         builder.Services.AddSingleton<OnlineHubConnectionRegistry>();
+        builder.Services.AddSingleton<OnlineMatchmakingService>();
         if (options.Auth.EnableAuthentication)
         {
             builder.Services
@@ -114,7 +116,7 @@ public static class ChessOnlineServerHost
                 : Results.Json(new { status = "notReady", reason = "missingProfile" }, statusCode: 503);
         });
         MapAuthEndpoints(app, options);
-        app.MapGet("/chess3d/diagnostics", (OnlineRoomRegistry registry, OnlineHubConnectionRegistry connections) =>
+        app.MapGet("/chess3d/diagnostics", (OnlineRoomRegistry registry, OnlineHubConnectionRegistry connections, OnlineMatchmakingService matchmaking) =>
         {
             var diagnostics = registry.GetDiagnostics();
             return Results.Json(new
@@ -134,7 +136,8 @@ public static class ChessOnlineServerHost
                 diagnostics.ProtocolErrorCount,
                 diagnostics.LastRejectReason,
                 authEnabled = options.Auth.EnableAuthentication,
-                persistenceProvider = options.Persistence.Provider
+                persistenceProvider = options.Persistence.Provider,
+                matchmakingQueueCount = matchmaking.ActiveQueueCount
             });
         });
         app.MapHub<Chess3DRelayHub>(options.HubPath, hub =>

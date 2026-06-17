@@ -95,6 +95,21 @@ public sealed class OnlineHubConnectionRegistry
         return false;
     }
 
+    public bool TryGetByPlayerId(string playerId, out OnlineConnectionSession session)
+    {
+        lock (_gate)
+        {
+            var found = _byConnection.Values.FirstOrDefault(s => string.Equals(s.PlayerId, playerId, StringComparison.OrdinalIgnoreCase));
+            if (found != null)
+            {
+                session = found.Clone();
+                return true;
+            }
+        }
+        session = new OnlineConnectionSession();
+        return false;
+    }
+
     public void SetMembership(string connectionId, string roomId, string tableId = "")
     {
         lock (_gate)

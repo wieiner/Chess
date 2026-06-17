@@ -388,3 +388,22 @@ Still deferred:
 - opening books;
 - GPU/CUDA search;
 - online AI authority/synchronization.
+
+## P4B Status
+
+P4B adds deployment scaffolding and a matchmaking MVP without adding a new Chess3D mode.
+
+Implemented:
+
+- authenticated SignalR matchmaking commands for join, cancel, status, and queue summary;
+- exact-profile in-memory queues over the five existing Chess3D RuleProfiles;
+- match-found room/table/seat creation through the existing authoritative `OnlineRoomRegistry`;
+- ChessOnlineApp controls for selecting a profile and joining/cancelling/checking matchmaking;
+- contract tests for anonymous rejection, duplicate ticket rejection, match-found creation, and an Asgard online playability gate;
+- production sample config, Linux nginx/systemd templates, Windows deployment notes, and deploy helper scripts;
+- packaging/verify checks for matchmaking, Asgard online, deployment scenarios, config sample, and deploy templates.
+
+Still deferred:
+
+- real Linux runtime execution because ChessOnlineServer still targets `net8.0-windows` and uses the Windows native Chess3DEngine DLL;
+- public ranked matchmaking, durable queue recovery, cloud backplanes, Redis, Kubernetes, and real TLS automation.

@@ -322,3 +322,18 @@ P3D.1 is completed as a hardening pass over the existing search layer:
 - summary JSON v2 reports nodes, qnodes, cutoffs, stopped reason, best score, and compact best-action text;
 - WPF Search Best and Make AI Move are asynchronous and leave rules in the native engine;
 - all five real Chess3D RuleProfiles remain isolated, and no sixth mode is added.
+
+## P3E / P3F / P4A / P4B - Online Authority Path
+
+Completed:
+
+- P3E: online authority protocol and replay-safe server action contract.
+- P3F: hosted/local SignalR transport prototype.
+- P4A: identity, authenticated sessions, JSON persistence, and no-secret packaging checks.
+- P4B: single-server matchmaking MVP, deployment templates, Asgard online playability gate, and packaging checks.
+
+Next:
+
+- P4C: make ChessOnlineServer genuinely Linux-portable by removing the Windows-native engine dependency.
+- P4D: durable matchmaking/reconnect semantics and stronger server observability.
+- P4E: public deployment hardening, rate limits, log rotation, backups, and operator runbooks.

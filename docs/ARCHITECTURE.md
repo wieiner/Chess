@@ -166,4 +166,12 @@ SignalR is not rule authority. P4A adds a production-oriented local identity/ses
 - authenticated hub mode derives player identity from bearer session claims and rejects spoofed envelope player ids.
 - development anonymous sessions remain explicitly available for local smoke flow.
 
-Public matchmaking, cloud deployment, Redis/Azure SignalR backplane, OAuth, complete anti-cheat, and binary protocol remain later work.
+P4B adds a single-server matchmaking MVP over the same hosted transport:
+
+- queues are in-memory and keyed by exact `rulesetId`;
+- authenticated players can join/cancel/status-check queues;
+- a match creates a room/table/seats through `OnlineRoomRegistry`;
+- Asgard has an online playability gate through matchmaking, ready/start, snapshot, and accepted legal action;
+- deployment scaffolding includes production sample config plus Linux systemd/nginx and Windows service templates.
+
+Linux deployment remains a packaging/runbook target, not a runtime guarantee, because the server still targets `net8.0-windows` and uses the Windows native engine DLL. Cloud deployment, Redis/Azure SignalR backplane, OAuth, complete anti-cheat, ranked matchmaking, and binary protocol remain later work.

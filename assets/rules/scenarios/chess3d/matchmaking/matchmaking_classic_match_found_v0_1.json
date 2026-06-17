@@ -1,0 +1,15 @@
+{
+  "format": "chess3d-matchmaking-regression",
+  "version": "0.1",
+  "scenarioId": "matchmaking-classic-match-found-v0.1",
+  "displayName": "Classic exact-profile matchmaking creates a room and table",
+  "rulesetId": "classic-six-side-3d-8x8x8-v0.1",
+  "purpose": "Two authenticated players queue for the same profile and receive a matched room/table.",
+  "expected": {
+    "authRequired": true,
+    "firstJoin": "MatchmakingJoined",
+    "duplicateJoinReject": "alreadyQueued",
+    "secondJoin": "MatchFound",
+    "seatCount": 2
+  }
+}

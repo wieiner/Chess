@@ -34,6 +34,24 @@
     <Content Include="..\..\assets\rules\scenarios\chess3d\persistence\**\*.*" Link="Assets\Rules3D\PersistenceScenarios\%(RecursiveDir)%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\..\assets\rules\scenarios\chess3d\matchmaking\**\*.*" Link="Assets\Rules3D\MatchmakingScenarios\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\assets\rules\scenarios\chess3d\asgard_online\**\*.*" Link="Assets\Rules3D\AsgardOnlineScenarios\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\assets\rules\scenarios\chess3d\deployment\**\*.*" Link="Assets\Rules3D\DeploymentScenarios\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Update="appsettings.Production.sample.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\deploy\linux\**\*.*" Link="Deploy\linux\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\deploy\windows\**\*.*" Link="Deploy\windows\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <Target Name="CopyNative3DEngine" AfterTargets="Build">

@@ -1,0 +1,14 @@
+{
+  "format": "chess3d-asgard-online-regression",
+  "version": "0.1",
+  "scenarioId": "asgard-matchmaking-table-v0.1",
+  "displayName": "Asgard matchmaking starts an authoritative table",
+  "rulesetId": "asgard-convergence-3d-8x8x8-v0.1",
+  "purpose": "Authenticated matchmaking can create an Asgard room/table, ready/start it, and return an authoritative snapshot.",
+  "expected": {
+    "matchFound": true,
+    "snapshotRulesetId": "asgard-convergence-3d-8x8x8-v0.1",
+    "legalActionAccepted": true,
+    "coreStacksRemainServerAuthoritative": true
+  }
+}

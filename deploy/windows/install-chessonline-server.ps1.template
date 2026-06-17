@@ -1,0 +1,8 @@
+param(
+    [string]$InstallRoot = "C:\ChessOnlineServer",
+    [string]$ServiceName = "ChessOnlineServer"
+)
+
+Write-Host "Copy the ProductionOutput\ChessOnlineServer package to $InstallRoot before running this template."
+Write-Host "Create a Windows Service with sc.exe or NSSM according to your local operations policy."
+Write-Host "Do not store access tokens, refresh tokens, TLS keys, or JSON data stores in git."

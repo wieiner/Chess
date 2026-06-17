@@ -496,6 +496,30 @@ public partial class MainWindow : Window
         await P3FInvokeAsync("Diagnostics", P3FMessage(OnlineMessageTypes.RequestDiagnostics));
     }
 
+    private async void P3FJoinMatchmaking_Click(object sender, RoutedEventArgs e)
+    {
+        await EnsureP3FHelloAsync();
+        var message = P3FMessage(OnlineMessageTypes.JoinMatchmaking);
+        message.Matchmaking = new OnlineMatchmakingCommand
+        {
+            RequestedRulesetId = SelectedP3FMatchmakingRuleset(),
+            ExpireSeconds = 120
+        };
+        await P3FInvokeAsync("JoinMatchmaking", message);
+    }
+
+    private async void P3FCancelMatchmaking_Click(object sender, RoutedEventArgs e)
+    {
+        await EnsureP3FHelloAsync();
+        await P3FInvokeAsync("CancelMatchmaking", P3FMessage(OnlineMessageTypes.CancelMatchmaking));
+    }
+
+    private async void P3FMatchmakingStatus_Click(object sender, RoutedEventArgs e)
+    {
+        await EnsureP3FHelloAsync();
+        await P3FInvokeAsync("GetMatchmakingStatus", P3FMessage(OnlineMessageTypes.GetMatchmakingStatus));
+    }
+
     private async Task SaveRelayProfileAsync(Uri uri, string source)
     {
         var seat = ReadInt(RelaySeatBox, 1, 0, 6);
@@ -555,6 +579,10 @@ public partial class MainWindow : Window
             "ReceiveAuthoritativeSnapshot",
             "ReceiveActionLogChunk",
             "ReceiveResyncRequired",
+            "ReceiveMatchmakingStatus",
+            "ReceiveMatchmakingCancelled",
+            "ReceiveMatchFound",
+            "ReceiveMatchmakingError",
             "ReceivePong",
             "ReceiveError",
             "ReceiveDiagnostics"
@@ -634,10 +662,32 @@ public partial class MainWindow : Window
                 Log($"P3F event #{actionEvent.ServerSeq}: {actionEvent.Notation} hash={actionEvent.StateHashAfter}");
             }
         }
+        if (message.MatchmakingStatus != null)
+        {
+            var mm = message.MatchmakingStatus;
+            if (!string.IsNullOrWhiteSpace(mm.RoomId))
+            {
+                P3ERoomBox.Text = mm.RoomId;
+            }
+            if (!string.IsNullOrWhiteSpace(mm.TableId))
+            {
+                P3ETableBox.Text = mm.TableId;
+            }
+            Log($"P3F matchmaking {mm.State}: ruleset={mm.RequestedRulesetId} queue={mm.QueueCount} room={mm.RoomId} table={mm.TableId} seat={mm.SeatIndex}");
+        }
         if (message.Diagnostics != null)
         {
             Log(JsonSerializer.Serialize(message.Diagnostics, OnlineProtocolJson.Options));
         }
+    }
+
+    private string SelectedP3FMatchmakingRuleset()
+    {
+        if (P3FMatchmakingProfileBox.SelectedItem is ComboBoxItem item && item.Content is string text)
+        {
+            return text;
+        }
+        return "classic-six-side-3d-8x8x8-v0.1";
     }
 
     private OnlineMessageEnvelope P3EEnvelope(string messageType)

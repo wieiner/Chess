@@ -1,0 +1,6 @@
+# Place real certificate paths outside the repository. Do not commit keys.
+listen 443 ssl http2;
+ssl_certificate /etc/letsencrypt/live/chess.example.invalid/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/chess.example.invalid/privkey.pem;
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_prefer_server_ciphers off;

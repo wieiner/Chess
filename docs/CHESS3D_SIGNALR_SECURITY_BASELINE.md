@@ -13,15 +13,18 @@ P3F is a local hosted prototype. P4A adds a production-oriented local identity/s
 - Wrong protocol, unsupported version, unknown message type, wrong actor, duplicate seat, stale hash, and malformed commands reject cleanly.
 - P4A optional authenticated mode using hashed passwords, Data Protection protected tokens, server-derived player identity, and durable local sessions.
 - P4A persistence baseline for rooms, tables, seats, and accepted action logs.
+- P4B authenticated matchmaking MVP with one active ticket per player and exact-profile queues.
+- P4B deployment templates and verify checks that keep runtime stores, key rings, token files, and certificates out of `ProductionOutput`.
 
 ## Not Implemented
 
-- Public matchmaking.
+- Public ranked matchmaking.
 - Redis/Azure SignalR backplane.
 - Complete anti-cheat.
 - Encrypted transport policy enforcement.
 - Public internet hardening.
 - OAuth/external login and real email confirmation.
+- Linux-native server runtime.
 
 ## Rule Safety
 

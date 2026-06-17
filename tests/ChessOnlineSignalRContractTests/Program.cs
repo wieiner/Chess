@@ -41,6 +41,9 @@ try
     FixtureParseTests(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "signalr"));
     FixtureParseTestsWithFormat(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "identity"), "chess3d-identity-regression", "Identity fixture");
     FixtureParseTestsWithFormat(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "persistence"), "chess3d-persistence-regression", "Persistence fixture");
+    FixtureParseTestsWithFormat(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "matchmaking"), "chess3d-matchmaking-regression", "Matchmaking fixture");
+    FixtureParseTestsWithFormat(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "asgard_online"), "chess3d-asgard-online-regression", "Asgard online fixture");
+    FixtureParseTestsWithFormat(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "deployment"), "chess3d-deployment-regression", "Deployment fixture");
 
     await app.StopAsync();
     return test.Finish();
@@ -309,6 +312,10 @@ static async Task AuthPersistenceTests(ContractTest test, string root, string pr
     await anonymous.StartAsync();
     var anonResult = await anonymous.InvokeAsync<OnlineProtocolMessage>("CreateRoom", Message(OnlineMessageTypes.CreateRoom, "anon", "", "auth-room", ""));
     test.Check(anonResult.Error?.ReasonCode == OnlineRejectReasons.IllegalAction, "P4A auth-required server rejects anonymous mutating command");
+    var anonMatchmaking = Message(OnlineMessageTypes.JoinMatchmaking, "anon", "", "", "");
+    anonMatchmaking.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = "classic-six-side-3d-8x8x8-v0.1" };
+    test.Check((await anonymous.InvokeAsync<OnlineProtocolMessage>("JoinMatchmaking", anonMatchmaking)).Error?.ReasonCode == OnlineRejectReasons.IllegalAction,
+        "P4B auth-required server rejects anonymous matchmaking");
 
     await using var spoof = NewAuthenticatedClient(hubUrl, token!.AccessToken);
     await spoof.StartAsync();
@@ -343,6 +350,69 @@ static async Task AuthPersistenceTests(ContractTest test, string root, string pr
     var accepted = await client.InvokeAsync<OnlineProtocolMessage>("SubmitAction", action);
     test.Check(accepted.Envelope.MessageType == OnlineMessageTypes.ActionAccepted, "P4A authenticated SubmitAction reaches authority registry");
 
+    var register2 = await http.PostAsJsonAsync("/api/auth/register", new AuthRegisterRequest
+    {
+        UserName = "p4b-user-2",
+        DisplayName = "P4B User 2",
+        Password = "correct horse battery staple",
+        ClientName = "contract-test"
+    });
+    var token2 = await register2.Content.ReadFromJsonAsync<AuthTokenResponse>();
+    test.Check(register2.IsSuccessStatusCode && token2?.Success == true, "P4B second player registration succeeds");
+
+    await using var client2 = NewAuthenticatedClient(hubUrl, token2!.AccessToken);
+    await client2.StartAsync();
+    await client2.InvokeAsync<OnlineProtocolMessage>("Hello", Message(OnlineMessageTypes.Hello, "auth-client-2", token2.PlayerId));
+
+    var joinClassic1 = Message(OnlineMessageTypes.JoinMatchmaking, "auth-client", token.PlayerId);
+    joinClassic1.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = "classic-six-side-3d-8x8x8-v0.1", ExpireSeconds = 120 };
+    var queuedClassic = await client.InvokeAsync<OnlineProtocolMessage>("JoinMatchmaking", joinClassic1);
+    test.Check(queuedClassic.Envelope.MessageType == OnlineMessageTypes.MatchmakingJoined &&
+        queuedClassic.MatchmakingStatus?.State == "Queued", "P4B first Classic player enters matchmaking queue");
+    var duplicateClassic = await client.InvokeAsync<OnlineProtocolMessage>("JoinMatchmaking", joinClassic1);
+    test.Check(duplicateClassic.Error?.ReasonCode == OnlineRejectReasons.AlreadyQueued, "P4B duplicate matchmaking ticket is rejected");
+    var statusClassic = await client.InvokeAsync<OnlineProtocolMessage>("GetMatchmakingStatus", Message(OnlineMessageTypes.GetMatchmakingStatus, "auth-client", token.PlayerId));
+    test.Check(statusClassic.Envelope.MessageType == OnlineMessageTypes.MatchmakingStatus &&
+        statusClassic.MatchmakingStatus?.State == "Queued", "P4B matchmaking status reports queued ticket");
+
+    var joinClassic2 = Message(OnlineMessageTypes.JoinMatchmaking, "auth-client-2", token2.PlayerId);
+    joinClassic2.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = "classic-six-side-3d-8x8x8-v0.1", ExpireSeconds = 120 };
+    var classicFound = await client2.InvokeAsync<OnlineProtocolMessage>("JoinMatchmaking", joinClassic2);
+    test.Check(classicFound.Envelope.MessageType == OnlineMessageTypes.MatchFound &&
+        classicFound.MatchmakingStatus?.Tickets.Count == 2 &&
+        !string.IsNullOrWhiteSpace(classicFound.MatchmakingStatus.RoomId) &&
+        !string.IsNullOrWhiteSpace(classicFound.MatchmakingStatus.TableId), "P4B second Classic player creates match-found room/table");
+
+    var joinAsgard1 = Message(OnlineMessageTypes.JoinMatchmaking, "auth-client", token.PlayerId);
+    joinAsgard1.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = "asgard-convergence-3d-8x8x8-v0.1", ExpireSeconds = 120 };
+    var asgardQueued = await client.InvokeAsync<OnlineProtocolMessage>("JoinMatchmaking", joinAsgard1);
+    test.Check(asgardQueued.Envelope.MessageType == OnlineMessageTypes.MatchmakingJoined, "P4B first Asgard player enters matchmaking queue");
+    var joinAsgard2 = Message(OnlineMessageTypes.JoinMatchmaking, "auth-client-2", token2.PlayerId);
+    joinAsgard2.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = "asgard-convergence-3d-8x8x8-v0.1", ExpireSeconds = 120 };
+    var asgardFound = await client2.InvokeAsync<OnlineProtocolMessage>("JoinMatchmaking", joinAsgard2);
+    test.Check(asgardFound.Envelope.MessageType == OnlineMessageTypes.MatchFound, "P4B Asgard matchmaking creates match-found room/table");
+    var asgardRoom = asgardFound.MatchmakingStatus?.RoomId ?? "";
+    var asgardTable = asgardFound.MatchmakingStatus?.TableId ?? "";
+    var ready1 = Message(OnlineMessageTypes.Ready, "auth-client", token.PlayerId, asgardRoom, asgardTable);
+    ready1.Table = new OnlineTableCommand { Ready = true };
+    var ready2 = Message(OnlineMessageTypes.Ready, "auth-client-2", token2.PlayerId, asgardRoom, asgardTable);
+    ready2.Table = new OnlineTableCommand { Ready = true };
+    await client.InvokeAsync<OnlineProtocolMessage>("Ready", ready1);
+    await client2.InvokeAsync<OnlineProtocolMessage>("Ready", ready2);
+    var asgardStart = await client.InvokeAsync<OnlineProtocolMessage>("StartGame", Message(OnlineMessageTypes.StartGame, "auth-client", token.PlayerId, asgardRoom, asgardTable));
+    test.Check(asgardStart.Envelope.MessageType == OnlineMessageTypes.GameStarted &&
+        asgardStart.Snapshot?.RulesetId == "asgard-convergence-3d-8x8x8-v0.1", "P4B matched Asgard table starts with authoritative snapshot");
+    var asgardHelper = StartedRegistry(profileRoot, "auth-asgard-helper-room", "auth-asgard-helper-table", "asgard-convergence-3d-8x8x8-v0.1", 1);
+    var asgardCommand = asgardHelper.BuildFirstLegalNormalMoveCommand("auth-asgard-helper-room", "auth-asgard-helper-table", 1);
+    test.Check(asgardCommand != null, "P4B helper can build Asgard legal action");
+    if (asgardCommand != null)
+    {
+        var asgardAction = Message(OnlineMessageTypes.SubmitAction, "auth-client", token.PlayerId, asgardRoom, asgardTable);
+        asgardAction.Action = asgardCommand;
+        var asgardAccepted = await client.InvokeAsync<OnlineProtocolMessage>("SubmitAction", asgardAction);
+        test.Check(asgardAccepted.Envelope.MessageType == OnlineMessageTypes.ActionAccepted, "P4B matched Asgard table accepts legal action");
+    }
+
     var refresh = await http.PostAsJsonAsync("/api/auth/refresh", new AuthRefreshRequest { RefreshToken = token.RefreshToken });
     var refreshed = await refresh.Content.ReadFromJsonAsync<AuthTokenResponse>();
     test.Check(refresh.IsSuccessStatusCode && refreshed?.Success == true &&
@@ -354,8 +424,8 @@ static async Task AuthPersistenceTests(ContractTest test, string root, string pr
 
     var storeJson = File.ReadAllText(storePath);
     using var storeDoc = JsonDocument.Parse(storeJson);
-    test.Check(storeDoc.RootElement.GetProperty("players").GetArrayLength() == 1, "P4A JSON store persists account");
-    test.Check(storeDoc.RootElement.GetProperty("sessions").GetArrayLength() == 1, "P4A JSON store persists durable session");
+    test.Check(storeDoc.RootElement.GetProperty("players").GetArrayLength() >= 2, "P4A/P4B JSON store persists accounts");
+    test.Check(storeDoc.RootElement.GetProperty("sessions").GetArrayLength() >= 2, "P4A/P4B JSON store persists durable sessions");
     test.Check(storeDoc.RootElement.GetProperty("actions").GetArrayLength() >= 1, "P4A JSON store persists accepted action log event");
 
     await app.StopAsync();

@@ -21,6 +21,10 @@ Hub path:
 - `SubmitAction`
 - `RequestSnapshot`
 - `RequestActionLog`
+- `JoinMatchmaking`
+- `CancelMatchmaking`
+- `GetMatchmakingStatus`
+- `ListMatchmakingQueues`
 - `Ping`
 - `Diagnostics`
 
@@ -42,6 +46,10 @@ Each method accepts an `OnlineProtocolMessage` and returns an `OnlineProtocolMes
 - `ReceiveAuthoritativeSnapshot`
 - `ReceiveActionLogChunk`
 - `ReceiveResyncRequired`
+- `ReceiveMatchmakingStatus`
+- `ReceiveMatchmakingCancelled`
+- `ReceiveMatchFound`
+- `ReceiveMatchmakingError`
 - `ReceivePong`
 - `ReceiveError`
 - `ReceiveDiagnostics`
@@ -60,5 +68,6 @@ Groups are used only after the registry accepts membership. They are not authori
 - Accepted action: broadcast `ReceiveActionAccepted` to the table group.
 - Rejected action: send `ReceiveActionRejected` to the caller.
 - Stale hash: send `ReceiveResyncRequired` with an authoritative snapshot.
+- Matchmaking join/status/cancel: send or return matchmaking status messages.
+- Match found: create the authoritative room/table/seats and send `ReceiveMatchFound`.
 - Malformed or unsupported message: return/send `ReceiveError`.
-
