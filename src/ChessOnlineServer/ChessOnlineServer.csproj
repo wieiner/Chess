@@ -52,6 +52,9 @@
     <Content Include="..\..\deploy\windows\**\*.*" Link="Deploy\windows\%(RecursiveDir)%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\..\scripts\deploy\*ChessOnlineServer-Windows.ps1" Link="Deploy\windows\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <Target Name="CopyNative3DEngine" AfterTargets="Build">

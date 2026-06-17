@@ -103,3 +103,21 @@
 - concrete files affected: `src/ChessOnlineServer/ChessOnlineServerHost.cs`, `docs/CHESS3D_ONLINE_AUTHORITY_ADAPTER.md`, `docs/ARCHITECTURE.md`
 - risk: diagnostics must not expose secrets; native library path is an application binary path, not a token/key/store path
 - test/verify plan: existing diagnostics no-secret tests plus targeted online/SignalR contract tests
+
+## Phase 04 - Windows Server Package Hardening
+
+- topic: Windows portable server run flow
+- internet/source researched: local package scripts, `ChessOnlineServer.csproj`, `deploy\windows`, and existing `ProductionOutput\ChessOnlineServer` launcher
+- key finding: the server package already copied Windows deploy templates, but it did not include first-class start/stop/smoke scripts in the packaged deploy folder
+- decision for this repo: add Windows start, stop, and smoke scripts; copy them into `Deploy\windows` through the server project; keep runtime data under operator-owned `Data`
+- concrete files affected: `scripts\deploy\Start-ChessOnlineServer-Windows.ps1`, `scripts\deploy\Stop-ChessOnlineServer-Windows.ps1`, `scripts\deploy\Test-ChessOnlineServer-Windows.ps1`, `src\ChessOnlineServer\ChessOnlineServer.csproj`
+- risk: start/stop helpers must not commit stores, logs, key rings, or PID files
+- test/verify plan: run the Windows smoke script against `ProductionOutput\ChessOnlineServer`, then run full verify
+
+- topic: deployment artifact verification
+- internet/source researched: local `scripts\verify.ps1` and production package layout
+- key finding: verify checked Linux deploy templates but did not assert Windows deploy scripts or runbook presence
+- decision for this repo: make Windows deploy scripts, Windows deploy templates, and the runbook part of the local and production verification gate
+- concrete files affected: `scripts\verify.ps1`, `docs\CHESS3D_WINDOWS_SERVER_RUNBOOK.md`, `deploy\windows\README.md`
+- risk: package checks must remain file-presence checks and avoid requiring runtime stores/secrets in `ProductionOutput`
+- test/verify plan: targeted server package build plus full `scripts\verify.ps1`
