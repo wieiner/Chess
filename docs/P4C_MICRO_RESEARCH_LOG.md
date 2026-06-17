@@ -121,3 +121,37 @@
 - concrete files affected: `scripts\verify.ps1`, `docs\CHESS3D_WINDOWS_SERVER_RUNBOOK.md`, `deploy\windows\README.md`
 - risk: package checks must remain file-presence checks and avoid requiring runtime stores/secrets in `ProductionOutput`
 - test/verify plan: targeted server package build plus full `scripts\verify.ps1`
+
+## Phase 05 - Hetzner Linux Deployment Runbook
+
+- topic: Hetzner Cloud firewall shape
+- internet/source researched: Hetzner Docs, "Firewalls", https://docs.hetzner.com/cloud/firewalls/; Hetzner Cloud API docs, firewall note, https://docs.hetzner.cloud/reference/cloud
+- key finding: Hetzner Cloud firewall rules must be intentionally configured; an empty inbound rule set blocks inbound traffic
+- decision for this repo: document only ports 22, 80, and 443 as the public VPS firewall surface; keep Kestrel on a local loopback port behind Nginx
+- concrete files affected: `docs/CHESS3D_HETZNER_LINUX_DEPLOYMENT_RUNBOOK.md`
+- risk: publishing a server with a broad Kestrel bind would expose the authority endpoint without a reverse proxy plan
+- test/verify plan: docs-only phase plus `git diff --check`
+
+- topic: ASP.NET Core on Linux behind Nginx/systemd
+- internet/source researched: Microsoft Learn, "Host ASP.NET Core on Linux with Nginx", https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/linux-nginx
+- key finding: the documented production shape is Kestrel behind Nginx with a service manager such as systemd, including forwarded headers and WebSocket-aware reverse proxy config
+- decision for this repo: write the Hetzner runbook around `/opt/chessonline/server`, systemd, Nginx, local app port `5077`, and health checks
+- concrete files affected: `docs/CHESS3D_HETZNER_LINUX_DEPLOYMENT_RUNBOOK.md`
+- risk: this remains a runbook scaffold until the Windows-native authority blocker is removed
+- test/verify plan: docs-only phase plus CI
+
+- topic: Ubuntu .NET runtime installation
+- internet/source researched: Microsoft Learn, "Install .NET SDK or .NET Runtime on Ubuntu", https://learn.microsoft.com/en-us/dotnet/core/install/linux-ubuntu-install
+- key finding: runtime-only servers should install the ASP.NET Core Runtime rather than a full SDK unless build tools are needed
+- decision for this repo: document ASP.NET Core Runtime installation as the intended VPS path, while noting that the current package is not Linux-runnable yet
+- concrete files affected: `docs/CHESS3D_HETZNER_LINUX_DEPLOYMENT_RUNBOOK.md`
+- risk: installing the runtime does not solve the native `Chess3DEngine.dll` platform blocker
+- test/verify plan: no command is executed against a VPS in P4C
+
+- topic: ASP.NET Core Data Protection key persistence
+- internet/source researched: Microsoft Learn, "Configure ASP.NET Core Data Protection", https://learn.microsoft.com/en-us/aspnet/core/security/data-protection/configuration/overview; Microsoft Learn, "Key storage providers in ASP.NET Core", https://learn.microsoft.com/en-us/aspnet/core/security/data-protection/implementation/key-storage-providers
+- key finding: Data Protection keys must be persisted consistently for auth/session continuity, and key storage is deployment-specific
+- decision for this repo: document `/var/lib/chessonline/keyring` as the operator-owned key ring path and include it in backup/rollback instructions
+- concrete files affected: `docs/CHESS3D_HETZNER_LINUX_DEPLOYMENT_RUNBOOK.md`
+- risk: losing key-ring data can invalidate protected cookies/tokens even if the JSON store survives
+- test/verify plan: docs-only phase with no secret/key files committed
