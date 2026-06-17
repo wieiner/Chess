@@ -425,6 +425,18 @@ static async Task AuthPersistenceTests(ContractTest test, string root, string pr
     using var storeDoc = JsonDocument.Parse(storeJson);
     test.Check(storeDoc.RootElement.GetProperty("players").GetArrayLength() >= 2, "P4A/P4B JSON store persists accounts");
     test.Check(storeDoc.RootElement.GetProperty("sessions").GetArrayLength() >= 2, "P4A/P4B JSON store persists durable sessions");
+    test.Check(storeDoc.RootElement.GetProperty("rooms").EnumerateArray().Any(r =>
+        JsonString(r, "roomId") == classicFound.MatchmakingStatus?.RoomId &&
+        JsonString(r, "state") == OnlineMessageTypes.MatchFound), "P4C matched Classic room is persisted after matchmaking");
+    test.Check(storeDoc.RootElement.GetProperty("tables").EnumerateArray().Any(t =>
+        JsonString(t, "tableId") == $"{classicFound.MatchmakingStatus?.RoomId}/{classicFound.MatchmakingStatus?.TableId}" &&
+        JsonString(t, "rulesetId") == "classic-six-side-3d-8x8x8-v0.1"), "P4C matched Classic table is persisted after matchmaking");
+    test.Check(storeDoc.RootElement.GetProperty("seats").EnumerateArray().Count(s =>
+        JsonString(s, "tableId") == $"{classicFound.MatchmakingStatus?.RoomId}/{classicFound.MatchmakingStatus?.TableId}") == 2, "P4C matched Classic seats are persisted after matchmaking");
+    test.Check(storeDoc.RootElement.GetProperty("sessions").EnumerateArray().Any(s =>
+        JsonString(s, "sessionId") == token.SessionId &&
+        JsonString(s, "lastKnownRoomId") == asgardRoom &&
+        JsonString(s, "lastKnownTableId") == asgardTable), "P4C matched player session records last-known table");
     test.Check(storeDoc.RootElement.GetProperty("actions").GetArrayLength() >= 1, "P4A JSON store persists accepted action log event");
 
     await app.StopAsync();
@@ -586,6 +598,11 @@ static OnlineActionCommand Clone(OnlineActionCommand command)
 {
     var json = JsonSerializer.Serialize(command, OnlineProtocolJson.Options);
     return JsonSerializer.Deserialize<OnlineActionCommand>(json, OnlineProtocolJson.Options) ?? new OnlineActionCommand();
+}
+
+static string JsonString(JsonElement element, string propertyName)
+{
+    return element.TryGetProperty(propertyName, out var property) ? property.GetString() ?? "" : "";
 }
 
 internal sealed record StartedHubClient(HubConnection Client, string SessionToken);

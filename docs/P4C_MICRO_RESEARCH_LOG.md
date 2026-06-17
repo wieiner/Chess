@@ -155,3 +155,21 @@
 - concrete files affected: `docs/CHESS3D_HETZNER_LINUX_DEPLOYMENT_RUNBOOK.md`
 - risk: losing key-ring data can invalidate protected cookies/tokens even if the JSON store survives
 - test/verify plan: docs-only phase with no secret/key files committed
+
+## Phase 06 - Matchmaking Durability / Reconnect Policy Audit
+
+- topic: matchmaking ticket durability
+- internet/source researched: local source audit of `OnlineMatchmakingService`, `Chess3DRelayHub`, `JsonOnlineStore`, and P4A/P4B SignalR tests
+- key finding: queued matchmaking tickets are intentionally in-memory and expire; they are not represented in `JsonOnlineStore`
+- decision for this repo: document queued ticket loss on server restart as P4C policy rather than pretending the queue is durable
+- concrete files affected: `docs/CHESS3D_MATCHMAKING_DURABILITY_AUDIT.md`
+- risk: users waiting in queue need UI/status messaging after reconnect or restart
+- test/verify plan: SignalR contract tests continue to assert queued/duplicate/status behavior
+
+- topic: matched table durability
+- internet/source researched: local source audit of `Chess3DRelayHub.JoinMatchmaking`, persistence interfaces, and JSON store format
+- key finding: manual room/table/seat flows persisted through hub helpers, but match-found room/table/seat assignments were created by the registry and not persisted by the hub
+- decision for this repo: persist matched room/table/seat assignments and update last-known session membership after `MatchFound`; keep queued ticket durability out of scope
+- concrete files affected: `src/ChessOnlineServer/Chess3DRelayHub.cs`, `tests/ChessOnlineSignalRContractTests/Program.cs`, `docs/CHESS3D_MATCHMAKING_DURABILITY_AUDIT.md`
+- risk: persistence must remain a side effect after a successful match, not a second authority source for gameplay
+- test/verify plan: targeted SignalR contract test checks persisted matched room/table/seats and last-known table, then full CI

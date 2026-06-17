@@ -307,6 +307,7 @@ public sealed class Chess3DRelayHub : Hub
                     }
                 }
             }
+            await PersistMatchFound(result);
             await Clients.Group(TableGroup(result.TableId)).SendAsync("ReceiveMatchFound", response);
         }
         else
@@ -533,6 +534,60 @@ public sealed class Chess3DRelayHub : Hub
             IsConnected = true,
             LastSeenAtUtc = DateTime.UtcNow
         });
+    }
+
+    private async Task PersistMatchFound(OnlineMatchmakingResult result)
+    {
+        if (string.IsNullOrWhiteSpace(result.RoomId) || string.IsNullOrWhiteSpace(result.TableId))
+        {
+            return;
+        }
+
+        var rulesetId = result.MatchedTickets.FirstOrDefault()?.RequestedRulesetId ?? "";
+        var tableKey = PersistenceTableKey(result.RoomId, result.TableId);
+        await _roomStore.UpsertRoomAsync(new PersistentRoomEntity
+        {
+            RoomId = result.RoomId,
+            DisplayName = $"Match {result.RoomId}",
+            CreatedAtUtc = DateTime.UtcNow,
+            OwnerPlayerId = result.MatchedTickets.FirstOrDefault()?.PlayerId ?? "",
+            State = OnlineMessageTypes.MatchFound,
+            LastServerSeq = 0,
+            LastUpdatedAtUtc = DateTime.UtcNow
+        });
+        await _roomStore.UpsertTableAsync(new PersistentTableEntity
+        {
+            RoomId = result.RoomId,
+            TableId = tableKey,
+            RulesetId = rulesetId,
+            ProfileKind = rulesetId,
+            State = OnlineMessageTypes.MatchFound,
+            ServerSeq = 0,
+            StateHash = "",
+            SaveGameJson = "",
+            CreatedAtUtc = DateTime.UtcNow,
+            LastUpdatedAtUtc = DateTime.UtcNow
+        });
+
+        foreach (var ticket in result.MatchedTickets)
+        {
+            await _roomStore.UpsertSeatAsync(new PersistentSeatEntity
+            {
+                TableId = tableKey,
+                SeatIndex = ticket.SeatIndex,
+                SideId = rulesetId.Contains("hodge-projection-duel", StringComparison.OrdinalIgnoreCase) ? 0 : ticket.SeatIndex,
+                MacroPlayer = rulesetId.Contains("hodge-projection-duel", StringComparison.OrdinalIgnoreCase) ? ticket.SeatIndex : 0,
+                PlayerId = ticket.PlayerId,
+                IsReady = false,
+                IsConnected = true,
+                LastSeenAtUtc = DateTime.UtcNow
+            });
+
+            if (_connections.TryGetByPlayerId(ticket.PlayerId, out var session) && !string.IsNullOrWhiteSpace(session.SessionToken))
+            {
+                await _sessionStore.UpdateLastSeenAsync(session.SessionToken, result.RoomId, result.TableId, ticket.SeatIndex);
+            }
+        }
     }
 
     private async Task PersistAcceptedAction(OnlineProtocolMessage result)
