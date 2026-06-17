@@ -80,6 +80,8 @@ The engine still reserves side ids `1..6`. Six-sided chess should be built by ma
 
 `ChessOnlineApp.exe` owns accounts, portal profiles, read-only platform APIs, ICS-style connections, and future hosted relay integration. The ordinary board app stays focused on chess play/advice instead of account management.
 
+P4C adds an online rules authority adapter boundary for hosted Chess3D play. `OnlineRoomRegistry` now depends on `IChessOnlineGameSessionFactory` and stores table sessions as `IChessOnlineRulesAuthority`. The current implementation remains `WindowsNative` through `NativeChessOnlineGameSessionFactory` and `Chess3DEngine.dll`; Linux-native authority is an explicit future replacement point rather than a claimed runtime capability.
+
 ## Why Separate Apps
 
 - 2D chess can remain a stable advisor/game app.

@@ -119,6 +119,7 @@ public static class ChessOnlineServerHost
         app.MapGet("/chess3d/diagnostics", (OnlineRoomRegistry registry, OnlineHubConnectionRegistry connections, OnlineMatchmakingService matchmaking) =>
         {
             var diagnostics = registry.GetDiagnostics();
+            var authority = registry.GetAuthorityDiagnostics();
             return Results.Json(new
             {
                 protocolId = OnlineProtocolVersion.ProtocolId,
@@ -135,6 +136,13 @@ public static class ChessOnlineServerHost
                 diagnostics.ActionLogLength,
                 diagnostics.ProtocolErrorCount,
                 diagnostics.LastRejectReason,
+                authorityRuntimeKind = authority.RuntimeKindName,
+                authorityIsPortableRuntime = authority.IsPortableRuntime,
+                authorityIsSupported = authority.IsSupported,
+                authorityPlatform = authority.Platform,
+                authorityProcessArchitecture = authority.ProcessArchitecture,
+                authorityNativeLibraryName = authority.NativeLibraryName,
+                authorityNativeLibraryPath = authority.NativeLibraryPath,
                 authEnabled = options.Auth.EnableAuthentication,
                 persistenceProvider = options.Persistence.Provider,
                 matchmakingQueueCount = matchmaking.ActiveQueueCount

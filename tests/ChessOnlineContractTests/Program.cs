@@ -13,6 +13,7 @@ try
     test.Check(RuleProfileCatalog.All.Count == 5, "exactly five Chess3D RuleProfiles are in online catalog");
 
     ProtocolRoundtripTests(test);
+    AuthorityRuntimeDiagnosticsTests(test, profileRoot);
     AuthorityClassicTests(test, profileRoot);
     AuthorityProfileSmokeTests(test, profileRoot);
     SnapshotAndReplayTests(test, profileRoot);
@@ -24,6 +25,15 @@ catch (Exception ex)
 {
     test.Fail($"Unhandled exception: {ex}");
     return test.Finish();
+}
+
+static void AuthorityRuntimeDiagnosticsTests(ContractTest test, string profileRoot)
+{
+    var registry = new OnlineRoomRegistry(profileRoot);
+    var diagnostics = registry.GetAuthorityDiagnostics();
+    test.Check(diagnostics.RuntimeKind == AuthorityRuntimeKind.WindowsNative, "online authority runtime reports WindowsNative on Windows build");
+    test.Check(!diagnostics.IsPortableRuntime, "online authority runtime is explicitly not portable yet");
+    test.Check(diagnostics.NativeLibraryName == "Chess3DEngine.dll", "online authority diagnostics expose native library name");
 }
 
 static void ProtocolRoundtripTests(ContractTest test)

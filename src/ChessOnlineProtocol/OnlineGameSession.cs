@@ -2,7 +2,7 @@ using ChessApp;
 
 namespace ChessOnlineProtocol;
 
-public sealed class OnlineGameSession : IDisposable
+public sealed class OnlineGameSession : IChessOnlineRulesAuthority
 {
     private readonly NativeChess3DEngine _engine = new();
     private readonly RuleProfileInfo _profile;

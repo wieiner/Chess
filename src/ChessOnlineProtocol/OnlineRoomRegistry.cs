@@ -23,11 +23,13 @@ public sealed class OnlineRoomRegistry
     private readonly object _gate = new();
     private readonly Dictionary<string, OnlineRoom> _rooms = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _profileRoot;
+    private readonly IChessOnlineGameSessionFactory _sessionFactory;
     private readonly OnlineDiagnostics _diagnostics = new();
 
-    public OnlineRoomRegistry(string profileRoot)
+    public OnlineRoomRegistry(string profileRoot, IChessOnlineGameSessionFactory? sessionFactory = null)
     {
         _profileRoot = profileRoot;
+        _sessionFactory = sessionFactory ?? new NativeChessOnlineGameSessionFactory();
     }
 
     public IReadOnlyCollection<OnlineRoom> Rooms
@@ -142,7 +144,7 @@ public sealed class OnlineRoomRegistry
                 State = OnlineTableState.WaitingForPlayers,
                 CreatedAtUtc = DateTime.UtcNow
             };
-            table.Session = new OnlineGameSession(profile, _profileRoot);
+            table.Session = _sessionFactory.Create(profile, _profileRoot);
             room.Tables.Add(table.TableId, table);
             _diagnostics.TableCount = room.Tables.Count;
             return Reply(OnlineMessageTypes.TableCreated, envelope, table: new OnlineTableCommand
@@ -224,7 +226,7 @@ public sealed class OnlineRoomRegistry
                 return Reject(envelope, OnlineRejectReasons.IllegalAction, "Seat must be ready before StartGame.");
             }
 
-            table.Session = new OnlineGameSession(RuleProfileCatalog.ResolveRequired(_profileRoot, table.RulesetId), _profileRoot);
+            table.Session = _sessionFactory.Create(RuleProfileCatalog.ResolveRequired(_profileRoot, table.RulesetId), _profileRoot);
             table.State = OnlineTableState.InGame;
             table.StartedAtUtc = DateTime.UtcNow;
             table.ServerSeq = 0;
@@ -371,6 +373,11 @@ public sealed class OnlineRoomRegistry
         }
     }
 
+    public OnlineAuthorityRuntimeDiagnostics GetAuthorityDiagnostics()
+    {
+        return _sessionFactory.GetDiagnostics();
+    }
+
     public void SetActiveConnectionCount(int count)
     {
         lock (_gate)
@@ -381,18 +388,13 @@ public sealed class OnlineRoomRegistry
 
     public static string HashFromSaveGameJson(string saveGameJson)
     {
-        using var engine = new NativeChess3DEngine();
-        if (!engine.LoadSaveGameJson(saveGameJson))
-        {
-            throw new InvalidOperationException("Snapshot savegame did not load into a fresh engine.");
-        }
-        return engine.GetStateHash();
+        return NativeChessOnlineGameSessionFactory.HashFromSaveGameJson(saveGameJson);
     }
 
     public string ReplayActionLogToHash(string rulesetId, IEnumerable<OnlineActionEvent> events)
     {
         var profile = RuleProfileCatalog.ResolveRequired(_profileRoot, rulesetId);
-        using var session = new OnlineGameSession(profile, _profileRoot);
+        using var session = _sessionFactory.Create(profile, _profileRoot);
         foreach (var actionEvent in events.OrderBy(e => e.ServerSeq))
         {
             if (!session.TryApply(actionEvent.Command, out var reason, out var text))
@@ -559,7 +561,7 @@ public sealed class OnlineTable
     public string LastStateHash { get; set; } = "";
     public Dictionary<int, OnlineSeat> Seats { get; } = new();
     public List<OnlineActionEvent> ActionLog { get; } = new();
-    public OnlineGameSession? Session { get; set; }
+    public IChessOnlineRulesAuthority? Session { get; set; }
     public bool IsHodge => RulesetId.Contains("hodge-projection-duel", StringComparison.OrdinalIgnoreCase);
 }
 

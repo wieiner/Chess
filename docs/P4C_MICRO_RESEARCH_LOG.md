@@ -85,3 +85,21 @@
 - concrete files affected: `docs/CHESS3D_P4C_LINUX_PORTABILITY_DECISION.md`
 - risk: deployment templates can be mistaken for a working Linux product unless the blocker is repeated in the decision package
 - test/verify plan: build the current Windows server path and keep CI green
+
+## Phase 03 - Authority Adapter Boundary
+
+- topic: authority/session construction boundary
+- internet/source researched: local source audit of `OnlineGameSession`, `OnlineRoomRegistry`, `ChessOnlineServerHost`; Microsoft Learn native library loading and target framework docs from Phase 02 remain the platform reference
+- key finding: `OnlineRoomRegistry` directly constructed `OnlineGameSession`, and `OnlineGameSession` directly owned `NativeChess3DEngine`, so the hosted transport and native rules authority had no replacement seam
+- decision for this repo: introduce `IChessOnlineRulesAuthority` and `IChessOnlineGameSessionFactory`, keep the current Windows-native authority as the default implementation, and leave gameplay behavior unchanged
+- concrete files affected: `src/ChessOnlineProtocol/OnlineRulesAuthority.cs`, `src/ChessOnlineProtocol/OnlineGameSession.cs`, `src/ChessOnlineProtocol/OnlineRoomRegistry.cs`, `src/ChessOnlineServer/ChessOnlineServerHost.cs`
+- risk: adapter work could accidentally change online action semantics if the registry/session contract shifts too much
+- test/verify plan: build protocol/server, run online contract tests, run SignalR contract tests, then full verify before commit
+
+- topic: operator diagnostics for portability
+- internet/source researched: local diagnostics endpoint audit; Microsoft Learn RID/native loading docs from Phase 02
+- key finding: the existing `/chess3d/diagnostics` endpoint did not say whether authority runtime is portable or Windows-native
+- decision for this repo: expose authority runtime kind, platform, process architecture, native library name/path, and support/portability flags in diagnostics
+- concrete files affected: `src/ChessOnlineServer/ChessOnlineServerHost.cs`, `docs/CHESS3D_ONLINE_AUTHORITY_ADAPTER.md`, `docs/ARCHITECTURE.md`
+- risk: diagnostics must not expose secrets; native library path is an application binary path, not a token/key/store path
+- test/verify plan: existing diagnostics no-secret tests plus targeted online/SignalR contract tests
