@@ -59,3 +59,29 @@
 - concrete files affected: `tests/ChessOnlineSignalRContractTests/Program.cs`
 - risk: SignalR broadcast/event assertions can be CI-sensitive when they assume callback delivery is synchronous with method return
 - test/verify plan: run targeted `dotnet run --project tests\ChessOnlineSignalRContractTests\ChessOnlineSignalRContractTests.csproj -c Release -p:Platform=x64`, then full `tests\run-tests.ps1 -SkipBenchmark` and `scripts\verify.ps1`
+
+## Phase 02 - Server Linux Portability Decision
+
+- topic: server target framework portability
+- internet/source researched: Microsoft Learn, "Target frameworks in SDK-style projects", https://learn.microsoft.com/en-us/dotnet/standard/frameworks
+- key finding: portable apps and libraries should target a base TFM, while platform-specific projects use platform-specific TFMs such as `net*-windows`
+- decision for this repo: do not claim `ChessOnlineServer` is Linux-ready while `ChessOnlineServer` and `ChessOnlineProtocol` target `net8.0-windows`; use P4C to prepare an adapter boundary first
+- concrete files affected: `docs/CHESS3D_P4C_LINUX_PORTABILITY_DECISION.md`
+- risk: switching target frameworks before removing the native/WPF wrapper dependency would create noisy build failures instead of real portability
+- test/verify plan: docs decision plus targeted `dotnet build src\ChessOnlineServer\ChessOnlineServer.csproj -c Release -p:Platform=x64`
+
+- topic: native Chess3D engine blocker
+- internet/source researched: Microsoft Learn, ".NET RID Catalog", https://learn.microsoft.com/en-us/dotnet/core/rid-catalog; Microsoft Learn, "Native library loading", https://learn.microsoft.com/en-us/dotnet/standard/native-interop/native-library-loading
+- key finding: RID-specific native assets are platform-bound; native loading helpers do not remove the need for a Linux-compatible native library
+- decision for this repo: keep the Windows `Chess3DEngine.dll` authority as the current implementation and define Linux `.so` plus state-hash parity as P4D backlog
+- concrete files affected: `docs/CHESS3D_P4C_LINUX_PORTABILITY_DECISION.md`
+- risk: publishing `linux-x64` without a Linux `Chess3DEngine` would produce a package that starts only until authority code touches the missing native dependency
+- test/verify plan: no native publish change in Phase 02
+
+- topic: Hetzner/Linux runtime shape
+- internet/source researched: Microsoft Learn, "Host ASP.NET Core on Linux with Nginx", https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/linux-nginx
+- key finding: Kestrel behind Nginx/systemd is a valid deployment shape for ASP.NET Core after application dependencies are portable
+- decision for this repo: keep Hetzner/Linux docs as runbook scaffolding now; treat the authoritative runtime as blocked until the rules authority boundary and Linux native engine exist
+- concrete files affected: `docs/CHESS3D_P4C_LINUX_PORTABILITY_DECISION.md`
+- risk: deployment templates can be mistaken for a working Linux product unless the blocker is repeated in the decision package
+- test/verify plan: build the current Windows server path and keep CI green
