@@ -73,13 +73,13 @@ static async Task ServerStartupTests(ContractTest test, string url, string hubUr
 static async Task ProtocolTests(ContractTest test, string hubUrl)
 {
     await using var client = NewClient(hubUrl);
-    var welcomeEvents = new List<OnlineProtocolMessage>();
-    client.On<OnlineProtocolMessage>("ReceiveWelcome", welcomeEvents.Add);
+    var welcomeEventCount = 0;
+    client.On<OnlineProtocolMessage>("ReceiveWelcome", _ => Interlocked.Increment(ref welcomeEventCount));
     await client.StartAsync();
     var hello = await client.InvokeAsync<OnlineProtocolMessage>("Hello", Message(OnlineMessageTypes.Hello, "protocol-client", "protocol-player"));
     test.Check(hello.Envelope.MessageType == OnlineMessageTypes.Welcome &&
         !string.IsNullOrWhiteSpace(hello.Envelope.SessionToken), "SignalR Hello returns Welcome and session token");
-    test.Check(welcomeEvents.Count == 1, "SignalR Hello emits ReceiveWelcome");
+    test.Check(await WaitUntilAsync(() => Volatile.Read(ref welcomeEventCount) == 1), "SignalR Hello emits ReceiveWelcome");
 
     var wrong = Message(OnlineMessageTypes.Hello, "wrong-client", "wrong-player");
     wrong.Envelope.ProtocolId = "wrong.protocol";
@@ -91,8 +91,8 @@ static async Task RoomTableAuthorityTests(ContractTest test, string hubUrl, stri
 {
     await using var client1 = NewClient(hubUrl);
     await using var client2 = NewClient(hubUrl);
-    var acceptedBroadcasts = new List<OnlineProtocolMessage>();
-    client2.On<OnlineProtocolMessage>("ReceiveActionAccepted", acceptedBroadcasts.Add);
+    var acceptedBroadcastCount = 0;
+    client2.On<OnlineProtocolMessage>("ReceiveActionAccepted", _ => Interlocked.Increment(ref acceptedBroadcastCount));
     await client1.StartAsync();
     await client2.StartAsync();
 
@@ -133,8 +133,7 @@ static async Task RoomTableAuthorityTests(ContractTest test, string hubUrl, stri
     var accepted = await client1.InvokeAsync<OnlineProtocolMessage>("SubmitAction", action);
     test.Check(accepted.Envelope.MessageType == OnlineMessageTypes.ActionAccepted &&
         accepted.ActionLog?.Events.Count == 1, "SignalR Classic legal action accepted");
-    await Task.Delay(150);
-    test.Check(acceptedBroadcasts.Count >= 1, "SignalR accepted action broadcasts to table group");
+    test.Check(await WaitUntilAsync(() => Volatile.Read(ref acceptedBroadcastCount) >= 1), "SignalR accepted action broadcasts to table group");
 
     var wrong = Message(OnlineMessageTypes.SubmitAction, "c2", "p2", "room-signalr", "classic");
     wrong.Action = command;
@@ -546,6 +545,20 @@ static HubConnection NewAuthenticatedClient(string hubUrl, string accessToken)
     return new HubConnectionBuilder()
         .WithUrl(hubUrl, options => options.AccessTokenProvider = () => Task.FromResult<string?>(accessToken))
         .Build();
+}
+
+static async Task<bool> WaitUntilAsync(Func<bool> condition, int timeoutMs = 2000)
+{
+    var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+    while (DateTime.UtcNow < deadline)
+    {
+        if (condition())
+        {
+            return true;
+        }
+        await Task.Delay(25);
+    }
+    return condition();
 }
 
 static int FindFreePort()

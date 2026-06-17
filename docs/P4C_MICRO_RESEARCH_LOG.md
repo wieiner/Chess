@@ -51,3 +51,11 @@
 - concrete files affected: `docs/CHESS3D_P4C_PORTABILITY_PRODUCT_AUDIT.md`
 - risk: current C# P/Invoke wrappers name Windows DLLs directly
 - test/verify plan: no code changes in Phase 01
+
+- topic: Phase 01 CI failure triage after docs-only audit push
+- internet/source researched: GitHub Actions failed log for run `27694551492`; local SignalR contract test reproduction
+- key finding: `ChessOnlineSignalRContractTests` failed only at `SignalR Hello emits ReceiveWelcome`; the hub returned the `Welcome` message, but the test checked the async client event immediately after `InvokeAsync`, creating a scheduler-sensitive CI race
+- decision for this repo: keep the SignalR behavior contract, but make the test wait briefly for required async hub events with an atomic counter instead of a fixed immediate `List.Count` check
+- concrete files affected: `tests/ChessOnlineSignalRContractTests/Program.cs`
+- risk: SignalR broadcast/event assertions can be CI-sensitive when they assume callback delivery is synchronous with method return
+- test/verify plan: run targeted `dotnet run --project tests\ChessOnlineSignalRContractTests\ChessOnlineSignalRContractTests.csproj -c Release -p:Platform=x64`, then full `tests\run-tests.ps1 -SkipBenchmark` and `scripts\verify.ps1`
