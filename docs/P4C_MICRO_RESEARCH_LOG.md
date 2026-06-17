@@ -209,3 +209,29 @@
 - concrete files affected: `tests/ChessOnlineContractTests/Program.cs`, `docs/CHESS3D_ASGARD_ONLINE_TEST_MATRIX.md`
 - risk: online tests must keep using authority APIs and must not bypass profile-gated engine behavior
 - test/verify plan: targeted `ChessOnlineContractTests`, then `tests/run-tests.ps1 -SkipBenchmark`, then full verify
+
+## Phase 09 - Rubik / Hodge / Classic / Single Product Refresh
+
+- topic: Rubik product surface
+- internet/source researched: local audit of `rubik_convergence_3d_v0_1.json`, Rubik layer-turn docs, SignalR profile-action tests, matchmaking tests, replay/playthrough fixtures, and AI/search docs
+- key finding: Rubik has runtime layer turns, four-turn state diagnostics, action history, replay/save support, AI candidate visibility, and SignalR layer action tests, but exact-profile matchmaking smoke was only covered generically
+- decision for this repo: document Rubik as an experimental-playable Asgard-like profile with ritual layer turns and add a SignalR matchmaking smoke for the Rubik ruleset
+- concrete files affected: `docs/CHESS3D_RUBIK_PRODUCT_REFRESH.md`, `tests/ChessOnlineSignalRContractTests/Program.cs`
+- risk: Rubik layer turns must remain profile-gated and must not imply standalone RubikApp online support
+- test/verify plan: targeted SignalR contract tests, run-tests, and verify
+
+- topic: Hodge product surface
+- internet/source researched: local audit of `hodge_projection_duel_3d_v0_1.json`, Hodge projection docs, online action tests, playthrough fixtures, and AI/search docs
+- key finding: Hodge projected composite actions are runtime and online-authoritative, but matchmaking coverage was generic rather than explicitly named in the SignalR auth flow
+- decision for this repo: document Hodge as separate from Asgard and add exact-profile matchmaking smoke for Hodge
+- concrete files affected: `docs/CHESS3D_HODGE_PRODUCT_REFRESH.md`, `tests/ChessOnlineSignalRContractTests/Program.cs`
+- risk: Hodge macro-player semantics must not be mistaken for six independent sides or Asgard core/fusion behavior
+- test/verify plan: targeted SignalR contract tests, run-tests, and verify
+
+- topic: Classic and Single-Side product surface
+- internet/source researched: local audit of Classic/Single profiles, king-safety docs, action preview/perft docs, online tests, matchmaking policy, and playthrough fixtures
+- key finding: Classic is the normal king-safe 3D chess profile with online move authority; Single-Side is a one-player training profile accepted by the catalog but not public competitive matchmaking
+- decision for this repo: document Classic and Single-Side together so Classic remains first-class and Single-Side remains training/sandbox
+- concrete files affected: `docs/CHESS3D_CLASSIC_SINGLE_PRODUCT_REFRESH.md`
+- risk: product docs can overstate Single-Side as a public multiplayer mode
+- test/verify plan: existing profile/catalog and action tests plus full verify

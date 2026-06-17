@@ -412,6 +412,11 @@ static async Task AuthPersistenceTests(ContractTest test, string root, string pr
         test.Check(asgardAccepted.Envelope.MessageType == OnlineMessageTypes.ActionAccepted, "P4B matched Asgard table accepts legal action");
     }
 
+    await AssertMatchmakingProfile(test, client, token.PlayerId, client2, token2.PlayerId,
+        "rubik-convergence-3d-8x8x8-v0.1", "Rubik");
+    var latestMatch = await AssertMatchmakingProfile(test, client, token.PlayerId, client2, token2.PlayerId,
+        "hodge-projection-duel-3d-8x8x8-v0.1", "Hodge");
+
     var refresh = await http.PostAsJsonAsync("/api/auth/refresh", new AuthRefreshRequest { RefreshToken = token.RefreshToken });
     var refreshed = await refresh.Content.ReadFromJsonAsync<AuthTokenResponse>();
     test.Check(refresh.IsSuccessStatusCode && refreshed?.Success == true &&
@@ -435,11 +440,35 @@ static async Task AuthPersistenceTests(ContractTest test, string root, string pr
         JsonString(s, "tableId") == $"{classicFound.MatchmakingStatus?.RoomId}/{classicFound.MatchmakingStatus?.TableId}") == 2, "P4C matched Classic seats are persisted after matchmaking");
     test.Check(storeDoc.RootElement.GetProperty("sessions").EnumerateArray().Any(s =>
         JsonString(s, "sessionId") == token.SessionId &&
-        JsonString(s, "lastKnownRoomId") == asgardRoom &&
-        JsonString(s, "lastKnownTableId") == asgardTable), "P4C matched player session records last-known table");
+        JsonString(s, "lastKnownRoomId") == latestMatch.RoomId &&
+        JsonString(s, "lastKnownTableId") == latestMatch.TableId), "P4C matched player session records latest match-found table");
     test.Check(storeDoc.RootElement.GetProperty("actions").GetArrayLength() >= 1, "P4A JSON store persists accepted action log event");
 
     await app.StopAsync();
+}
+
+static async Task<(string RoomId, string TableId)> AssertMatchmakingProfile(
+    ContractTest test,
+    HubConnection client1,
+    string player1,
+    HubConnection client2,
+    string player2,
+    string rulesetId,
+    string label)
+{
+    var queue1 = Message(OnlineMessageTypes.JoinMatchmaking, $"match-{label}-1", player1);
+    queue1.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = rulesetId, ExpireSeconds = 120 };
+    var queued = await client1.InvokeAsync<OnlineProtocolMessage>("JoinMatchmaking", queue1);
+    test.Check(queued.Envelope.MessageType == OnlineMessageTypes.MatchmakingJoined, $"P4C {label} first player enters matchmaking queue");
+
+    var queue2 = Message(OnlineMessageTypes.JoinMatchmaking, $"match-{label}-2", player2);
+    queue2.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = rulesetId, ExpireSeconds = 120 };
+    var found = await client2.InvokeAsync<OnlineProtocolMessage>("JoinMatchmaking", queue2);
+    test.Check(found.Envelope.MessageType == OnlineMessageTypes.MatchFound &&
+        found.MatchmakingStatus?.Tickets.Count == 2 &&
+        !string.IsNullOrWhiteSpace(found.MatchmakingStatus.RoomId) &&
+        !string.IsNullOrWhiteSpace(found.MatchmakingStatus.TableId), $"P4C {label} matchmaking creates match-found room/table");
+    return (found.MatchmakingStatus?.RoomId ?? "", found.MatchmakingStatus?.TableId ?? "");
 }
 
 static void FixtureParseTests(ContractTest test, string fixtureRoot)
