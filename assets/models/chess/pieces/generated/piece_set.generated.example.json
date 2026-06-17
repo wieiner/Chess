@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "setId": "generated-example-disabled",
+  "displayName": "Generated Piece Set Example",
+  "enabled": false,
+  "source": {
+    "type": "placeholder",
+    "author": "local-generated-art",
+    "license": "replace-before-use",
+    "notes": "Descriptor only. No generated mesh files are tracked for this example."
+  },
+  "supportedApps": ["Chess2D", "Chess3D"],
+  "formats": {
+    "current": "obj-mtl",
+    "futurePreferred": "glb-gltf"
+  },
+  "assetRoot": "generated/example",
+  "sizePolicy": {
+    "maxFileBytes": 5242880,
+    "maxSetBytes": 52428800,
+    "requiresSizeAuditAboveBytes": 10485760
+  },
+  "pieceTypes": ["pawn", "rook", "knight", "bishop", "queen", "king"],
+  "requiredVariants": ["white", "black"],
+  "namingConvention": "{variant}_{piece}.obj and optional {variant}_{piece}.mtl",
+  "transformDefaults": {
+    "scale": 1.0,
+    "rotation": { "x": 0, "y": 0, "z": 0 },
+    "verticalOffset": 0.0,
+    "origin": "centered-on-square"
+  },
+  "materialPolicy": {
+    "whiteFallback": "#EEE7CE",
+    "blackFallback": "#58606C",
+    "diffuseTexture": "optional",
+    "specularTexture": "optional",
+    "normalTexture": "documented-but-ignored-by-current-wpf",
+    "roughnessTexture": "documented-but-ignored-by-current-wpf"
+  },
+  "validation": {
+    "noAbsolutePaths": true,
+    "noPrivateOrTempFiles": true,
+    "noHeavyBinariesWithoutAudit": true,
+    "requiredBeforeEnable": [
+      "all declared OBJ files exist",
+      "source and license metadata reviewed",
+      "scale/origin verified in Chess2D and Chess3D",
+      "fallback materials are readable"
+    ]
+  },
+  "pieces": {
+    "pawn": { "white": { "obj": "generated/example/white_pawn.obj" }, "black": { "obj": "generated/example/black_pawn.obj" } },
+    "rook": { "white": { "obj": "generated/example/white_rook.obj" }, "black": { "obj": "generated/example/black_rook.obj" } },
+    "knight": { "white": { "obj": "generated/example/white_knight.obj" }, "black": { "obj": "generated/example/black_knight.obj" } },
+    "bishop": { "white": { "obj": "generated/example/white_bishop.obj" }, "black": { "obj": "generated/example/black_bishop.obj" } },
+    "queen": { "white": { "obj": "generated/example/white_queen.obj" }, "black": { "obj": "generated/example/black_queen.obj" } },
+    "king": { "white": { "obj": "generated/example/white_king.obj" }, "black": { "obj": "generated/example/black_king.obj" } }
+  },
+  "knownLimitations": [
+    "This example manifest is disabled and intentionally references files that are not tracked.",
+    "It documents the contract for future generated sets without adding heavy binary assets."
+  ]
+}

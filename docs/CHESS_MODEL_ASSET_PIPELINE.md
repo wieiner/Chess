@@ -46,3 +46,20 @@ Expected runtime examples:
 P3B overlays are procedural WPF geometry and do not require new OBJ/MTL files. They layer on top of the canonical model catalog.
 
 P3C keeps that asset boundary. The visual diagnostics panel now surfaces active model set, OBJ/fallback model counts, overlay count, animation state, visual state, option state, and the last material/model diagnostic text. P3C does not add new model formats or automatically unpack ZIP archives.
+
+## Generated Piece Sets
+
+P4C phase 10 adds a generated-asset contract without adding heavy generated meshes:
+
+```text
+assets/models/chess/pieces/generated/piece_set.generated.example.json
+```
+
+The example manifest is disabled and descriptor-only. It defines the rules for future generated piece sets:
+
+- OBJ/MTL remains the supported runtime format today;
+- glTF/GLB is the preferred future interchange/runtime format once a loader is added;
+- every enabled set needs source/license metadata, size review, fallback materials, scale/origin data, and path validation;
+- no absolute local paths, ZIP dumps, cache files, or heavy binaries should be committed without audit.
+
+The detailed policy lives in `docs/CHESS3D_GENERATED_PIECE_ASSET_PIPELINE.md`.

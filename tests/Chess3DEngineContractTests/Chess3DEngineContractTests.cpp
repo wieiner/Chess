@@ -1765,6 +1765,46 @@ int main()
     test.Check(std::filesystem::exists("assets\\models\\chess\\pieces\\default\\Board\\light_tile.obj") &&
         std::filesystem::exists("assets\\models\\chess\\pieces\\default\\Board\\dark_tile.obj"),
         "default OBJ board tiles exist");
+    const std::string generatedManifest = ReadTextFile("assets\\models\\chess\\pieces\\generated\\piece_set.generated.example.json");
+    test.Check(!generatedManifest.empty(), "generated piece set example manifest exists");
+    test.Check(JsonParser(generatedManifest).Parse(), "generated piece set example manifest parses as JSON");
+    test.Check(generatedManifest.find("\"enabled\": false") != std::string::npos,
+        "generated piece set example is disabled");
+    test.Check(generatedManifest.find("\"license\": \"replace-before-use\"") != std::string::npos,
+        "generated piece set example requires license replacement before use");
+    test.Check(generatedManifest.find("\"maxFileBytes\"") != std::string::npos &&
+        generatedManifest.find("\"requiresSizeAuditAboveBytes\"") != std::string::npos,
+        "generated piece set example declares size policy");
+    test.Check(generatedManifest.find("C:\\") == std::string::npos &&
+        generatedManifest.find("E:\\") == std::string::npos &&
+        generatedManifest.find("/Users/") == std::string::npos &&
+        generatedManifest.find("/home/") == std::string::npos,
+        "generated piece set example avoids absolute local paths");
+    test.Check(generatedManifest.find(".blend1") == std::string::npos &&
+        generatedManifest.find("__MACOSX") == std::string::npos &&
+        generatedManifest.find("rude-resource") == std::string::npos,
+        "generated piece set example avoids temp/private asset markers");
+    const auto generatedRoot = std::filesystem::path("assets\\models\\chess\\pieces\\generated");
+    bool generatedHasHeavyBinary = false;
+    if (std::filesystem::exists(generatedRoot))
+    {
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(generatedRoot))
+        {
+            if (!entry.is_regular_file())
+            {
+                continue;
+            }
+            const auto extension = entry.path().extension().string();
+            const auto size = entry.file_size();
+            if ((extension == ".obj" || extension == ".fbx" || extension == ".glb" || extension == ".zip" ||
+                    extension == ".blend" || extension == ".blend1") &&
+                size > 0)
+            {
+                generatedHasHeavyBinary = true;
+            }
+        }
+    }
+    test.Check(!generatedHasHeavyBinary, "generated asset staging folder has no heavy mesh/archive binaries");
 
     const std::string classicProfile = ReadTextFile("assets\\rules\\profiles\\classic_six_side_3d_v0_1.json");
     const std::string singleProfile = ReadTextFile("assets\\rules\\profiles\\single_side_3d_v0_1.json");

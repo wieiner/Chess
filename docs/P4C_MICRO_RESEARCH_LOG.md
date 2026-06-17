@@ -235,3 +235,21 @@
 - concrete files affected: `docs/CHESS3D_CLASSIC_SINGLE_PRODUCT_REFRESH.md`
 - risk: product docs can overstate Single-Side as a public multiplayer mode
 - test/verify plan: existing profile/catalog and action tests plus full verify
+
+## Phase 10 - Generated 3D Piece Asset Pipeline
+
+- topic: glTF/GLB as future generated asset format
+- internet/source researched: Khronos glTF overview, https://www.khronos.org/gltf/; Khronos glTF 2.0 specification, https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
+- key finding: Khronos defines glTF as an efficient, interoperable runtime 3D asset delivery format; GLB/glTF is a better future target for generated assets than long-term OBJ-only storage, but the current WPF pipeline is OBJ/MTL
+- decision for this repo: keep OBJ/MTL as the supported runtime format today and document GLB/glTF as the preferred future import/runtime format once a loader exists
+- concrete files affected: `docs/CHESS3D_GENERATED_PIECE_ASSET_PIPELINE.md`, `assets/models/chess/pieces/generated/piece_set.generated.example.json`
+- risk: claiming GLB support now would be false because no GLB loader is implemented
+- test/verify plan: manifest/doc smoke plus existing OBJ/MTL tests and full verify
+
+- topic: generated-piece manifest validation
+- internet/source researched: local audit of `assets/models/chess/pieces`, `piece_sets.json`, WPF model copy rules, `Chess3DEngineContractTests`, and `scripts/verify.ps1`
+- key finding: the canonical model catalog already copies all files below `assets/models/chess/pieces` to Chess2D and Chess3D outputs; a disabled generated example manifest can be validated without committing meshes
+- decision for this repo: add a descriptor-only generated example manifest, test that it parses and avoids absolute/private/temp/heavy-binary markers, and verify it appears in dev and portable output
+- concrete files affected: `tests/Chess3DEngineContractTests/Chess3DEngineContractTests.cpp`, `scripts/verify.ps1`, `docs/TESTING.md`, `docs/CHESS_MODEL_ASSET_PIPELINE.md`
+- risk: future generated sets can bloat git history or carry unclear license/source metadata if not gated
+- test/verify plan: targeted `Chess3DEngineContractTests`, `tests/run-tests.ps1 -SkipBenchmark`, and full `scripts/verify.ps1`

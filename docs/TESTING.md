@@ -47,8 +47,9 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - P2K Chess3D tests validate scenario smoke descriptor JSON for classic, Asgard, Rubik, and Hodge, plus non-Hodge projected-move clean failure/no mutation.
 - P2L Chess3D tests validate exactly five real RuleProfiles, legal action preview non-mutation, invalid-action reasons, profile capability masks, turn summaries, mode isolation, and playthrough scenario JSON parsing.
 - P2M Chess3D tests validate the canonical visual piece-set manifest, readable black-piece fallback metadata, required OBJ/MTL files for all standard piece types, and default board tile OBJ assets.
+- P4C phase 10 extends visual asset tests with a disabled generated-piece manifest smoke: it must parse, declare source/license/size policy, avoid absolute paths, avoid private/temp file markers, and remain lightweight.
 - `scripts/verify.ps1` checks that representative Asgard, Rubik convergence, and Hodge Projection Duel profiles plus all P2K smoke and P2L playthrough scenario descriptors are copied into `Chess3DApp` output and `ProductionOutput/Chess3D`.
-- `scripts/verify.ps1` also checks that `Assets/Models/piece_sets.json` and representative OBJ/MTL assets are copied into Chess2D and Chess3D development output and portable `ProductionOutput`.
+- `scripts/verify.ps1` also checks that `Assets/Models/piece_sets.json`, representative OBJ/MTL assets, and the generated-piece example manifest are copied into Chess2D and Chess3D development output and portable `ProductionOutput`.
 - Rubik size, state, rotation, scramble, reverse-history solve, and manual-state ABI calls still work.
 - GPU backend CPU/Auto paths work without CUDA, and Direct3D/CUDA absence is handled as non-fatal where appropriate.
 - P3E online authority tests validate protocol roundtrip/rejection, exact five-profile catalog, room/table/seat flows, server-side action validation, stale-hash resync, snapshots, action-log chunks, action-log replay hash equality, and online fixture parsing.

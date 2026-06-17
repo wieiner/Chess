@@ -77,6 +77,7 @@ P4A adds a local production-oriented identity/session/persistence layer around t
 - `docs/CHESS3D_SCENARIO_PLAYTHROUGHS.md`: P2L playthrough descriptors.
 - `assets/models/chess/pieces/piece_sets.json`: canonical visual model catalog for Chess2D and Chess3D.
 - `assets/models/chess/pieces/default`: canonical local OBJ/MTL chess piece set.
+- `assets/models/chess/pieces/generated/piece_set.generated.example.json`: disabled descriptor-only manifest for future generated piece sets.
 - `docs/CHESS_VISUAL_ASSET_AUDIT.md`: P2M audit of OBJ/MTL, lighting, hit-test, and interaction boundaries.
 - `docs/CHESS_MODEL_ASSET_PIPELINE.md`: canonical model asset layout and packaging contract.
 - `docs/CHESS_OBJ_MTL_TEXTURE_SUPPORT.md`: supported OBJ/MTL/texture subset and fallbacks.
