@@ -253,3 +253,13 @@
 - concrete files affected: `tests/Chess3DEngineContractTests/Chess3DEngineContractTests.cpp`, `scripts/verify.ps1`, `docs/TESTING.md`, `docs/CHESS_MODEL_ASSET_PIPELINE.md`
 - risk: future generated sets can bloat git history or carry unclear license/source metadata if not gated
 - test/verify plan: targeted `Chess3DEngineContractTests`, `tests/run-tests.ps1 -SkipBenchmark`, and full `scripts/verify.ps1`
+
+## Phase 11 - Product Presentation Deck
+
+- topic: product-facing Chess3D feature story
+- internet/source researched: local audit of `docs/CHESS3D_MODE_FEATURE_MATRIX.md`, `docs/CHESS3D_PRODUCT_SURFACE_MAP.md`, `docs/PROJECT_STATUS.md`, `docs/ROADMAP.md`, and the five RuleProfile JSON files
+- key finding: the product story is strongest when it keeps the five Chess3D profiles separate and treats online authority, AI/search, replay, visual assets, deployment, and generated assets as cross-cutting capabilities rather than modes
+- decision for this repo: add a lightweight presentation packet under `docs/presentation` with a Markdown deck, feature inventory, screenshot TODO list, and standalone HTML deck that uses no external CDN
+- concrete files affected: `docs/presentation/CHESS3D_PRODUCT_PRESENTATION.md`, `docs/presentation/CHESS3D_FEATURE_INVENTORY.md`, `docs/presentation/CHESS3D_SCREENSHOT_TODO.md`, `docs/presentation/chess3d_presentation.html`
+- risk: marketing copy can overstate Linux deployment, public matchmaking, or final Asgard/Rubik/Hodge rule completeness
+- test/verify plan: run `git diff --check`, then `scripts/verify.ps1`

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chess3D Product Presentation</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #20242b;
+      --panel: #2c323b;
+      --text: #edf1f5;
+      --muted: #b8c1cc;
+      --accent: #8fc7ff;
+      --line: #46515f;
+      --good: #a7d88b;
+      --warn: #ffd27d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+    }
+    section {
+      min-height: 560px;
+      padding: 36px;
+      margin: 0 0 24px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+    h1, h2 {
+      margin: 0 0 18px;
+      letter-spacing: 0;
+    }
+    h1 { font-size: 42px; }
+    h2 { font-size: 30px; color: var(--accent); }
+    p, li { font-size: 19px; color: var(--muted); }
+    ul { padding-left: 24px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 18px;
+      font-size: 17px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { color: var(--text); background: #37404b; }
+    .tag {
+      display: inline-block;
+      margin: 4px 8px 4px 0;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      color: var(--text);
+      background: #252b33;
+      font-size: 14px;
+    }
+    .good { color: var(--good); }
+    .warn { color: var(--warn); }
+  </style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>Chess3D Platform</h1>
+    <p>A five-profile 8x8x8 chess platform with profile-gated rules, action history, replay, AI/search smoke, visual assets, and a Windows-hosted SignalR authority prototype.</p>
+    <span class="tag">Classic</span>
+    <span class="tag">Single-Side</span>
+    <span class="tag">Asgard</span>
+    <span class="tag">Rubik</span>
+    <span class="tag">Hodge</span>
+  </section>
+
+  <section>
+    <h2>Five Real RuleProfiles</h2>
+    <table>
+      <tr><th>Profile</th><th>Role</th></tr>
+      <tr><td>Classic Six-Side</td><td>normal king-safe 8x8x8 chess profile</td></tr>
+      <tr><td>Single-Side Training</td><td>one-side movement and UI training profile</td></tr>
+      <tr><td>Asgard / Meru</td><td>Forbidden Core, stacks, fusion descriptors, reserve, anchors</td></tr>
+      <tr><td>Rubik Convergence</td><td>Asgard-like state plus legal layer turns</td></tr>
+      <tr><td>Hodge Projection Duel</td><td>two macro-players with projected composite moves</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Runtime Spine</h2>
+    <ul>
+      <li>RuleProfile JSON loading and capability summaries.</li>
+      <li>Legal action preview and invalid-action reasons.</li>
+      <li>Action history, notation, save/load, replay, and state hash.</li>
+      <li>Headless playthrough and regression fixtures.</li>
+      <li>Profile-aware AI/search candidates.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Online Authority</h2>
+    <ul>
+      <li class="good">Windows hosted SignalR authority prototype.</li>
+      <li class="good">Auth/session/persistence baseline.</li>
+      <li class="good">Exact-profile matchmaking smoke.</li>
+      <li class="warn">Linux-native authority is not proven yet.</li>
+      <li class="warn">No Redis/Azure SignalR/backplane or public ranked matchmaking.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Visual Assets</h2>
+    <ul>
+      <li>Canonical OBJ/MTL catalog shared by Chess2D and Chess3D.</li>
+      <li>Readable fallback materials and neutral scene lighting.</li>
+      <li>Generated-piece descriptor example without tracked generated meshes.</li>
+      <li>Future GLB/glTF path is documented, not claimed as current runtime support.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Next Product Work</h2>
+    <ul>
+      <li>Deployment decision package and Hetzner action plan.</li>
+      <li>Linux-native rules authority spike.</li>
+      <li>Richer visual presentation and online UX.</li>
+      <li>Final AI/search, matchmaking, and release polish.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>
