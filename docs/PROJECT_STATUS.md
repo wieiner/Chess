@@ -409,3 +409,22 @@ Still deferred:
 
 - real Linux runtime execution because ChessOnlineServer still targets `net8.0-windows` and uses the Windows native Chess3DEngine DLL;
 - public ranked matchmaking, durable queue recovery, cloud backplanes, Redis, Kubernetes, and real TLS automation.
+
+## P4C Deployment Decision Status
+
+P4C keeps the Windows hosted server path executable and documents the Linux/Hetzner path honestly.
+
+Implemented:
+
+- deployment decision matrix in `docs/CHESS3D_DEPLOYMENT_DECISION_PACKAGE.md`;
+- placeholder-only Hetzner action plan in `docs/CHESS3D_HETZNER_ACTION_PLAN.md`;
+- repository/package/deploy safety checklist in `docs/CHESS3D_DEPLOYMENT_CHECKLIST.md`;
+- existing Windows server package remains the only executable hosted authority path today;
+- existing nginx/systemd templates remain planning scaffolding until a Linux-native rules authority is available.
+
+Still deferred:
+
+- Linux-native `Chess3DEngine` shared library;
+- `linux-x64` server publish;
+- state-hash parity on Linux for all five RuleProfiles;
+- public matchmaking scale-out, Redis/Azure SignalR/backplane, Kubernetes, and production TLS automation.

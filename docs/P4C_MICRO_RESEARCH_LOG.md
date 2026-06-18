@@ -263,3 +263,13 @@
 - concrete files affected: `docs/presentation/CHESS3D_PRODUCT_PRESENTATION.md`, `docs/presentation/CHESS3D_FEATURE_INVENTORY.md`, `docs/presentation/CHESS3D_SCREENSHOT_TODO.md`, `docs/presentation/chess3d_presentation.html`
 - risk: marketing copy can overstate Linux deployment, public matchmaking, or final Asgard/Rubik/Hodge rule completeness
 - test/verify plan: run `git diff --check`, then `scripts/verify.ps1`
+
+## Phase 12 - Deployment Decision Package
+
+- topic: deployment readiness and Hetzner boundary
+- internet/source researched: local audit of `docs/CHESS3D_P4C_LINUX_PORTABILITY_DECISION.md`, `docs/CHESS3D_HETZNER_LINUX_DEPLOYMENT_RUNBOOK.md`, `docs/CHESS3D_WINDOWS_SERVER_RUNBOOK.md`, `deploy/linux`, `deploy/windows`, and production package checks in `scripts/verify.ps1`
+- key finding: Windows server packaging is executable today, while Linux/Hetzner remains blocked by the Windows-native `Chess3DEngine.dll` authority dependency despite useful nginx/systemd scaffolding
+- decision for this repo: add a decision package that separates the current Windows path, future Hetzner Linux path, gateway fallback, Docker/future orchestration, and public-scale features without committing operator IPs, private keys, stores, keyrings, or secrets
+- concrete files affected: `docs/CHESS3D_DEPLOYMENT_DECISION_PACKAGE.md`, `docs/CHESS3D_HETZNER_ACTION_PLAN.md`, `docs/CHESS3D_DEPLOYMENT_CHECKLIST.md`, `docs/CHESS3D_DEPLOYMENT_TARGET_DECISION.md`, `docs/PROJECT_STATUS.md`
+- risk: deploy docs can be mistaken for a working Linux release if the native authority blocker is not repeated
+- test/verify plan: run `git diff --check`, then `scripts/verify.ps1`
