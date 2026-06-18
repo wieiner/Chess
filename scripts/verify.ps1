@@ -9,6 +9,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Root = [System.IO.Path]::GetFullPath((Join-Path $ScriptDir ".."))
 $Configuration = "Release"
 $Platform = "x64"
+$MSBuildMaxCpuCount = if ($env:CHESS_VERIFY_MSBUILD_MAX_CPU_COUNT) { $env:CHESS_VERIFY_MSBUILD_MAX_CPU_COUNT } else { "4" }
 
 function Write-Step([string]$Message) {
     Write-Host ""
@@ -81,6 +82,7 @@ try {
     Write-Host "Root: $Root"
     Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
     Write-Host "MSBuild: $(Resolve-MSBuild)"
+    Write-Host "MSBuild max CPU count: $MSBuildMaxCpuCount"
     Write-Host "nvcc:"
     cmd /c where nvcc
     if ($LASTEXITCODE -ne 0) { Write-Host "nvcc not found in PATH; CUDA backend remains optional." }
@@ -131,10 +133,14 @@ try {
     Assert-File "docs\CHESS3D_ONLINE_AUTHORITY_ADAPTER.md"
     Assert-File "docs\CHESS3D_MATCHMAKING_DURABILITY_AUDIT.md"
     Assert-File "docs\CHESS3D_ASGARD_DEEPENING_PLAN.md"
+    Assert-File "docs\CHESS3D_P4D_LINUX_NATIVE_AUTHORITY_PLAN.md"
+    Assert-File "docs\CHESS3D_CLANG_LINUX_TOOLCHAIN_PLAN.md"
+    Assert-File "docs\CHESS3D_HETZNER_BUILD_PROBE_PLAN.md"
+    Assert-File "cmake\toolchains\linux-x64-clang-from-windows.cmake"
 
     Write-Step "Build Release x64"
     $msbuild = Resolve-MSBuild
-    Invoke-Checked { & $msbuild ".\Chess.sln" "/restore" "/m" "/nr:false" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal" } "MSBuild failed."
+    Invoke-Checked { & $msbuild ".\Chess.sln" "/restore" "/m:$MSBuildMaxCpuCount" "/nr:false" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal" } "MSBuild failed."
 
     Write-Step "Development executable checks"
     Assert-File "src\ChessApp\bin\x64\Release\net8.0-windows\ChessApp.exe"

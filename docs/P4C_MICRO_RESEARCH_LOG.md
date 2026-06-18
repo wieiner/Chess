@@ -283,3 +283,13 @@
 - concrete files affected: `docs/ROADMAP.md`, `docs/PROJECT_STATUS.md`, `docs/ARCHITECTURE.md`, `docs/TESTING.md`, `docs/BUILD_AND_RELEASE.md`, `scripts/verify.ps1`
 - risk: source-level docs can drift while binary/package verification remains green
 - test/verify plan: run `tests/run-tests.ps1 -SkipBenchmark`, then full `scripts/verify.ps1`
+
+## Phase 14 - Linux Native Authority Spike Preparation
+
+- topic: custom Clang and Linux-native authority feasibility
+- internet/source researched: CMake toolchains manual, https://cmake.org/cmake/help/latest/manual/cmake-toolchains.7.html; Clang cross-compilation guide, https://clang.llvm.org/docs/CrossCompilation.html; Microsoft .NET RID catalog, https://learn.microsoft.com/en-us/dotnet/core/rid-catalog; Microsoft .NET native library loading, https://learn.microsoft.com/en-us/dotnet/standard/native-interop/native-library-loading
+- local audit: `C:\ll\local\bin` contains Clang, Clang++, LLD, LLVM ar, and LLVM ranlib; Clang reports version `23.0.0git` with default target `x86_64-pc-windows-msvc`
+- key finding: no Linux sysroot was found in the expected `C:\ll` paths or in `SYSROOT` / `LINUX_SYSROOT`, so Windows-hosted Linux linking is blocked even though LLVM tools exist
+- decision for this repo: add a documented draft CMake toolchain and P4D plan docs, but do not claim Linux-native authority readiness or perform a Hetzner probe
+- risk: a target triple without a sysroot can create false confidence; P4D must prove native artifact loading and state-hash parity
+- test/verify plan: run `git diff --check`, full `scripts/verify.ps1`, commit, push, and wait for GitHub Actions

@@ -51,6 +51,8 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - `scripts/verify.ps1` checks that representative Asgard, Rubik convergence, and Hodge Projection Duel profiles plus all P2K smoke and P2L playthrough scenario descriptors are copied into `Chess3DApp` output and `ProductionOutput/Chess3D`.
 - `scripts/verify.ps1` also checks that `Assets/Models/piece_sets.json`, representative OBJ/MTL assets, and the generated-piece example manifest are copied into Chess2D and Chess3D development output and portable `ProductionOutput`.
 - P4C phase 13 extends `scripts/verify.ps1` with source-level checks for generated asset pipeline docs, product presentation docs, deployment decision docs, the online authority adapter doc, matchmaking durability docs, and Asgard deepening docs.
+- P4C phase 14 extends the same source checks to cover the P4D Linux-native authority plan, Clang/Linux toolchain plan, Hetzner build probe plan, and draft CMake toolchain file.
+- `scripts/verify.ps1` bounds the direct MSBuild pass with `CHESS_VERIFY_MSBUILD_MAX_CPU_COUNT` (default `4`) to reduce local resource contention without reducing test coverage.
 - Rubik size, state, rotation, scramble, reverse-history solve, and manual-state ABI calls still work.
 - GPU backend CPU/Auto paths work without CUDA, and Direct3D/CUDA absence is handled as non-fatal where appropriate.
 - P3E online authority tests validate protocol roundtrip/rejection, exact five-profile catalog, room/table/seat flows, server-side action validation, stale-hash resync, snapshots, action-log chunks, action-log replay hash equality, and online fixture parsing.

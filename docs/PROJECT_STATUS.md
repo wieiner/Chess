@@ -443,3 +443,23 @@ Implemented:
 Next:
 
 - P4D should focus on Linux-native authority feasibility, not new gameplay rules.
+
+## P4C Phase 14 Linux-Native Authority Prep Status
+
+P4C now includes a safe P4D preparation layer.
+
+Implemented:
+
+- local LLVM audit recorded in `docs/CHESS3D_CLANG_LINUX_TOOLCHAIN_PLAN.md`;
+- no Linux sysroot found, so Linux-native authority remains blocked;
+- draft CMake toolchain added at `cmake/toolchains/linux-x64-clang-from-windows.cmake`;
+- P4D authority plan added in `docs/CHESS3D_P4D_LINUX_NATIVE_AUTHORITY_PLAN.md`;
+- Hetzner build probe plan added in `docs/CHESS3D_HETZNER_BUILD_PROBE_PLAN.md`;
+- `scripts/verify.ps1` now asserts these P4D-prep source artifacts exist.
+
+Still deferred:
+
+- actual Linux `Chess3DEngine` shared library;
+- platform-aware Linux native loading;
+- state-hash parity between Windows and Linux authorities;
+- any real Hetzner deploy or SSH probe.

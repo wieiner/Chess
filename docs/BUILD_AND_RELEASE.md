@@ -234,3 +234,7 @@ Current planning-only path:
 - `docs\CHESS3D_DEPLOYMENT_DECISION_PACKAGE.md`.
 
 Do not claim Linux runtime readiness until P4D provides a Linux-native authority package and state-hash parity tests.
+
+P4C phase 14 adds a draft Windows-hosted Clang toolchain file at `cmake\toolchains\linux-x64-clang-from-windows.cmake`. It is intentionally a planning artifact until a Linux sysroot exists and the native `Chess3DEngine` shared library is proven with state-hash parity tests.
+
+The direct build pass in `scripts\verify.ps1` uses `CHESS_VERIFY_MSBUILD_MAX_CPU_COUNT` with default `4`. This keeps local verification less fragile under competing compiler workloads while preserving the same build/test/package checks.
