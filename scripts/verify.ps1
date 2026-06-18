@@ -120,6 +120,17 @@ try {
     Assert-File "deploy\windows\install-chessonline-server.ps1.template"
     Assert-File "deploy\windows\uninstall-chessonline-server.ps1.template"
     Assert-File "docs\CHESS3D_WINDOWS_SERVER_RUNBOOK.md"
+    Assert-File "docs\CHESS3D_GENERATED_PIECE_ASSET_PIPELINE.md"
+    Assert-File "docs\presentation\CHESS3D_PRODUCT_PRESENTATION.md"
+    Assert-File "docs\presentation\CHESS3D_FEATURE_INVENTORY.md"
+    Assert-File "docs\presentation\CHESS3D_SCREENSHOT_TODO.md"
+    Assert-File "docs\presentation\chess3d_presentation.html"
+    Assert-File "docs\CHESS3D_DEPLOYMENT_DECISION_PACKAGE.md"
+    Assert-File "docs\CHESS3D_HETZNER_ACTION_PLAN.md"
+    Assert-File "docs\CHESS3D_DEPLOYMENT_CHECKLIST.md"
+    Assert-File "docs\CHESS3D_ONLINE_AUTHORITY_ADAPTER.md"
+    Assert-File "docs\CHESS3D_MATCHMAKING_DURABILITY_AUDIT.md"
+    Assert-File "docs\CHESS3D_ASGARD_DEEPENING_PLAN.md"
 
     Write-Step "Build Release x64"
     $msbuild = Resolve-MSBuild

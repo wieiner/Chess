@@ -50,6 +50,7 @@ Each test executable prints `PASS`/`FAIL` lines and returns exit code `0` only w
 - P4C phase 10 extends visual asset tests with a disabled generated-piece manifest smoke: it must parse, declare source/license/size policy, avoid absolute paths, avoid private/temp file markers, and remain lightweight.
 - `scripts/verify.ps1` checks that representative Asgard, Rubik convergence, and Hodge Projection Duel profiles plus all P2K smoke and P2L playthrough scenario descriptors are copied into `Chess3DApp` output and `ProductionOutput/Chess3D`.
 - `scripts/verify.ps1` also checks that `Assets/Models/piece_sets.json`, representative OBJ/MTL assets, and the generated-piece example manifest are copied into Chess2D and Chess3D development output and portable `ProductionOutput`.
+- P4C phase 13 extends `scripts/verify.ps1` with source-level checks for generated asset pipeline docs, product presentation docs, deployment decision docs, the online authority adapter doc, matchmaking durability docs, and Asgard deepening docs.
 - Rubik size, state, rotation, scramble, reverse-history solve, and manual-state ABI calls still work.
 - GPU backend CPU/Auto paths work without CUDA, and Direct3D/CUDA absence is handled as non-fatal where appropriate.
 - P3E online authority tests validate protocol roundtrip/rejection, exact five-profile catalog, room/table/seat flows, server-side action validation, stale-hash resync, snapshots, action-log chunks, action-log replay hash equality, and online fixture parsing.
@@ -249,3 +250,14 @@ The P3D.1 tests still do not claim tournament strength, opening-book quality, GP
 - parsing of matchmaking, Asgard-online, and deployment scenario descriptors.
 
 `scripts\verify.ps1` additionally checks that OnlineServer development output and `ProductionOutput\ChessOnlineServer` include the P4B scenarios, production sample config, and deploy templates.
+
+## P4C Consolidation Checks
+
+P4C keeps the CI gate conservative:
+
+- no new RuleProfile count is introduced;
+- Windows server packaging remains verified;
+- Linux/Hetzner docs remain planning-only until a Linux-native authority exists;
+- generated 3D assets use descriptor-first validation, not tracked heavy meshes;
+- presentation and deployment docs are checked as source artifacts;
+- `ProductionOutput` is scanned for database, token, key, certificate, and runtime secret-like files.

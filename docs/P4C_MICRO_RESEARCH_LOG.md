@@ -273,3 +273,13 @@
 - concrete files affected: `docs/CHESS3D_DEPLOYMENT_DECISION_PACKAGE.md`, `docs/CHESS3D_HETZNER_ACTION_PLAN.md`, `docs/CHESS3D_DEPLOYMENT_CHECKLIST.md`, `docs/CHESS3D_DEPLOYMENT_TARGET_DECISION.md`, `docs/PROJECT_STATUS.md`
 - risk: deploy docs can be mistaken for a working Linux release if the native authority blocker is not repeated
 - test/verify plan: run `git diff --check`, then `scripts/verify.ps1`
+
+## Phase 13 - Roadmap and Verify Consolidation
+
+- topic: P4C documentation and verification closure
+- internet/source researched: local audit of `docs/ROADMAP.md`, `docs/PROJECT_STATUS.md`, `docs/ARCHITECTURE.md`, `docs/TESTING.md`, `docs/BUILD_AND_RELEASE.md`, and `scripts/verify.ps1`
+- key finding: the important P4C deliverables are now spread across authority adapter, Windows deploy, Hetzner planning, matchmaking durability, mode matrix, Asgard/Rubik/Hodge refresh, generated assets, presentation, and deployment decision docs; CI should assert the most important source docs in addition to package assets
+- decision for this repo: consolidate P4C status in roadmap/status/architecture/testing/build docs and make `scripts/verify.ps1` check the key P4C source documents
+- concrete files affected: `docs/ROADMAP.md`, `docs/PROJECT_STATUS.md`, `docs/ARCHITECTURE.md`, `docs/TESTING.md`, `docs/BUILD_AND_RELEASE.md`, `scripts/verify.ps1`
+- risk: source-level docs can drift while binary/package verification remains green
+- test/verify plan: run `tests/run-tests.ps1 -SkipBenchmark`, then full `scripts/verify.ps1`

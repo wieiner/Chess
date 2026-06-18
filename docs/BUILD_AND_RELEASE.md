@@ -160,6 +160,7 @@ After successful verification, CI uploads `ProductionOutput` as the short-retent
 
 CUDA remains optional in CI and in the default local build. After P2M, the same verification pipeline also covers Rubik convergence layer turns, action history, deterministic notation, reserve restore contracts, Hodge Projection Duel composite-turn contracts, legal action preview contracts, scenario smoke/playthrough descriptors, packaging of the Chess3D control-center assets, and packaging of the canonical OBJ/MTL model catalog.
 P3F extends verification to build/package `ChessOnlineServer`, copy SignalR scenario descriptors, and run `ChessOnlineSignalRContractTests`. P4A extends the same path with identity/persistence descriptors and verifies that generated stores, Data Protection keys, certificates, token files, and other runtime secret-like artifacts are not present in `ProductionOutput`.
+P4C extends source verification to assert the generated-piece pipeline doc, product presentation packet, deployment decision package, authority adapter docs, matchmaking durability docs, and Asgard deepening plan. These checks are intentionally lightweight but prevent major P4C guidance from disappearing while build artifacts remain green.
 ## P2N Packaging Notes
 
 Save/replay code does not add required runtime data files beyond the existing RuleProfile and scenario assets.
@@ -218,3 +219,18 @@ P4B extends `ProductionOutput\ChessOnlineServer` with:
 - `Deploy\windows`
 
 These files are templates and descriptors only. The package must not contain runtime data stores, tokens, key rings, certificates, or private keys. Linux deployment files are included as scaffolding; real Linux runtime execution remains deferred until the server no longer depends on the Windows native engine build.
+
+## P4C Deployment Boundary
+
+Current executable server path:
+
+- `ProductionOutput\ChessOnlineServer` on Windows.
+- `Deploy\windows` start/stop/test helper scripts.
+
+Current planning-only path:
+
+- `Deploy\linux` nginx/systemd templates.
+- `docs\CHESS3D_HETZNER_ACTION_PLAN.md`.
+- `docs\CHESS3D_DEPLOYMENT_DECISION_PACKAGE.md`.
+
+Do not claim Linux runtime readiness until P4D provides a Linux-native authority package and state-hash parity tests.

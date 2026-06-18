@@ -82,6 +82,16 @@ The engine still reserves side ids `1..6`. Six-sided chess should be built by ma
 
 P4C adds an online rules authority adapter boundary for hosted Chess3D play. `OnlineRoomRegistry` now depends on `IChessOnlineGameSessionFactory` and stores table sessions as `IChessOnlineRulesAuthority`. The current implementation remains `WindowsNative` through `NativeChessOnlineGameSessionFactory` and `Chess3DEngine.dll`; Linux-native authority is an explicit future replacement point rather than a claimed runtime capability.
 
+P4C also separates deployment architecture from deployment claims:
+
+- Windows `ChessOnlineServer` packaging is executable and verified today.
+- Linux/Hetzner documentation is a target shape, not a working runtime claim.
+- nginx/systemd templates are packaged as scaffolding.
+- generated 3D piece manifests, presentation docs, and deployment decision docs are source-level product artifacts, not runtime modes.
+- `scripts/verify.ps1` checks key source docs, package assets, and absence of secret-like artifacts in `ProductionOutput`.
+
+The next architecture gate is P4D: provide a Linux-native rules authority or equivalent adapter, then prove state-hash parity across all five RuleProfiles.
+
 ## Why Separate Apps
 
 - 2D chess can remain a stable advisor/game app.

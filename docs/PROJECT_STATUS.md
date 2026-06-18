@@ -428,3 +428,18 @@ Still deferred:
 - `linux-x64` server publish;
 - state-hash parity on Linux for all five RuleProfiles;
 - public matchmaking scale-out, Redis/Azure SignalR/backplane, Kubernetes, and production TLS automation.
+
+## P4C Phase 13 Consolidation Status
+
+P4C source guidance and verification are now consolidated.
+
+Implemented:
+
+- roadmap/status/build/testing/architecture docs state the Windows-vs-Linux boundary consistently;
+- `scripts/verify.ps1` asserts key P4C source docs for generated assets, presentation, deployment decisions, authority adapter, matchmaking durability, and Asgard deepening;
+- `ProductionOutput` remains checked for secret-like runtime artifacts;
+- no sixth Chess3D RuleProfile was added.
+
+Next:
+
+- P4D should focus on Linux-native authority feasibility, not new gameplay rules.

@@ -221,9 +221,16 @@
 
 - Completed P4A: replace dev-only session smoke with optional authenticated local identity/session baseline.
 - Completed P4A: persistent player accounts, durable sessions, Data Protection protected access/refresh tokens, server-derived SignalR player identity, JSON persistence provider, and identity/persistence fixtures.
-- Add durable rooms/tables or explicit stateless lifecycle rules.
-- Decide whether to use Redis/Azure SignalR/backplane.
-- Add public matchmaking and spectator/reconnect UX only after auth and persistence are defined.
+- Completed P4B: single-server authenticated matchmaking MVP and deploy scaffolding.
+- Completed P4C phase 00-13: baseline reports, SignalR CI stabilization, Linux portability decision, online rules authority adapter boundary, Windows server package hardening, Hetzner runbook/planning docs, matchmaking durability policy, five-mode feature matrix, Asgard/Rubik/Hodge/Classic product refresh docs, generated asset pipeline policy, product presentation packet, deployment decision package, and consolidated verify checks.
+- Still deferred: Linux-native authority, Redis/Azure SignalR/backplane, public ranked matchmaking, Kubernetes/Docker orchestration, and production anti-cheat completeness.
+
+### P4D - Linux Native Authority Spike
+
+- Next: audit `C:\ll\local\bin` Clang/LLVM and sysroot availability.
+- Next: draft a Windows-to-Linux CMake toolchain file without claiming cross-compile success.
+- Next: plan Linux `Chess3DEngine` shared-library output, native loading, and state-hash parity tests.
+- Next: only run Hetzner probes after source, local verify, and CI are green.
 
 ## P5 - Asset Pipeline
 
