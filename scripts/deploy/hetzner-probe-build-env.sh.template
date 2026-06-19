@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# P4D template: prepare a Hetzner Ubuntu host for a native build probe.
+# This file is intentionally a template. Review before running manually.
+# Do not commit secrets, runtime stores, certificates, or keyrings.
+
+set -euo pipefail
+
+echo "== P4D build environment preflight =="
+uname -a
+cat /etc/os-release
+free -h
+df -h /
+
+echo "== Existing tools =="
+command -v dotnet && dotnet --info || true
+command -v clang++ && clang++ --version || true
+command -v cmake && cmake --version || true
+command -v ninja && ninja --version || true
+command -v git && git --version || true
+
+echo "== Planned install =="
+echo "apt update"
+echo "apt install -y dotnet-sdk-8.0 clang cmake ninja-build git build-essential"
+echo
+read -r -p "Type INSTALL to run the build dependency install: " confirm
+if [[ "${confirm}" != "INSTALL" ]]; then
+  echo "Install aborted. No changes made."
+  exit 0
+fi
+
+apt update
+apt install -y dotnet-sdk-8.0 clang cmake ninja-build git build-essential
+
+echo "== Installed tools =="
+dotnet --info
+clang++ --version
+cmake --version
+ninja --version
+git --version
+
+echo "Build environment probe complete. Do not deploy from this script."
