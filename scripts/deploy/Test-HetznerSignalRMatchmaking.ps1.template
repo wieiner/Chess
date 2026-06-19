@@ -1,0 +1,34 @@
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$BaseUrl,
+
+    [string]$RulesetId = "asgard-convergence-3d-8x8x8-v0.1",
+    [switch]$DryRun
+)
+
+$ErrorActionPreference = "Stop"
+
+Write-Host "P4D SignalR matchmaking smoke template"
+Write-Host "BaseUrl: $BaseUrl"
+Write-Host "RulesetId: $RulesetId"
+Write-Host
+Write-Host "Prerequisites:"
+Write-Host "  - Linux native libChess3DEngine.so exists and loads."
+Write-Host "  - Kestrel-only health/diagnostics smoke has passed."
+Write-Host "  - Ephemeral test users are allowed."
+Write-Host
+Write-Host "Planned sequence:"
+Write-Host "  1. Register/login two ephemeral users."
+Write-Host "  2. Connect both users to /chess3d/relay via SignalR."
+Write-Host "  3. Enter Asgard matchmaking."
+Write-Host "  4. Assert match found."
+Write-Host "  5. Request snapshot."
+Write-Host "  6. Submit one legal Asgard action."
+Write-Host "  7. Assert action log/state hash."
+
+if ($DryRun) {
+    Write-Host "DryRun set; no network calls made."
+    exit 0
+}
+
+throw "This is a template. Implement the concrete SignalR client after P4D Kestrel smoke passes. Do not put credentials in this file."
