@@ -12,8 +12,18 @@ internal sealed class NativeChess3DEngine : IDisposable
     public const int Queen = 5;
     public const int King = 6;
 
-    private const string DllName = "Chess3DEngine.dll";
+    private const string DllName = Chess3DNativeLibraryResolver.ImportLibraryName;
     private IntPtr _handle;
+
+    static NativeChess3DEngine()
+    {
+        Chess3DNativeLibraryResolver.EnsureRegistered(typeof(NativeChess3DEngine).Assembly);
+    }
+
+    public static Chess3DNativeRuntimeInfo GetNativeRuntimeInfo()
+    {
+        return Chess3DNativeLibraryResolver.GetRuntimeInfo();
+    }
 
     public NativeChess3DEngine()
     {

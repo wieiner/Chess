@@ -32,8 +32,12 @@ static void AuthorityRuntimeDiagnosticsTests(ContractTest test, string profileRo
     var registry = new OnlineRoomRegistry(profileRoot);
     var diagnostics = registry.GetAuthorityDiagnostics();
     test.Check(diagnostics.RuntimeKind == AuthorityRuntimeKind.WindowsNative, "online authority runtime reports WindowsNative on Windows build");
-    test.Check(!diagnostics.IsPortableRuntime, "online authority runtime is explicitly not portable yet");
-    test.Check(diagnostics.NativeLibraryName == "Chess3DEngine.dll", "online authority diagnostics expose native library name");
+    test.Check(diagnostics.IsPortableRuntime, "online authority runtime uses portable native resolver boundary");
+    test.Check(diagnostics.NativeLibraryName == "Chess3DEngine.dll", "online authority diagnostics expose Windows native library name");
+    test.Check(NativeChessOnlineGameSessionFactory.GetExpectedNativeLibraryNameForPlatform("Linux") == "libChess3DEngine.so", "online authority computes Linux native library name");
+    var linuxPath = NativeChessOnlineGameSessionFactory.GetExpectedNativeLibraryPathForPlatform("Linux", "/opt/chessonline");
+    test.Check(linuxPath.Replace('\\', '/').EndsWith("/opt/chessonline/libChess3DEngine.so", StringComparison.Ordinal), "online authority computes Linux native library path");
+    test.Check(NativeChessOnlineGameSessionFactory.GetExpectedNativeLibraryNameForPlatform("Windows") == "Chess3DEngine.dll", "online authority keeps Windows native library name");
 }
 
 static void ProtocolRoundtripTests(ContractTest test)

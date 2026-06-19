@@ -46,8 +46,6 @@ public interface IChessOnlineGameSessionFactory
 
 public sealed class NativeChessOnlineGameSessionFactory : IChessOnlineGameSessionFactory
 {
-    private const string NativeLibraryName = "Chess3DEngine.dll";
-
     public IChessOnlineRulesAuthority Create(RuleProfileInfo profile, string profileRoot)
     {
         return new OnlineGameSession(profile, profileRoot);
@@ -55,26 +53,33 @@ public sealed class NativeChessOnlineGameSessionFactory : IChessOnlineGameSessio
 
     public OnlineAuthorityRuntimeDiagnostics GetDiagnostics()
     {
-        var nativePath = Path.Combine(AppContext.BaseDirectory, NativeLibraryName);
-        var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-        var platform = isWindows
-            ? "Windows"
-            : RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
-                ? "Linux"
-                : RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
-                    ? "OSX"
-                    : "Unknown";
-        var runtimeKind = isWindows ? AuthorityRuntimeKind.WindowsNative : AuthorityRuntimeKind.Unsupported;
+        var native = NativeChess3DEngine.GetNativeRuntimeInfo();
+        var runtimeKind = native.Platform switch
+        {
+            "Windows" => AuthorityRuntimeKind.WindowsNative,
+            "Linux" => AuthorityRuntimeKind.LinuxNativeFuture,
+            _ => AuthorityRuntimeKind.Unsupported
+        };
         return new OnlineAuthorityRuntimeDiagnostics(
             runtimeKind,
             runtimeKind.ToString(),
-            platform,
-            RuntimeInformation.OSDescription,
-            RuntimeInformation.ProcessArchitecture.ToString(),
-            NativeLibraryName,
-            File.Exists(nativePath) ? nativePath : "",
-            IsPortableRuntime: false,
-            IsSupported: isWindows && File.Exists(nativePath));
+            native.Platform,
+            native.OSDescription,
+            native.ProcessArchitecture,
+            native.ExpectedLibraryName,
+            native.ExpectedLibraryExists ? native.ExpectedLibraryPath : "",
+            IsPortableRuntime: native.IsSupportedPlatform,
+            IsSupported: native.IsSupportedPlatform && native.ExpectedLibraryExists);
+    }
+
+    public static string GetExpectedNativeLibraryNameForPlatform(string platformName)
+    {
+        return Chess3DNativeLibraryResolver.GetExpectedLibraryNameForPlatform(platformName);
+    }
+
+    public static string GetExpectedNativeLibraryPathForPlatform(string platformName, string baseDirectory)
+    {
+        return Chess3DNativeLibraryResolver.GetExpectedLibraryPathForPlatform(platformName, baseDirectory);
     }
 
     public static string HashFromSaveGameJson(string saveGameJson)

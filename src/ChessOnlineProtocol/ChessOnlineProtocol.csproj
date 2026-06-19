@@ -11,5 +11,6 @@
 
   <ItemGroup>
     <Compile Include="..\ChessApp\NativeChess3DEngine.cs" Link="NativeChess3DEngine.cs" />
+    <Compile Include="..\ChessApp\Chess3DNativeLibraryResolver.cs" Link="Chess3DNativeLibraryResolver.cs" />
   </ItemGroup>
 </Project>

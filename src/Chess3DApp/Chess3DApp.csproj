@@ -22,6 +22,7 @@
       <DependentUpon>Chess3DWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="..\ChessApp\NativeChess3DEngine.cs" Link="NativeChess3DEngine.cs" />
+    <Compile Include="..\ChessApp\Chess3DNativeLibraryResolver.cs" Link="Chess3DNativeLibraryResolver.cs" />
     <Compile Include="..\ChessApp\Chess3DNetworkEndpoint.cs" Link="Chess3DNetworkEndpoint.cs" />
     <Compile Include="..\ChessApp\Chess3DVisualDescriptors.cs" Link="Chess3DVisualDescriptors.cs" />
     <Compile Include="..\ChessApp\Chess3DVisualState.cs" Link="Chess3DVisualState.cs" />
