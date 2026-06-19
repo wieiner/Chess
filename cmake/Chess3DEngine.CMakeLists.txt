@@ -1,0 +1,35 @@
+# Portable native scaffold for Chess3DEngine.
+# Windows production builds still use src/Chess3DEngine/Chess3DEngine.vcxproj.
+# This CMake target exists to validate and build the same C ABI as a Linux .so.
+
+add_library(Chess3DEngine SHARED
+    "${CMAKE_CURRENT_LIST_DIR}/../src/Chess3DEngine/Chess3DEngine.cpp"
+)
+
+target_include_directories(Chess3DEngine
+    PUBLIC
+        "${CMAKE_CURRENT_LIST_DIR}/../src/Chess3DEngine"
+)
+
+target_compile_features(Chess3DEngine PUBLIC cxx_std_20)
+target_compile_definitions(Chess3DEngine PRIVATE CHESS3DENGINE_EXPORTS)
+
+set_target_properties(Chess3DEngine PROPERTIES
+    OUTPUT_NAME "Chess3DEngine"
+    POSITION_INDEPENDENT_CODE ON
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN YES
+)
+
+if(UNIX AND NOT APPLE)
+    set_target_properties(Chess3DEngine PROPERTIES
+        PREFIX "lib"
+        SUFFIX ".so"
+    )
+endif()
+
+if(MSVC)
+    target_compile_options(Chess3DEngine PRIVATE /W4 /permissive-)
+else()
+    target_compile_options(Chess3DEngine PRIVATE -Wall -Wextra)
+endif()

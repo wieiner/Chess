@@ -1,9 +1,13 @@
 #pragma once
 
+#if defined(_WIN32)
 #ifdef CHESS3DENGINE_EXPORTS
 #define CHESS3D_API extern "C" __declspec(dllexport)
 #else
 #define CHESS3D_API extern "C" __declspec(dllimport)
+#endif
+#else
+#define CHESS3D_API extern "C" __attribute__((visibility("default")))
 #endif
 
 // 3D coordinates: x 0..7 means a..h, y 0..7 means ranks 1..8, z 0..7 means levels 1..8.
