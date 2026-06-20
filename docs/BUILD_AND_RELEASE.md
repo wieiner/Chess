@@ -238,3 +238,15 @@ Do not claim Linux runtime readiness until P4D provides a Linux-native authority
 P4C phase 14 adds a draft Windows-hosted Clang toolchain file at `cmake\toolchains\linux-x64-clang-from-windows.cmake`. It is intentionally a planning artifact until a Linux sysroot exists and the native `Chess3DEngine` shared library is proven with state-hash parity tests.
 
 The direct build pass in `scripts\verify.ps1` uses `CHESS_VERIFY_MSBUILD_MAX_CPU_COUNT` with default `4`. This keeps local verification less fragile under competing compiler workloads while preserving the same build/test/package checks.
+
+## P4D1.4 Server and Test Pipeline
+
+The managed online server-side projects now build as portable `net8.0` projects:
+
+- `src/ChessOnlineProtocol`
+- `src/ChessOnlinePersistence`
+- `src/ChessOnlineServer`
+
+The WPF clients remain Windows-targeted. Windows portable packaging now copies the server from `src/ChessOnlineServer/bin/x64/Release/net8.0`. Linux publishing uses `scripts/deploy/Publish-ChessOnlineServer-Linux.ps1` and can include a separately built, tested `libChess3DEngine.so` through `-NativeLibraryPath`.
+
+Build scripts use explicit `/m:N` instead of bare `/m`. `scripts/verify.ps1` passes its selected MSBuild parallelism and test timeouts into the decomposed test runner.

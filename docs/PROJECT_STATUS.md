@@ -463,3 +463,15 @@ Still deferred:
 - platform-aware Linux native loading;
 - state-hash parity between Windows and Linux authorities;
 - any real Hetzner deploy or SSH probe.
+
+## P4D1.4 Pipeline Stabilization
+
+P4D1.4 stabilizes the local and CI build/test path after the server-side `net8.0` cleanup. The test runner now supports suites, `-Only`, build-only mode, skip-test-build mode, per-test process timeouts, and logs under `.tmp/test-logs`. This keeps online/SignalR hangs diagnosable instead of letting a monolithic PowerShell run wait indefinitely.
+
+## P4D1.4 Timeout Hotfix
+
+The online test runner timeout path is hardened. A hanging SignalR test now reports `TIMEOUT` with logs under `.tmp/test-logs` instead of leaving an endless PowerShell run.
+
+## P4D1.4 Test Runner Stabilization
+
+P4D1.4 introduced a dedicated C# process watchdog for contract test execution. SignalR-only test execution is now bounded and was proven with artificial hang/normal-process self-tests plus direct SignalR execution. The online SignalR contract test also writes temporary store/keyring files under repo `.tmp` for sandbox-safe runs.

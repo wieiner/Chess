@@ -243,7 +243,15 @@ public sealed class JsonOnlineStore : IOnlineIdentityStore, IOnlineSessionStore,
         File.WriteAllText(temp, JsonSerializer.Serialize(_document, _jsonOptions), Encoding.UTF8);
         if (File.Exists(_path))
         {
-            File.Replace(temp, _path, null);
+            try
+            {
+                File.Replace(temp, _path, null);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                File.Copy(temp, _path, overwrite: true);
+                File.Delete(temp);
+            }
         }
         else
         {
@@ -269,4 +277,3 @@ public sealed class JsonOnlineStore : IOnlineIdentityStore, IOnlineSessionStore,
         public List<PersistentActionLogEntity> Actions { get; set; } = new();
     }
 }
-

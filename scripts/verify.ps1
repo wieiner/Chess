@@ -1,5 +1,8 @@
 param(
-    [switch]$SkipBenchmark
+    [switch]$SkipBenchmark,
+    [int]$MSBuildMaxCpuCount = 0,
+    [int]$TestTimeoutSeconds = 120,
+    [int]$OnlineTestTimeoutSeconds = 180
 )
 
 Set-StrictMode -Version Latest
@@ -9,7 +12,15 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Root = [System.IO.Path]::GetFullPath((Join-Path $ScriptDir ".."))
 $Configuration = "Release"
 $Platform = "x64"
-$MSBuildMaxCpuCount = if ($env:CHESS_VERIFY_MSBUILD_MAX_CPU_COUNT) { $env:CHESS_VERIFY_MSBUILD_MAX_CPU_COUNT } else { "4" }
+$ResolvedMSBuildMaxCpuCount = if ($MSBuildMaxCpuCount -gt 0) {
+    $MSBuildMaxCpuCount
+}
+elseif ($env:CHESS_VERIFY_MSBUILD_MAX_CPU_COUNT -match '^[1-9][0-9]*$') {
+    [int]$env:CHESS_VERIFY_MSBUILD_MAX_CPU_COUNT
+}
+else {
+    4
+}
 
 function Write-Step([string]$Message) {
     Write-Host ""
@@ -82,7 +93,7 @@ try {
     Write-Host "Root: $Root"
     Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
     Write-Host "MSBuild: $(Resolve-MSBuild)"
-    Write-Host "MSBuild max CPU count: $MSBuildMaxCpuCount"
+    Write-Host "MSBuild max CPU count: $ResolvedMSBuildMaxCpuCount"
     Write-Host "nvcc:"
     cmd /c where nvcc
     if ($LASTEXITCODE -ne 0) { Write-Host "nvcc not found in PATH; CUDA backend remains optional." }
@@ -140,36 +151,36 @@ try {
 
     Write-Step "Build Release x64"
     $msbuild = Resolve-MSBuild
-    Invoke-Checked { & $msbuild ".\Chess.sln" "/restore" "/m:$MSBuildMaxCpuCount" "/nr:false" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal" } "MSBuild failed."
+    Invoke-Checked { & $msbuild ".\Chess.sln" "/restore" "/m:$ResolvedMSBuildMaxCpuCount" "/nr:false" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal" } "MSBuild failed."
 
     Write-Step "Development executable checks"
     Assert-File "src\ChessApp\bin\x64\Release\net8.0-windows\ChessApp.exe"
     Assert-File "src\Chess3DApp\bin\x64\Release\net8.0-windows\Chess3DApp.exe"
     Assert-File "src\RubikApp\bin\x64\Release\net8.0-windows\RubikApp.exe"
     Assert-File "src\ChessOnlineApp\bin\x64\Release\net8.0-windows\ChessOnlineApp.exe"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\ChessOnlineServer.exe"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\ChessOnlineServer.exe"
     Assert-File "src\ChessOnlineApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Profiles\classic_six_side_3d_v0_1.json"
     Assert-File "src\ChessOnlineApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Profiles\hodge_projection_duel_3d_v0_1.json"
     Assert-File "src\ChessOnlineApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\Online\schemas\chess3d_relay_v0_1.schema.json"
     Assert-File "src\ChessOnlineApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\OnlineScenarios\online_protocol_hello_v0_1.json"
     Assert-File "src\ChessOnlineApp\bin\x64\Release\net8.0-windows\Assets\Rules3D\OnlineScenarios\online_hodge_composite_smoke_v0_1.json"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Assets\Rules3D\Profiles\classic_six_side_3d_v0_1.json"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Assets\Rules3D\Online\schemas\chess3d_relay_v0_1.schema.json"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Assets\Rules3D\SignalRScenarios\signalr_hello_connect_v0_1.json"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Assets\Rules3D\IdentityScenarios\identity_register_login_v0_1.json"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Assets\Rules3D\PersistenceScenarios\persistence_room_table_action_log_v0_1.json"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Assets\Rules3D\MatchmakingScenarios\matchmaking_classic_match_found_v0_1.json"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Assets\Rules3D\AsgardOnlineScenarios\asgard_matchmaking_table_v0_1.json"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Assets\Rules3D\DeploymentScenarios\deployment_nginx_template_v0_1.json"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\appsettings.Production.sample.json"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Deploy\linux\chessonline-server.service.template"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Deploy\linux\nginx-chessonline.conf.template"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Deploy\windows\README.md"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Deploy\windows\install-chessonline-server.ps1.template"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Deploy\windows\uninstall-chessonline-server.ps1.template"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Deploy\windows\Start-ChessOnlineServer-Windows.ps1"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Deploy\windows\Stop-ChessOnlineServer-Windows.ps1"
-    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0-windows\Deploy\windows\Test-ChessOnlineServer-Windows.ps1"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Assets\Rules3D\Profiles\classic_six_side_3d_v0_1.json"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Assets\Rules3D\Online\schemas\chess3d_relay_v0_1.schema.json"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Assets\Rules3D\SignalRScenarios\signalr_hello_connect_v0_1.json"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Assets\Rules3D\IdentityScenarios\identity_register_login_v0_1.json"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Assets\Rules3D\PersistenceScenarios\persistence_room_table_action_log_v0_1.json"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Assets\Rules3D\MatchmakingScenarios\matchmaking_classic_match_found_v0_1.json"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Assets\Rules3D\AsgardOnlineScenarios\asgard_matchmaking_table_v0_1.json"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Assets\Rules3D\DeploymentScenarios\deployment_nginx_template_v0_1.json"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\appsettings.Production.sample.json"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Deploy\linux\chessonline-server.service.template"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Deploy\linux\nginx-chessonline.conf.template"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Deploy\windows\README.md"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Deploy\windows\install-chessonline-server.ps1.template"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Deploy\windows\uninstall-chessonline-server.ps1.template"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Deploy\windows\Start-ChessOnlineServer-Windows.ps1"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Deploy\windows\Stop-ChessOnlineServer-Windows.ps1"
+    Assert-File "src\ChessOnlineServer\bin\x64\Release\net8.0\Deploy\windows\Test-ChessOnlineServer-Windows.ps1"
     Assert-File "bin\x64\Release\Chess2DBenchmark.exe"
     Assert-File "src\ChessApp\bin\x64\Release\net8.0-windows\Assets\Models\piece_sets.json"
     Assert-File "src\ChessApp\bin\x64\Release\net8.0-windows\Assets\Models\default\Pieces\white_pawn.obj"
@@ -315,10 +326,10 @@ try {
         throw "Contract test runner is missing: $testScript"
     }
     if ($SkipBenchmark) {
-        Invoke-Checked { powershell -NoProfile -ExecutionPolicy Bypass -File ".\tests\run-tests.ps1" -SkipSolutionBuild -SkipBenchmark } "Contract tests failed."
+        Invoke-Checked { powershell -NoProfile -ExecutionPolicy Bypass -File ".\tests\run-tests.ps1" -SkipSolutionBuild -Suite All -MSBuildMaxCpuCount $ResolvedMSBuildMaxCpuCount -TestTimeoutSeconds $TestTimeoutSeconds -OnlineTestTimeoutSeconds $OnlineTestTimeoutSeconds -SkipBenchmark } "Contract tests failed."
     }
     else {
-        Invoke-Checked { powershell -NoProfile -ExecutionPolicy Bypass -File ".\tests\run-tests.ps1" -SkipSolutionBuild } "Contract tests failed."
+        Invoke-Checked { powershell -NoProfile -ExecutionPolicy Bypass -File ".\tests\run-tests.ps1" -SkipSolutionBuild -Suite All -MSBuildMaxCpuCount $ResolvedMSBuildMaxCpuCount -TestTimeoutSeconds $TestTimeoutSeconds -OnlineTestTimeoutSeconds $OnlineTestTimeoutSeconds } "Contract tests failed."
     }
 
     Write-Step "Verify complete"

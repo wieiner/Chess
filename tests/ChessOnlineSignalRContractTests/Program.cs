@@ -5,10 +5,12 @@ using System.Net.Sockets;
 using System.Text.Json;
 using ChessOnlineProtocol;
 using ChessOnlineServer;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 
 var test = new ContractTest("ChessOnlineSignalRContractTests");
+WebApplication? app = null;
 
 try
 {
@@ -17,9 +19,9 @@ try
     var port = FindFreePort();
     var url = $"http://127.0.0.1:{port}";
     var hubUrl = $"{url}/chess3d/relay";
-    var serverTempRoot = Path.Combine(Path.GetTempPath(), "chess3d-p4a-signalr-tests", Guid.NewGuid().ToString("N"));
+    var serverTempRoot = Path.Combine(root, ".tmp", "chess3d-p4a-signalr-tests", Guid.NewGuid().ToString("N"));
 
-    await using var app = ChessOnlineServerHost.BuildApp(Array.Empty<string>(), options =>
+    app = ChessOnlineServerHost.BuildApp(Array.Empty<string>(), options =>
     {
         options.HostUrls = url;
         options.ProfileRoot = profileRoot;
@@ -45,13 +47,21 @@ try
     FixtureParseTestsWithFormat(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "asgard_online"), "chess3d-asgard-online-regression", "Asgard online fixture");
     FixtureParseTestsWithFormat(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "deployment"), "chess3d-deployment-regression", "Deployment fixture");
 
-    await app.StopAsync();
     return test.Finish();
 }
 catch (Exception ex)
 {
     test.Fail($"Unhandled exception: {ex}");
     return test.Finish();
+}
+finally
+{
+    if (app != null)
+    {
+        using var stopCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        try { await app.StopAsync(stopCts.Token); } catch { }
+        await app.DisposeAsync();
+    }
 }
 
 static async Task ServerStartupTests(ContractTest test, string url, string hubUrl)
@@ -271,11 +281,11 @@ static async Task AuthPersistenceTests(ContractTest test, string root, string pr
     var port = FindFreePort();
     var url = $"http://127.0.0.1:{port}";
     var hubUrl = $"{url}/chess3d/relay";
-    var tempRoot = Path.Combine(Path.GetTempPath(), "chess3d-p4a-tests", Guid.NewGuid().ToString("N"));
+    var tempRoot = Path.Combine(root, ".tmp", "chess3d-p4a-tests", Guid.NewGuid().ToString("N"));
     var storePath = Path.Combine(tempRoot, "store", "online-store.json");
     var keyPath = Path.Combine(tempRoot, "keys");
 
-    await using var app = ChessOnlineServerHost.BuildApp(Array.Empty<string>(), options =>
+    await using var authApp = ChessOnlineServerHost.BuildApp(Array.Empty<string>(), options =>
     {
         options.HostUrls = url;
         options.ProfileRoot = profileRoot;
@@ -287,7 +297,7 @@ static async Task AuthPersistenceTests(ContractTest test, string root, string pr
         options.Persistence.StorePath = storePath;
         options.DataProtection.KeyRingPath = keyPath;
     });
-    await app.StartAsync();
+    await authApp.StartAsync();
 
     using var http = new HttpClient { BaseAddress = new Uri(url) };
     var register = await http.PostAsJsonAsync("/api/auth/register", new AuthRegisterRequest
@@ -444,7 +454,7 @@ static async Task AuthPersistenceTests(ContractTest test, string root, string pr
         JsonString(s, "lastKnownTableId") == latestMatch.TableId), "P4C matched player session records latest match-found table");
     test.Check(storeDoc.RootElement.GetProperty("actions").GetArrayLength() >= 1, "P4A JSON store persists accepted action log event");
 
-    await app.StopAsync();
+    await authApp.StopAsync();
 }
 
 static async Task<(string RoomId, string TableId)> AssertMatchmakingProfile(

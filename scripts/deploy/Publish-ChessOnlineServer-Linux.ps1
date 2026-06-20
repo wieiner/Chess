@@ -1,16 +1,25 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "linux-x64",
-    [switch]$Force
+    [string]$OutputPath = "",
+    [string]$NativeLibraryPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $project = Join-Path $root "src\ChessOnlineServer\ChessOnlineServer.csproj"
-$projectText = Get-Content -LiteralPath $project -Raw
 
-if ($projectText -match "net8\.0-windows" -and -not $Force) {
-    throw "ChessOnlineServer currently targets net8.0-windows and uses the Windows native Chess3DEngine DLL. Linux runtime publish is deferred; rerun with -Force only for portability experiments."
+if ([string]::IsNullOrWhiteSpace($OutputPath)) {
+    $OutputPath = Join-Path $root "DeploymentOutput\$Runtime\ChessOnlineServer"
 }
 
-dotnet publish $project -c $Configuration -r $Runtime --self-contained false -p:Platform=x64
+if (-not [string]::IsNullOrWhiteSpace($NativeLibraryPath)) {
+    if (-not (Test-Path -LiteralPath $NativeLibraryPath)) {
+        throw "Linux native library not found: $NativeLibraryPath"
+    }
+
+    dotnet publish $project -c $Configuration -r $Runtime --self-contained false -p:Platform=x64 -p:Chess3DEngineLinuxPath="$NativeLibraryPath" -o $OutputPath
+}
+else {
+    dotnet publish $project -c $Configuration -r $Runtime --self-contained false -p:Platform=x64 -o $OutputPath
+}

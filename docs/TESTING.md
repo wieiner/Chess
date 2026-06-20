@@ -263,3 +263,36 @@ P4C keeps the CI gate conservative:
 - generated 3D assets use descriptor-first validation, not tracked heavy meshes;
 - presentation and deployment docs are checked as source artifacts;
 - `ProductionOutput` is scanned for database, token, key, certificate, and runtime secret-like files.
+
+## P4D1.4 Test Runner and Server TFM Notes
+
+P4D1.4 decomposes `tests/run-tests.ps1` into selectable suites with controlled MSBuild parallelism and per-test executable timeouts. The old `-SkipBenchmark` command remains compatible, but it now reports selected tests, build/run timing, timeout values, and log paths under `.tmp/test-logs`.
+
+Useful examples:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -List
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -Suite Native -SkipBenchmark
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -Suite Online -SkipBenchmark -OnlineTestTimeoutSeconds 180
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -Only SignalR -SkipBenchmark -OnlineTestTimeoutSeconds 60
+```
+
+Server-side managed projects now target `net8.0`; WPF applications remain `net8.0-windows`. See `docs/P4D1_SERVER_TFM_CLEANUP.md`, `docs/P4D1_TEST_RUNNER_DECOMPOSITION.md`, and `docs/P4D1_LOCAL_MSBUILD_STABILITY.md`.
+
+## P4D1.4 Timeout Hotfix
+
+The test runner now uses file-backed stdout/stderr redirection for test executables and has a global timeout cap. This prevents online/SignalR test hangs from trapping PowerShell inside pipe reads after a killed process.
+
+## P4D1.4 Reliable Test Watchdog
+
+`tests/run-tests.ps1` now runs test executables through the C# watchdog at `tools/TestProcessWatchdog`. Use `-Only SignalR` or `-Suite Online` for bounded online diagnostics. Logs are written under `.tmp/test-logs`.
+
+Examples:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -List -SkipBenchmark
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -Only SignalR -SkipSolutionBuild -SkipTestBuild -SkipBenchmark -OnlineTestTimeoutSeconds 60 -GlobalTimeoutSeconds 120
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -Suite Online -SkipBenchmark -OnlineTestTimeoutSeconds 180 -GlobalTimeoutSeconds 420
+```
+
+Do not use the old PowerShell process wrapper as the authoritative timeout mechanism.

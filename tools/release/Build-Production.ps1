@@ -325,7 +325,7 @@ function Publish-Products {
             }
             "ChessOnlineServer" {
                 $dst = Join-Path $ProductionRoot "ChessOnlineServer"
-                Copy-FilteredDirectory (Join-Path $Root "src\ChessOnlineServer\bin\x64\Release\net8.0-windows") $dst
+                Copy-FilteredDirectory (Join-Path $Root "src\ChessOnlineServer\bin\x64\Release\net8.0") $dst
                 Write-Launcher $dst "run_chess_online_server.bat" "ChessOnlineServer.exe" -Console
             }
             "Benchmark2D" {

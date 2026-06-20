@@ -344,3 +344,13 @@ Next:
 - P4C: make ChessOnlineServer genuinely Linux-portable by removing the Windows-native engine dependency.
 - P4D: durable matchmaking/reconnect semantics and stronger server observability.
 - P4E: public deployment hardening, rate limits, log rotation, backups, and operator runbooks.
+
+## P4D1.4
+
+P4D1.4 stabilizes the server publish and test pipeline after the Linux-native authority spike:
+
+- controlled MSBuild parallelism instead of bare `/m`;
+- decomposed native/managed/online test suites;
+- per-test executable timeouts and logs;
+- `ChessOnlineServer`, `ChessOnlineProtocol`, and `ChessOnlinePersistence` as `net8.0` server-side projects;
+- WPF clients remain `net8.0-windows`.

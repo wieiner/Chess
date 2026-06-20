@@ -16,6 +16,9 @@ public static class ChessOnlineServerHost
     public static WebApplication BuildApp(string[] args, Action<HostedOnlineOptions>? configure = null)
     {
         var builder = WebApplication.CreateBuilder(args);
+        builder.Logging.ClearProviders();
+        builder.Logging.AddConsole();
+        builder.Logging.AddDebug();
         builder.Configuration.AddEnvironmentVariables("CHESS3D_ONLINE_");
 
         var options = new HostedOnlineOptions();

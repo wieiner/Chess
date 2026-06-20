@@ -75,6 +75,7 @@ out/
 
 ProductionOutput/
 rude-resource/
+.tmp/
 
 # Packaged archives / installers
 *.zip
