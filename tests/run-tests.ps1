@@ -35,11 +35,26 @@ function Write-Step([string]$Message) {
 }
 
 function Resolve-MSBuild {
-    $candidates = @(
+    $candidates = New-Object System.Collections.Generic.List[string]
+    $vswhereCandidates = @(
+        "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe",
+        "C:\Program Files\Microsoft Visual Studio\Installer\vswhere.exe"
+    )
+    foreach ($vswhere in $vswhereCandidates) {
+        if (Test-Path -LiteralPath $vswhere) {
+            $found = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\amd64\MSBuild.exe" 2>$null
+            foreach ($item in $found) {
+                if (-not [string]::IsNullOrWhiteSpace($item)) { $candidates.Add($item) }
+            }
+        }
+    }
+    foreach ($candidate in @(
+        "C:\Program Files\Microsoft Visual Studio\18\Enterprise\MSBuild\Current\Bin\amd64\MSBuild.exe",
         "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe",
+        "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\amd64\MSBuild.exe",
         "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\amd64\MSBuild.exe",
         "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\amd64\MSBuild.exe"
-    )
+    )) { $candidates.Add($candidate) }
     foreach ($candidate in $candidates) {
         if (Test-Path -LiteralPath $candidate) { return $candidate }
     }
