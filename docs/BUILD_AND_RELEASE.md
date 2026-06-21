@@ -315,3 +315,23 @@ The first production-like Linux layout keeps immutable app files and mutable run
 ```
 
 The `chessonline` Linux system user runs the app in layout smoke tests. Package files are root-owned and read-only to the app user; runtime directories are owned by the app user. `docs/NEXT_ERA_PRODUCTION_LAYOUT_RESULT.md` records the first successful loopback smoke from this layout.
+
+## Next Era systemd Service
+
+The tracked Linux service template is:
+
+```text
+deploy/linux/chessonline-server.service.template
+```
+
+It matches the production-like layout:
+
+```text
+WorkingDirectory=/opt/chessonline/server
+ExecStart=/usr/bin/dotnet /opt/chessonline/server/ChessOnlineServer.dll
+User=chessonline
+Group=chessonline
+ASPNETCORE_URLS=http://127.0.0.1:5077
+```
+
+The first Hetzner `systemd` smoke installed `/etc/systemd/system/chessonline.service`, enabled it, restarted it, and verified loopback health/diagnostics. See `docs/NEXT_ERA_SYSTEMD_SERVICE_RESULT.md`.

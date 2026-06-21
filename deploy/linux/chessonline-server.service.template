@@ -1,16 +1,22 @@
 [Unit]
 Description=ChessOnlineServer
-After=network.target
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/chess-online-server
-ExecStart=/opt/chess-online-server/ChessOnlineServer --urls http://127.0.0.1:5077
-Restart=on-failure
-RestartSec=5
-User=chess
-Group=chess
+User=chessonline
+Group=chessonline
+WorkingDirectory=/opt/chessonline/server
+ExecStart=/usr/bin/dotnet /opt/chessonline/server/ChessOnlineServer.dll
+Restart=always
+RestartSec=10
 Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5077
+Environment=CHESS3D_ONLINE_HostedOnline__Auth__EnableAuthentication=true
+Environment=CHESS3D_ONLINE_HostedOnline__Auth__AllowDevAnonymousSessions=false
+Environment=CHESS3D_ONLINE_HostedOnline__Persistence__StorePath=/var/lib/chessonline/data/store.json
+Environment=CHESS3D_ONLINE_HostedOnline__DataProtection__KeyRingPath=/var/lib/chessonline/keyring
 
 [Install]
 WantedBy=multi-user.target

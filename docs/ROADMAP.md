@@ -364,10 +364,10 @@ Completed:
 - Hetzner Kestrel-only loopback smoke.
 - Remote authenticated SignalR/Asgard matchmaking/action smoke through SSH local-forward.
 - Production-like `/opt/chessonline` and `/var/lib/chessonline` layout with service-user loopback smoke.
+- `systemd` unit installed/enabled for loopback Kestrel service.
 
 Next:
 
-- systemd unit rehearsal;
 - Nginx reverse-proxy rehearsal;
 - TLS/domain hardening;
 - remote operator runbook and rollback/backup notes.

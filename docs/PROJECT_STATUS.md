@@ -487,10 +487,10 @@ The Linux-native server path has passed a temporary Hetzner dry-run:
 - exact-profile Asgard matchmaking starts a game, accepts one legal action, and exposes snapshot/action-log state.
 - production-like package/runtime directories exist under `/opt/chessonline` and `/var/lib/chessonline`;
 - the server can start as the `chessonline` system user from `/opt/chessonline/server` and use `/var/lib/chessonline` for state/keyring.
+- `chessonline.service` is installed/enabled on Hetzner and serves loopback Kestrel health/diagnostics from `/opt/chessonline/server`.
 
 Still deferred:
 
-- systemd service;
 - Nginx reverse proxy;
 - TLS/domain;
 - public health/service exposure;
