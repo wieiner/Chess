@@ -413,3 +413,7 @@ Current priority order after the stalled-area audit:
 5. Reconnect/resume and public SignalR smoke over HTTPS.
 6. Visual QA automation and screenshot checklist execution.
 7. AI/search quality work and anti-cheat policy.
+
+## Next Era - Mode Incubator
+
+Future concepts such as Timefold, Portal/Gate, Gravity Well, Orbit, Team Cathedral, and Shadow Mirror are documented only in `docs/NEXT_ERA_MODE_INCUBATOR.md`. They are not runtime modes, not JSON profiles, and not test-counted profiles. The next implementation work should remain deployment hardening and Chess2D/online foundations, not a sixth Chess3D mode.

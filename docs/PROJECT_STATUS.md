@@ -515,3 +515,7 @@ Chess.com remains read-only through the public Published Data API unless an appr
 ## Next Era Stalled Areas Audit
 
 The stalled-area audit found no hidden branch/tag line to recover: `main` is the source of truth. The main open areas are TLS/domain hardening, public HTTPS SignalR smoke, deployment rollback/backups/log rotation, documentation reconciliation for older `draft`/`blocked` notes, Chess2D PGN/UCI portal foundations, visual QA automation, and future AI/search quality work.
+
+## Next Era Mode Incubator
+
+`docs/NEXT_ERA_MODE_INCUBATOR.md` records future 3D mode ideas as concepts only. It does not add JSON RuleProfiles, schema values, tests, engine hooks, UI panels, or online protocol actions. Runtime Chess3D still has exactly five real RuleProfiles.
