@@ -100,3 +100,13 @@ Date: 2026-06-21
 | Forwarded headers | Microsoft Learn, "Configure ASP.NET Core to work with proxy servers and load balancers": https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/proxy-load-balancer | Apps behind a proxy should process `X-Forwarded-For` and `X-Forwarded-Proto` from trusted proxies. | Enable forwarded headers for loopback Nginx only; do not trust arbitrary public proxies. | `src/ChessOnlineServer/ChessOnlineServerHost.cs` | Windows build/CI plus remote diagnostics through Nginx. |
 | WebSocket proxying | Microsoft Learn SignalR hosting notes: https://learn.microsoft.com/en-us/aspnet/core/signalr/scale | SignalR needs proxy support for WebSocket upgrade and long-running connections. | Keep `Upgrade`, `Connection`, and long `proxy_read_timeout` in the Nginx template. | `deploy/linux/nginx-chessonline.conf.template` | Remote health first; SignalR through public HTTP remains a later hardening check unless needed. |
 | Public HTTP boundary | Microsoft Learn ASP.NET Core security/auth guidance and project security baseline | Token issuance over public HTTP is not production-safe. | Public HTTP is a diagnostic/dev exposure only until TLS/domain is configured; do not use real accounts. | `docs/NEXT_ERA_TLS_DOMAIN_STATUS.md` later | Document TLS as blocked/deferred if no domain exists. |
+
+## Phase 09 - TLS / Domain Status
+
+Date: 2026-06-21
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Test/verify plan |
+| --- | --- | --- | --- | --- | --- |
+| Domain validation requirement | Let's Encrypt, "How It Works": https://letsencrypt.org/how-it-works/ | An ACME client must prove control of a domain before a certificate can be issued. | Do not run certbot against a bare IP address or placeholder domain. | `docs/NEXT_ERA_TLS_DOMAIN_STATUS.md` | Documentation-only phase; no certbot commands are executed. |
+| Certbot and Nginx | Certbot, Nginx instructions: https://certbot.eff.org/instructions?ws=nginx | Certbot can obtain and install Nginx certificates when a real domain and web server configuration exist. | Keep certbot as a future P4E action after DNS/domain confirmation. | `docs/NEXT_ERA_TLS_DOMAIN_STATUS.md` | Record commands as future operator steps, not as completed work. |
+| ASP.NET Core behind reverse proxy | Microsoft Learn, "Host ASP.NET Core on Linux with Nginx": https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/linux-nginx | Nginx is a supported reverse proxy in front of Kestrel; HTTPS termination belongs at the proxy boundary. | Current public HTTP is diagnostic-only; token-bearing public auth must wait for HTTPS. | `docs/NEXT_ERA_TLS_DOMAIN_STATUS.md`, `docs/BUILD_AND_RELEASE.md` | `git diff --check` and CI after doc commit. |

@@ -366,6 +366,7 @@ Completed:
 - Production-like `/opt/chessonline` and `/var/lib/chessonline` layout with service-user loopback smoke.
 - `systemd` unit installed/enabled for loopback Kestrel service.
 - Nginx public HTTP reverse proxy with external health/diagnostics smoke.
+- TLS/domain status documented as blocked on missing confirmed DNS/domain; public HTTP remains diagnostic-only.
 
 Next:
 

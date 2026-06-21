@@ -353,3 +353,9 @@ http://0.0.0.0:80 -> http://127.0.0.1:5077
 The template includes WebSocket upgrade headers for the SignalR hub path and forwarded headers for proxy awareness. `ChessOnlineServer` processes forwarded headers only from loopback proxies.
 
 `docs/NEXT_ERA_NGINX_PUBLIC_HTTP_RESULT.md` records the first successful local and external HTTP health/diagnostics smoke. TLS/domain remains a separate phase; public HTTP is diagnostic-only.
+
+## Next Era TLS / Domain Status
+
+Phase 09 records that no real domain is configured yet. Certbot was not run, no certificate was issued, and no private key material exists in the repository. The public HTTP endpoint is therefore limited to diagnostics and disposable smoke traffic until a domain is confirmed and HTTPS is configured.
+
+See `docs/NEXT_ERA_TLS_DOMAIN_STATUS.md`.
