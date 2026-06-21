@@ -301,3 +301,17 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy\Test-HetznerSigna
 The script builds `tools\HetznerSignalRSmoke` if requested, starts a local SSH tunnel, and runs the smoke client through `tools\TestProcessWatchdog`. Logs are written under `.tmp\test-logs` and are ignored.
 
 The smoke verifies live/ready/diagnostics, two ephemeral registrations, authenticated SignalR connections, Asgard matchmaking, game start, one legal Asgard action, and action-log/snapshot retrieval. It does not install systemd, Nginx, TLS, Redis, or any production service.
+
+## Next Era Linux Production-Like Layout
+
+The first production-like Linux layout keeps immutable app files and mutable runtime files separate:
+
+```text
+/opt/chessonline/server                  root-owned app package
+/var/lib/chessonline/data                chessonline-owned JSON store
+/var/lib/chessonline/keyring             chessonline-owned Data Protection keys
+/var/log/chessonline                     chessonline-owned logs
+/var/backups/chessonline                 chessonline-owned future backups
+```
+
+The `chessonline` Linux system user runs the app in layout smoke tests. Package files are root-owned and read-only to the app user; runtime directories are owned by the app user. `docs/NEXT_ERA_PRODUCTION_LAYOUT_RESULT.md` records the first successful loopback smoke from this layout.

@@ -485,10 +485,11 @@ The Linux-native server path has passed a temporary Hetzner dry-run:
 - `/healthz/live`, `/healthz/ready`, and `/chess3d/diagnostics` pass;
 - authenticated remote SignalR smoke passes through an SSH local-forward;
 - exact-profile Asgard matchmaking starts a game, accepts one legal action, and exposes snapshot/action-log state.
+- production-like package/runtime directories exist under `/opt/chessonline` and `/var/lib/chessonline`;
+- the server can start as the `chessonline` system user from `/opt/chessonline/server` and use `/var/lib/chessonline` for state/keyring.
 
 Still deferred:
 
-- persistent `/opt/chessonline` and `/var/lib/chessonline` layout;
 - systemd service;
 - Nginx reverse proxy;
 - TLS/domain;

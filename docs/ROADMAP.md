@@ -363,10 +363,10 @@ Completed:
 - `linux-x64` ChessOnlineServer package with canonical `libChess3DEngine.so`.
 - Hetzner Kestrel-only loopback smoke.
 - Remote authenticated SignalR/Asgard matchmaking/action smoke through SSH local-forward.
+- Production-like `/opt/chessonline` and `/var/lib/chessonline` layout with service-user loopback smoke.
 
 Next:
 
-- production-like filesystem layout under `/opt/chessonline` and `/var/lib/chessonline`;
 - systemd unit rehearsal;
 - Nginx reverse-proxy rehearsal;
 - TLS/domain hardening;
