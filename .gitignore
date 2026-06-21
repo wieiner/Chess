@@ -74,6 +74,7 @@ out/
 # ============================================================
 
 ProductionOutput/
+DeploymentOutput/
 rude-resource/
 .tmp/
 

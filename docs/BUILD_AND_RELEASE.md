@@ -267,3 +267,20 @@ The managed online server-side projects now build as portable `net8.0` projects:
 The WPF clients remain Windows-targeted. Windows portable packaging now copies the server from `src/ChessOnlineServer/bin/x64/Release/net8.0`. Linux publishing uses `scripts/deploy/Publish-ChessOnlineServer-Linux.ps1` and can include a separately built, tested `libChess3DEngine.so` through `-NativeLibraryPath`.
 
 Build scripts use explicit `/m:N` instead of bare `/m`. `scripts/verify.ps1` passes its selected MSBuild parallelism and test timeouts into the decomposed test runner.
+
+## Next Era Linux Server Package
+
+`scripts/deploy/Publish-ChessOnlineServer-Linux.ps1` publishes the server for `linux-x64`:
+
+```powershell
+$so = Join-Path $env:TEMP 'libChess3DEngine-next-era.so'
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy\Publish-ChessOnlineServer-Linux.ps1 -NativeLibraryPath $so
+```
+
+The script copies the tested native library as `libChess3DEngine.so` and verifies that `ChessOnlineServer.dll` is present. Normal CI does not require the remote Linux `.so`; to include this package in local verification, set:
+
+```powershell
+$env:CHESS_VERIFY_LINUX_PACKAGE = "1"
+$env:CHESS3D_LINUX_NATIVE_LIBRARY = "$env:TEMP\libChess3DEngine-next-era.so"
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1 -SkipBenchmark
+```

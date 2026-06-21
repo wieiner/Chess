@@ -320,6 +320,29 @@ try {
         throw "ProductionOutput contains runtime secret, database, token, or key artifacts."
     }
 
+    if ($env:CHESS_VERIFY_LINUX_PACKAGE -eq "1") {
+        Write-Step "Optional Linux server package"
+        if ([string]::IsNullOrWhiteSpace($env:CHESS3D_LINUX_NATIVE_LIBRARY)) {
+            throw "CHESS_VERIFY_LINUX_PACKAGE=1 requires CHESS3D_LINUX_NATIVE_LIBRARY to point at a tested libChess3DEngine.so."
+        }
+        if (-not (Test-Path -LiteralPath $env:CHESS3D_LINUX_NATIVE_LIBRARY -PathType Leaf)) {
+            throw "CHESS3D_LINUX_NATIVE_LIBRARY does not exist: $env:CHESS3D_LINUX_NATIVE_LIBRARY"
+        }
+        Invoke-Checked { powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\deploy\Publish-ChessOnlineServer-Linux.ps1" -NativeLibraryPath $env:CHESS3D_LINUX_NATIVE_LIBRARY } "Linux server publish failed."
+        Assert-File "DeploymentOutput\linux-x64\ChessOnlineServer\ChessOnlineServer.dll"
+        Assert-File "DeploymentOutput\linux-x64\ChessOnlineServer\libChess3DEngine.so"
+        Assert-File "DeploymentOutput\linux-x64\ChessOnlineServer\appsettings.Production.sample.json"
+        Assert-File "DeploymentOutput\linux-x64\ChessOnlineServer\Assets\Rules3D\Profiles\classic_six_side_3d_v0_1.json"
+        Assert-File "DeploymentOutput\linux-x64\ChessOnlineServer\Assets\Rules3D\SignalRScenarios\signalr_hello_connect_v0_1.json"
+        Assert-File "DeploymentOutput\linux-x64\ChessOnlineServer\Deploy\linux\chessonline-server.service.template"
+        Assert-File "DeploymentOutput\linux-x64\ChessOnlineServer\Deploy\linux\nginx-chessonline.conf.template"
+        $windowsNativeInLinuxPackage = Get-ChildItem -LiteralPath (Join-Path $Root "DeploymentOutput\linux-x64\ChessOnlineServer") -Recurse -File -Filter "Chess3DEngine.dll" -ErrorAction SilentlyContinue
+        if ($windowsNativeInLinuxPackage) {
+            $windowsNativeInLinuxPackage | Select-Object -ExpandProperty FullName
+            throw "Linux server package must not include Windows Chess3DEngine.dll."
+        }
+    }
+
     Write-Step "Contract tests"
     $testScript = Join-Path $Root "tests\run-tests.ps1"
     if (-not (Test-Path -LiteralPath $testScript -PathType Leaf)) {
