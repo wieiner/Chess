@@ -6,8 +6,10 @@ using ChessOnlineServer.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
+using System.Net;
 
 namespace ChessOnlineServer;
 
@@ -93,9 +95,16 @@ public static class ChessOnlineServerHost
             hub.KeepAliveInterval = TimeSpan.FromSeconds(options.KeepAliveIntervalSeconds);
             hub.ClientTimeoutInterval = TimeSpan.FromSeconds(options.ClientTimeoutSeconds);
         });
+        builder.Services.Configure<ForwardedHeadersOptions>(forwarded =>
+        {
+            forwarded.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            forwarded.KnownProxies.Add(IPAddress.Loopback);
+            forwarded.KnownProxies.Add(IPAddress.IPv6Loopback);
+        });
         builder.Services.AddHealthChecks();
 
         var app = builder.Build();
+        app.UseForwardedHeaders();
         app.UseCors("local-dev");
         if (options.Auth.EnableAuthentication)
         {

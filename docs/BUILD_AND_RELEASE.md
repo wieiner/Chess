@@ -335,3 +335,21 @@ ASPNETCORE_URLS=http://127.0.0.1:5077
 ```
 
 The first Hetzner `systemd` smoke installed `/etc/systemd/system/chessonline.service`, enabled it, restarted it, and verified loopback health/diagnostics. See `docs/NEXT_ERA_SYSTEMD_SERVICE_RESULT.md`.
+
+## Next Era Nginx Public HTTP
+
+The tracked Nginx template is:
+
+```text
+deploy/linux/nginx-chessonline.conf.template
+```
+
+It proxies public HTTP port 80 to loopback Kestrel:
+
+```text
+http://0.0.0.0:80 -> http://127.0.0.1:5077
+```
+
+The template includes WebSocket upgrade headers for the SignalR hub path and forwarded headers for proxy awareness. `ChessOnlineServer` processes forwarded headers only from loopback proxies.
+
+`docs/NEXT_ERA_NGINX_PUBLIC_HTTP_RESULT.md` records the first successful local and external HTTP health/diagnostics smoke. TLS/domain remains a separate phase; public HTTP is diagnostic-only.

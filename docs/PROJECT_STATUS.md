@@ -488,10 +488,11 @@ The Linux-native server path has passed a temporary Hetzner dry-run:
 - production-like package/runtime directories exist under `/opt/chessonline` and `/var/lib/chessonline`;
 - the server can start as the `chessonline` system user from `/opt/chessonline/server` and use `/var/lib/chessonline` for state/keyring.
 - `chessonline.service` is installed/enabled on Hetzner and serves loopback Kestrel health/diagnostics from `/opt/chessonline/server`.
+- Nginx is installed and proxies public HTTP port 80 to loopback Kestrel; external live/ready/diagnostics probes pass.
 
 Still deferred:
 
-- Nginx reverse proxy;
 - TLS/domain;
+- public authenticated SignalR over HTTPS;
 - public health/service exposure;
 - Redis/Azure SignalR/backplane and public ranked matchmaking.
