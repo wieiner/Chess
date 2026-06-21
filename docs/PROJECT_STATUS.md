@@ -1,8 +1,10 @@
 # Project Status
 
-Last audited locally for P4A production-oriented identity/session/persistence baseline.
+Last audited locally for Next Era Phase 12 roadmap/status cleanup.
 
-P4A adds a local production-oriented identity/session/persistence layer around the P3E/P3F online authority contract: persistent player accounts, password hashing, protected access/refresh tokens, authenticated SignalR player identity, durable session records, JSON persistence baseline, identity/persistence fixtures, tests, and packaging checks. It does not add a sixth Chess3D RuleProfile and does not make online play a public production service.
+Current summary: the repository now contains Windows desktop products, a Linux-capable ChessOnlineServer authority, a proven Hetzner systemd + Nginx public HTTP dry-run, and exactly five real Chess3D RuleProfiles. TLS/domain hardening, HTTPS auth enforcement, public SignalR over HTTPS, deployment rollback/backups/log rotation, Chess2D PGN/UCI portal foundations, and documentation reconciliation remain open. Historical sections below keep phase context; `docs/NEXT_ERA_PROJECT_MAP.md` is the concise current-state map.
+
+P4A added a local production-oriented identity/session/persistence layer around the P3E/P3F online authority contract: persistent player accounts, password hashing, protected access/refresh tokens, authenticated SignalR player identity, durable session records, JSON persistence baseline, identity/persistence fixtures, tests, and packaging checks. It did not add a sixth Chess3D RuleProfile and did not make online play a public production service.
 
 ## Exists
 
@@ -405,29 +407,33 @@ Implemented:
 - production sample config, Linux nginx/systemd templates, Windows deployment notes, and deploy helper scripts;
 - packaging/verify checks for matchmaking, Asgard online, deployment scenarios, config sample, and deploy templates.
 
-Still deferred:
+Historical deferred state at P4B:
 
-- real Linux runtime execution because ChessOnlineServer still targets `net8.0-windows` and uses the Windows native Chess3DEngine DLL;
-- public ranked matchmaking, durable queue recovery, cloud backplanes, Redis, Kubernetes, and real TLS automation.
+- real Linux runtime execution was still blocked then because ChessOnlineServer targeted `net8.0-windows` and used the Windows native Chess3DEngine DLL;
+- public ranked matchmaking, durable queue recovery, cloud backplanes, Redis, Kubernetes, and real TLS automation were deferred.
+
+Superseded current state: server-side projects now target portable `net8.0`, Linux-native `libChess3DEngine.so` has been built, and Hetzner systemd/Nginx HTTP smoke has passed. Public ranked matchmaking, durable recovery, backplanes, Kubernetes, and TLS/domain hardening remain deferred.
 
 ## P4C Deployment Decision Status
 
-P4C keeps the Windows hosted server path executable and documents the Linux/Hetzner path honestly.
+P4C kept the Windows hosted server path executable and documented the Linux/Hetzner path honestly. This section is historical; the Next Era Linux dry-run later proved the Linux-native authority path.
 
 Implemented:
 
 - deployment decision matrix in `docs/CHESS3D_DEPLOYMENT_DECISION_PACKAGE.md`;
 - placeholder-only Hetzner action plan in `docs/CHESS3D_HETZNER_ACTION_PLAN.md`;
 - repository/package/deploy safety checklist in `docs/CHESS3D_DEPLOYMENT_CHECKLIST.md`;
-- existing Windows server package remains the only executable hosted authority path today;
-- existing nginx/systemd templates remain planning scaffolding until a Linux-native rules authority is available.
+- existing Windows server package remained the only executable hosted authority path at P4C time;
+- existing nginx/systemd templates were planning scaffolding until a Linux-native rules authority became available.
 
-Still deferred:
+Historical deferred state at P4C:
 
 - Linux-native `Chess3DEngine` shared library;
 - `linux-x64` server publish;
 - state-hash parity on Linux for all five RuleProfiles;
 - public matchmaking scale-out, Redis/Azure SignalR/backplane, Kubernetes, and production TLS automation.
+
+Superseded current state: Linux-native library build, Linux server publish, ABI parity, and Hetzner smoke are now proven. Production TLS automation, public HTTPS auth, backplane/scale-out, Kubernetes, and public ranked matchmaking remain deferred.
 
 ## P4C Phase 13 Consolidation Status
 
@@ -451,18 +457,20 @@ P4C now includes a safe P4D preparation layer.
 Implemented:
 
 - local LLVM audit recorded in `docs/CHESS3D_CLANG_LINUX_TOOLCHAIN_PLAN.md`;
-- no Linux sysroot found, so Linux-native authority remains blocked;
+- no Linux sysroot found locally, so Windows-hosted cross-compilation remained blocked;
 - draft CMake toolchain added at `cmake/toolchains/linux-x64-clang-from-windows.cmake`;
 - P4D authority plan added in `docs/CHESS3D_P4D_LINUX_NATIVE_AUTHORITY_PLAN.md`;
 - Hetzner build probe plan added in `docs/CHESS3D_HETZNER_BUILD_PROBE_PLAN.md`;
 - `scripts/verify.ps1` now asserts these P4D-prep source artifacts exist.
 
-Still deferred:
+Historical deferred state at P4C phase 14:
 
 - actual Linux `Chess3DEngine` shared library;
 - platform-aware Linux native loading;
 - state-hash parity between Windows and Linux authorities;
 - any real Hetzner deploy or SSH probe.
+
+Superseded current state: Linux native build, platform-aware loading, ABI parity, Hetzner Kestrel smoke, production-like layout, systemd, Nginx HTTP, and remote SignalR/Asgard smoke are now documented. Local Windows-to-Linux cross-compilation remains blocked by missing sysroot.
 
 ## P4D1.4 Pipeline Stabilization
 

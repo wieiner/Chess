@@ -235,24 +235,24 @@ P4B extends `ProductionOutput\ChessOnlineServer` with:
 - `Deploy\linux`
 - `Deploy\windows`
 
-These files are templates and descriptors only. The package must not contain runtime data stores, tokens, key rings, certificates, or private keys. Linux deployment files are included as scaffolding; real Linux runtime execution remains deferred until the server no longer depends on the Windows native engine build.
+These files are templates and descriptors only. The package must not contain runtime data stores, tokens, key rings, certificates, or private keys. This P4B note is historical: later P4D/Next Era work moved the server-side projects to portable `net8.0`, added Linux package publishing with an external tested `libChess3DEngine.so`, and proved a Hetzner Linux dry-run.
 
 ## P4C Deployment Boundary
 
-Current executable server path:
+Historical P4C executable server path:
 
 - `ProductionOutput\ChessOnlineServer` on Windows.
 - `Deploy\windows` start/stop/test helper scripts.
 
-Current planning-only path:
+Historical P4C planning-only Linux path:
 
 - `Deploy\linux` nginx/systemd templates.
 - `docs\CHESS3D_HETZNER_ACTION_PLAN.md`.
 - `docs\CHESS3D_DEPLOYMENT_DECISION_PACKAGE.md`.
 
-Do not claim Linux runtime readiness until P4D provides a Linux-native authority package and state-hash parity tests.
+Superseded current status: P4D/Next Era now has a Linux-native authority package, `libChess3DEngine.so` build proof, ABI parity, Hetzner Kestrel smoke, production-like layout smoke, systemd service smoke, Nginx public HTTP smoke, and remote authenticated SignalR/Asgard smoke. Do not claim production readiness, though: TLS/domain, HTTPS auth enforcement, rollback, backups, log rotation, rate limiting, and public SignalR over HTTPS are still open.
 
-P4C phase 14 adds a draft Windows-hosted Clang toolchain file at `cmake\toolchains\linux-x64-clang-from-windows.cmake`. It is intentionally a planning artifact until a Linux sysroot exists and the native `Chess3DEngine` shared library is proven with state-hash parity tests.
+P4C phase 14 added a draft Windows-hosted Clang toolchain file at `cmake\toolchains\linux-x64-clang-from-windows.cmake`. Local Windows-hosted cross-compilation remains blocked by lack of Linux sysroot, but the native Linux build was later proven directly on Hetzner.
 
 The direct build pass in `scripts\verify.ps1` uses `CHESS_VERIFY_MSBUILD_MAX_CPU_COUNT` with default `4`. This keeps local verification less fragile under competing compiler workloads while preserving the same build/test/package checks.
 

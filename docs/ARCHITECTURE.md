@@ -78,19 +78,21 @@ The engine still reserves side ids `1..6`. Six-sided chess should be built by ma
 
 ### Online/Integration Boundary
 
-`ChessOnlineApp.exe` owns accounts, portal profiles, read-only platform APIs, ICS-style connections, and future hosted relay integration. The ordinary board app stays focused on chess play/advice instead of account management.
+`ChessOnlineApp.exe` owns accounts, portal profiles, read-only platform APIs, ICS-style connections, and the client-facing integration UI. The ordinary board app stays focused on chess play/advice instead of account management.
 
-P4C adds an online rules authority adapter boundary for hosted Chess3D play. `OnlineRoomRegistry` now depends on `IChessOnlineGameSessionFactory` and stores table sessions as `IChessOnlineRulesAuthority`. The current implementation remains `WindowsNative` through `NativeChessOnlineGameSessionFactory` and `Chess3DEngine.dll`; Linux-native authority is an explicit future replacement point rather than a claimed runtime capability.
+P4C added an online rules authority adapter boundary for hosted Chess3D play. `OnlineRoomRegistry` depends on `IChessOnlineGameSessionFactory` and stores table sessions as `IChessOnlineRulesAuthority`. Later P4D/Next Era work proved the Linux-native authority path: `ChessOnlineServer` now builds as portable `net8.0`, can load `libChess3DEngine.so` on Linux, and has passed Hetzner Kestrel, systemd, Nginx HTTP, and authenticated SignalR/Asgard dry-runs.
 
-P4C also separates deployment architecture from deployment claims:
+The current deployment architecture is:
 
-- Windows `ChessOnlineServer` packaging is executable and verified today.
-- Linux/Hetzner documentation is a target shape, not a working runtime claim.
-- nginx/systemd templates are packaged as scaffolding.
-- generated 3D piece manifests, presentation docs, and deployment decision docs are source-level product artifacts, not runtime modes.
+- Windows desktop apps remain `net8.0-windows`.
+- `ChessOnlineServer`, `ChessOnlineProtocol`, and `ChessOnlinePersistence` are portable `net8.0`.
+- Windows CI remains the main repository gate.
+- Linux `libChess3DEngine.so` is a separately built/tested native artifact and is not committed.
+- Hetzner public HTTP is diagnostic-only until domain/TLS and HTTPS auth enforcement exist.
+- generated 3D piece manifests, presentation docs, deployment decision docs, and scenario descriptors are source-level product artifacts, not runtime modes.
 - `scripts/verify.ps1` checks key source docs, package assets, and absence of secret-like artifacts in `ProductionOutput`.
 
-The next architecture gate is P4D: provide a Linux-native rules authority or equivalent adapter, then prove state-hash parity across all five RuleProfiles.
+The next architecture gate is TLS/domain hardening plus operational deployment discipline: rollback, backups, log rotation, public HTTPS SignalR smoke, and rate limiting.
 
 ## Why Separate Apps
 

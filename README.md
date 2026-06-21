@@ -1,5 +1,7 @@
 # Chess Advisor
 
+Current map: see `docs/NEXT_ERA_PROJECT_MAP.md` for the latest product/deploy status. In short, the repository contains Chess2D, Chess3D, Rubik, online integration apps, a portable `net8.0` ChessOnlineServer, and exactly five real Chess3D RuleProfiles. Linux server smoke has passed through Hetzner systemd + Nginx public HTTP, but TLS/domain and production hardening are still open.
+
 ## Structure
 
 - `src/ChessEngine` - native C++ DLL with chess rules, legal move generation, FEN, undo and AI search.
@@ -11,6 +13,7 @@
 - `src/Chess3DApp` - separate cube-chess WPF frontend. It starts directly into the 8x8x8 game and runs independently from `ChessApp.exe`.
 - `src/RubikApp` - separate WPF 3D frontend for the 8x8x8 Rubik assembly project.
 - `src/ChessOnlineApp` - separate WPF hub for internet integrations, online portal accounts, read-only platform APIs, ICS text servers and the future 3D chess web relay.
+- `src/ChessOnlineServer` - portable ASP.NET Core/SignalR authority for Chess3D online play.
 - `src/Chess2DBenchmark` - separate native console benchmark executable for ordinary 2D chess engine and CPU/Direct3D/CUDA batch evaluation.
 - `rude-resource/` - local ignored read-only archive with historical/source materials. It is not part of Git and is not used as runtime content.
 - `src/.../Assets` - runtime assets that are copied to application output during build.
@@ -25,6 +28,7 @@ src\ChessApp\bin\x64\Release\net8.0-windows\ChessApp.exe
 src\Chess3DApp\bin\x64\Release\net8.0-windows\Chess3DApp.exe
 src\RubikApp\bin\x64\Release\net8.0-windows\RubikApp.exe
 src\ChessOnlineApp\bin\x64\Release\net8.0-windows\ChessOnlineApp.exe
+src\ChessOnlineServer\bin\x64\Release\net8.0\ChessOnlineServer.exe
 bin\x64\Release\Chess2DBenchmark.exe
 ```
 

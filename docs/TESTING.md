@@ -8,7 +8,7 @@ Use the main verification script:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
 ```
 
-It builds `Release|x64`, creates portable output, runs native contract tests, and runs `Chess2DBenchmark --quick`.
+It builds `Release|x64`, creates portable output, runs native/managed contract tests through the decomposed watchdog-backed runner, and runs `Chess2DBenchmark --quick`.
 
 The same baseline is now covered by the green GitHub Actions `Windows Build` workflow. CI runs from a clean checkout, builds `Release|x64`, creates production packages, runs the contract tests, runs `Chess2DBenchmark --quick`, and validates the no-CUDA baseline. The default branch is `main`; the workflow also listens to `master` for compatibility.
 
@@ -154,7 +154,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
 
 - exactly five real Chess3D RuleProfile JSON files, with scenario/playthrough files excluded from mode count;
 - game phase, game outcome, mode rule summary, allowed action mask, and current-turn summary ABI;
-- draft Classic check status summary and side legal-action counts;
+- P3A Classic/Single-Side king-safety status summary and side legal-action counts;
 - profile isolation for Classic, Asgard, Rubik, and Hodge action masks;
 - `Chess3D_PerftActions` depth 0/1 and `Chess3D_DivideActionsJson` depth 1;
 - state-hash no-mutation guarantees for perft/divide;

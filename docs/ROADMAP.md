@@ -1,5 +1,19 @@
 # Roadmap
 
+## Current Next Era Priorities
+
+Current source of truth after Next Era Phase 12:
+
+1. Confirm domain/DNS and configure TLS/HTTPS for ChessOnlineServer.
+2. Enforce HTTPS-safe auth/token behavior before real public accounts.
+3. Add deployment rollback, backup/restore, and log rotation runbooks.
+4. Reconcile older historical docs that still say Linux-native authority or Classic king safety are blocked/draft.
+5. Build Chess2D PGN/SAN and UCI adapter foundations before live portal play.
+6. Prove public SignalR over HTTPS and reconnect/resume semantics.
+7. Add visual QA automation and later AI/search strength work.
+
+Historical phase sections below are retained for context. When an older "Next" line conflicts with this section or `docs/NEXT_ERA_PROJECT_MAP.md`, the Next Era map wins.
+
 ## P0 - Repo, Build, Package Stabilization
 
 - Keep GitHub import reproducible.
@@ -339,11 +353,10 @@ Completed:
 - P4A: identity, authenticated sessions, JSON persistence, and no-secret packaging checks.
 - P4B: single-server matchmaking MVP, deployment templates, Asgard online playability gate, and packaging checks.
 
-Next:
+Superseded next steps:
 
-- P4C: make ChessOnlineServer genuinely Linux-portable by removing the Windows-native engine dependency.
-- P4D: durable matchmaking/reconnect semantics and stronger server observability.
-- P4E: public deployment hardening, rate limits, log rotation, backups, and operator runbooks.
+- P4C/P4D Linux portability and remote smoke work are now complete through the Next Era dry-run.
+- Current work is public deployment hardening: TLS/domain, HTTPS auth enforcement, rollback, backups, log rotation, public SignalR over HTTPS, and rate limits.
 
 ## P4D1.4
 
