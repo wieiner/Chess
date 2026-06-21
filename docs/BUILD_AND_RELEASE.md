@@ -14,10 +14,18 @@ The default solution configuration builds all required products except `ChessCud
 Use `vswhere` to find MSBuild, or run with a known Visual Studio path:
 
 ```powershell
-& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe" .\Chess.sln /restore /m /p:Configuration=Release /p:Platform=x64
+& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe" .\Chess.sln /restore /m:4 /nr:false /p:Configuration=Release /p:Platform=x64
 ```
 
 `scripts\verify.ps1` also resolves MSBuild across Community, Professional, Enterprise, and BuildTools installations.
+
+For scripted or CI-like local builds, prefer explicit node count and node reuse disablement:
+
+```powershell
+& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe" .\Chess.sln /restore /m:4 /nr:false /p:Configuration=Release /p:Platform=x64
+```
+
+The repository test and verify scripts do not use bare `/m`; they pass `/m:N` and `/nr:false`.
 
 ## Without CUDA
 
@@ -33,7 +41,7 @@ No CUDA Toolkit is required for the default build. `ChessGpuBackend.dll` remains
 - `src\Chess3DApp\bin\x64\Release\net8.0-windows\Chess3DApp.exe`
 - `src\RubikApp\bin\x64\Release\net8.0-windows\RubikApp.exe`
 - `src\ChessOnlineApp\bin\x64\Release\net8.0-windows\ChessOnlineApp.exe`
-- `src\ChessOnlineServer\bin\x64\Release\net8.0-windows\ChessOnlineServer.exe`
+- `src\ChessOnlineServer\bin\x64\Release\net8.0\ChessOnlineServer.exe`
 - `bin\x64\Release\Chess2DBenchmark.exe`
 
 `Chess3DApp` also copies configurable RuleProfile JSON files into:
@@ -130,6 +138,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
 ```
 
 `scripts\verify.ps1` builds `Release|x64`, checks representative Chess3D RuleProfile assets in development output, creates `ProductionOutput`, checks representative Chess3D RuleProfile assets in portable output, runs `tests\run-tests.ps1`, and fails on the first build/package/test failure. The test runner builds and runs native contract tests and then runs `Chess2DBenchmark --quick` unless `-SkipBenchmark` is passed.
+
+If local compiler contention appears, set:
+
+```powershell
+$env:CHESS_VERIFY_MSBUILD_MAX_CPU_COUNT = "1"
+$env:CHESS_TEST_MSBUILD_MAX_CPU_COUNT = "1"
+```
+
+Use `docs/NEXT_ERA_TEST_RUNNER_OPERATIONS.md` for the current bounded test-runner workflow and stale build process diagnostics.
 
 ## Contract Tests
 

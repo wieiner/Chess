@@ -81,10 +81,19 @@ function Assert-GlobalTimeout([string]$StepName) {
 function Stop-StaleBuildProcessesIfRequested {
     if (-not $CleanStaleBuildProcesses) { return }
     Write-Step "Clean stale build processes"
-    $processes = @(Get-Process MSBuild,VBCSCompiler,dotnet -ErrorAction SilentlyContinue)
+    $escapedRoot = [Regex]::Escape($Root)
+    $processes = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $name = $_.Name
+        $commandLine = [string]$_.CommandLine
+        if ($name -in @("MSBuild.exe", "VBCSCompiler.exe")) { return $true }
+        if ($name -eq "dotnet.exe" -and $commandLine -match $escapedRoot) { return $true }
+        return $false
+    })
     if ($processes.Count -eq 0) { Write-Host "No stale build processes found."; return }
-    $processes | Select-Object Id, ProcessName, StartTime, CPU, Path | Format-Table -AutoSize
-    $processes | Stop-Process -Force
+    $processes | Select-Object ProcessId, Name, CreationDate, CommandLine | Format-Table -AutoSize
+    foreach ($process in $processes) {
+        Stop-Process -Id $process.ProcessId -Force
+    }
 }
 
 function New-TestRegistry {

@@ -296,3 +296,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -Suite
 ```
 
 Do not use the old PowerShell process wrapper as the authoritative timeout mechanism.
+
+## Next Era Runner Operations
+
+For local work, prefer `pwsh`:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -List
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -Suite Native -SkipBenchmark -MSBuildMaxCpuCount 1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\run-tests.ps1 -Suite Online -SkipBenchmark -OnlineTestTimeoutSeconds 180 -MSBuildMaxCpuCount 1
+```
+
+Use `docs/NEXT_ERA_TEST_RUNNER_OPERATIONS.md` for the current operator playbook. Stale-process cleanup is inspect-first: run `scripts\diagnostics\Find-StaleBuildProcesses.ps1`, then use `Stop-StaleBuildProcesses.ps1.template -ConfirmStop` only after reviewing the candidate list.
