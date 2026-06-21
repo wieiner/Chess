@@ -503,3 +503,7 @@ Still deferred:
 Chess2D portal integration is audited, not implemented. The ordinary 8x8 engine already has legal move generation, king safety, FEN import/export, draw status, search, UI FEN controls, and native benchmark coverage. The missing portal layers are full PGN/SAN import/export, a UCI-compatible process adapter, safe token/account storage, and a hardened Lichess connector that keeps Board API human play separate from Bot API engine play.
 
 Chess.com remains read-only through the public Published Data API unless an approved interactive API is provided. Chess3D custom RuleProfiles remain on the project's own online authority and are not mapped onto public orthodox chess portals.
+
+## Next Era Stalled Areas Audit
+
+The stalled-area audit found no hidden branch/tag line to recover: `main` is the source of truth. The main open areas are TLS/domain hardening, public HTTPS SignalR smoke, deployment rollback/backups/log rotation, documentation reconciliation for older `draft`/`blocked` notes, Chess2D PGN/UCI portal foundations, visual QA automation, and future AI/search quality work.

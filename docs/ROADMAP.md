@@ -388,3 +388,15 @@ Deferred:
 - account-token persistence;
 - Chess.com interactive play, because the public Published Data API is read-only;
 - any public-portal path for Chess3D custom modes.
+
+## Next Era - Stalled Areas Priority
+
+Current priority order after the stalled-area audit:
+
+1. TLS/domain + HTTPS auth enforcement.
+2. Deployment rollback, backup, and log rotation.
+3. Documentation consistency pass for stale `draft`/`blocked` notes.
+4. Chess2D PGN/SAN and UCI adapter.
+5. Reconnect/resume and public SignalR smoke over HTTPS.
+6. Visual QA automation and screenshot checklist execution.
+7. AI/search quality work and anti-cheat policy.
