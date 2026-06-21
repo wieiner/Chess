@@ -497,3 +497,9 @@ Still deferred:
 - public authenticated SignalR over HTTPS;
 - public health/service exposure;
 - Redis/Azure SignalR/backplane and public ranked matchmaking.
+
+## Next Era Chess2D Portal Integration Audit
+
+Chess2D portal integration is audited, not implemented. The ordinary 8x8 engine already has legal move generation, king safety, FEN import/export, draw status, search, UI FEN controls, and native benchmark coverage. The missing portal layers are full PGN/SAN import/export, a UCI-compatible process adapter, safe token/account storage, and a hardened Lichess connector that keeps Board API human play separate from Bot API engine play.
+
+Chess.com remains read-only through the public Published Data API unless an approved interactive API is provided. Chess3D custom RuleProfiles remain on the project's own online authority and are not mapped onto public orthodox chess portals.

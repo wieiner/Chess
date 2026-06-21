@@ -372,3 +372,19 @@ Next:
 
 - TLS/domain hardening;
 - remote operator runbook and rollback/backup notes.
+
+## Next Era - Chess2D Portal Integration Path
+
+Audited path:
+
+- Phase A: FEN/PGN export/import hardening for ordinary 2D chess.
+- Phase B: UCI-compatible engine adapter as a separate console/process boundary.
+- Phase C: Lichess connector hardening with safe token storage and explicit Board API vs Bot API policy.
+- Phase D: keep Chess3D custom profiles on ChessOnlineServer; do not force 8x8x8 Asgard/Rubik/Hodge actions into public orthodox chess portals.
+
+Deferred:
+
+- live portal move submission;
+- account-token persistence;
+- Chess.com interactive play, because the public Published Data API is read-only;
+- any public-portal path for Chess3D custom modes.
