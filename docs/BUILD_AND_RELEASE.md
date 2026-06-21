@@ -284,3 +284,20 @@ $env:CHESS_VERIFY_LINUX_PACKAGE = "1"
 $env:CHESS3D_LINUX_NATIVE_LIBRARY = "$env:TEMP\libChess3DEngine-next-era.so"
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1 -SkipBenchmark
 ```
+
+## Next Era Remote SignalR Smoke
+
+After the temporary Linux package is copied to the VPS and Kestrel is running on loopback, the remote SignalR/Asgard smoke can be run from the workstation through an SSH local-forward:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy\Test-HetznerSignalRMatchmaking.ps1 `
+  -SshTarget root@<HETZNER_HOST> `
+  -SshKeyPath "$env:USERPROFILE\.ssh\id_ed25519_hetzner" `
+  -LocalPort 15077 `
+  -TimeoutSeconds 120 `
+  -BuildSmokeTool
+```
+
+The script builds `tools\HetznerSignalRSmoke` if requested, starts a local SSH tunnel, and runs the smoke client through `tools\TestProcessWatchdog`. Logs are written under `.tmp\test-logs` and are ignored.
+
+The smoke verifies live/ready/diagnostics, two ephemeral registrations, authenticated SignalR connections, Asgard matchmaking, game start, one legal Asgard action, and action-log/snapshot retrieval. It does not install systemd, Nginx, TLS, Redis, or any production service.

@@ -475,3 +475,22 @@ The online test runner timeout path is hardened. A hanging SignalR test now repo
 ## P4D1.4 Test Runner Stabilization
 
 P4D1.4 introduced a dedicated C# process watchdog for contract test execution. SignalR-only test execution is now bounded and was proven with artificial hang/normal-process self-tests plus direct SignalR execution. The online SignalR contract test also writes temporary store/keyring files under repo `.tmp` for sandbox-safe runs.
+
+## Next Era Linux Remote Smoke
+
+The Linux-native server path has passed a temporary Hetzner dry-run:
+
+- Linux `libChess3DEngine.so` loads inside `ChessOnlineServer`;
+- `linux-x64` server package starts on Hetzner Kestrel loopback;
+- `/healthz/live`, `/healthz/ready`, and `/chess3d/diagnostics` pass;
+- authenticated remote SignalR smoke passes through an SSH local-forward;
+- exact-profile Asgard matchmaking starts a game, accepts one legal action, and exposes snapshot/action-log state.
+
+Still deferred:
+
+- persistent `/opt/chessonline` and `/var/lib/chessonline` layout;
+- systemd service;
+- Nginx reverse proxy;
+- TLS/domain;
+- public health/service exposure;
+- Redis/Azure SignalR/backplane and public ranked matchmaking.

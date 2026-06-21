@@ -354,3 +354,20 @@ P4D1.4 stabilizes the server publish and test pipeline after the Linux-native au
 - per-test executable timeouts and logs;
 - `ChessOnlineServer`, `ChessOnlineProtocol`, and `ChessOnlinePersistence` as `net8.0` server-side projects;
 - WPF clients remain `net8.0-windows`.
+
+## Next Era - Linux Native Authority Dry-Run
+
+Completed:
+
+- Linux-native `libChess3DEngine.so` build and ABI parity check.
+- `linux-x64` ChessOnlineServer package with canonical `libChess3DEngine.so`.
+- Hetzner Kestrel-only loopback smoke.
+- Remote authenticated SignalR/Asgard matchmaking/action smoke through SSH local-forward.
+
+Next:
+
+- production-like filesystem layout under `/opt/chessonline` and `/var/lib/chessonline`;
+- systemd unit rehearsal;
+- Nginx reverse-proxy rehearsal;
+- TLS/domain hardening;
+- remote operator runbook and rollback/backup notes.

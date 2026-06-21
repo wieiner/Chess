@@ -92,10 +92,14 @@ Post-stop check:
 - no persistent ChessOnline service was installed;
 - `/opt/chessonline` and `/var/lib/chessonline` were not touched.
 
+## Follow-Up Completed
+
+The next phase completed remote auth/register/login, authenticated SignalR, exact-profile Asgard matchmaking, snapshot, one legal Asgard action, and action-log smoke. See:
+
+- `docs/NEXT_ERA_REMOTE_SIGNALR_ASGARD_SMOKE_RESULT.md`
+
 ## Still Deferred
 
-- Remote auth/register/login smoke.
-- SignalR matchmaking and Asgard action smoke.
 - Production-like `/opt/chessonline` and `/var/lib/chessonline` layout.
 - `systemd` service.
 - Nginx reverse proxy.
