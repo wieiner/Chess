@@ -165,6 +165,16 @@ public sealed class JsonOnlineStore : IOnlineIdentityStore, IOnlineSessionStore,
         }
     }
 
+    public Task ClearActionLogAsync(string tableId, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            _document.Actions.RemoveAll(a => string.Equals(a.TableId, tableId, StringComparison.OrdinalIgnoreCase));
+            Save();
+            return Task.CompletedTask;
+        }
+    }
+
     public Task AppendActionAsync(PersistentActionLogEntity action, CancellationToken cancellationToken = default)
     {
         lock (_gate)

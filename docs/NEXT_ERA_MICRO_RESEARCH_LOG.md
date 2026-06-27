@@ -487,3 +487,12 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | Linux service rollback boundary | Microsoft Learn, Host ASP.NET Core on Linux with Nginx: https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/linux-nginx | The ASP.NET Core app payload and systemd unit can be backed up independently of Nginx/TLS/firewall. | Back up only `/opt/chessonline/server` and `/etc/systemd/system/chessonline.service`; do not touch nginx, UFW, 443, x-ui/Xray, Outline, Albatronix, or Unreal. | `docs/P4G2_HETZNER_BACKUP_RESULT.md` | SSH backup command, systemd status, loopback health/diagnostics before deploy. |
 | Rollback readiness | Existing Hetzner deployment layout | A timestamped tarball under `/opt/chessonline/backups` is sufficient for the next server-only deploy rollback. | Record backup path and pre-deploy health in docs before copying the new package. | docs only | Confirm backup file exists and service remains active. |
+
+## P4G2 Phase 17 - Hetzner Legal Preview Deploy
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Server-only deploy boundary | Microsoft Learn, Host ASP.NET Core on Linux with Nginx: https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/linux-nginx | Restarting a Kestrel systemd service does not require changing Nginx, TLS, firewall, or other services. | Replace only `/opt/chessonline/server` with the prepared package and restart `chessonline.service`; leave 443/x-ui/Xray/Outline/Albatronix/Unreal untouched. | `docs/P4G2_HETZNER_LEGAL_PREVIEW_DEPLOY_RESULT.md` | Loopback health, public HTTP health, diagnostics capability flags, Classic/Asgard remote smoke. |
+| Runtime data safety | OWASP secrets guidance and existing deployment layout | Runtime stores/keyrings must not be bundled into deploy archives or accidentally exposed in Git. | Inspect remote service configuration before deploy; preserve runtime data paths if they are outside the published payload. | docs only unless deployment layout requires a safe copy step | `systemctl cat`, server directory listing, no runtime artifacts in Git. |

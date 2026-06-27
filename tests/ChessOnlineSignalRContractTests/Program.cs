@@ -3,6 +3,9 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text.Json;
+using ChessOnlinePersistence;
+using ChessOnlinePersistence.Entities;
+using ChessOnlinePersistence.Repositories;
 using ChessOnlineProtocol;
 using ChessOnlineServer;
 using Microsoft.AspNetCore.Builder;
@@ -40,6 +43,7 @@ try
     await ConcurrencyTests(test, hubUrl, profileRoot);
     await SecurityTests(test, hubUrl);
     await AuthPersistenceTests(test, root, profileRoot);
+    await PersistenceRestartSequenceTests(test, root);
     FixtureParseTests(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "signalr"));
     FixtureParseTestsWithFormat(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "identity"), "chess3d-identity-regression", "Identity fixture");
     FixtureParseTestsWithFormat(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "persistence"), "chess3d-persistence-regression", "Persistence fixture");
@@ -479,6 +483,47 @@ static async Task<(string RoomId, string TableId)> AssertMatchmakingProfile(
         !string.IsNullOrWhiteSpace(found.MatchmakingStatus.RoomId) &&
         !string.IsNullOrWhiteSpace(found.MatchmakingStatus.TableId), $"P4C {label} matchmaking creates match-found room/table");
     return (found.MatchmakingStatus?.RoomId ?? "", found.MatchmakingStatus?.TableId ?? "");
+}
+
+static async Task PersistenceRestartSequenceTests(ContractTest test, string root)
+{
+    var storePath = Path.Combine(root, ".tmp", "chess3d-p4g2-restart-store", Guid.NewGuid().ToString("N"), "store.json");
+    var store = new JsonOnlineStore(new OnlineStoreOptions { StorePath = storePath });
+    const string tableKey = "match-1-asgard/table-1";
+
+    await store.AppendActionAsync(new PersistentActionLogEntity
+    {
+        TableId = tableKey,
+        ServerSeq = 1,
+        ActionIndex = 1,
+        ActorPlayerId = "player-before-restart",
+        ActionKind = OnlineActionKinds.NormalMove,
+        ActionJson = "{}",
+        Notation = "before restart",
+        StateHashAfter = "hash-before",
+        CreatedAtUtc = DateTime.UtcNow
+    });
+
+    await store.ClearActionLogAsync(tableKey);
+
+    await store.AppendActionAsync(new PersistentActionLogEntity
+    {
+        TableId = tableKey,
+        ServerSeq = 1,
+        ActionIndex = 1,
+        ActorPlayerId = "player-after-restart",
+        ActionKind = OnlineActionKinds.NormalMove,
+        ActionJson = "{}",
+        Notation = "after restart",
+        StateHashAfter = "hash-after",
+        CreatedAtUtc = DateTime.UtcNow
+    });
+
+    var log = await store.GetActionLogAsync(tableKey);
+    test.Check(log.Count == 1 &&
+        log[0].ServerSeq == 1 &&
+        log[0].Notation == "after restart",
+        "P4G2 persistence clears stale action log for reused matchmaking table key after restart");
 }
 
 static void FixtureParseTests(ContractTest test, string fixtureRoot)

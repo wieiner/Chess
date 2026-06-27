@@ -489,10 +489,15 @@ public sealed class Chess3DRelayHub : Hub
         {
             return;
         }
+        var tableKey = PersistenceTableKey(result.Envelope.RoomId, tableId);
+        if (result.Envelope.MessageType == OnlineMessageTypes.GameStarted)
+        {
+            await _roomStore.ClearActionLogAsync(tableKey);
+        }
         await _roomStore.UpsertTableAsync(new PersistentTableEntity
         {
             RoomId = result.Envelope.RoomId,
-            TableId = PersistenceTableKey(result.Envelope.RoomId, tableId),
+            TableId = tableKey,
             RulesetId = result.Table?.RulesetId ?? snapshot?.RulesetId ?? "",
             ProfileKind = result.Table?.RulesetId ?? snapshot?.RulesetId ?? "",
             State = result.Envelope.MessageType,
@@ -552,6 +557,7 @@ public sealed class Chess3DRelayHub : Hub
 
         var rulesetId = result.MatchedTickets.FirstOrDefault()?.RequestedRulesetId ?? "";
         var tableKey = PersistenceTableKey(result.RoomId, result.TableId);
+        await _roomStore.ClearActionLogAsync(tableKey);
         await _roomStore.UpsertRoomAsync(new PersistentRoomEntity
         {
             RoomId = result.RoomId,
