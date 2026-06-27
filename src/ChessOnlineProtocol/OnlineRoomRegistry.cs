@@ -349,6 +349,85 @@ public sealed class OnlineRoomRegistry
         }
     }
 
+    public OnlineProtocolMessage RequestLegalPreview(OnlineMessageEnvelope envelope, OnlineLegalPreviewRequest request)
+    {
+        lock (_gate)
+        {
+            if (!TrySeat(envelope, out _, out var table, out var seat))
+            {
+                return Reject(envelope, OnlineRejectReasons.PlayerNotSeated, "Player is not seated at this table.");
+            }
+            if (table.State != OnlineTableState.InGame || table.Session == null)
+            {
+                return Reject(envelope, OnlineRejectReasons.TableNotInGame, "Table is not in game.");
+            }
+
+            request.PlayerId = string.IsNullOrWhiteSpace(request.PlayerId) ? RequirePlayerId(envelope) : request.PlayerId;
+            request.RoomId = string.IsNullOrWhiteSpace(request.RoomId) ? table.RoomId : request.RoomId;
+            request.TableId = string.IsNullOrWhiteSpace(request.TableId) ? table.TableId : request.TableId;
+            if (request.ActorSide == 0)
+            {
+                request.ActorSide = table.IsHodge ? seat.MacroPlayer : seat.SideId;
+            }
+            if (request.MacroPlayer == 0 && table.IsHodge)
+            {
+                request.MacroPlayer = seat.MacroPlayer;
+            }
+
+            if (!ActorMatchesSeat(table, seat, new OnlineActionCommand
+            {
+                ActorSide = request.ActorSide,
+                MacroPlayer = request.MacroPlayer,
+                Side = request.ActorSide
+            }))
+            {
+                return Reject(envelope, OnlineRejectReasons.WrongActor, "Player does not own the requested preview actor.", table.Session.StateHash, table.ServerSeq);
+            }
+
+            var beforeHash = table.Session.StateHash;
+            if (!string.IsNullOrWhiteSpace(request.ExpectedStateHash) &&
+                !string.Equals(request.ExpectedStateHash, beforeHash, StringComparison.Ordinal))
+            {
+                _diagnostics.ResyncCount++;
+                return Reply(OnlineMessageTypes.LegalPreviewResult, envelope, legalPreview: new OnlineLegalPreviewResult
+                {
+                    RoomId = table.RoomId,
+                    TableId = table.TableId,
+                    RulesetId = table.RulesetId,
+                    StateHash = beforeHash,
+                    ServerSeq = table.ServerSeq,
+                    SourceX = request.SourceX,
+                    SourceY = request.SourceY,
+                    SourceZ = request.SourceZ,
+                    ActorSide = request.ActorSide,
+                    MacroPlayer = request.MacroPlayer,
+                    IsStale = true,
+                    NoLegalActionReason = "Client expected hash does not match authoritative state.",
+                    Error = new OnlineLegalPreviewError
+                    {
+                        ReasonCode = OnlineRejectReasons.StaleStateHash,
+                        ReasonText = "Client expected hash does not match authoritative state.",
+                        RequiresResync = true
+                    }
+                });
+            }
+
+            var preview = table.Session.BuildLegalPreview(request, table.RoomId, table.TableId, table.ServerSeq);
+            if (!string.Equals(table.Session.StateHash, beforeHash, StringComparison.Ordinal))
+            {
+                preview.Error = new OnlineLegalPreviewError
+                {
+                    ReasonCode = OnlineRejectReasons.InternalError,
+                    ReasonText = "Legal preview mutated authoritative state.",
+                    RequiresResync = true
+                };
+                preview.Options.Clear();
+                preview.NoLegalActionReason = preview.Error.ReasonText;
+            }
+            return Reply(OnlineMessageTypes.LegalPreviewResult, envelope, legalPreview: preview);
+        }
+    }
+
     public OnlineDiagnostics GetDiagnostics()
     {
         lock (_gate)
@@ -441,6 +520,7 @@ public sealed class OnlineRoomRegistry
         OnlineActionCommand? action = null,
         OnlineSnapshot? snapshot = null,
         OnlineActionLogChunk? actionLog = null,
+        OnlineLegalPreviewResult? legalPreview = null,
         OnlineError? error = null,
         string text = "")
     {
@@ -455,7 +535,7 @@ public sealed class OnlineRoomRegistry
                 TableId = request.TableId,
                 ClientId = "server",
                 PlayerId = request.PlayerId,
-                ServerSeq = snapshot?.ServerSeq ?? actionLog?.ToServerSeq ?? error?.ServerSeq ?? 0,
+                ServerSeq = snapshot?.ServerSeq ?? actionLog?.ToServerSeq ?? legalPreview?.ServerSeq ?? error?.ServerSeq ?? 0,
                 SentAtUtc = DateTime.UtcNow.ToString("O")
             },
             Room = room,
@@ -463,6 +543,7 @@ public sealed class OnlineRoomRegistry
             Action = action,
             Snapshot = snapshot,
             ActionLog = actionLog,
+            LegalPreview = legalPreview,
             Error = error,
             Text = text
         };

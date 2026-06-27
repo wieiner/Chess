@@ -34,6 +34,7 @@ public interface IChessOnlineRulesAuthority : IDisposable
 
     OnlineActionCommand? FirstLegalNormalMoveCommand(int actorSide);
     OnlineActionCommand? FirstAiCandidateCommand(string preferredKind = "");
+    OnlineLegalPreviewResult BuildLegalPreview(OnlineLegalPreviewRequest request, string roomId, string tableId, long serverSeq);
     bool TryApply(OnlineActionCommand command, out string rejectReason, out string rejectText);
     OnlineSnapshot CreateSnapshot(string roomId, string tableId, long serverSeq);
 }

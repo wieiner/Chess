@@ -92,6 +92,71 @@ public sealed class OnlineGameSession : IChessOnlineRulesAuthority
         return null;
     }
 
+    public OnlineLegalPreviewResult BuildLegalPreview(OnlineLegalPreviewRequest request, string roomId, string tableId, long serverSeq)
+    {
+        var beforeHash = StateHash;
+        var actorSide = request.ActorSide;
+        if (actorSide <= 0)
+        {
+            var piece = _engine.GetPiece(request.SourceX, request.SourceY, request.SourceZ);
+            actorSide = piece > 0 ? piece / 10 : _engine.GetCurrentSide();
+        }
+
+        var result = new OnlineLegalPreviewResult
+        {
+            RoomId = roomId,
+            TableId = tableId,
+            RulesetId = RulesetId,
+            StateHash = beforeHash,
+            ServerSeq = serverSeq,
+            SourceX = request.SourceX,
+            SourceY = request.SourceY,
+            SourceZ = request.SourceZ,
+            ActorSide = actorSide,
+            MacroPlayer = request.MacroPlayer != 0 ? request.MacroPlayer : _engine.GetCurrentMacroPlayer()
+        };
+
+        var count = _engine.BuildLegalActionPreviewForCell(request.SourceX, request.SourceY, request.SourceZ, actorSide);
+        var entries = _engine.GetLegalActionPreview();
+        for (var i = 0; i < entries.Length; ++i)
+        {
+            var option = ToLegalPreviewOption(entries[i], _engine.GetPreviewEntryReason(i));
+            if (!string.IsNullOrWhiteSpace(request.ActionKindFilter) &&
+                !string.Equals(option.ActionKind, request.ActionKindFilter, StringComparison.Ordinal))
+            {
+                continue;
+            }
+            result.Options.Add(option);
+        }
+
+        if (result.Options.Count == 0)
+        {
+            result.NoLegalActionReason = count <= 0
+                ? _engine.GetLastInvalidActionReason()
+                : "No legal preview option matched the requested filter.";
+            if (string.IsNullOrWhiteSpace(result.NoLegalActionReason))
+            {
+                result.NoLegalActionReason = "No legal action is available for the selected source.";
+            }
+        }
+
+        var afterHash = StateHash;
+        if (!string.Equals(beforeHash, afterHash, StringComparison.Ordinal))
+        {
+            result.Error = new OnlineLegalPreviewError
+            {
+                ReasonCode = OnlineRejectReasons.InternalError,
+                ReasonText = "Legal preview mutated authoritative state.",
+                RequiresResync = true
+            };
+            result.NoLegalActionReason = result.Error.ReasonText;
+            result.Options.Clear();
+            result.StateHash = afterHash;
+        }
+
+        return result;
+    }
+
     public bool TryApply(OnlineActionCommand command, out string rejectReason, out string rejectText)
     {
         rejectReason = OnlineRejectReasons.None;
@@ -171,6 +236,37 @@ public sealed class OnlineGameSession : IChessOnlineRulesAuthority
             OnlineActionKinds.ReserveRestore => _engine.GetLastReserveRestoreInfo(),
             OnlineActionKinds.AiActionRequest => "Server-side AI search is disabled in P3E by default.",
             _ => "Unsupported action kind."
+        };
+    }
+
+    private static OnlineLegalActionOption ToLegalPreviewOption(Chess3DLegalActionPreviewEntryDto entry, string reason)
+    {
+        var actionKind = entry.Kind switch
+        {
+            3 => OnlineActionKinds.ReserveRestore,
+            4 => OnlineActionKinds.RubikLayerTurn,
+            5 => OnlineActionKinds.HodgeProjectedMove,
+            _ => OnlineActionKinds.NormalMove
+        };
+        var isCapture = entry.CapturedPieceCode != 0 || entry.Kind == 2;
+        return new OnlineLegalActionOption
+        {
+            ActionKind = actionKind,
+            ActorSide = entry.Side,
+            From = new OnlineLegalTarget { X = entry.FromX, Y = entry.FromY, Z = entry.FromZ },
+            To = new OnlineLegalTarget { X = entry.ToX, Y = entry.ToY, Z = entry.ToZ },
+            ReserveTarget = new OnlineLegalTarget { X = entry.ToX, Y = entry.ToY, Z = entry.ToZ },
+            PrimarySide = entry.Side,
+            DisplayLabel = $"{actionKind} S{entry.Side} ({entry.FromX},{entry.FromY},{entry.FromZ})->({entry.ToX},{entry.ToY},{entry.ToZ})",
+            Reason = reason,
+            Capability = actionKind,
+            Flags = entry.Flags,
+            PieceCode = entry.PieceCode,
+            CapturedPieceCode = entry.CapturedPieceCode,
+            ReasonCode = entry.ReasonCode,
+            IsCapture = isCapture,
+            IsSpecial = !string.Equals(actionKind, OnlineActionKinds.NormalMove, StringComparison.Ordinal),
+            IsRecommendedSafeTestAction = false
         };
     }
 }

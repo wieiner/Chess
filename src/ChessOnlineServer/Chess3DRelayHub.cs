@@ -255,6 +255,13 @@ public sealed class Chess3DRelayHub : Hub
         return result;
     }
 
+    public async Task<OnlineProtocolMessage> RequestLegalPreview(OnlineProtocolMessage message)
+    {
+        var result = InvokeRegistry(message, OnlineMessageTypes.RequestLegalPreview, env => _registry.RequestLegalPreview(env, message.LegalPreviewRequest ?? new OnlineLegalPreviewRequest()));
+        await SendCaller(result.Envelope.MessageType == OnlineMessageTypes.LegalPreviewResult ? "ReceiveLegalPreviewResult" : "ReceiveError", result);
+        return result;
+    }
+
     public async Task<OnlineProtocolMessage> Ping(OnlineProtocolMessage message)
     {
         var result = Reply(OnlineMessageTypes.Pong, message.Envelope);

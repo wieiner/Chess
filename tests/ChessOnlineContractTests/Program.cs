@@ -18,6 +18,7 @@ try
     AuthorityRuntimeDiagnosticsTests(test, profileRoot);
     AuthorityClassicTests(test, profileRoot);
     AuthorityProfileSmokeTests(test, profileRoot);
+    LegalPreviewAuthorityTests(test, profileRoot);
     SnapshotAndReplayTests(test, profileRoot);
     FixtureParseTests(test, onlineFixtureRoot);
 
@@ -366,6 +367,78 @@ static void AsgardProfileIsolationTests(ContractTest test, string profileRoot)
 
     var aiCandidate = asgard.BuildFirstAiCandidateCommand("room-asgard-isolation", "asgard-isolation");
     test.Check(aiCandidate != null, "Asgard online authority exposes at least one profile-aware AI candidate");
+}
+
+static void LegalPreviewAuthorityTests(ContractTest test, string profileRoot)
+{
+    var classic = StartedRegistry(profileRoot, "room-preview-classic", "preview-classic", "classic-six-side-3d-8x8x8-v0.1", 1, out var classicEnv);
+    var command = classic.BuildFirstLegalNormalMoveCommand("room-preview-classic", "preview-classic", 1);
+    test.Check(command != null, "online authority can build source command for legal preview test");
+    var before = classic.RequestSnapshot(classicEnv(OnlineMessageTypes.RequestSnapshot)).Snapshot?.StateHash ?? "";
+    var preview = classic.RequestLegalPreview(classicEnv(OnlineMessageTypes.RequestLegalPreview), new OnlineLegalPreviewRequest
+    {
+        SourceX = command?.FromX ?? 0,
+        SourceY = command?.FromY ?? 0,
+        SourceZ = command?.FromZ ?? 0,
+        ActorSide = 1,
+        ExpectedStateHash = before
+    });
+    var after = classic.RequestSnapshot(classicEnv(OnlineMessageTypes.RequestSnapshot)).Snapshot?.StateHash ?? "";
+    test.Check(preview.Envelope.MessageType == OnlineMessageTypes.LegalPreviewResult &&
+        preview.LegalPreview?.Options.Any(o =>
+            o.ActionKind == OnlineActionKinds.NormalMove &&
+            o.From.X == command?.FromX &&
+            o.From.Y == command?.FromY &&
+            o.From.Z == command?.FromZ &&
+            o.To.X == command?.ToX &&
+            o.To.Y == command?.ToY &&
+            o.To.Z == command?.ToZ) == true,
+        "legal preview returns matching Classic normal move option");
+    test.Check(after == before, "legal preview does not mutate Classic state hash");
+
+    var stale = classic.RequestLegalPreview(classicEnv(OnlineMessageTypes.RequestLegalPreview), new OnlineLegalPreviewRequest
+    {
+        SourceX = command?.FromX ?? 0,
+        SourceY = command?.FromY ?? 0,
+        SourceZ = command?.FromZ ?? 0,
+        ActorSide = 1,
+        ExpectedStateHash = "stale"
+    });
+    test.Check(stale.Envelope.MessageType == OnlineMessageTypes.LegalPreviewResult &&
+        stale.LegalPreview?.IsStale == true &&
+        stale.LegalPreview.Error?.ReasonCode == OnlineRejectReasons.StaleStateHash,
+        "stale legal preview returns explicit resync hint");
+
+    var empty = classic.RequestLegalPreview(classicEnv(OnlineMessageTypes.RequestLegalPreview), new OnlineLegalPreviewRequest
+    {
+        SourceX = 4,
+        SourceY = 4,
+        SourceZ = 4,
+        ActorSide = 1,
+        ExpectedStateHash = before
+    });
+    test.Check(empty.Envelope.MessageType == OnlineMessageTypes.LegalPreviewResult &&
+        empty.LegalPreview?.Options.Count == 0 &&
+        !string.IsNullOrWhiteSpace(empty.LegalPreview.NoLegalActionReason),
+        "empty source legal preview returns clear no-action reason");
+
+    var asgard = StartedRegistry(profileRoot, "room-preview-asgard", "preview-asgard", "asgard-convergence-3d-8x8x8-v0.1", 1, out var asgardEnv);
+    var asgardCommand = asgard.BuildFirstLegalNormalMoveCommand("room-preview-asgard", "preview-asgard", 1);
+    test.Check(asgardCommand != null, "online authority can build source Asgard command for legal preview test");
+    var asgardHash = asgard.RequestSnapshot(asgardEnv(OnlineMessageTypes.RequestSnapshot)).Snapshot?.StateHash ?? "";
+    var asgardPreview = asgard.RequestLegalPreview(asgardEnv(OnlineMessageTypes.RequestLegalPreview), new OnlineLegalPreviewRequest
+    {
+        SourceX = asgardCommand?.FromX ?? 0,
+        SourceY = asgardCommand?.FromY ?? 0,
+        SourceZ = asgardCommand?.FromZ ?? 0,
+        ActorSide = 1,
+        ExpectedStateHash = asgardHash
+    });
+    var asgardAfter = asgard.RequestSnapshot(asgardEnv(OnlineMessageTypes.RequestSnapshot)).Snapshot?.StateHash ?? "";
+    test.Check(asgardPreview.Envelope.MessageType == OnlineMessageTypes.LegalPreviewResult &&
+        asgardPreview.LegalPreview?.Options.Any(o => o.ActionKind == OnlineActionKinds.NormalMove) == true,
+        "Asgard source legal preview returns at least one normal move option");
+    test.Check(asgardAfter == asgardHash, "legal preview does not mutate Asgard state hash");
 }
 
 static void SnapshotAndReplayTests(ContractTest test, string profileRoot)
