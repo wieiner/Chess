@@ -254,3 +254,12 @@ Date: 2026-06-27
 | Snapshot/action log UI | Microsoft Learn, "ASP.NET Core SignalR .NET client": https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | Client-side hub method results can be projected into small desktop status views without changing the server contract. | Add compact snapshot status, action counters, and action-log list to `ChessOnlineApp`. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build app. |
 | Safe action smoke | Project remote smoke result and existing online authority contract | The proven Asgard smoke action is a normal move from `(2,3,0)` to `(2,3,1)` with expected state hash. | Add `Submit Safe Asgard Test Action` for the Asgard profile only. | `src/ChessOnlineApp/MainWindow.xaml.cs`, `docs/P4F_ONLINE_SNAPSHOT_VIEWER.md` | Build app; remote UI smoke later. |
 | Session report safety | OWASP Secrets Management Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html | Runtime reports must avoid credentials and tokens. | Save sanitized client session reports under ignored `.tmp/manual-smoke`. | `src/ChessOnlineApp/MainWindow.xaml.cs` | No report files are committed. |
+
+## P4F Phase 07 - Remote Smoke Result
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Test/verify plan |
+| --- | --- | --- | --- | --- | --- |
+| Operator smoke boundary | Existing `tools/HetznerSignalRSmoke` and P4F UI code | The command-line smoke remains the fastest reliable proof of remote auth/SignalR/matchmaking/action. | Run the public HTTP Asgard smoke after the UI MVP code and record sanitized results. | `docs/P4F_MANUAL_HETZNER_UI_SMOKE_RESULT.md` | Smoke PASS with `-NoSecretLog`; WPF click path remains manual. |
+| Manual UI validation | Microsoft Learn, WPF layout overview: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/layout | WPF manual workflows should be documented when screenshot automation is out of scope. | Document exact click path rather than adding fragile UI automation. | `docs/P4F_MANUAL_HETZNER_UI_SMOKE_RESULT.md` | Local build plus operator manual smoke. |
