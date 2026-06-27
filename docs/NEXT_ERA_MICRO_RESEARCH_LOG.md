@@ -389,3 +389,13 @@ Date: 2026-06-27
 | WPF click/highlight state | Microsoft Learn, WPF data binding and controls: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/data/ | Incremental UI state can be kept as simple view models and refreshed on selection without embedding the full local Chess3D window. | Add legal-preview status/list and color markers to the existing P4G board slice. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`. |
 | SignalR callback threading | Microsoft Learn, SignalR .NET client: https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | Desktop callbacks can arrive away from the UI thread; UI changes must be marshalled through the dispatcher. | Keep preview display updates inside existing app event/dispatcher patterns. | `src/ChessOnlineApp/MainWindow.xaml.cs` | Build plus existing contract tests. |
 | Preview safety boundary | Existing Phase 04 server no-mutation tests | Preview is authoritative metadata, not a local action. | UI highlights targets but still submits through `SubmitAction` later; no local board mutation. | `docs/P4G2_UI_LEGAL_TARGETS.md` | Manual remote smoke later; no remote smoke in CI. |
+
+## P4G2 Phase 07 - One-Click Legal Dispatch
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Exact action dispatch | Existing `OnlineActionCommand` and Phase 05 preview option command mapping | Legal preview options already contain enough action shape to submit through the existing server authority. | Clicking a highlighted target submits the matching preview option instead of building a rough From/To command. | `src/ChessOnlineApp/MainWindow.xaml.cs` | Build app and contract tests. |
+| Duplicate-submit safety | Microsoft Learn WPF command/control event basics: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/ | Rapid clicks can trigger duplicate async handlers unless the UI keeps a pending flag. | Add a pending submit guard around preview-option dispatch. | `src/ChessOnlineApp/MainWindow.xaml.cs` | Build app; manual smoke later. |
+| Fallback UX | Existing P4G manual From/To flow | The rough coordinate flow remains useful for debugging while preview dispatch is young. | Preserve `Use Selected as From/To` and `Submit Normal Move` as advanced fallback. | `docs/P4G2_ONE_CLICK_LEGAL_DISPATCH.md` | Documentation plus local build. |

@@ -33,6 +33,7 @@ public partial class MainWindow : Window
     private OnlineChess3DBoardCell? _p4gMoveFrom;
     private OnlineChess3DBoardCell? _p4gMoveTo;
     private LegalPreviewState _p4gLegalPreview = LegalPreviewState.Empty();
+    private bool _p4gSubmitPending;
     private int _p4fAcceptedActionCount;
     private int _p4fRejectedActionCount;
     private long _p4fLastServerSeq;
@@ -567,6 +568,7 @@ public partial class MainWindow : Window
         _p4gMoveFrom = null;
         _p4gMoveTo = null;
         ClearP4GLegalPreview("Legal preview: session cleared.");
+        _p4gSubmitPending = false;
         _p4fAcceptedActionCount = 0;
         _p4fRejectedActionCount = 0;
         _p4fLastServerSeq = 0;
@@ -1053,6 +1055,7 @@ public partial class MainWindow : Window
         _p4gMoveFrom = null;
         _p4gMoveTo = null;
         ClearP4GLegalPreview("Legal preview: session cleared.");
+        _p4gSubmitPending = false;
         _p4fAcceptedActionCount = 0;
         _p4fRejectedActionCount = 0;
         _p4fLastServerSeq = 0;
@@ -1154,6 +1157,17 @@ public partial class MainWindow : Window
         await RequestP4GLegalPreviewAsync(_p4gMoveFrom);
     }
 
+    private async void P4GSubmitSelectedPreviewAction_Click(object sender, RoutedEventArgs e)
+    {
+        if (P4GLegalPreviewOptionBox.SelectedItem is not LegalActionOptionViewModel option)
+        {
+            P4GMoveStatusText.Text = "Online move: choose a legal preview action first.";
+            return;
+        }
+
+        await SubmitP4GPreviewOptionAsync(option);
+    }
+
     private void P4GBoardLayerBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (P4GBoardGrid != null)
@@ -1178,6 +1192,20 @@ public partial class MainWindow : Window
             }
 
             _p4gMoveTo = cell;
+            var matches = MatchingP4GPreviewOptions(cell).ToArray();
+            if (matches.Length == 1)
+            {
+                await SubmitP4GPreviewOptionAsync(matches[0]);
+                return;
+            }
+            if (matches.Length > 1)
+            {
+                P4GLegalPreviewOptionBox.SelectedItem = matches[0];
+                P4GMoveStatusText.Text = $"Online move: {matches.Length} legal actions target {cell.Coordinate}; choose one and submit.";
+                RenderP4GBoard();
+                return;
+            }
+
             P4GMoveStatusText.Text = $"Online move: selected target {cell.Coordinate}. From={DescribeMoveCell(_p4gMoveFrom)}.";
             RenderP4GBoard();
         }
@@ -1328,12 +1356,99 @@ public partial class MainWindow : Window
         }
     }
 
+    private IEnumerable<LegalActionOptionViewModel> MatchingP4GPreviewOptions(OnlineChess3DBoardCell target)
+    {
+        return _p4gLegalPreview.Options.Where(o =>
+            o.ToX == target.X &&
+            o.ToY == target.Y &&
+            o.ToZ == target.Z);
+    }
+
+    private async Task SubmitP4GPreviewOptionAsync(LegalActionOptionViewModel option)
+    {
+        if (_p4gSubmitPending)
+        {
+            P4GMoveStatusText.Text = "Online move: submit already pending.";
+            return;
+        }
+        if (_p4fLastSnapshot == null)
+        {
+            P4GMoveStatusText.Text = "Online move: request a snapshot before submitting.";
+            return;
+        }
+        if (!IsSupportedP4GPreviewAction(option.ActionKind))
+        {
+            P4GMoveStatusText.Text = $"Online move: preview action kind is not supported by this UI yet: {option.ActionKind}.";
+            return;
+        }
+
+        _p4gSubmitPending = true;
+        try
+        {
+            EnsureP4FMatchReady();
+            var action = option.Command;
+            action.ExpectedStateHashBefore = _p4fLastSnapshot.StateHash;
+            var result = await _p4fPrimaryRelay!.SubmitActionAsync("p4f-client-a", _p4fRoomId, _p4fTableId, action);
+            RememberP4FServerSeq(result);
+            if (result.Envelope.MessageType == OnlineMessageTypes.ActionAccepted)
+            {
+                _p4fAcceptedActionCount++;
+                var notation = result.ActionLog?.Events.LastOrDefault()?.Notation ?? option.DisplayLabel;
+                P4GMoveStatusText.Text = $"Online move accepted: {notation}";
+                P4FActionLogList.Items.Add($"#{result.Envelope.ServerSeq}: {notation}");
+                ClearP4GLegalPreview("Legal preview: cleared after accepted action.");
+                var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
+                RememberP4FSnapshot(snapshot);
+            }
+            else if (result.Envelope.MessageType == OnlineMessageTypes.ResyncRequired)
+            {
+                _p4fRejectedActionCount++;
+                P4GMoveStatusText.Text = $"Online move requires resync: {result.Error?.ReasonCode} {result.Error?.ReasonText}".Trim();
+                if (result.Snapshot != null)
+                {
+                    RememberP4FSnapshot(result);
+                }
+            }
+            else
+            {
+                _p4fRejectedActionCount++;
+                P4GMoveStatusText.Text = $"Online move rejected: {result.Error?.ReasonCode} {result.Error?.ReasonText}".Trim();
+            }
+            UpdateP4FActionCounters();
+            Log($"P4G {P4GMoveStatusText.Text}");
+            RenderP4GBoard();
+        }
+        catch (Exception ex)
+        {
+            _p4fRejectedActionCount++;
+            UpdateP4FActionCounters();
+            P4GMoveStatusText.Text = $"Online move failed: {ex.Message}";
+            Log(P4GMoveStatusText.Text);
+        }
+        finally
+        {
+            _p4gSubmitPending = false;
+        }
+    }
+
+    private static bool IsSupportedP4GPreviewAction(string actionKind)
+    {
+        return string.Equals(actionKind, OnlineActionKinds.NormalMove, StringComparison.Ordinal) ||
+            string.Equals(actionKind, OnlineActionKinds.RubikLayerTurn, StringComparison.Ordinal) ||
+            string.Equals(actionKind, OnlineActionKinds.HodgeProjectedMove, StringComparison.Ordinal) ||
+            string.Equals(actionKind, OnlineActionKinds.ReserveRestore, StringComparison.Ordinal);
+    }
+
     private void ClearP4GLegalPreview(string reason = "")
     {
         _p4gLegalPreview = LegalPreviewState.Empty(reason);
         if (P4GLegalPreviewList != null)
         {
             P4GLegalPreviewList.Items.Clear();
+        }
+        if (P4GLegalPreviewOptionBox != null)
+        {
+            P4GLegalPreviewOptionBox.ItemsSource = null;
         }
         if (P4GLegalPreviewStatusText != null)
         {
@@ -1346,6 +1461,12 @@ public partial class MainWindow : Window
     private void RenderP4GLegalPreviewList()
     {
         P4GLegalPreviewList.Items.Clear();
+        P4GLegalPreviewOptionBox.ItemsSource = _p4gLegalPreview.Options;
+        P4GLegalPreviewOptionBox.DisplayMemberPath = nameof(LegalActionOptionViewModel.DisplayLabel);
+        if (_p4gLegalPreview.Options.Count > 0)
+        {
+            P4GLegalPreviewOptionBox.SelectedIndex = 0;
+        }
         foreach (var option in _p4gLegalPreview.Options)
         {
             var suffix = option.IsCapture ? " capture" : option.IsSpecial ? " special" : "";

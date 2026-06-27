@@ -427,6 +427,10 @@
                                 <TextBlock x:Name="P4GMoveStatusText" Foreground="#AFC0D0" Margin="8,0,0,0" TextWrapping="Wrap" Text="Online move: choose From and To." />
                             </StackPanel>
                             <TextBlock x:Name="P4GLegalPreviewStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Legal preview: select an occupied source cell." />
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <ComboBox x:Name="P4GLegalPreviewOptionBox" Width="320" />
+                                <Button Content="Submit Selected Preview Action" Click="P4GSubmitSelectedPreviewAction_Click" MinWidth="220" />
+                            </StackPanel>
                             <ListBox x:Name="P4GLegalPreviewList" Height="72" Margin="0,6,0,0" />
                         </StackPanel>
                     </Border>
