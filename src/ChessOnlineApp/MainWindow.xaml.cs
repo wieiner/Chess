@@ -20,6 +20,8 @@ public partial class MainWindow : Window
     private Chess3DInternetRelayClient? _relayClient;
     private HubConnection? _p3fConnection;
     private string _p3fSessionToken = "";
+    private ChessOnlineClientSession? _p4fPrimarySession;
+    private ChessOnlineClientSession? _p4fSecondarySession;
     private const string P4FHetznerHttpBaseUrl = "http://178.105.220.117";
 
     public MainWindow()
@@ -424,6 +426,116 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void P4FRegisterTemp_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var endpoint = ResolveP4FEndpoint();
+            using var http = CreateP4FHttpClient(endpoint);
+            var auth = new ChessOnlineAuthClient(http, endpoint);
+            var token = await auth.RegisterTemporaryUserAsync(clientName: "ChessOnlineApp-P4F");
+            RequireSuccessfulAuth(token, "register temp");
+            _p4fPrimarySession = new ChessOnlineClientSession(endpoint, "ChessOnlineApp-P4F");
+            _p4fPrimarySession.SetToken(token);
+            P4FAuthUserBox.Text = token.UserName;
+            P4FAuthPasswordBox.Password = "";
+            UpdateP4FAuthStatus("Temporary user registered and authenticated.");
+        }
+        catch (Exception ex)
+        {
+            P4FAuthStatusText.Text = $"Register temp failed: {ex.Message}";
+            Log(P4FAuthStatusText.Text);
+        }
+    }
+
+    private async void P4FLogin_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var endpoint = ResolveP4FEndpoint();
+            var userName = P4FAuthUserBox.Text.Trim();
+            var password = P4FAuthPasswordBox.Password;
+            if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(password))
+            {
+                throw new InvalidOperationException("Username and password are required for manual login.");
+            }
+
+            using var http = CreateP4FHttpClient(endpoint);
+            var auth = new ChessOnlineAuthClient(http, endpoint);
+            var token = await auth.LoginAsync(userName, password, "ChessOnlineApp-P4F");
+            RequireSuccessfulAuth(token, "login");
+            _p4fPrimarySession = new ChessOnlineClientSession(endpoint, "ChessOnlineApp-P4F");
+            _p4fPrimarySession.SetToken(token);
+            UpdateP4FAuthStatus("Login succeeded.");
+        }
+        catch (Exception ex)
+        {
+            P4FAuthStatusText.Text = $"Login failed: {ex.Message}";
+            Log(P4FAuthStatusText.Text);
+        }
+    }
+
+    private async void P4FLogout_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_p4fPrimarySession?.Token == null || string.IsNullOrWhiteSpace(_p4fPrimarySession.Token.RefreshToken))
+            {
+                P4FAuthStatusText.Text = "No authenticated session to logout.";
+                return;
+            }
+
+            using var http = CreateP4FHttpClient(_p4fPrimarySession.Endpoint);
+            var auth = new ChessOnlineAuthClient(http, _p4fPrimarySession.Endpoint);
+            await auth.LogoutAsync(_p4fPrimarySession.Token.RefreshToken);
+            _p4fPrimarySession.ClearToken();
+            _p4fPrimarySession = null;
+            UpdateP4FAuthStatus("Logged out.");
+        }
+        catch (Exception ex)
+        {
+            P4FAuthStatusText.Text = $"Logout failed: {ex.Message}";
+            Log(P4FAuthStatusText.Text);
+        }
+    }
+
+    private async void P4FCreateTwoTestPlayers_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var endpoint = ResolveP4FEndpoint();
+            using var http = CreateP4FHttpClient(endpoint);
+            var auth = new ChessOnlineAuthClient(http, endpoint);
+
+            var tokenA = await auth.RegisterTemporaryUserAsync("p4f_a", "ChessOnlineApp-P4F-A");
+            var tokenB = await auth.RegisterTemporaryUserAsync("p4f_b", "ChessOnlineApp-P4F-B");
+            RequireSuccessfulAuth(tokenA, "register player A");
+            RequireSuccessfulAuth(tokenB, "register player B");
+
+            _p4fPrimarySession = new ChessOnlineClientSession(endpoint, "ChessOnlineApp-P4F-A");
+            _p4fSecondarySession = new ChessOnlineClientSession(endpoint, "ChessOnlineApp-P4F-B");
+            _p4fPrimarySession.SetToken(tokenA);
+            _p4fSecondarySession.SetToken(tokenB);
+            P4FAuthUserBox.Text = tokenA.UserName;
+            P4FAuthPasswordBox.Password = "";
+            UpdateP4FAuthStatus($"Two temporary players ready: A={ShortId(tokenA.PlayerId)} B={ShortId(tokenB.PlayerId)}.");
+        }
+        catch (Exception ex)
+        {
+            P4FAuthStatusText.Text = $"Create two test players failed: {ex.Message}";
+            Log(P4FAuthStatusText.Text);
+        }
+    }
+
+    private void P4FClearSession_Click(object sender, RoutedEventArgs e)
+    {
+        _p4fPrimarySession = null;
+        _p4fSecondarySession = null;
+        _p3fSessionToken = "";
+        P4FAuthPasswordBox.Password = "";
+        UpdateP4FAuthStatus("Session cleared.");
+    }
+
     private async void P3FConnect_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -433,10 +545,16 @@ public partial class MainWindow : Window
                 await _p3fConnection.DisposeAsync();
             }
 
-            var endpoint = ResolveP4FEndpoint();
+            var endpoint = ResolveP4FEndpointForConnect();
             ApplyP4FEndpointToHubUrl(endpoint);
             _p3fConnection = new HubConnectionBuilder()
-                .WithUrl(endpoint.HubUri)
+                .WithUrl(endpoint.HubUri, options =>
+                {
+                    if (_p4fPrimarySession?.Token is { AccessToken.Length: > 0 } token)
+                    {
+                        options.AccessTokenProvider = () => Task.FromResult<string?>(token.AccessToken);
+                    }
+                })
                 .Build();
             RegisterP3FEvents(_p3fConnection);
             await _p3fConnection.StartAsync();
@@ -592,6 +710,36 @@ public partial class MainWindow : Window
         return baseUrl.Contains("<HETZNER_HOST>", StringComparison.OrdinalIgnoreCase)
             ? ChessOnlineServerEndpoint.FromBaseUrl(P3FServerUrlBox.Text.Trim())
             : ChessOnlineServerEndpoint.FromBaseUrl(baseUrl);
+    }
+
+    private static HttpClient CreateP4FHttpClient(ChessOnlineServerEndpoint endpoint)
+    {
+        return new HttpClient
+        {
+            BaseAddress = endpoint.BaseUri,
+            Timeout = TimeSpan.FromSeconds(20)
+        };
+    }
+
+    private void RequireSuccessfulAuth(ChessOnlineAuthTokenResponse token, string operation)
+    {
+        if (!token.Success || string.IsNullOrWhiteSpace(token.AccessToken))
+        {
+            throw new InvalidOperationException($"{operation} failed: {token.ErrorCode} {token.ErrorText}".Trim());
+        }
+    }
+
+    private void UpdateP4FAuthStatus(string prefix)
+    {
+        var primary = _p4fPrimarySession?.RedactedStatus ?? "anonymous";
+        var secondary = _p4fSecondarySession?.RedactedStatus ?? "none";
+        P4FAuthStatusText.Text = $"Auth status: {prefix} primary={primary}; secondary={secondary}";
+        Log(P4FAuthStatusText.Text);
+    }
+
+    private static string ShortId(string value)
+    {
+        return value.Length <= 8 ? value : value[..8];
     }
 
     private void ApplyP4FEndpointToHubUrl()

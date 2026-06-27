@@ -335,6 +335,26 @@
                             <TextBlock x:Name="P4FServerStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Server status idle." />
                         </StackPanel>
                     </Border>
+                    <Border Background="#111923" BorderBrush="#2B3746" BorderThickness="1" Padding="10" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="Auth / Test Users" FontWeight="SemiBold" />
+                            <TextBlock Text="Temporary users are generated for diagnostic HTTP smoke. Tokens and generated passwords are kept in memory only." Foreground="#AFC0D0" TextWrapping="Wrap" Margin="0,4,0,8" />
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Username" Width="64" />
+                                <TextBox x:Name="P4FAuthUserBox" Width="180" />
+                                <TextBlock Text="Password" Margin="8,0,0,0" />
+                                <PasswordBox x:Name="P4FAuthPasswordBox" Width="180" />
+                                <Button Content="Register Temp" Click="P4FRegisterTemp_Click" />
+                                <Button Content="Login" Click="P4FLogin_Click" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Content="Logout" Click="P4FLogout_Click" />
+                                <Button Content="Create Two Test Players" Click="P4FCreateTwoTestPlayers_Click" />
+                                <Button Content="Clear Session" Click="P4FClearSession_Click" />
+                                <TextBlock x:Name="P4FAuthStatusText" Foreground="#AFC0D0" Margin="8,0,0,0" TextWrapping="Wrap" Text="Auth status: anonymous." />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Hub URL" Width="64" />
                         <TextBox x:Name="P3FServerUrlBox" Text="http://127.0.0.1:5077/chess3d/relay" Width="330" />
