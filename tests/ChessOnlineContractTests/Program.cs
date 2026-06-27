@@ -358,6 +358,44 @@ static void OnlineClientSdkTests(ContractTest test)
         logB.Events[0].Contains("window B", StringComparison.Ordinal) &&
         !logA.Events[0].Contains("secret-a", StringComparison.Ordinal) &&
         !logB.Events[0].Contains("secret-b", StringComparison.Ordinal), "two-window event logs stay separate and redacted");
+
+    var realtime = new OnlineRealtimeSyncState();
+    var event1 = OnlineProtocolJson.Wrap(OnlineMessageTypes.ActionAccepted, "client-a", "player-a");
+    event1.Envelope.ServerSeq = 1;
+    var observed1 = realtime.Observe(event1);
+    test.Check(!observed1.IsDuplicate &&
+        !observed1.HasGap &&
+        realtime.LastServerSeq == 1, "online realtime sync accepts first sequenced event");
+
+    var duplicate = OnlineProtocolJson.Wrap(OnlineMessageTypes.ActionAccepted, "client-a", "player-a");
+    duplicate.Envelope.ServerSeq = 1;
+    var observedDuplicate = realtime.Observe(duplicate);
+    test.Check(observedDuplicate.IsDuplicate &&
+        realtime.DuplicateEventCount == 1 &&
+        realtime.LastServerSeq == 1, "online realtime sync detects duplicate events without advancing seq");
+
+    var gap = OnlineProtocolJson.Wrap(OnlineMessageTypes.ActionAccepted, "client-a", "player-a");
+    gap.Envelope.ServerSeq = 4;
+    var observedGap = realtime.Observe(gap);
+    test.Check(observedGap.HasGap &&
+        observedGap.RequiresResync &&
+        realtime.GapEventCount == 1 &&
+        realtime.LastServerSeq == 4, "online realtime sync detects server seq gaps");
+
+    var stale = OnlineProtocolJson.Wrap(OnlineMessageTypes.ResyncRequired, "client-a", "player-a");
+    stale.Envelope.ServerSeq = 4;
+    stale.Error = OnlineProtocolJson.Error(OnlineRejectReasons.StaleStateHash, "Client expected hash does not match authoritative state.");
+    var observedStale = realtime.Observe(stale);
+    test.Check(observedStale.IsDuplicate &&
+        realtime.ResyncRequired, "online realtime sync keeps resync required after stale duplicate response");
+
+    var snapshotEvent = OnlineProtocolJson.Wrap(OnlineMessageTypes.AuthoritativeSnapshot, "client-a", "player-a");
+    snapshotEvent.Envelope.ServerSeq = 5;
+    snapshotEvent.Snapshot = new OnlineSnapshot { StateHash = "snapshot-hash-123456", ServerSeq = 5 };
+    var observedSnapshot = realtime.Observe(snapshotEvent);
+    test.Check(!observedSnapshot.RequiresResync &&
+        realtime.LastSnapshotHash == "snapshot-hash-123456" &&
+        realtime.Summary.Contains("hash=", StringComparison.Ordinal), "online realtime sync clears resync after fresh snapshot");
 }
 
 static OnlineChess3DBoardSnapshot Board(string rulesetId, int currentSide, int currentMacroPlayer)

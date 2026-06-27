@@ -37,6 +37,8 @@ public partial class MainWindow : Window
     private OnlineChess3DBoardCell? _p4gMoveTo;
     private LegalPreviewState _p4gLegalPreview = LegalPreviewState.Empty();
     private OnlineSeatTurnState _p4fSeatTurnState = OnlineSeatTurnState.Empty();
+    private OnlineRealtimeSyncState _p4fRealtimeSync = new();
+    private bool _p4fResyncRefreshPending;
     private bool _p4gSubmitPending;
     private int _p4fAcceptedActionCount;
     private int _p4fRejectedActionCount;
@@ -56,6 +58,7 @@ public partial class MainWindow : Window
         P3EStatusText.Text = "P3E local authority harness idle.";
         RenderP4GBoard();
         UpdateP4FSeatTurnStatus();
+        UpdateP4FRealtimeStatus();
     }
 
     protected override void OnClosed(EventArgs e)
@@ -571,6 +574,8 @@ public partial class MainWindow : Window
         _p4fSecondarySeatIndex = 0;
         _p4fLastMatchmakingStatus = null;
         _p4fSeatTurnState = OnlineSeatTurnState.Empty();
+        _p4fRealtimeSync = new OnlineRealtimeSyncState();
+        _p4fResyncRefreshPending = false;
         _p4fLastSnapshot = null;
         _p4gBoardSnapshot = null;
         _p4gSelectedCell = null;
@@ -585,6 +590,7 @@ public partial class MainWindow : Window
         P4FSnapshotStatusText.Text = "Snapshot: none.";
         RenderP4GBoard();
         UpdateP4FSeatTurnStatus();
+        UpdateP4FRealtimeStatus();
         UpdateP4FActionCounters();
         P4FAuthPasswordBox.Password = "";
         P4FMatchStatusText.Text = "Match status: none.";
@@ -764,6 +770,8 @@ public partial class MainWindow : Window
             await _p4fSecondaryRelay.ConnectAsync();
             await _p4fPrimaryRelay.HelloAsync("p4f-client-a");
             await _p4fSecondaryRelay.HelloAsync("p4f-client-b");
+            _p4fRealtimeSync.MarkConnectionState("single-app relays connected");
+            UpdateP4FRealtimeStatus();
 
             var rulesetId = SelectedP3FMatchmakingRuleset();
             var queued = await _p4fPrimaryRelay.JoinMatchmakingAsync("p4f-client-a", rulesetId);
@@ -1172,6 +1180,8 @@ public partial class MainWindow : Window
         _p4fPrimaryRelay.MessageReceived += P4FRelayMessageReceived;
         await _p4fPrimaryRelay.ConnectAsync();
         await _p4fPrimaryRelay.HelloAsync(clientId);
+        _p4fRealtimeSync.MarkConnectionState("primary relay connected");
+        UpdateP4FRealtimeStatus();
     }
 
     private async Task ResetP4FRelaysAsync()
@@ -1192,6 +1202,8 @@ public partial class MainWindow : Window
         _p4fSecondarySeatIndex = 0;
         _p4fLastMatchmakingStatus = null;
         _p4fSeatTurnState = OnlineSeatTurnState.Empty();
+        _p4fRealtimeSync = new OnlineRealtimeSyncState();
+        _p4fResyncRefreshPending = false;
         _p4fLastSnapshot = null;
         _p4gBoardSnapshot = null;
         _p4gSelectedCell = null;
@@ -1206,6 +1218,7 @@ public partial class MainWindow : Window
         P4FSnapshotStatusText.Text = "Snapshot: none.";
         RenderP4GBoard();
         UpdateP4FSeatTurnStatus();
+        UpdateP4FRealtimeStatus();
         UpdateP4FActionCounters();
     }
 
@@ -1287,6 +1300,73 @@ public partial class MainWindow : Window
         }
     }
 
+    private OnlineRealtimeObservation ObserveP4FRealtime(string label, OnlineProtocolMessage message)
+    {
+        var observation = _p4fRealtimeSync.Observe(message);
+        UpdateP4FRealtimeStatus();
+        if (observation.IsDuplicate)
+        {
+            Log($"P4G realtime duplicate ignored from {label}: {observation.Reason}");
+        }
+        else if (observation.HasGap || observation.RequiresResync)
+        {
+            Log($"P4G realtime resync hint from {label}: {observation.Reason}");
+        }
+        return observation;
+    }
+
+    private void UpdateP4FRealtimeStatus()
+    {
+        if (P4FRealtimeStatusText != null)
+        {
+            P4FRealtimeStatusText.Text = _p4fRealtimeSync.Summary;
+            P4FRealtimeStatusText.Foreground = _p4fRealtimeSync.ResyncRequired ? Brush("#F4D58D") : Brush("#AFC0D0");
+        }
+    }
+
+    private async Task RefreshP4FAfterRealtimeResyncAsync(string reason)
+    {
+        if (_p4fResyncRefreshPending || _p4fPrimaryRelay == null ||
+            string.IsNullOrWhiteSpace(_p4fRoomId) ||
+            string.IsNullOrWhiteSpace(_p4fTableId))
+        {
+            return;
+        }
+
+        _p4fResyncRefreshPending = true;
+        try
+        {
+            P4FRealtimeStatusText.Text = $"Realtime: resync refresh starting ({reason}).";
+            var snapshot = await _p4fPrimaryRelay.RequestSnapshotAsync("p4f-resync", _p4fRoomId, _p4fTableId);
+            RememberP4FSnapshot(snapshot);
+            var actionLog = await _p4fPrimaryRelay.RequestActionLogAsync("p4f-resync", _p4fRoomId, _p4fTableId);
+            RememberP4FServerSeq(actionLog);
+            if (actionLog.ActionLog != null)
+            {
+                foreach (var actionEvent in actionLog.ActionLog.Events.TakeLast(10))
+                {
+                    var line = $"resync #{actionEvent.ServerSeq}: {actionEvent.Notation}";
+                    if (!P4FActionLogList.Items.Contains(line))
+                    {
+                        P4FActionLogList.Items.Add(line);
+                    }
+                }
+            }
+            _p4fRealtimeSync.ClearResync();
+            UpdateP4FRealtimeStatus();
+        }
+        catch (Exception ex)
+        {
+            _p4fRealtimeSync.MarkConnectionState($"resync failed: {ex.Message}");
+            UpdateP4FRealtimeStatus();
+            Log($"P4G realtime resync failed: {ex.Message}");
+        }
+        finally
+        {
+            _p4fResyncRefreshPending = false;
+        }
+    }
+
     private static string DisplaySeat(int seat) => seat > 0 ? seat.ToString() : "none";
 
     private void RememberP4FSnapshot(OnlineProtocolMessage message)
@@ -1331,6 +1411,11 @@ public partial class MainWindow : Window
 
         Dispatcher.Invoke(() =>
         {
+            var observation = ObserveP4FRealtime(label, message);
+            if (observation.IsDuplicate)
+            {
+                return;
+            }
             RememberP4FServerSeq(message);
             if (message.Snapshot != null)
             {
@@ -1352,6 +1437,10 @@ public partial class MainWindow : Window
                 }
             }
             Log($"P4G realtime event {label}: {message.Envelope.MessageType} seq={message.Envelope.ServerSeq}");
+            if (observation.HasGap || observation.RequiresResync)
+            {
+                _ = RefreshP4FAfterRealtimeResyncAsync(observation.Reason);
+            }
         });
     }
 
