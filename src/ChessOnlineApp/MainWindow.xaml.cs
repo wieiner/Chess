@@ -30,6 +30,8 @@ public partial class MainWindow : Window
     private OnlineSnapshot? _p4fLastSnapshot;
     private OnlineChess3DBoardSnapshot? _p4gBoardSnapshot;
     private OnlineChess3DBoardCell? _p4gSelectedCell;
+    private OnlineChess3DBoardCell? _p4gMoveFrom;
+    private OnlineChess3DBoardCell? _p4gMoveTo;
     private int _p4fAcceptedActionCount;
     private int _p4fRejectedActionCount;
     private long _p4fLastServerSeq;
@@ -561,6 +563,8 @@ public partial class MainWindow : Window
         _p4fLastSnapshot = null;
         _p4gBoardSnapshot = null;
         _p4gSelectedCell = null;
+        _p4gMoveFrom = null;
+        _p4gMoveTo = null;
         _p4fAcceptedActionCount = 0;
         _p4fRejectedActionCount = 0;
         _p4fLastServerSeq = 0;
@@ -1044,6 +1048,8 @@ public partial class MainWindow : Window
         _p4fLastSnapshot = null;
         _p4gBoardSnapshot = null;
         _p4gSelectedCell = null;
+        _p4gMoveFrom = null;
+        _p4gMoveTo = null;
         _p4fAcceptedActionCount = 0;
         _p4fRejectedActionCount = 0;
         _p4fLastServerSeq = 0;
@@ -1137,7 +1143,91 @@ public partial class MainWindow : Window
         {
             _p4gSelectedCell = cell;
             P4GSelectedCellText.Text = $"Selected online cell: {cell.Coordinate} piece={PieceLabel(cell.PieceCode)} index={cell.Index}";
+            P4GMoveStatusText.Text = $"Online move: selected {cell.Coordinate}. Use it as From or To.";
             RenderP4GBoard();
+        }
+    }
+
+    private void P4GUseSelectedFrom_Click(object sender, RoutedEventArgs e)
+    {
+        if (_p4gSelectedCell == null)
+        {
+            P4GMoveStatusText.Text = "Online move: select a cell first.";
+            return;
+        }
+
+        _p4gMoveFrom = _p4gSelectedCell;
+        P4GMoveStatusText.Text = $"Online move: From={DescribeMoveCell(_p4gMoveFrom)} To={DescribeMoveCell(_p4gMoveTo)}.";
+    }
+
+    private void P4GUseSelectedTo_Click(object sender, RoutedEventArgs e)
+    {
+        if (_p4gSelectedCell == null)
+        {
+            P4GMoveStatusText.Text = "Online move: select a cell first.";
+            return;
+        }
+
+        _p4gMoveTo = _p4gSelectedCell;
+        P4GMoveStatusText.Text = $"Online move: From={DescribeMoveCell(_p4gMoveFrom)} To={DescribeMoveCell(_p4gMoveTo)}.";
+    }
+
+    private async void P4GSubmitNormalMove_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            EnsureP4FMatchReady();
+            if (_p4gBoardSnapshot == null || _p4fLastSnapshot == null)
+            {
+                throw new InvalidOperationException("Request a snapshot before submitting a board move.");
+            }
+            if (_p4gMoveFrom == null || _p4gMoveTo == null)
+            {
+                throw new InvalidOperationException("Choose From and To cells first.");
+            }
+            if (!_p4gMoveFrom.IsOccupied)
+            {
+                throw new InvalidOperationException("From cell is empty.");
+            }
+
+            var action = new OnlineActionCommand
+            {
+                ActionKind = OnlineActionKinds.NormalMove,
+                ActorSide = _p4gMoveFrom.Side,
+                ExpectedStateHashBefore = _p4fLastSnapshot.StateHash,
+                FromX = _p4gMoveFrom.X,
+                FromY = _p4gMoveFrom.Y,
+                FromZ = _p4gMoveFrom.Z,
+                ToX = _p4gMoveTo.X,
+                ToY = _p4gMoveTo.Y,
+                ToZ = _p4gMoveTo.Z
+            };
+
+            var result = await _p4fPrimaryRelay!.SubmitActionAsync("p4f-client-a", _p4fRoomId, _p4fTableId, action);
+            RememberP4FServerSeq(result);
+            if (result.Envelope.MessageType == OnlineMessageTypes.ActionAccepted)
+            {
+                _p4fAcceptedActionCount++;
+                var notation = result.ActionLog?.Events.LastOrDefault()?.Notation ?? "accepted";
+                P4GMoveStatusText.Text = $"Online move accepted: {notation}";
+                P4FActionLogList.Items.Add($"#{result.Envelope.ServerSeq}: {notation}");
+                var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
+                RememberP4FSnapshot(snapshot);
+            }
+            else
+            {
+                _p4fRejectedActionCount++;
+                P4GMoveStatusText.Text = $"Online move rejected: {result.Error?.ReasonCode} {result.Error?.ReasonText}".Trim();
+            }
+            UpdateP4FActionCounters();
+            Log($"P4G {P4GMoveStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            _p4fRejectedActionCount++;
+            UpdateP4FActionCounters();
+            P4GMoveStatusText.Text = $"Online move failed: {ex.Message}";
+            Log(P4GMoveStatusText.Text);
         }
     }
 
@@ -1153,6 +1243,7 @@ public partial class MainWindow : Window
         {
             P4GBoardStatusText.Text = "Board: no snapshot.";
             P4GSelectedCellText.Text = "Selected online cell: none.";
+            P4GMoveStatusText.Text = "Online move: choose From and To.";
             return;
         }
 
@@ -1168,6 +1259,8 @@ public partial class MainWindow : Window
             {
                 var cell = _p4gBoardSnapshot.GetCell(x, y, layer);
                 var isSelected = _p4gSelectedCell?.Index == cell.Index;
+                var isFrom = _p4gMoveFrom?.Index == cell.Index;
+                var isTo = _p4gMoveTo?.Index == cell.Index;
                 var button = new Button
                 {
                     Content = cell.IsOccupied ? PieceLabel(cell.PieceCode) : ".",
@@ -1177,8 +1270,8 @@ public partial class MainWindow : Window
                     Margin = new Thickness(1),
                     FontSize = 11,
                     Foreground = Brushes.White,
-                    Background = isSelected ? Brush("#3F7FBF") : CellBrush(cell),
-                    BorderBrush = isSelected ? Brush("#D8F0FF") : Brush("#263442"),
+                    Background = isFrom ? Brush("#3F8F5F") : isTo ? Brush("#9A6A3A") : isSelected ? Brush("#3F7FBF") : CellBrush(cell),
+                    BorderBrush = isSelected || isFrom || isTo ? Brush("#D8F0FF") : Brush("#263442"),
                     ToolTip = $"{cell.Coordinate} index={cell.Index} piece={PieceLabel(cell.PieceCode)}"
                 };
                 button.Click += P4GBoardCell_Click;
@@ -1244,6 +1337,11 @@ public partial class MainWindow : Window
             _ => "?"
         };
         return $"S{side}{piece}";
+    }
+
+    private static string DescribeMoveCell(OnlineChess3DBoardCell? cell)
+    {
+        return cell == null ? "none" : $"{cell.Coordinate} {PieceLabel(cell.PieceCode)}";
     }
 
     private void RememberP4FServerSeq(OnlineProtocolMessage message)

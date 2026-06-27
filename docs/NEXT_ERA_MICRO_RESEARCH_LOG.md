@@ -310,3 +310,12 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | SignalR callback surfacing | Microsoft Learn, "ASP.NET Core SignalR .NET client": https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | Hub callbacks are the correct desktop client mechanism for receiving pushed server state. | Expose `ChessOnlineRelayClient.MessageReceived` and let `ChessOnlineApp` react to `Receive*` callbacks. | `src/ChessOnlineClient/ChessOnlineRelayClient.cs`, `src/ChessOnlineApp/MainWindow.xaml.cs`, `docs/P4G_REALTIME_BOARD_EVENT_SYNC.md` | Build client/app; no remote smoke in CI. |
 | Authoritative board sync | Existing `OnlineSnapshot.SaveGameJson` contract | Snapshot-bearing pushed events can redraw the online board without local engine mutation. | Parse snapshots from server callbacks and append action-log event notation, keeping direct Invoke results separate. | `src/ChessOnlineApp/MainWindow.xaml.cs` | Build app and keep P4F direct button flow intact. |
+
+## P4G Phase 05 - Online Click-To-Move MVP
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Test/verify plan |
+| --- | --- | --- | --- | --- | --- |
+| Server-authoritative move submit | Existing `OnlineActionCommand` and `OnlineGameSession.TryApply` | The protocol already supports `NormalMove` with source/target coordinates and expected state hash. | Add From/To selection controls to the P4G board and submit normal moves to the server without local mutation. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs`, `docs/P4G_ONLINE_CLICK_TO_MOVE_MVP.md` | Build `ChessOnlineApp`; remote/manual smoke remains operator-driven. |
+| Honest legal preview boundary | Existing P4G audit | Online legal preview is not exposed yet, so the client must show server rejection text instead of pretending to know legality. | Keep the first click-to-move path as server-accepted/rejected MVP; legal target highlighting is a later append-only protocol step. | `docs/P4G_ONLINE_CLICK_TO_MOVE_MVP.md` | Build app; no protocol change. |
