@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
+using ChessOnlineClient;
 using ChessOnlineProtocol;
 using Microsoft.AspNetCore.SignalR.Client;
 
@@ -96,7 +97,7 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
     Require(!string.IsNullOrWhiteSpace(roomId) && !string.IsNullOrWhiteSpace(tableId), "match contains room/table");
     Console.WriteLine($"STEP PASS matchmaking room={roomId} table={tableId}");
 
-    Console.WriteLine("STEP START Asgard start");
+    Console.WriteLine("STEP START game start");
     var ready1 = Message(OnlineMessageTypes.Ready, "smoke-client-a", token1.PlayerId, roomId, tableId);
     ready1.Table = new OnlineTableCommand { Ready = true };
     var ready2 = Message(OnlineMessageTypes.Ready, "smoke-client-b", token2.PlayerId, roomId, tableId);
@@ -104,44 +105,43 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
     await InvokeAsync(client1, "Ready", ready1, cancellationToken);
     await InvokeAsync(client2, "Ready", ready2, cancellationToken);
     var started = await InvokeAsync(client1, "StartGame", Message(OnlineMessageTypes.StartGame, "smoke-client-a", token1.PlayerId, roomId, tableId), cancellationToken);
-    Require(started.Envelope.MessageType == OnlineMessageTypes.GameStarted, "Asgard game started");
-    Require(started.Snapshot?.RulesetId == options.RulesetId, "snapshot is Asgard");
+    Require(started.Envelope.MessageType == OnlineMessageTypes.GameStarted, "game started");
+    Require(started.Snapshot?.RulesetId == options.RulesetId, "snapshot ruleset matches requested ruleset");
     var startedSnapshot = started.Snapshot ?? throw new InvalidOperationException("started snapshot is missing");
     Require(!string.IsNullOrWhiteSpace(startedSnapshot.StateHash), "snapshot has state hash");
-    Console.WriteLine($"STEP PASS Asgard start hash={startedSnapshot.StateHash}");
+    Console.WriteLine($"STEP PASS game start hash={startedSnapshot.StateHash}");
 
+    var actionSubmitted = false;
     if (options.SkipActionSubmit)
     {
-        Console.WriteLine("STEP SKIP Asgard action submit skipped by --skip-action-submit");
+        Console.WriteLine("STEP SKIP action submit skipped by --skip-action-submit");
     }
     else
     {
-        Console.WriteLine("STEP START Asgard action");
-        var action = Message(OnlineMessageTypes.SubmitAction, "smoke-client-a", token1.PlayerId, roomId, tableId);
-        action.Action = new OnlineActionCommand
+        Console.WriteLine($"STEP START profile action ruleset={options.RulesetId}");
+        var command = await BuildLegalActionCommandAsync(client1, token1, roomId, tableId, startedSnapshot, options, cancellationToken);
+        if (command == null)
         {
-            ActionKind = OnlineActionKinds.NormalMove,
-            ActorSide = 1,
-            ExpectedStateHashBefore = startedSnapshot.StateHash,
-            FromX = options.FromX,
-            FromY = options.FromY,
-            FromZ = options.FromZ,
-            ToX = options.ToX,
-            ToY = options.ToY,
-            ToZ = options.ToZ
-        };
+            Console.WriteLine("STEP SKIP profile action submit skipped because no safe preview/fallback action is available");
+        }
+        else
+        {
+        var action = Message(OnlineMessageTypes.SubmitAction, "smoke-client-a", token1.PlayerId, roomId, tableId);
+        action.Action = command;
         var accepted = await InvokeAsync(client1, "SubmitAction", action, cancellationToken);
-        Require(accepted.Envelope.MessageType == OnlineMessageTypes.ActionAccepted, $"Asgard action accepted, reject={accepted.Error?.ReasonCode}");
+        Require(accepted.Envelope.MessageType == OnlineMessageTypes.ActionAccepted, $"profile action accepted, reject={accepted.Error?.ReasonCode}");
         Require(accepted.ActionLog?.Events.Count >= 1, "action log contains accepted event");
         var acceptedLog = accepted.ActionLog ?? throw new InvalidOperationException("accepted action log is missing");
         Require(!string.IsNullOrWhiteSpace(acceptedLog.Events[^1].StateHashAfter), "accepted event has state hash");
-        Console.WriteLine($"STEP PASS Asgard action notation={acceptedLog.Events[^1].Notation}");
+            actionSubmitted = true;
+        Console.WriteLine($"STEP PASS profile action notation={acceptedLog.Events[^1].Notation}");
+        }
     }
 
     Console.WriteLine("STEP START snapshot/actionlog");
     var snapshot = await InvokeAsync(client1, "RequestSnapshot", Message(OnlineMessageTypes.RequestSnapshot, "smoke-client-a", token1.PlayerId, roomId, tableId), cancellationToken);
     Require(snapshot.Envelope.MessageType == OnlineMessageTypes.AuthoritativeSnapshot, "snapshot returned");
-    if (options.SkipActionSubmit)
+    if (!actionSubmitted)
     {
         Require(snapshot.Snapshot != null, "snapshot returned after skipped action submit");
     }
@@ -186,6 +186,208 @@ static HubConnection NewAuthenticatedClient(string hubUrl, string accessToken)
 static async Task<OnlineProtocolMessage> InvokeAsync(HubConnection client, string methodName, OnlineProtocolMessage message, CancellationToken cancellationToken)
 {
     return await client.InvokeAsync<OnlineProtocolMessage>(methodName, message, cancellationToken);
+}
+
+static async Task<OnlineActionCommand?> BuildLegalActionCommandAsync(
+    HubConnection client,
+    AuthTokenResponse token,
+    string roomId,
+    string tableId,
+    OnlineSnapshot snapshot,
+    SmokeOptions options,
+    CancellationToken cancellationToken)
+{
+    if (!OnlineChess3DBoardSnapshotParser.TryParse(snapshot, out var board, out var parseError))
+    {
+        throw new InvalidOperationException($"Cannot build legal action: {parseError}");
+    }
+
+    var candidates = CandidateCellsForCurrentTurn(board).ToList();
+    if (candidates.Count == 0)
+    {
+        throw new InvalidOperationException("Cannot build legal action: current side has no occupied source cells.");
+    }
+
+    foreach (var cell in candidates)
+    {
+        var request = Message(OnlineMessageTypes.RequestLegalPreview, "smoke-client-a", token.PlayerId, roomId, tableId);
+        request.LegalPreviewRequest = new OnlineLegalPreviewRequest
+        {
+            PlayerId = token.PlayerId,
+            RoomId = roomId,
+            TableId = tableId,
+            SourceX = cell.X,
+            SourceY = cell.Y,
+            SourceZ = cell.Z,
+            ActorSide = cell.Side,
+            MacroPlayer = board.CurrentMacroPlayer,
+            ExpectedStateHash = snapshot.StateHash
+        };
+
+        OnlineProtocolMessage response;
+        try
+        {
+            response = await InvokeAsync(client, "RequestLegalPreview", request, cancellationToken);
+        }
+        catch (Exception ex) when (ex.Message.Contains("Method does not exist", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("STEP INFO legal-preview hub method unavailable; checking versioned smoke fallback action");
+            return LegacyFallbackAction(options, snapshot.StateHash);
+        }
+
+        if (response.Envelope.MessageType != OnlineMessageTypes.LegalPreviewResult || response.LegalPreview == null)
+        {
+            Console.WriteLine($"STEP INFO preview source={cell.Coordinate} side={cell.Side} skipped response={response.Envelope.MessageType} reason={response.Error?.ReasonCode}");
+            continue;
+        }
+
+        if (response.LegalPreview.IsStale)
+        {
+            throw new InvalidOperationException("Cannot build legal action: legal preview response was stale.");
+        }
+
+        var option = SelectSmokeActionOption(response.LegalPreview.Options);
+        if (option == null)
+        {
+            Console.WriteLine($"STEP INFO preview source={cell.Coordinate} side={cell.Side} has no submit-ready option reason={response.LegalPreview.NoLegalActionReason}");
+            continue;
+        }
+
+        Console.WriteLine(
+            "STEP PASS action-source=server-preview " +
+            $"source={cell.Coordinate} side={cell.Side} kind={option.ActionKind} " +
+            $"from=({option.From.X},{option.From.Y},{option.From.Z}) to=({option.To.X},{option.To.Y},{option.To.Z}) " +
+            $"label={option.DisplayLabel}");
+        return CommandFromOption(option, snapshot.StateHash);
+    }
+
+    throw new InvalidOperationException("Cannot build legal action: no legal preview option was available for the current turn.");
+}
+
+static OnlineActionCommand? LegacyFallbackAction(SmokeOptions options, string expectedStateHash)
+{
+    switch (options.RulesetId)
+    {
+        case "classic-six-side-3d-8x8x8-v0.1":
+        case "single-side-3d-8x8x8-v0.1":
+            return FallbackCommand(
+                expectedStateHash,
+                OnlineActionKinds.NormalMove,
+                actorSide: 1,
+                fromX: 4,
+                fromY: 4,
+                fromZ: 0,
+                toX: 3,
+                toY: 5,
+                toZ: 1);
+        case "asgard-convergence-3d-8x8x8-v0.1":
+            return FallbackCommand(
+                expectedStateHash,
+                OnlineActionKinds.NormalMove,
+                actorSide: 1,
+                fromX: options.FromX,
+                fromY: options.FromY,
+                fromZ: options.FromZ,
+                toX: options.ToX,
+                toY: options.ToY,
+                toZ: options.ToZ);
+        default:
+            Console.WriteLine($"STEP SKIP action-source=compat-fallback unsupported-profile={options.RulesetId}");
+            return null;
+    }
+}
+
+static OnlineActionCommand FallbackCommand(
+    string expectedStateHash,
+    string actionKind,
+    int actorSide,
+    int fromX,
+    int fromY,
+    int fromZ,
+    int toX,
+    int toY,
+    int toZ)
+{
+    var command = new OnlineActionCommand
+    {
+        ActionKind = actionKind,
+        ActorSide = actorSide,
+        ExpectedStateHashBefore = expectedStateHash,
+        FromX = fromX,
+        FromY = fromY,
+        FromZ = fromZ,
+        ToX = toX,
+        ToY = toY,
+        ToZ = toZ
+    };
+    Console.WriteLine(
+        "STEP INFO action-source=compat-fallback " +
+        $"kind={command.ActionKind} side={command.ActorSide} " +
+        $"from=({command.FromX},{command.FromY},{command.FromZ}) to=({command.ToX},{command.ToY},{command.ToZ})");
+    return command;
+}
+
+static IEnumerable<OnlineChess3DBoardCell> CandidateCellsForCurrentTurn(OnlineChess3DBoardSnapshot board)
+{
+    var currentSide = board.CurrentSide;
+    if (currentSide > 0)
+    {
+        foreach (var cell in board.OccupiedCells.Where(cell => cell.Side == currentSide))
+        {
+            yield return cell;
+        }
+    }
+
+    foreach (var cell in board.OccupiedCells.Where(cell => currentSide <= 0 || cell.Side != currentSide))
+    {
+        yield return cell;
+    }
+}
+
+static OnlineLegalActionOption? SelectSmokeActionOption(IReadOnlyList<OnlineLegalActionOption> options)
+{
+    return options
+        .Where(IsSubmitReadyAction)
+        .OrderByDescending(option => option.IsRecommendedSafeTestAction)
+        .ThenBy(option => option.ActionKind == OnlineActionKinds.NormalMove ? 0 : 1)
+        .ThenBy(option => option.IsCapture ? 1 : 0)
+        .ThenBy(option => option.IsSpecial ? 1 : 0)
+        .FirstOrDefault();
+}
+
+static bool IsSubmitReadyAction(OnlineLegalActionOption option)
+{
+    return option.ActionKind is OnlineActionKinds.NormalMove or
+        OnlineActionKinds.HodgeProjectedMove or
+        OnlineActionKinds.ReserveRestore or
+        OnlineActionKinds.RubikLayerTurn;
+}
+
+static OnlineActionCommand CommandFromOption(OnlineLegalActionOption option, string expectedStateHash)
+{
+    return new OnlineActionCommand
+    {
+        ActionKind = option.ActionKind,
+        ActorSide = option.ActorSide != 0 ? option.ActorSide : option.Side,
+        MacroPlayer = option.MacroPlayer,
+        ExpectedStateHashBefore = expectedStateHash,
+        FromX = option.From.X,
+        FromY = option.From.Y,
+        FromZ = option.From.Z,
+        ToX = option.To.X,
+        ToY = option.To.Y,
+        ToZ = option.To.Z,
+        PromotionType = option.PromotionType,
+        Side = option.Side,
+        PieceType = option.PieceType,
+        X = option.ReserveTarget.X,
+        Y = option.ReserveTarget.Y,
+        Z = option.ReserveTarget.Z,
+        PrimarySide = option.PrimarySide,
+        Axis = option.Axis,
+        Layer = option.Layer,
+        QuarterTurns = option.QuarterTurns
+    };
 }
 
 static OnlineProtocolMessage Message(string type, string clientId, string playerId, string roomId = "", string tableId = "")
