@@ -2,6 +2,8 @@
 
 Date: 2026-06-21
 
+Reachability refresh: 2026-06-27
+
 This is the current operator-facing map after the Next Era Linux dry-run, Chess2D portal audit, and stalled-area audit. Historical phase documents remain useful, but this page is the concise current-state entry point.
 
 ## Products
@@ -12,7 +14,7 @@ This is the current operator-facing map after the Next Era Linux dry-run, Chess2
 | Chess3DApp | Playable experimental Windows WPF app | Exactly five Chess3D RuleProfiles: Classic, Single-Side, Asgard, Rubik, Hodge. No sixth runtime mode exists. |
 | RubikApp | Playable Windows WPF app | Separate Rubik state/rotation product; not a Chess3D RuleProfile. |
 | ChessOnlineApp | Windows WPF online/integration hub | Account/portal/relay UI shell and local integration clients. |
-| ChessOnlineServer | Linux-capable ASP.NET Core authority | `net8.0` server package can run with Linux `libChess3DEngine.so`; Hetzner systemd + Nginx HTTP smoke passed. TLS/domain hardening is still missing. |
+| ChessOnlineServer | Linux-capable ASP.NET Core authority | `net8.0` server package can run with Linux `libChess3DEngine.so`; Hetzner systemd + loopback Nginx smoke works. External port 80 is currently blocked by firewall policy; TLS/domain hardening is still missing. |
 | Chess2DBenchmark | Native benchmark executable | Measures ordinary 2D legal move/search/evaluation hot paths. |
 
 ## Executables
@@ -62,13 +64,15 @@ Current proven state:
 - Package was installed under `/opt/chessonline/server`.
 - Runtime data/keyring/log directories exist under `/var/lib/chessonline` and `/var/log/chessonline`.
 - `chessonline.service` runs Kestrel on `127.0.0.1:5077`.
-- Nginx proxies public HTTP port 80 to Kestrel.
-- Public `/healthz/live`, `/healthz/ready`, and `/chess3d/diagnostics` probes passed.
+- Nginx is installed and proxies HTTP port 80 to Kestrel locally.
+- Phase 14 public `/healthz/live`, `/healthz/ready`, and `/chess3d/diagnostics` probes passed.
+- On 2026-06-27, loopback health still passed, but external TCP connect to port 80 timed out because `ufw` does not currently allow `80/tcp`.
 
 Still not production-complete:
 
 - no confirmed domain;
 - no TLS certificate;
+- no current external HTTP reachability on port 80;
 - no HTTPS-only auth/token policy;
 - no public authenticated SignalR smoke over HTTPS;
 - no rate limiting, log rotation, backup/restore rehearsal, or rollback package flow.
@@ -104,8 +108,8 @@ Scenario, smoke, playthrough, regression, deployment, identity, persistence, and
 
 ## Known Blockers
 
-1. TLS/domain and HTTPS auth enforcement.
-2. Public SignalR smoke over HTTPS.
+1. TLS/domain, firewall policy, and HTTPS auth enforcement.
+2. Public HTTP/HTTPS reachability and public SignalR smoke over HTTPS.
 3. Deployment rollback, backup/restore, and log rotation.
 4. Documentation reconciliation for old historical `draft`/`blocked` text.
 5. Chess2D PGN/SAN and UCI adapter.

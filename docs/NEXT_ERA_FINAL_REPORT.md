@@ -2,6 +2,8 @@
 
 Date: 2026-06-21
 
+Reachability refresh: 2026-06-27
+
 This report closes the current Next Era hardening sequence. It records what is actually proven, what is still only planned, and which work should come next.
 
 ## Executive status
@@ -44,11 +46,11 @@ The Hetzner server has a real Linux-native ChessOnlineServer dry-run path:
 - Mutable runtime state belongs under `/var/lib/chessonline`.
 - Runtime logs belong under `/var/log/chessonline`.
 
-This is not yet a hardened production deployment. It is a working single-server authority rehearsal with public HTTP diagnostics.
+This is not yet a hardened production deployment. It is a working single-server authority rehearsal with loopback health, systemd, and Nginx installed. Public HTTP reachability must be rechecked before any operator treats it as externally available.
 
 ## Public HTTP health result
 
-Fresh public HTTP probes against `http://178.105.220.117` returned:
+Phase 14 public HTTP probes against `http://<HETZNER_HOST>` returned:
 
 - `GET /healthz/live`: HTTP 200, `Healthy`.
 - `GET /healthz/ready`: HTTP 200, ready JSON with `profileCount: 5`, `authEnabled: true`, and `persistenceProvider: json`.
@@ -60,6 +62,18 @@ Fresh public HTTP probes against `http://178.105.220.117` returned:
   - `authorityIsSupported: true`
   - `authEnabled: true`
   - `persistenceProvider: json`
+
+Refresh on 2026-06-27:
+
+- Loopback health through SSH still works.
+- `chessonline.service` is still active/enabled.
+- Nginx is still active and `nginx -t` succeeds.
+- Nginx listens on `0.0.0.0:80`.
+- `ufw` is active and does not currently allow `80/tcp`.
+- External TCP connect to `<HETZNER_HOST>:80` timed out from the local workstation.
+- `<HETZNER_HOST>:443` is reachable, but it is owned by an existing non-Chess process, not ChessOnlineServer.
+
+Current conclusion: the server is alive internally, but external public HTTP for ChessOnlineServer is not currently reachable until the firewall/reverse-proxy/TLS plan is revisited.
 
 ## systemd status
 
@@ -83,8 +97,8 @@ The service runs Kestrel on loopback:
 Useful operator checks:
 
 ```powershell
-ssh -i "$env:USERPROFILE\.ssh\id_ed25519_hetzner" root@178.105.220.117 "systemctl status chessonline.service --no-pager"
-ssh -i "$env:USERPROFILE\.ssh\id_ed25519_hetzner" root@178.105.220.117 "journalctl -u chessonline.service -n 100 --no-pager"
+ssh -i "$env:USERPROFILE\.ssh\id_ed25519_hetzner" root@<HETZNER_HOST> "systemctl status chessonline.service --no-pager"
+ssh -i "$env:USERPROFILE\.ssh\id_ed25519_hetzner" root@<HETZNER_HOST> "journalctl -u chessonline.service -n 100 --no-pager"
 ```
 
 ## Nginx status
@@ -115,7 +129,7 @@ Reason:
 - No Let's Encrypt/Certbot run was performed.
 - No real certificates, private keys, tokens, passwords, runtime store, or Data Protection keyring files were committed.
 
-Current public HTTP must be treated as diagnostic/disposable only. Do not use real user credentials over public HTTP. The correct next step is P4E: domain, DNS, Certbot, HTTPS, renewal, firewall, backup/restore, and rollback rehearsal.
+Current public HTTP must be treated as not production-ready and, as of the 2026-06-27 refresh, not externally reachable on port 80 from the local workstation. Do not use real user credentials over public HTTP. The correct next step is P4E: domain, DNS, firewall policy, Certbot, HTTPS, renewal, backup/restore, and rollback rehearsal.
 
 ## SignalR / Asgard smoke status
 
@@ -162,6 +176,7 @@ The most important remaining technical debt groups are:
 
 - Linux CI/smoke coverage is not yet part of GitHub Actions.
 - TLS/domain/firewall/backup/restore/rollback are not complete.
+- External public HTTP reachability is currently blocked on `80/tcp` by firewall policy even though loopback health works.
 - Public HTTPS SignalR is not proven.
 - Online reconnect/resume/spectator UX is future work.
 - Asgard destructive fusion/implosion and richer reserve/core UI are future work.
@@ -239,6 +254,7 @@ The full verify built Release x64 outputs, checked assets/profiles/scenarios/mod
 
 1. P4E - TLS/domain/public deployment hardening:
    - DNS/domain confirmation.
+   - Decide how port 80 should be handled because `ufw` currently does not allow `80/tcp`.
    - Certbot/HTTPS.
    - Firewall.
    - Backup/restore.
