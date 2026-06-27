@@ -158,6 +158,28 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy\Test-HetznerSigna
   -NoSecretLog
 ```
 
+## P4F playable online client
+
+P4F adds a practical Windows client path in `ChessOnlineApp` for the same diagnostic HTTP 80 deployment.
+
+The UI now supports:
+
+- selecting the Hetzner HTTP endpoint;
+- checking `/healthz/live`, `/healthz/ready`, and `/chess3d/diagnostics`;
+- creating temporary test users without printing tokens or passwords;
+- connecting SignalR clients;
+- selecting one of the five real Chess3D RuleProfiles;
+- creating a two-local-client test match;
+- ready/start/snapshot/action-log flow;
+- submitting the known safe Asgard test action;
+- saving a sanitized session report under ignored `.tmp/manual-smoke`.
+
+Operator guide:
+
+- `docs/P4F_PLAYABLE_ONLINE_USER_GUIDE.md`
+
+This is still a diagnostic/dev client path. Do not use real credentials over HTTP; TLS/domain/443 remain deferred.
+
 ## Test runner status
 
 The old failure mode was an unbounded PowerShell/process runner path where a requested short timeout still allowed commands to hang for hours. That path is no longer trusted.

@@ -13,7 +13,7 @@ This is the current operator-facing map after the Next Era Linux dry-run, Chess2
 | Chess2D / Chess Advisor | Playable Windows WPF app | Ordinary 8x8 chess engine with legal moves, FEN, draw status, search, and 3D model view. Portal integration is audited but not implemented. |
 | Chess3DApp | Playable experimental Windows WPF app | Exactly five Chess3D RuleProfiles: Classic, Single-Side, Asgard, Rubik, Hodge. No sixth runtime mode exists. |
 | RubikApp | Playable Windows WPF app | Separate Rubik state/rotation product; not a Chess3D RuleProfile. |
-| ChessOnlineApp | Windows WPF online/integration hub | Account/portal/relay UI shell and local integration clients. |
+| ChessOnlineApp | Playable Windows WPF online client MVP | Account/portal/relay UI shell plus P4F server connection, temp auth, matchmaking, snapshot, action log, and safe Asgard action flow over diagnostic HTTP 80. |
 | ChessOnlineServer | Linux-capable ASP.NET Core authority | `net8.0` server package can run with Linux `libChess3DEngine.so`; Hetzner systemd + Nginx external HTTP health and SignalR Asgard smoke work. TLS/domain hardening is still missing. |
 | Chess2DBenchmark | Native benchmark executable | Measures ordinary 2D legal move/search/evaluation hot paths. |
 
@@ -67,6 +67,7 @@ Current proven state:
 - Nginx is installed and proxies HTTP port 80 to Kestrel locally.
 - Phase 14 public `/healthz/live`, `/healthz/ready`, and `/chess3d/diagnostics` probes passed.
 - On 2026-06-27, `ufw` allowed `80/tcp`, external HTTP health/diagnostics passed, and public HTTP SignalR/Asgard smoke passed through `scripts/deploy/Test-HetznerSignalRMatchmaking.ps1`.
+- P4F added a hands-on `ChessOnlineApp` client path for the same public HTTP server: health, diagnostics, temporary users, matchmaking, snapshot, action log, and a safe Asgard action.
 
 Still not production-complete:
 
@@ -74,6 +75,7 @@ Still not production-complete:
 - no TLS certificate;
 - no HTTPS-only auth/token policy;
 - no public authenticated SignalR smoke over HTTPS;
+- no reconnect/resume/spectator UX;
 - no rate limiting, log rotation, backup/restore rehearsal, or rollback package flow.
 
 ## Game Modes

@@ -50,6 +50,38 @@ The script writes ignored logs under:
 
 It generates temporary users and passwords at runtime and does not print access or refresh tokens.
 
+## Playable Windows Client
+
+P4F adds a hands-on Windows client path in:
+
+```text
+src/ChessOnlineApp
+```
+
+Build and run:
+
+```powershell
+dotnet build src\ChessOnlineApp\ChessOnlineApp.csproj -c Release -p:Platform=x64
+.\src\ChessOnlineApp\bin\x64\Release\net8.0-windows\ChessOnlineApp.exe
+```
+
+In the app:
+
+1. Click `Use Hetzner HTTP`.
+2. Click `Check Health`.
+3. Click `Check Diagnostics`.
+4. Click `Create Two Test Players`.
+5. Select `asgard-convergence-3d-8x8x8-v0.1`.
+6. Click `Create Test Match With Two Local Clients`.
+7. Click `Ready Both`.
+8. Click `Start Game`.
+9. Click `Request Snapshot`.
+10. Click `Submit Safe Asgard Test Action`.
+11. Click `Request Action Log`.
+12. Click `Save Session Report`.
+
+See `docs/P4F_PLAYABLE_ONLINE_USER_GUIDE.md` for the full operator flow.
+
 ## Dry run
 
 ```powershell
