@@ -319,3 +319,13 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | Server-authoritative move submit | Existing `OnlineActionCommand` and `OnlineGameSession.TryApply` | The protocol already supports `NormalMove` with source/target coordinates and expected state hash. | Add From/To selection controls to the P4G board and submit normal moves to the server without local mutation. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs`, `docs/P4G_ONLINE_CLICK_TO_MOVE_MVP.md` | Build `ChessOnlineApp`; remote/manual smoke remains operator-driven. |
 | Honest legal preview boundary | Existing P4G audit | Online legal preview is not exposed yet, so the client must show server rejection text instead of pretending to know legality. | Keep the first click-to-move path as server-accepted/rejected MVP; legal target highlighting is a later append-only protocol step. | `docs/P4G_ONLINE_CLICK_TO_MOVE_MVP.md` | Build app; no protocol change. |
+
+## P4G2 Phase 00 - Current Online Playability Baseline
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Desktop SignalR client baseline | Microsoft Learn, "ASP.NET Core SignalR .NET client": https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | The .NET client is the supported desktop path for async hub calls and callbacks. | Keep P4G2 on `ChessOnlineApp` + `ChessOnlineClient` and measure current playability before adding legal preview. | `docs/P4G2_CURRENT_PLAYABILITY_BASELINE.md` | Public HTTP health, smoke, app build. |
+| Public HTTP security boundary | Microsoft Learn, "Security considerations in ASP.NET Core SignalR": https://learn.microsoft.com/en-us/aspnet/core/signalr/security | Public HTTP with auth tokens is diagnostic-only and requires careful log redaction. | Keep HTTP 80 for dev smoke only; use temp users; do not log tokens/passwords; leave TLS/443 deferred. | `docs/P4G2_CURRENT_PLAYABILITY_BASELINE.md` | Smoke with `-NoSecretLog`; no secrets committed. |
+| WPF incremental playability | Microsoft Learn, WPF data binding overview: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/data/ | WPF UI can evolve through view state and bindings/controls without a large rewrite. | Treat the P4G board renderer as a stepping stone toward legal target/turn UI, not as a finished game UX. | `docs/P4G2_CURRENT_PLAYABILITY_BASELINE.md` | `dotnet build src\ChessOnlineApp\ChessOnlineApp.csproj -c Release -p:Platform=x64`. |
