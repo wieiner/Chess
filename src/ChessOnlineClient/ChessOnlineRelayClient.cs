@@ -26,6 +26,8 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
 
     public OnlineMatchmakingStatus? LastMatchmakingStatus { get; private set; }
 
+    public event Action<string, OnlineProtocolMessage>? MessageReceived;
+
     public static HubConnection CreateHubConnection(ChessOnlineServerEndpoint endpoint, Func<string> accessTokenProvider)
     {
         return new HubConnectionBuilder()
@@ -159,6 +161,7 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
         {
             LastMatchmakingStatus = message.MatchmakingStatus;
         }
+        MessageReceived?.Invoke(label, message);
     }
 }
 

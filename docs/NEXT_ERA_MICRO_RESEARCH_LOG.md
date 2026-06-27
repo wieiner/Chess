@@ -301,3 +301,12 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | WPF board surface | Microsoft Learn, WPF `UniformGrid` and panel layout docs: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/panels-overview | A compact grid can render a first board slice without embedding the full local `Chess3DWindow`. | Add a `P4G Realtime Board Snapshot` slice grid to `ChessOnlineApp`. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs`, `docs/P4G_ONLINE_BOARD_RENDERER.md` | Build `ChessOnlineApp`; no remote smoke in CI. |
 | Authoritative refresh | Existing P4F SignalR action/snapshot flow | Accepted actions already return action-log data, and the client can request a fresh snapshot immediately after acceptance. | Refresh the online board from server snapshot after safe Asgard action acceptance instead of mutating locally. | `src/ChessOnlineApp/MainWindow.xaml.cs` | Build app and remote smoke remains manual/operator. |
+
+## P4G Phase 04 - Realtime Board Event Sync
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Test/verify plan |
+| --- | --- | --- | --- | --- | --- |
+| SignalR callback surfacing | Microsoft Learn, "ASP.NET Core SignalR .NET client": https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | Hub callbacks are the correct desktop client mechanism for receiving pushed server state. | Expose `ChessOnlineRelayClient.MessageReceived` and let `ChessOnlineApp` react to `Receive*` callbacks. | `src/ChessOnlineClient/ChessOnlineRelayClient.cs`, `src/ChessOnlineApp/MainWindow.xaml.cs`, `docs/P4G_REALTIME_BOARD_EVENT_SYNC.md` | Build client/app; no remote smoke in CI. |
+| Authoritative board sync | Existing `OnlineSnapshot.SaveGameJson` contract | Snapshot-bearing pushed events can redraw the online board without local engine mutation. | Parse snapshots from server callbacks and append action-log event notation, keeping direct Invoke results separate. | `src/ChessOnlineApp/MainWindow.xaml.cs` | Build app and keep P4F direct button flow intact. |

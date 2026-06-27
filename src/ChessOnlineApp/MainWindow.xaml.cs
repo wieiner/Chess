@@ -740,6 +740,8 @@ public partial class MainWindow : Window
 
             _p4fPrimaryRelay = new ChessOnlineRelayClient(_p4fPrimarySession!);
             _p4fSecondaryRelay = new ChessOnlineRelayClient(_p4fSecondarySession!);
+            _p4fPrimaryRelay.MessageReceived += P4FRelayMessageReceived;
+            _p4fSecondaryRelay.MessageReceived += P4FRelayMessageReceived;
             await _p4fPrimaryRelay.ConnectAsync();
             await _p4fSecondaryRelay.ConnectAsync();
             await _p4fPrimaryRelay.HelloAsync("p4f-client-a");
@@ -1085,6 +1087,35 @@ public partial class MainWindow : Window
         }
         RenderP4GBoard();
         UpdateP4FActionCounters();
+    }
+
+    private void P4FRelayMessageReceived(string label, OnlineProtocolMessage message)
+    {
+        if (!label.StartsWith("Receive", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Dispatcher.Invoke(() =>
+        {
+            RememberP4FServerSeq(message);
+            if (message.Snapshot != null)
+            {
+                RememberP4FSnapshot(message);
+            }
+            if (message.ActionLog?.Events.Count > 0)
+            {
+                foreach (var actionEvent in message.ActionLog.Events)
+                {
+                    var line = $"event seq={actionEvent.ServerSeq} {actionEvent.Notation}";
+                    if (!P4FActionLogList.Items.Contains(line))
+                    {
+                        P4FActionLogList.Items.Add(line);
+                    }
+                }
+            }
+            Log($"P4G realtime event {label}: {message.Envelope.MessageType} seq={message.Envelope.ServerSeq}");
+        });
     }
 
     private void P4GRefreshBoard_Click(object sender, RoutedEventArgs e)
