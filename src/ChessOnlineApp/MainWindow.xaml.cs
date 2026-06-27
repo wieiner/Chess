@@ -22,6 +22,10 @@ public partial class MainWindow : Window
     private string _p3fSessionToken = "";
     private ChessOnlineClientSession? _p4fPrimarySession;
     private ChessOnlineClientSession? _p4fSecondarySession;
+    private ChessOnlineRelayClient? _p4fPrimaryRelay;
+    private ChessOnlineRelayClient? _p4fSecondaryRelay;
+    private string _p4fRoomId = "";
+    private string _p4fTableId = "";
     private const string P4FHetznerHttpBaseUrl = "http://178.105.220.117";
 
     public MainWindow()
@@ -44,6 +48,14 @@ public partial class MainWindow : Window
         if (_p3fConnection != null)
         {
             _p3fConnection.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+        if (_p4fPrimaryRelay != null)
+        {
+            _p4fPrimaryRelay.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+        if (_p4fSecondaryRelay != null)
+        {
+            _p4fSecondaryRelay.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
         base.OnClosed(e);
     }
@@ -529,10 +541,17 @@ public partial class MainWindow : Window
 
     private void P4FClearSession_Click(object sender, RoutedEventArgs e)
     {
+        _p4fPrimaryRelay?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        _p4fSecondaryRelay?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        _p4fPrimaryRelay = null;
+        _p4fSecondaryRelay = null;
         _p4fPrimarySession = null;
         _p4fSecondarySession = null;
         _p3fSessionToken = "";
+        _p4fRoomId = "";
+        _p4fTableId = "";
         P4FAuthPasswordBox.Password = "";
+        P4FMatchStatusText.Text = "Match status: none.";
         UpdateP4FAuthStatus("Session cleared.");
     }
 
@@ -694,6 +713,116 @@ public partial class MainWindow : Window
         await P3FInvokeAsync("GetMatchmakingStatus", P3FMessage(OnlineMessageTypes.GetMatchmakingStatus));
     }
 
+    private async void P4FCreateTestMatch_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await EnsureP4FTwoSessionsAsync();
+            await ResetP4FRelaysAsync();
+
+            _p4fPrimaryRelay = new ChessOnlineRelayClient(_p4fPrimarySession!);
+            _p4fSecondaryRelay = new ChessOnlineRelayClient(_p4fSecondarySession!);
+            await _p4fPrimaryRelay.ConnectAsync();
+            await _p4fSecondaryRelay.ConnectAsync();
+            await _p4fPrimaryRelay.HelloAsync("p4f-client-a");
+            await _p4fSecondaryRelay.HelloAsync("p4f-client-b");
+
+            var rulesetId = SelectedP3FMatchmakingRuleset();
+            var queued = await _p4fPrimaryRelay.JoinMatchmakingAsync("p4f-client-a", rulesetId);
+            var found = await _p4fSecondaryRelay.JoinMatchmakingAsync("p4f-client-b", rulesetId);
+            var status = found.MatchmakingStatus ?? queued.MatchmakingStatus ?? _p4fSecondaryRelay.LastMatchmakingStatus;
+            if (found.Envelope.MessageType != OnlineMessageTypes.MatchFound || status == null)
+            {
+                throw new InvalidOperationException($"Matchmaking did not produce MatchFound: {found.Error?.ReasonCode} {found.Error?.ReasonText}".Trim());
+            }
+
+            _p4fRoomId = status.RoomId;
+            _p4fTableId = status.TableId;
+            P3ERoomBox.Text = _p4fRoomId;
+            P3ETableBox.Text = _p4fTableId;
+            P4FMatchStatusText.Text = $"MatchFound ruleset={rulesetId} room={_p4fRoomId} table={_p4fTableId} primary={ShortId(_p4fPrimarySession!.PlayerId)} secondary={ShortId(_p4fSecondarySession!.PlayerId)}";
+            Log($"P4F {P4FMatchStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4FMatchStatusText.Text = $"Create test match failed: {ex.Message}";
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private async void P4FReadyBoth_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            EnsureP4FMatchReady();
+            await _p4fPrimaryRelay!.ReadyAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
+            await _p4fSecondaryRelay!.ReadyAsync("p4f-client-b", _p4fRoomId, _p4fTableId);
+            P4FMatchStatusText.Text = $"Ready both: room={_p4fRoomId} table={_p4fTableId}";
+            Log($"P4F {P4FMatchStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4FMatchStatusText.Text = $"Ready both failed: {ex.Message}";
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private async void P4FStartGame_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            EnsureP4FMatchReady();
+            var started = await _p4fPrimaryRelay!.StartGameAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
+            P4FMatchStatusText.Text = $"Started: {started.Envelope.MessageType} ruleset={started.Snapshot?.RulesetId} hash={started.Snapshot?.StateHash}";
+            Log($"P4F {P4FMatchStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4FMatchStatusText.Text = $"Start failed: {ex.Message}";
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private async void P4FRequestSnapshot_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            EnsureP4FMatchReady();
+            var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
+            P4FMatchStatusText.Text = $"Snapshot: ruleset={snapshot.Snapshot?.RulesetId} seq={snapshot.Envelope.ServerSeq} actions={snapshot.Snapshot?.ActionCount} hash={snapshot.Snapshot?.StateHash}";
+            Log($"P4F {P4FMatchStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4FMatchStatusText.Text = $"Snapshot failed: {ex.Message}";
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private async void P4FRequestActionLog_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            EnsureP4FMatchReady();
+            var actionLog = await _p4fPrimaryRelay!.RequestActionLogAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
+            var count = actionLog.ActionLog?.Events.Count ?? 0;
+            P4FMatchStatusText.Text = $"ActionLog: seq={actionLog.Envelope.ServerSeq} events={count}";
+            Log($"P4F {P4FMatchStatusText.Text}");
+            if (actionLog.ActionLog != null)
+            {
+                foreach (var actionEvent in actionLog.ActionLog.Events)
+                {
+                    Log($"P4F event #{actionEvent.ServerSeq}: {actionEvent.Notation} hash={actionEvent.StateHashAfter}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            P4FMatchStatusText.Text = $"Action log failed: {ex.Message}";
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
     private ChessOnlineServerEndpoint ResolveP4FEndpoint()
     {
         var baseUrl = P4FBaseUrlBox.Text.Trim();
@@ -740,6 +869,53 @@ public partial class MainWindow : Window
     private static string ShortId(string value)
     {
         return value.Length <= 8 ? value : value[..8];
+    }
+
+    private async Task EnsureP4FTwoSessionsAsync()
+    {
+        if (_p4fPrimarySession?.IsAuthenticated == true && _p4fSecondarySession?.IsAuthenticated == true)
+        {
+            return;
+        }
+
+        var endpoint = ResolveP4FEndpoint();
+        using var http = CreateP4FHttpClient(endpoint);
+        var auth = new ChessOnlineAuthClient(http, endpoint);
+        var tokenA = await auth.RegisterTemporaryUserAsync("p4f_a", "ChessOnlineApp-P4F-A");
+        var tokenB = await auth.RegisterTemporaryUserAsync("p4f_b", "ChessOnlineApp-P4F-B");
+        RequireSuccessfulAuth(tokenA, "register player A");
+        RequireSuccessfulAuth(tokenB, "register player B");
+        _p4fPrimarySession = new ChessOnlineClientSession(endpoint, "ChessOnlineApp-P4F-A");
+        _p4fSecondarySession = new ChessOnlineClientSession(endpoint, "ChessOnlineApp-P4F-B");
+        _p4fPrimarySession.SetToken(tokenA);
+        _p4fSecondarySession.SetToken(tokenB);
+        UpdateP4FAuthStatus($"Two temporary players ready: A={ShortId(tokenA.PlayerId)} B={ShortId(tokenB.PlayerId)}.");
+    }
+
+    private async Task ResetP4FRelaysAsync()
+    {
+        if (_p4fPrimaryRelay != null)
+        {
+            await _p4fPrimaryRelay.DisposeAsync();
+            _p4fPrimaryRelay = null;
+        }
+        if (_p4fSecondaryRelay != null)
+        {
+            await _p4fSecondaryRelay.DisposeAsync();
+            _p4fSecondaryRelay = null;
+        }
+        _p4fRoomId = "";
+        _p4fTableId = "";
+    }
+
+    private void EnsureP4FMatchReady()
+    {
+        if (_p4fPrimaryRelay == null || _p4fSecondaryRelay == null ||
+            string.IsNullOrWhiteSpace(_p4fRoomId) ||
+            string.IsNullOrWhiteSpace(_p4fTableId))
+        {
+            throw new InvalidOperationException("Create a two-client test match first.");
+        }
     }
 
     private void ApplyP4FEndpointToHubUrl()
