@@ -263,3 +263,13 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | Operator smoke boundary | Existing `tools/HetznerSignalRSmoke` and P4F UI code | The command-line smoke remains the fastest reliable proof of remote auth/SignalR/matchmaking/action. | Run the public HTTP Asgard smoke after the UI MVP code and record sanitized results. | `docs/P4F_MANUAL_HETZNER_UI_SMOKE_RESULT.md` | Smoke PASS with `-NoSecretLog`; WPF click path remains manual. |
 | Manual UI validation | Microsoft Learn, WPF layout overview: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/layout | WPF manual workflows should be documented when screenshot automation is out of scope. | Document exact click path rather than adding fragile UI automation. | `docs/P4F_MANUAL_HETZNER_UI_SMOKE_RESULT.md` | Local build plus operator manual smoke. |
+
+## P4G Phase 00 - Realtime Online Board Baseline
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Test/verify plan |
+| --- | --- | --- | --- | --- | --- |
+| P4F reality check | Existing `docs/P4F_PLAYABLE_ONLINE_CLIENT_FINAL_REPORT.md` and current `gh run list` | P4F ended green with a diagnostic UI path, but the board is still a compact snapshot/action viewer rather than a realtime playable board. | Start P4G from `7bbe1acc` and explicitly target board rendering, selection, preview, and server action dispatch. | `docs/P4G_REALTIME_ONLINE_BOARD_BASELINE.md` | `gh run list`, P4F smoke, `curl.exe` health checks. |
+| Public HTTP SignalR boundary | Microsoft Learn, "Security considerations in ASP.NET Core SignalR": https://learn.microsoft.com/en-us/aspnet/core/signalr/security | Public HTTP token-bearing SignalR is acceptable only as a diagnostic/dev path; tokens must not be logged and real passwords must not be used. | Keep P4G over HTTP 80 for hands-on testing only; leave TLS/domain/443 and x-ui/Xray untouched. | `docs/P4G_REALTIME_ONLINE_BOARD_BASELINE.md` | Smoke with `-NoSecretLog`; no remote smoke in CI. |
+| Desktop realtime client path | Microsoft Learn, "ASP.NET Core SignalR .NET client": https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | The .NET SignalR client supports desktop apps, hub method calls, callbacks, and async flow needed for realtime board sync. | Continue incrementally in `ChessOnlineApp` and `src/ChessOnlineClient` instead of embedding or rewriting the full local Chess3D UI immediately. | `docs/P4G_REALTIME_ONLINE_BOARD_BASELINE.md` | Phase 01 audit before code changes. |
