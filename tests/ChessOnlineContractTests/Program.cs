@@ -63,6 +63,109 @@ static void ProtocolRoundtripTests(ContractTest test)
     var oversized = new string('x', OnlineProtocolVersion.MaxMessageBytes + 1);
     test.Check(!OnlineProtocolJson.TryDeserialize(oversized, out _, out error) &&
         error.ReasonCode == OnlineRejectReasons.OversizedMessage, "oversized message is rejected");
+
+    var emptyPreview = OnlineProtocolJson.Wrap(OnlineMessageTypes.LegalPreviewResult, "client-a", "player-a");
+    emptyPreview.LegalPreview = new OnlineLegalPreviewResult
+    {
+        RoomId = "room-a",
+        TableId = "table-a",
+        RulesetId = "classic-six-side-3d-8x8x8-v0.1",
+        StateHash = "hash-a",
+        SourceX = 0,
+        SourceY = 0,
+        SourceZ = 0,
+        ActorSide = 1,
+        NoLegalActionReason = "empty source"
+    };
+    var emptyPreviewJson = OnlineProtocolJson.Serialize(emptyPreview);
+    test.Check(OnlineProtocolJson.TryDeserialize(emptyPreviewJson, out var parsedEmptyPreview, out error) &&
+        parsedEmptyPreview.Envelope.MessageType == OnlineMessageTypes.LegalPreviewResult &&
+        parsedEmptyPreview.LegalPreview?.Options.Count == 0 &&
+        parsedEmptyPreview.LegalPreview.NoLegalActionReason.Contains("empty", StringComparison.OrdinalIgnoreCase),
+        "empty legal preview result serializes");
+
+    var previewRequest = OnlineProtocolJson.Wrap(OnlineMessageTypes.RequestLegalPreview, "client-a", "player-a");
+    previewRequest.LegalPreviewRequest = new OnlineLegalPreviewRequest
+    {
+        PlayerId = "player-a",
+        RoomId = "room-a",
+        TableId = "table-a",
+        SourceX = 2,
+        SourceY = 3,
+        SourceZ = 0,
+        ActorSide = 1,
+        ExpectedStateHash = "hash-a"
+    };
+    var previewRequestJson = OnlineProtocolJson.Serialize(previewRequest);
+    test.Check(OnlineProtocolJson.TryDeserialize(previewRequestJson, out var parsedPreviewRequest, out error) &&
+        parsedPreviewRequest.Envelope.MessageType == OnlineMessageTypes.RequestLegalPreview &&
+        parsedPreviewRequest.LegalPreviewRequest?.SourceX == 2 &&
+        parsedPreviewRequest.LegalPreviewRequest.ExpectedStateHash == "hash-a",
+        "legal preview request serializes");
+
+    var preview = OnlineProtocolJson.Wrap(OnlineMessageTypes.LegalPreviewResult, "client-a", "player-a");
+    preview.LegalPreview = new OnlineLegalPreviewResult
+    {
+        RoomId = "room-a",
+        TableId = "table-a",
+        RulesetId = "asgard-convergence-3d-8x8x8-v0.1",
+        StateHash = "hash-b",
+        ServerSeq = 42,
+        SourceX = 2,
+        SourceY = 3,
+        SourceZ = 0,
+        ActorSide = 1,
+        Options =
+        {
+            new OnlineLegalActionOption
+            {
+                ActionKind = OnlineActionKinds.NormalMove,
+                ActorSide = 1,
+                From = new OnlineLegalTarget { X = 2, Y = 3, Z = 0 },
+                To = new OnlineLegalTarget { X = 2, Y = 3, Z = 1 },
+                DisplayLabel = "S1P (2,3,0)->(2,3,1)",
+                PieceCode = 11
+            },
+            new OnlineLegalActionOption
+            {
+                ActionKind = OnlineActionKinds.RubikLayerTurn,
+                ActorSide = 1,
+                Axis = 0,
+                Layer = 0,
+                QuarterTurns = 1,
+                IsSpecial = true,
+                Capability = "layerTurn"
+            },
+            new OnlineLegalActionOption
+            {
+                ActionKind = OnlineActionKinds.HodgeProjectedMove,
+                ActorSide = 1,
+                MacroPlayer = 1,
+                PrimarySide = 1,
+                From = new OnlineLegalTarget { X = 2, Y = 3, Z = 0 },
+                To = new OnlineLegalTarget { X = 2, Y = 3, Z = 1 },
+                IsSpecial = true,
+                Capability = "projectionComposite"
+            },
+            new OnlineLegalActionOption
+            {
+                ActionKind = OnlineActionKinds.ReserveRestore,
+                Side = 1,
+                PieceType = 1,
+                ReserveTarget = new OnlineLegalTarget { X = 0, Y = 0, Z = 0 },
+                IsSpecial = true,
+                Capability = "reserveRestore"
+            }
+        }
+    };
+    var previewJson = OnlineProtocolJson.Serialize(preview);
+    test.Check(OnlineProtocolJson.TryDeserialize(previewJson, out var parsedPreview, out error) &&
+        parsedPreview.LegalPreview?.Options.Count == 4 &&
+        parsedPreview.LegalPreview.Options.Any(o => o.ActionKind == OnlineActionKinds.NormalMove && o.To.Z == 1) &&
+        parsedPreview.LegalPreview.Options.Any(o => o.ActionKind == OnlineActionKinds.RubikLayerTurn && o.Layer == 0) &&
+        parsedPreview.LegalPreview.Options.Any(o => o.ActionKind == OnlineActionKinds.HodgeProjectedMove && o.PrimarySide == 1) &&
+        parsedPreview.LegalPreview.Options.Any(o => o.ActionKind == OnlineActionKinds.ReserveRestore && o.ReserveTarget.X == 0),
+        "legal preview options represent normal, Rubik, Hodge, and reserve actions");
 }
 
 static void OnlineClientSdkTests(ContractTest test)

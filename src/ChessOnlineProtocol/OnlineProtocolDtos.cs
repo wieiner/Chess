@@ -25,6 +25,7 @@ public static class OnlineMessageTypes
     public const string RequestSnapshot = "RequestSnapshot";
     public const string RequestActionLog = "RequestActionLog";
     public const string RequestDiagnostics = "RequestDiagnostics";
+    public const string RequestLegalPreview = "RequestLegalPreview";
     public const string JoinMatchmaking = "JoinMatchmaking";
     public const string CancelMatchmaking = "CancelMatchmaking";
     public const string GetMatchmakingStatus = "GetMatchmakingStatus";
@@ -44,6 +45,7 @@ public static class OnlineMessageTypes
     public const string ActionRejected = "ActionRejected";
     public const string AuthoritativeSnapshot = "AuthoritativeSnapshot";
     public const string ActionLogChunk = "ActionLogChunk";
+    public const string LegalPreviewResult = "LegalPreviewResult";
     public const string ResyncRequired = "ResyncRequired";
     public const string Pong = "Pong";
     public const string Error = "Error";
@@ -116,6 +118,8 @@ public sealed class OnlineProtocolMessage
     public OnlineTableCommand? Table { get; set; }
     public OnlineSnapshot? Snapshot { get; set; }
     public OnlineActionLogChunk? ActionLog { get; set; }
+    public OnlineLegalPreviewRequest? LegalPreviewRequest { get; set; }
+    public OnlineLegalPreviewResult? LegalPreview { get; set; }
     public OnlineMatchmakingCommand? Matchmaking { get; set; }
     public OnlineMatchmakingStatus? MatchmakingStatus { get; set; }
     public OnlineDiagnostics? Diagnostics { get; set; }
@@ -201,6 +205,80 @@ public sealed class OnlineActionCommand
     public int TimeLimitMs { get; set; }
 }
 
+public sealed class OnlineLegalPreviewRequest
+{
+    public string PlayerId { get; set; } = "";
+    public string RoomId { get; set; } = "";
+    public string TableId { get; set; } = "";
+    public int SourceX { get; set; }
+    public int SourceY { get; set; }
+    public int SourceZ { get; set; }
+    public int ActorSide { get; set; }
+    public int MacroPlayer { get; set; }
+    public string ExpectedStateHash { get; set; } = "";
+    public string ActionKindFilter { get; set; } = "";
+}
+
+public sealed class OnlineLegalPreviewResult
+{
+    public string RoomId { get; set; } = "";
+    public string TableId { get; set; } = "";
+    public string RulesetId { get; set; } = "";
+    public string StateHash { get; set; } = "";
+    public long ServerSeq { get; set; }
+    public int SourceX { get; set; }
+    public int SourceY { get; set; }
+    public int SourceZ { get; set; }
+    public int ActorSide { get; set; }
+    public int MacroPlayer { get; set; }
+    public bool IsStale { get; set; }
+    public string NoLegalActionReason { get; set; } = "";
+    public List<OnlineLegalActionOption> Options { get; set; } = new();
+    public OnlineLegalPreviewError? Error { get; set; }
+}
+
+public sealed class OnlineLegalActionOption
+{
+    public string ActionKind { get; set; } = "";
+    public int ActorSide { get; set; }
+    public int MacroPlayer { get; set; }
+    public OnlineLegalTarget From { get; set; } = new();
+    public OnlineLegalTarget To { get; set; } = new();
+    public int PromotionType { get; set; }
+    public int Side { get; set; }
+    public int PieceType { get; set; }
+    public OnlineLegalTarget ReserveTarget { get; set; } = new();
+    public int PrimarySide { get; set; }
+    public int Axis { get; set; }
+    public int Layer { get; set; }
+    public int QuarterTurns { get; set; }
+    public string Notation { get; set; } = "";
+    public string DisplayLabel { get; set; } = "";
+    public string Reason { get; set; } = "";
+    public string Capability { get; set; } = "";
+    public int Flags { get; set; }
+    public int PieceCode { get; set; }
+    public int CapturedPieceCode { get; set; }
+    public int ReasonCode { get; set; }
+    public bool IsCapture { get; set; }
+    public bool IsSpecial { get; set; }
+    public bool IsRecommendedSafeTestAction { get; set; }
+}
+
+public sealed class OnlineLegalTarget
+{
+    public int X { get; set; }
+    public int Y { get; set; }
+    public int Z { get; set; }
+}
+
+public sealed class OnlineLegalPreviewError
+{
+    public string ReasonCode { get; set; } = OnlineRejectReasons.None;
+    public string ReasonText { get; set; } = "";
+    public bool RequiresResync { get; set; }
+}
+
 public sealed class OnlineActionEvent
 {
     public long ServerSeq { get; set; }
@@ -270,6 +348,11 @@ public sealed class OnlineDiagnostics
 [JsonSerializable(typeof(OnlineProtocolMessage))]
 [JsonSerializable(typeof(OnlineMessageEnvelope))]
 [JsonSerializable(typeof(OnlineActionCommand))]
+[JsonSerializable(typeof(OnlineLegalPreviewRequest))]
+[JsonSerializable(typeof(OnlineLegalPreviewResult))]
+[JsonSerializable(typeof(OnlineLegalActionOption))]
+[JsonSerializable(typeof(OnlineLegalTarget))]
+[JsonSerializable(typeof(OnlineLegalPreviewError))]
 [JsonSerializable(typeof(OnlineActionEvent))]
 [JsonSerializable(typeof(OnlineSnapshot))]
 [JsonSerializable(typeof(OnlineActionLogChunk))]
