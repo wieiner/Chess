@@ -321,6 +321,20 @@
                     <Separator Margin="0,18,0,14" Background="#2B3746" />
                     <TextBlock Text="P3F hosted SignalR transport" FontSize="16" FontWeight="SemiBold" />
                     <TextBlock Text="Hosted/local SignalR server over the same P3E authority registry. P4B adds authenticated matchmaking MVP for single-server smoke; it is still not public ranked matchmaking or cloud deployment." Foreground="#AFC0D0" TextWrapping="Wrap" Margin="0,4,0,10" />
+                    <Border Background="#111923" BorderBrush="#2B3746" BorderThickness="1" Padding="10" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="Server Connection" FontWeight="SemiBold" />
+                            <TextBlock Text="HTTP 80 is diagnostic/dev only. Do not enter real passwords until TLS is enabled." Foreground="#FFCF8A" TextWrapping="Wrap" Margin="0,4,0,8" />
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Base URL" Width="64" />
+                                <TextBox x:Name="P4FBaseUrlBox" Text="http://&lt;HETZNER_HOST&gt;" Width="260" />
+                                <Button Content="Use Hetzner HTTP" Click="P4FUseHetznerHttp_Click" />
+                                <Button Content="Check Health" Click="P4FCheckHealth_Click" />
+                                <Button Content="Check Diagnostics" Click="P4FCheckDiagnostics_Click" />
+                            </StackPanel>
+                            <TextBlock x:Name="P4FServerStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Server status idle." />
+                        </StackPanel>
+                    </Border>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Hub URL" Width="64" />
                         <TextBox x:Name="P3FServerUrlBox" Text="http://127.0.0.1:5077/chess3d/relay" Width="330" />

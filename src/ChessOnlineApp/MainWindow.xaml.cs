@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Net.Http;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using ChessApp;
+using ChessOnlineClient;
 using ChessOnlineProtocol;
 using Microsoft.AspNetCore.SignalR.Client;
 
@@ -18,6 +20,7 @@ public partial class MainWindow : Window
     private Chess3DInternetRelayClient? _relayClient;
     private HubConnection? _p3fConnection;
     private string _p3fSessionToken = "";
+    private const string P4FHetznerHttpBaseUrl = "http://178.105.220.117";
 
     public MainWindow()
     {
@@ -370,6 +373,57 @@ public partial class MainWindow : Window
         Log(json);
     }
 
+    private void P4FUseHetznerHttp_Click(object sender, RoutedEventArgs e)
+    {
+        P4FBaseUrlBox.Text = P4FHetznerHttpBaseUrl;
+        ApplyP4FEndpointToHubUrl();
+        P4FServerStatusText.Text = "Hetzner diagnostic HTTP selected. TLS/443 is intentionally deferred.";
+        Log("P4F selected Hetzner HTTP diagnostic endpoint.");
+    }
+
+    private async void P4FCheckHealth_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var endpoint = ResolveP4FEndpointForConnect();
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            var health = new ChessOnlineHealthClient(http, endpoint);
+            var live = await health.GetLiveAsync();
+            var ready = await health.GetReadyAsync();
+            var warning = endpoint.IsDiagnosticHttp ? " HTTP diagnostic-only." : "";
+            P4FServerStatusText.Text = $"live={live.Trim()} ready={ready.Status} profileCount={ready.ProfileCount} auth={ready.AuthEnabled}.{warning}";
+            ApplyP4FEndpointToHubUrl(endpoint);
+            Log($"P4F health OK: {P4FServerStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4FServerStatusText.Text = $"Health check failed: {ex.Message}";
+            Log(P4FServerStatusText.Text);
+        }
+    }
+
+    private async void P4FCheckDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var endpoint = ResolveP4FEndpoint();
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            var health = new ChessOnlineHealthClient(http, endpoint);
+            var diagnostics = await health.GetDiagnosticsAsync();
+            var d = diagnostics.Diagnostics;
+            P4FServerStatusText.Text =
+                $"diagnostics auth={diagnostics.AuthEnabled} authority={diagnostics.AuthorityPlatform}/{diagnostics.AuthorityNativeLibraryName} supported={diagnostics.AuthorityIsSupported} " +
+                $"active={d.ActiveConnectionCount} rooms={d.RoomCount} tables={d.TableCount} accepted={d.AcceptedActionCount} rejected={d.RejectedActionCount}";
+            ApplyP4FEndpointToHubUrl(endpoint);
+            Log($"P4F diagnostics OK: {P4FServerStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4FServerStatusText.Text = $"Diagnostics failed: {ex.Message}";
+            Log(P4FServerStatusText.Text);
+        }
+    }
+
     private async void P3FConnect_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -379,13 +433,15 @@ public partial class MainWindow : Window
                 await _p3fConnection.DisposeAsync();
             }
 
+            var endpoint = ResolveP4FEndpoint();
+            ApplyP4FEndpointToHubUrl(endpoint);
             _p3fConnection = new HubConnectionBuilder()
-                .WithUrl(P3FServerUrlBox.Text.Trim())
+                .WithUrl(endpoint.HubUri)
                 .Build();
             RegisterP3FEvents(_p3fConnection);
             await _p3fConnection.StartAsync();
             P3FStatusText.Text = "SignalR connected.";
-            Log("P3F SignalR connected.");
+            Log($"P3F SignalR connected: {endpoint.HubUri}");
         }
         catch (Exception ex)
         {
@@ -518,6 +574,35 @@ public partial class MainWindow : Window
     {
         await EnsureP3FHelloAsync();
         await P3FInvokeAsync("GetMatchmakingStatus", P3FMessage(OnlineMessageTypes.GetMatchmakingStatus));
+    }
+
+    private ChessOnlineServerEndpoint ResolveP4FEndpoint()
+    {
+        var baseUrl = P4FBaseUrlBox.Text.Trim();
+        if (baseUrl.Contains("<HETZNER_HOST>", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Set a real Base URL first, or click Use Hetzner HTTP.");
+        }
+        return ChessOnlineServerEndpoint.FromBaseUrl(baseUrl);
+    }
+
+    private ChessOnlineServerEndpoint ResolveP4FEndpointForConnect()
+    {
+        var baseUrl = P4FBaseUrlBox.Text.Trim();
+        return baseUrl.Contains("<HETZNER_HOST>", StringComparison.OrdinalIgnoreCase)
+            ? ChessOnlineServerEndpoint.FromBaseUrl(P3FServerUrlBox.Text.Trim())
+            : ChessOnlineServerEndpoint.FromBaseUrl(baseUrl);
+    }
+
+    private void ApplyP4FEndpointToHubUrl()
+    {
+        ApplyP4FEndpointToHubUrl(ResolveP4FEndpoint());
+    }
+
+    private void ApplyP4FEndpointToHubUrl(ChessOnlineServerEndpoint endpoint)
+    {
+        P4FBaseUrlBox.Text = endpoint.ToString();
+        P3FServerUrlBox.Text = endpoint.HubUri.ToString();
     }
 
     private async Task SaveRelayProfileAsync(Uri uri, string source)
