@@ -505,3 +505,12 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | SignalR legal preview validation | Microsoft Learn, ASP.NET Core SignalR .NET client: https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | Hub method invocation should be verified through the same operator client path that users will use for diagnostics. | Run the smoke tool against public HTTP 80 for Asgard and Classic and require `action-source=server-preview`. | `docs/P4G2_REMOTE_LEGAL_PREVIEW_SMOKE_RESULT.md` | Remote smoke with `-BuildSmokeTool`, no fallback, snapshot/action log PASS. |
 | Security/logging boundary | Microsoft Learn SignalR security and OWASP Logging guidance | Access tokens and temporary passwords must not be printed in operator smoke logs. | Use `-NoSecretLog`; commit only sanitized result docs, not raw `.tmp` logs. | docs only | Review stdout summaries for no tokens/passwords. |
+
+## P4G2 Phase 19 - One-App UI Play Smoke
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| WPF UI automation boundary | Microsoft Learn, WPF threading model and UI Automation guidance | Native WPF windows can be built and launched from the shell, but reliable click-path proof requires either operator interaction or explicit automation metadata. | Inspect `ChessOnlineApp` XAML/control names before claiming manual UI proof; if automation is not reliable, document a truthful operator smoke result/checklist. | `docs/P4G2_ONE_APP_UI_PLAY_RESULT.md` | Build app, inspect controls, run remote smoke as backend equivalent, and record whether UI click path was manually/automatically executed. |
+| Dispatcher and SignalR callbacks | Microsoft Learn, SignalR .NET client and WPF Dispatcher docs | SignalR callbacks must update UI through the dispatcher; existing UI code should be verified by build and targeted smoke. | Keep Phase 19 focused on UI playability proof, not rule/server changes. | docs/app build only unless a small UI fix is needed | `dotnet build src\ChessOnlineApp\ChessOnlineApp.csproj -c Release -p:Platform=x64`. |

@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using ChessApp;
@@ -1845,6 +1846,11 @@ public partial class MainWindow : Window
                         ? $"{cell.Coordinate} index={cell.Index} piece={PieceLabel(cell.PieceCode)} legal={legalMarker!.DisplayLabel}"
                         : $"{cell.Coordinate} index={cell.Index} piece={PieceLabel(cell.PieceCode)}"
                 };
+                AutomationProperties.SetAutomationId(button, $"P4GCell_{cell.X}_{cell.Y}_{cell.Z}");
+                AutomationProperties.SetName(button, $"Cell {cell.Coordinate} {PieceLabel(cell.PieceCode)}");
+                AutomationProperties.SetHelpText(button, isLegalTarget
+                    ? $"{cell.Coordinate} index={cell.Index} piece={PieceLabel(cell.PieceCode)} legal={legalMarker!.DisplayLabel}"
+                    : $"{cell.Coordinate} index={cell.Index} piece={PieceLabel(cell.PieceCode)}");
                 button.Click += P4GBoardCell_Click;
                 P4GBoardGrid.Children.Add(button);
             }
