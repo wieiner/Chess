@@ -274,6 +274,16 @@ static void SnapshotAndReplayTests(ContractTest test, string profileRoot)
     var snapshot = registry.RequestSnapshot(env(OnlineMessageTypes.RequestSnapshot));
     var loadedHash = OnlineRoomRegistry.HashFromSaveGameJson(snapshot.Snapshot?.SaveGameJson ?? "");
     test.Check(loadedHash == snapshot.Snapshot?.StateHash, "snapshot savegame loads to same state hash");
+    test.Check(OnlineChess3DBoardSnapshotParser.TryParse(snapshot.Snapshot, out var board, out var boardError),
+        $"online board snapshot parses from savegame: {boardError}");
+    test.Check(board.Width == 8 && board.Height == 8 && board.Depth == 8 &&
+        board.Cells.Count == 512, "online board snapshot exposes 8x8x8 projected cells");
+    test.Check(board.CurrentSide >= 1 && board.GetCell(0, 0, 0).Index == 0 &&
+        board.GetCell(7, 7, 7).Index == 511, "online board snapshot uses engine cell indexing");
+    test.Check(board.OccupiedCells.Any(), "online board snapshot exposes occupied cells");
+    var malformedSnapshot = new OnlineSnapshot { RulesetId = "classic-six-side-3d-8x8x8-v0.1", SaveGameJson = "{ not json }" };
+    test.Check(!OnlineChess3DBoardSnapshotParser.TryParse(malformedSnapshot, out _, out var malformedError) &&
+        malformedError.Contains("invalid", StringComparison.OrdinalIgnoreCase), "malformed online board snapshot fails cleanly");
 
     var events = accepted.ActionLog?.Events ?? new List<OnlineActionEvent>();
     var replayHash = registry.ReplayActionLogToHash("classic-six-side-3d-8x8x8-v0.1", events);
