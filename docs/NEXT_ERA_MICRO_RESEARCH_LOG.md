@@ -399,3 +399,13 @@ Date: 2026-06-27
 | Exact action dispatch | Existing `OnlineActionCommand` and Phase 05 preview option command mapping | Legal preview options already contain enough action shape to submit through the existing server authority. | Clicking a highlighted target submits the matching preview option instead of building a rough From/To command. | `src/ChessOnlineApp/MainWindow.xaml.cs` | Build app and contract tests. |
 | Duplicate-submit safety | Microsoft Learn WPF command/control event basics: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/ | Rapid clicks can trigger duplicate async handlers unless the UI keeps a pending flag. | Add a pending submit guard around preview-option dispatch. | `src/ChessOnlineApp/MainWindow.xaml.cs` | Build app; manual smoke later. |
 | Fallback UX | Existing P4G manual From/To flow | The rough coordinate flow remains useful for debugging while preview dispatch is young. | Preserve `Use Selected as From/To` and `Submit Normal Move` as advanced fallback. | `docs/P4G2_ONE_CLICK_LEGAL_DISPATCH.md` | Documentation plus local build. |
+
+## P4G2 Phase 08 - Seat And Turn Model Audit
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Seat ownership | Existing `OnlineRoomRegistry.JoinTableSeat`, `ActorMatchesSeat`, and matchmaking status | Non-Hodge seats map seat index to side id; Hodge seats map seat index to macro-player. | Document the current mapping and use it for Phase 09 UI indicators instead of changing protocol semantics. | `docs/P4G2_SEAT_TURN_AUDIT.md` | Documentation-only phase plus CI. |
+| Current turn data | Existing `OnlineSnapshot.TurnSummary` and `SaveGameJson` fields | Snapshot already carries turn summary, and savegame includes current side/macro-player parsed by the online board adapter. | Phase 09 can display current side/macro-player from existing snapshot data. | `docs/P4G2_SEAT_TURN_AUDIT.md` | Later UI build. |
+| Wrong actor rejection | Existing `SubmitAction` and `RequestLegalPreview` actor checks | Server rejects wrong actor at authority boundary; UI should explain it before submit when possible. | Document "can act now" as a UI-derived hint, not a replacement for server validation. | `docs/P4G2_SEAT_TURN_AUDIT.md` | Future UI tests and manual smoke. |
