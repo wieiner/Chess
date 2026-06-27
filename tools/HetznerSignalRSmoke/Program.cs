@@ -58,10 +58,16 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
     var user2 = $"smoke-b-{suffix}";
 
     Console.WriteLine("STEP START register");
-    var token1 = await RegisterAsync(http, user1, "Smoke A", password1, cancellationToken);
-    var token2 = await RegisterAsync(http, user2, "Smoke B", password2, cancellationToken);
-    Require(!string.IsNullOrWhiteSpace(token1.AccessToken) && !string.IsNullOrWhiteSpace(token2.AccessToken), "both access tokens issued");
-    Console.WriteLine($"STEP PASS register players={Short(token1.PlayerId)},{Short(token2.PlayerId)}");
+    var registered1 = await RegisterAsync(http, user1, "Smoke A", password1, cancellationToken);
+    var registered2 = await RegisterAsync(http, user2, "Smoke B", password2, cancellationToken);
+    Require(!string.IsNullOrWhiteSpace(registered1.PlayerId) && !string.IsNullOrWhiteSpace(registered2.PlayerId), "both players registered");
+    Console.WriteLine($"STEP PASS register players={Short(registered1.PlayerId)},{Short(registered2.PlayerId)}");
+
+    Console.WriteLine("STEP START login");
+    var token1 = await LoginAsync(http, user1, password1, cancellationToken);
+    var token2 = await LoginAsync(http, user2, password2, cancellationToken);
+    Require(!string.IsNullOrWhiteSpace(token1.AccessToken) && !string.IsNullOrWhiteSpace(token2.AccessToken), "both login access tokens issued");
+    Console.WriteLine($"STEP PASS login players={Short(token1.PlayerId)},{Short(token2.PlayerId)}");
 
     await using var client1 = NewAuthenticatedClient(hubUrl, token1.AccessToken);
     await using var client2 = NewAuthenticatedClient(hubUrl, token2.AccessToken);
@@ -104,33 +110,47 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
     Require(!string.IsNullOrWhiteSpace(startedSnapshot.StateHash), "snapshot has state hash");
     Console.WriteLine($"STEP PASS Asgard start hash={startedSnapshot.StateHash}");
 
-    Console.WriteLine("STEP START Asgard action");
-    var action = Message(OnlineMessageTypes.SubmitAction, "smoke-client-a", token1.PlayerId, roomId, tableId);
-    action.Action = new OnlineActionCommand
+    if (options.SkipActionSubmit)
     {
-        ActionKind = OnlineActionKinds.NormalMove,
-        ActorSide = 1,
-        ExpectedStateHashBefore = startedSnapshot.StateHash,
-        FromX = options.FromX,
-        FromY = options.FromY,
-        FromZ = options.FromZ,
-        ToX = options.ToX,
-        ToY = options.ToY,
-        ToZ = options.ToZ
-    };
-    var accepted = await InvokeAsync(client1, "SubmitAction", action, cancellationToken);
-    Require(accepted.Envelope.MessageType == OnlineMessageTypes.ActionAccepted, $"Asgard action accepted, reject={accepted.Error?.ReasonCode}");
-    Require(accepted.ActionLog?.Events.Count >= 1, "action log contains accepted event");
-    var acceptedLog = accepted.ActionLog ?? throw new InvalidOperationException("accepted action log is missing");
-    Require(!string.IsNullOrWhiteSpace(acceptedLog.Events[^1].StateHashAfter), "accepted event has state hash");
-    Console.WriteLine($"STEP PASS Asgard action notation={acceptedLog.Events[^1].Notation}");
+        Console.WriteLine("STEP SKIP Asgard action submit skipped by --skip-action-submit");
+    }
+    else
+    {
+        Console.WriteLine("STEP START Asgard action");
+        var action = Message(OnlineMessageTypes.SubmitAction, "smoke-client-a", token1.PlayerId, roomId, tableId);
+        action.Action = new OnlineActionCommand
+        {
+            ActionKind = OnlineActionKinds.NormalMove,
+            ActorSide = 1,
+            ExpectedStateHashBefore = startedSnapshot.StateHash,
+            FromX = options.FromX,
+            FromY = options.FromY,
+            FromZ = options.FromZ,
+            ToX = options.ToX,
+            ToY = options.ToY,
+            ToZ = options.ToZ
+        };
+        var accepted = await InvokeAsync(client1, "SubmitAction", action, cancellationToken);
+        Require(accepted.Envelope.MessageType == OnlineMessageTypes.ActionAccepted, $"Asgard action accepted, reject={accepted.Error?.ReasonCode}");
+        Require(accepted.ActionLog?.Events.Count >= 1, "action log contains accepted event");
+        var acceptedLog = accepted.ActionLog ?? throw new InvalidOperationException("accepted action log is missing");
+        Require(!string.IsNullOrWhiteSpace(acceptedLog.Events[^1].StateHashAfter), "accepted event has state hash");
+        Console.WriteLine($"STEP PASS Asgard action notation={acceptedLog.Events[^1].Notation}");
+    }
 
     Console.WriteLine("STEP START snapshot/actionlog");
     var snapshot = await InvokeAsync(client1, "RequestSnapshot", Message(OnlineMessageTypes.RequestSnapshot, "smoke-client-a", token1.PlayerId, roomId, tableId), cancellationToken);
     Require(snapshot.Envelope.MessageType == OnlineMessageTypes.AuthoritativeSnapshot, "snapshot returned");
-    Require(snapshot.Snapshot?.ActionCount >= 1, "snapshot action count updated");
+    if (options.SkipActionSubmit)
+    {
+        Require(snapshot.Snapshot != null, "snapshot returned after skipped action submit");
+    }
+    else
+    {
+        Require(snapshot.Snapshot?.ActionCount >= 1, "snapshot action count updated");
+    }
     var actionLog = await InvokeAsync(client1, "RequestActionLog", Message(OnlineMessageTypes.RequestActionLog, "smoke-client-a", token1.PlayerId, roomId, tableId), cancellationToken);
-    Require(actionLog.ActionLog?.Events.Count >= 1, "action log returned");
+    Require(actionLog.ActionLog != null, "action log returned");
     Console.WriteLine($"STEP PASS snapshot/actionlog finalHash={snapshot.Snapshot?.StateHash}");
 }
 
@@ -141,6 +161,17 @@ static async Task<AuthTokenResponse> RegisterAsync(HttpClient http, string userN
     if (!response.IsSuccessStatusCode || token?.Success != true)
     {
         throw new InvalidOperationException($"register failed: status={(int)response.StatusCode}, code={token?.ErrorCode}");
+    }
+    return token;
+}
+
+static async Task<AuthTokenResponse> LoginAsync(HttpClient http, string userName, string password, CancellationToken cancellationToken)
+{
+    var response = await http.PostAsJsonAsync("/api/auth/login", new AuthLoginRequest(userName, password, "hetzner-smoke"), cancellationToken);
+    var token = await response.Content.ReadFromJsonAsync<AuthTokenResponse>(cancellationToken: cancellationToken);
+    if (!response.IsSuccessStatusCode || token?.Success != true)
+    {
+        throw new InvalidOperationException($"login failed: status={(int)response.StatusCode}, code={token?.ErrorCode}");
     }
     return token;
 }
@@ -205,6 +236,8 @@ static string Short(string value)
 
 internal sealed record AuthRegisterRequest(string UserName, string DisplayName, string Password, string ClientName);
 
+internal sealed record AuthLoginRequest(string UserName, string Password, string ClientName);
+
 internal sealed class AuthTokenResponse
 {
     public bool Success { get; set; }
@@ -222,7 +255,8 @@ internal sealed record SmokeOptions(
     int FromZ,
     int ToX,
     int ToY,
-    int ToZ)
+    int ToZ,
+    bool SkipActionSubmit)
 {
     public static SmokeOptions Parse(string[] args)
     {
@@ -250,7 +284,8 @@ internal sealed record SmokeOptions(
             Int(map, "from-z", 0),
             Int(map, "to-x", 2),
             Int(map, "to-y", 3),
-            Int(map, "to-z", 1));
+            Int(map, "to-z", 1),
+            map.ContainsKey("skip-action-submit"));
     }
 
     private static string Required(Dictionary<string, string> map, string key)

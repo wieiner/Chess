@@ -2,9 +2,11 @@
 
 Date: 2026-06-21
 
+Public HTTP tooling refresh: 2026-06-27
+
 Host placeholder: `<HETZNER_HOST>`
 
-This phase ran the first functional remote SignalR smoke against the temporary Hetzner Kestrel server. It did not install systemd, Nginx, TLS, Redis, a SignalR backplane, or production paths.
+This phase ran the first functional remote SignalR smoke against the temporary Hetzner Kestrel server. On 2026-06-27, the smoke wrapper was updated to support direct public HTTP smoke against the installed systemd/Nginx deployment. It still does not configure TLS, Redis, a SignalR backplane, or production-ranked matchmaking.
 
 ## Scope
 
@@ -45,7 +47,17 @@ The operator wrapper is:
 scripts/deploy/Test-HetznerSignalRMatchmaking.ps1
 ```
 
-It can start an SSH local-forward and then runs the smoke client through:
+It accepts:
+
+- `-BaseUrl`;
+- `-ServerUrl`;
+- `-ProfileId`;
+- `-TimeoutSeconds`;
+- `-DryRun`;
+- `-NoSecretLog`;
+- `-SkipActionSubmit`.
+
+It can also still start an SSH local-forward for the older private loopback smoke mode. In all modes it runs the smoke client through:
 
 ```text
 tools/TestProcessWatchdog
@@ -61,7 +73,17 @@ These logs are ignored runtime diagnostics and must not be committed.
 
 ## Command Shape
 
-With the temporary server already running on the VPS loopback port, the local command shape is:
+For the current public HTTP deployment:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy\Test-HetznerSignalRMatchmaking.ps1 `
+  -BaseUrl "http://<HETZNER_HOST>" `
+  -ProfileId "asgard-convergence-3d-8x8x8-v0.1" `
+  -TimeoutSeconds 180 `
+  -NoSecretLog
+```
+
+For the earlier private loopback mode, the local command shape remains:
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy\Test-HetznerSignalRMatchmaking.ps1 `
@@ -78,7 +100,7 @@ The SSH local-forward maps:
 127.0.0.1:15077 -> <HETZNER_HOST>:127.0.0.1:5077
 ```
 
-The server sees loopback traffic, which keeps token issuance inside the temporary trusted dry-run boundary. Public HTTP/TLS is still deferred.
+The loopback mode keeps token issuance inside the temporary trusted dry-run boundary. The public HTTP mode is useful as an operator smoke only; do not use real accounts over HTTP without TLS.
 
 ## Result
 
@@ -95,6 +117,20 @@ Sanitized smoke steps:
 ```text
 STEP PASS health
 STEP PASS register
+STEP PASS SignalR connect
+STEP PASS matchmaking room=match-1-asgard table=table-1
+STEP PASS Asgard start hash=a0296f7e94a22346
+STEP PASS Asgard action notation=#1 S1 MOVE P (2,3,0)->(2,3,1)
+STEP PASS snapshot/actionlog finalHash=1116b19374131cc4
+SMOKE PASS
+```
+
+The 2026-06-27 public HTTP run also passed:
+
+```text
+STEP PASS health
+STEP PASS register
+STEP PASS login
 STEP PASS SignalR connect
 STEP PASS matchmaking room=match-1-asgard table=table-1
 STEP PASS Asgard start hash=a0296f7e94a22346
@@ -128,11 +164,8 @@ The remote `/tmp/chessonline-smoke` directory may contain temporary store/keyrin
 
 ## Still Deferred
 
-- Nginx reverse proxy.
-- systemd service.
 - TLS/domain handling.
-- public HTTP health endpoint.
-- production `/opt/chessonline` and `/var/lib/chessonline` layout.
+- 443 currently belongs to a non-Chess service and must not be touched without a separate TLS/domain phase.
 - backup/restore and log rotation.
 - Redis/Azure SignalR/backplane.
 - public ranked matchmaking.

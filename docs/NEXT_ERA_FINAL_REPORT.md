@@ -46,7 +46,7 @@ The Hetzner server has a real Linux-native ChessOnlineServer dry-run path:
 - Mutable runtime state belongs under `/var/lib/chessonline`.
 - Runtime logs belong under `/var/log/chessonline`.
 
-This is not yet a hardened production deployment. It is a working single-server authority rehearsal with loopback health, systemd, and Nginx installed. Public HTTP reachability must be rechecked before any operator treats it as externally available.
+This is not yet a hardened production deployment. It is a working single-server authority rehearsal with loopback health, systemd, Nginx, and external HTTP diagnostics.
 
 ## Public HTTP health result
 
@@ -63,17 +63,18 @@ Phase 14 public HTTP probes against `http://<HETZNER_HOST>` returned:
   - `authEnabled: true`
   - `persistenceProvider: json`
 
-Refresh on 2026-06-27:
+Refresh on 2026-06-27 after the firewall opening:
 
 - Loopback health through SSH still works.
 - `chessonline.service` is still active/enabled.
 - Nginx is still active and `nginx -t` succeeds.
 - Nginx listens on `0.0.0.0:80`.
-- `ufw` is active and does not currently allow `80/tcp`.
-- External TCP connect to `<HETZNER_HOST>:80` timed out from the local workstation.
+- `ufw` now allows `80/tcp`.
+- External TCP connect to `<HETZNER_HOST>:80` succeeds from the local workstation.
+- External `/healthz/live`, `/healthz/ready`, and `/chess3d/diagnostics` pass.
 - `<HETZNER_HOST>:443` is reachable, but it is owned by an existing non-Chess process, not ChessOnlineServer.
 
-Current conclusion: the server is alive internally, but external public HTTP for ChessOnlineServer is not currently reachable until the firewall/reverse-proxy/TLS plan is revisited.
+Current conclusion: the server is alive internally and externally over HTTP port 80. It is still not production-ready because TLS/domain/443 are not configured for ChessOnlineServer.
 
 ## systemd status
 
@@ -129,11 +130,11 @@ Reason:
 - No Let's Encrypt/Certbot run was performed.
 - No real certificates, private keys, tokens, passwords, runtime store, or Data Protection keyring files were committed.
 
-Current public HTTP must be treated as not production-ready and, as of the 2026-06-27 refresh, not externally reachable on port 80 from the local workstation. Do not use real user credentials over public HTTP. The correct next step is P4E: domain, DNS, firewall policy, Certbot, HTTPS, renewal, backup/restore, and rollback rehearsal.
+Current public HTTP must be treated as diagnostic-only. It is externally reachable on port 80, but do not use real user credentials over public HTTP. The correct next step is P4E: domain, DNS, firewall policy, Certbot, HTTPS, renewal, backup/restore, and rollback rehearsal.
 
 ## SignalR / Asgard smoke status
 
-Remote authenticated SignalR/Asgard smoke passed in Phase 05 through a controlled SSH local-forwarded path.
+Remote authenticated SignalR/Asgard smoke passed in Phase 05 through a controlled SSH local-forwarded path. On 2026-06-27, the public HTTP smoke tooling was fixed and the same Asgard chain also passed directly through `http://<HETZNER_HOST>`.
 
 The smoke covered:
 
@@ -146,6 +147,16 @@ The smoke covered:
 - Action log verification.
 
 Public HTTPS SignalR has not been proven because TLS/domain is not configured yet.
+
+Current public HTTP command shape:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy\Test-HetznerSignalRMatchmaking.ps1 `
+  -BaseUrl "http://<HETZNER_HOST>" `
+  -ProfileId "asgard-convergence-3d-8x8x8-v0.1" `
+  -TimeoutSeconds 180 `
+  -NoSecretLog
+```
 
 ## Test runner status
 
@@ -176,7 +187,7 @@ The most important remaining technical debt groups are:
 
 - Linux CI/smoke coverage is not yet part of GitHub Actions.
 - TLS/domain/firewall/backup/restore/rollback are not complete.
-- External public HTTP reachability is currently blocked on `80/tcp` by firewall policy even though loopback health works.
+- Public HTTP is reachable, but it is not a secure production auth boundary without TLS.
 - Public HTTPS SignalR is not proven.
 - Online reconnect/resume/spectator UX is future work.
 - Asgard destructive fusion/implosion and richer reserve/core UI are future work.
@@ -254,7 +265,7 @@ The full verify built Release x64 outputs, checked assets/profiles/scenarios/mod
 
 1. P4E - TLS/domain/public deployment hardening:
    - DNS/domain confirmation.
-   - Decide how port 80 should be handled because `ufw` currently does not allow `80/tcp`.
+   - Keep port 80 available for ACME/HTTP redirect as needed.
    - Certbot/HTTPS.
    - Firewall.
    - Backup/restore.
