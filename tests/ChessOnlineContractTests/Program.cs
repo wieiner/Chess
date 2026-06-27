@@ -339,6 +339,25 @@ static void OnlineClientSdkTests(ContractTest test)
     test.Check(statusTurn.PrimarySeatIndex == 1 &&
         statusTurn.OpponentSeatIndex == 2 &&
         statusTurn.CanPrimaryAct, "online seat turn state derives seats from matchmaking status");
+
+    var windowA = new ChessOnlineClientSession(endpoint, "window-a");
+    var windowB = new ChessOnlineClientSession(endpoint, "window-b");
+    windowA.SetToken(new ChessOnlineAuthTokenResponse { Success = true, PlayerId = "player-window-a", UserName = "a", AccessToken = "token-a" });
+    windowB.SetToken(new ChessOnlineAuthTokenResponse { Success = true, PlayerId = "player-window-b", UserName = "b", AccessToken = "token-b" });
+    test.Check(windowA.PlayerId == "player-window-a" &&
+        windowB.PlayerId == "player-window-b" &&
+        windowA.PlayerId != windowB.PlayerId, "two-window client sessions keep independent player ids");
+
+    var logA = new ChessOnlineClientEventLog();
+    var logB = new ChessOnlineClientEventLog();
+    logA.Add("window A event accessToken=secret-a");
+    logB.Add("window B event accessToken=secret-b");
+    test.Check(logA.Events.Count == 1 &&
+        logB.Events.Count == 1 &&
+        logA.Events[0].Contains("window A", StringComparison.Ordinal) &&
+        logB.Events[0].Contains("window B", StringComparison.Ordinal) &&
+        !logA.Events[0].Contains("secret-a", StringComparison.Ordinal) &&
+        !logB.Events[0].Contains("secret-b", StringComparison.Ordinal), "two-window event logs stay separate and redacted");
 }
 
 static OnlineChess3DBoardSnapshot Board(string rulesetId, int currentSide, int currentMacroPlayer)

@@ -389,10 +389,21 @@
                         <Button Content="Queue Status" Click="P3FMatchmakingStatus_Click" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <TextBlock Text="Play Mode" Width="72" />
+                        <ComboBox x:Name="P4FPlayModeBox" Width="190" SelectedIndex="0">
+                            <ComboBoxItem Content="Single-App Test Pair" />
+                            <ComboBoxItem Content="Two-Window Manual Player" />
+                        </ComboBox>
                         <Button Content="Create Test Match With Two Local Clients" Click="P4FCreateTestMatch_Click" MinWidth="240" />
+                        <Button Content="Manual Join Matchmaking" Click="P4FManualJoinMatchmaking_Click" MinWidth="180" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                         <Button Content="Ready Both" Click="P4FReadyBoth_Click" />
+                        <Button Content="Ready This Window" Click="P4FReadyThisWindow_Click" />
                         <Button Content="Start Game" Click="P4FStartGame_Click" />
+                        <Button Content="Start This Window" Click="P4FStartThisWindow_Click" />
                         <Button Content="Request Snapshot" Click="P4FRequestSnapshot_Click" />
+                        <Button Content="Snapshot This Window" Click="P4FSnapshotThisWindow_Click" />
                         <Button Content="Request Action Log" Click="P4FRequestActionLog_Click" />
                         <Button Content="Submit Safe Asgard Test Action" Click="P4FSubmitSafeAsgardAction_Click" MinWidth="210" />
                     </StackPanel>

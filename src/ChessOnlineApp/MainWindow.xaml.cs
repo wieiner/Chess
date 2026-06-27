@@ -793,7 +793,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            EnsureP4FMatchReady();
+            EnsureP4FTestPairReady();
             await _p4fPrimaryRelay!.ReadyAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
             await _p4fSecondaryRelay!.ReadyAsync("p4f-client-b", _p4fRoomId, _p4fTableId);
             P4FMatchStatusText.Text = $"Ready both: room={_p4fRoomId} table={_p4fTableId}";
@@ -806,36 +806,109 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void P4FStartGame_Click(object sender, RoutedEventArgs e)
+    private async void P4FManualJoinMatchmaking_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            EnsureP4FMatchReady();
-            var started = await _p4fPrimaryRelay!.StartGameAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
-            RememberP4FSnapshot(started);
-            P4FMatchStatusText.Text = $"Started: {started.Envelope.MessageType} ruleset={started.Snapshot?.RulesetId} hash={started.Snapshot?.StateHash}";
+            await ResetP4FRelaysAsync();
+            await EnsureP4FPrimaryRelayAsync("p4f-manual");
+
+            var rulesetId = SelectedP3FMatchmakingRuleset();
+            var joined = await _p4fPrimaryRelay!.JoinMatchmakingAsync("p4f-manual", rulesetId);
+            RememberP4FServerSeq(joined);
+            if (joined.MatchmakingStatus != null)
+            {
+                RememberP4FMatchmakingStatus(joined.MatchmakingStatus);
+            }
+
+            var state = joined.MatchmakingStatus?.State ?? joined.Envelope.MessageType;
+            P4FMatchStatusText.Text = joined.Envelope.MessageType == OnlineMessageTypes.MatchFound
+                ? $"Manual MatchFound ruleset={rulesetId} room={_p4fRoomId} table={_p4fTableId} seat={DisplaySeat(_p4fPrimarySeatIndex)}"
+                : $"Manual matchmaking {state}: ruleset={rulesetId}. Start a second ChessOnlineApp window with the same profile.";
             Log($"P4F {P4FMatchStatusText.Text}");
         }
         catch (Exception ex)
         {
-            P4FMatchStatusText.Text = $"Start failed: {ex.Message}";
+            P4FMatchStatusText.Text = $"Manual matchmaking failed: {ex.Message}";
             Log(P4FMatchStatusText.Text);
         }
     }
 
-    private async void P4FRequestSnapshot_Click(object sender, RoutedEventArgs e)
+    private async void P4FReadyThisWindow_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             EnsureP4FMatchReady();
-            var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
-            RememberP4FSnapshot(snapshot);
-            P4FMatchStatusText.Text = $"Snapshot: ruleset={snapshot.Snapshot?.RulesetId} seq={snapshot.Envelope.ServerSeq} actions={snapshot.Snapshot?.ActionCount} hash={snapshot.Snapshot?.StateHash}";
+            var ready = await _p4fPrimaryRelay!.ReadyAsync("p4f-manual", _p4fRoomId, _p4fTableId);
+            RememberP4FServerSeq(ready);
+            P4FMatchStatusText.Text = ready.Envelope.MessageType == OnlineMessageTypes.TableState
+                ? $"Ready this window: seat={DisplaySeat(_p4fPrimarySeatIndex)} room={_p4fRoomId} table={_p4fTableId}"
+                : $"Ready this window rejected: {ready.Error?.ReasonCode} {ready.Error?.ReasonText}".Trim();
             Log($"P4F {P4FMatchStatusText.Text}");
         }
         catch (Exception ex)
         {
-            P4FMatchStatusText.Text = $"Snapshot failed: {ex.Message}";
+            P4FMatchStatusText.Text = $"Ready this window failed: {ex.Message}";
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private async void P4FStartGame_Click(object sender, RoutedEventArgs e)
+    {
+        await StartP4FGameForPrimaryAsync("p4f-client-a", "Start");
+    }
+
+    private async void P4FStartThisWindow_Click(object sender, RoutedEventArgs e)
+    {
+        await StartP4FGameForPrimaryAsync("p4f-manual", "Start this window");
+    }
+
+    private async void P4FRequestSnapshot_Click(object sender, RoutedEventArgs e)
+    {
+        await RequestP4FSnapshotForPrimaryAsync("p4f-client-a", "Snapshot");
+    }
+
+    private async void P4FSnapshotThisWindow_Click(object sender, RoutedEventArgs e)
+    {
+        await RequestP4FSnapshotForPrimaryAsync("p4f-manual", "Snapshot this window");
+    }
+
+    private async Task StartP4FGameForPrimaryAsync(string clientId, string label)
+    {
+        try
+        {
+            EnsureP4FMatchReady();
+            var started = await _p4fPrimaryRelay!.StartGameAsync(clientId, _p4fRoomId, _p4fTableId);
+            RememberP4FServerSeq(started);
+            if (started.Snapshot != null)
+            {
+                RememberP4FSnapshot(started);
+            }
+            P4FMatchStatusText.Text = started.Envelope.MessageType == OnlineMessageTypes.GameStarted
+                ? $"{label}: {started.Envelope.MessageType} ruleset={started.Snapshot?.RulesetId} hash={started.Snapshot?.StateHash}"
+                : $"{label} rejected: {started.Error?.ReasonCode} {started.Error?.ReasonText}".Trim();
+            Log($"P4F {P4FMatchStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4FMatchStatusText.Text = $"{label} failed: {ex.Message}";
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private async Task RequestP4FSnapshotForPrimaryAsync(string clientId, string label)
+    {
+        try
+        {
+            EnsureP4FMatchReady();
+            var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync(clientId, _p4fRoomId, _p4fTableId);
+            RememberP4FSnapshot(snapshot);
+            P4FMatchStatusText.Text = $"{label}: ruleset={snapshot.Snapshot?.RulesetId} seq={snapshot.Envelope.ServerSeq} actions={snapshot.Snapshot?.ActionCount} hash={snapshot.Snapshot?.StateHash}";
+            Log($"P4F {P4FMatchStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4FMatchStatusText.Text = $"{label} failed: {ex.Message}";
             Log(P4FMatchStatusText.Text);
         }
     }
@@ -950,6 +1023,7 @@ public partial class MainWindow : Window
             {
                 format = "p4f-online-client-session",
                 createdUtc = DateTime.UtcNow.ToString("O"),
+                playMode = SelectedP4FPlayMode(),
                 baseUrl = P4FBaseUrlBox.Text.Trim(),
                 hubUrl = P3FServerUrlBox.Text.Trim(),
                 rulesetId = SelectedP3FMatchmakingRuleset(),
@@ -1039,6 +1113,13 @@ public partial class MainWindow : Window
         return value.Length <= 8 ? value : value[..8];
     }
 
+    private string SelectedP4FPlayMode()
+    {
+        return P4FPlayModeBox?.SelectedItem is ComboBoxItem item && item.Content is string text
+            ? text
+            : "Single-App Test Pair";
+    }
+
     private async Task EnsureP4FTwoSessionsAsync()
     {
         if (_p4fPrimarySession?.IsAuthenticated == true && _p4fSecondarySession?.IsAuthenticated == true)
@@ -1058,6 +1139,39 @@ public partial class MainWindow : Window
         _p4fPrimarySession.SetToken(tokenA);
         _p4fSecondarySession.SetToken(tokenB);
         UpdateP4FAuthStatus($"Two temporary players ready: A={ShortId(tokenA.PlayerId)} B={ShortId(tokenB.PlayerId)}.");
+    }
+
+    private async Task EnsureP4FPrimarySessionAsync()
+    {
+        if (_p4fPrimarySession?.IsAuthenticated == true)
+        {
+            return;
+        }
+
+        var endpoint = ResolveP4FEndpoint();
+        using var http = CreateP4FHttpClient(endpoint);
+        var auth = new ChessOnlineAuthClient(http, endpoint);
+        var token = await auth.RegisterTemporaryUserAsync("p4f_manual", "ChessOnlineApp-P4F-Manual");
+        RequireSuccessfulAuth(token, "register manual player");
+        _p4fPrimarySession = new ChessOnlineClientSession(endpoint, "ChessOnlineApp-P4F-Manual");
+        _p4fPrimarySession.SetToken(token);
+        P4FAuthUserBox.Text = token.UserName;
+        P4FAuthPasswordBox.Password = "";
+        UpdateP4FAuthStatus($"Manual temporary player ready: {ShortId(token.PlayerId)}.");
+    }
+
+    private async Task EnsureP4FPrimaryRelayAsync(string clientId)
+    {
+        await EnsureP4FPrimarySessionAsync();
+        if (_p4fPrimaryRelay != null)
+        {
+            return;
+        }
+
+        _p4fPrimaryRelay = new ChessOnlineRelayClient(_p4fPrimarySession!);
+        _p4fPrimaryRelay.MessageReceived += P4FRelayMessageReceived;
+        await _p4fPrimaryRelay.ConnectAsync();
+        await _p4fPrimaryRelay.HelloAsync(clientId);
     }
 
     private async Task ResetP4FRelaysAsync()
@@ -1096,6 +1210,16 @@ public partial class MainWindow : Window
     }
 
     private void EnsureP4FMatchReady()
+    {
+        if (_p4fPrimaryRelay == null ||
+            string.IsNullOrWhiteSpace(_p4fRoomId) ||
+            string.IsNullOrWhiteSpace(_p4fTableId))
+        {
+            throw new InvalidOperationException("Join matchmaking and wait for MatchFound first.");
+        }
+    }
+
+    private void EnsureP4FTestPairReady()
     {
         if (_p4fPrimaryRelay == null || _p4fSecondaryRelay == null ||
             string.IsNullOrWhiteSpace(_p4fRoomId) ||
