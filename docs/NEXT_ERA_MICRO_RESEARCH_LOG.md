@@ -514,3 +514,12 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | WPF UI automation boundary | Microsoft Learn, WPF threading model and UI Automation guidance | Native WPF windows can be built and launched from the shell, but reliable click-path proof requires either operator interaction or explicit automation metadata. | Inspect `ChessOnlineApp` XAML/control names before claiming manual UI proof; if automation is not reliable, document a truthful operator smoke result/checklist. | `docs/P4G2_ONE_APP_UI_PLAY_RESULT.md` | Build app, inspect controls, run remote smoke as backend equivalent, and record whether UI click path was manually/automatically executed. |
 | Dispatcher and SignalR callbacks | Microsoft Learn, SignalR .NET client and WPF Dispatcher docs | SignalR callbacks must update UI through the dispatcher; existing UI code should be verified by build and targeted smoke. | Keep Phase 19 focused on UI playability proof, not rule/server changes. | docs/app build only unless a small UI fix is needed | `dotnet build src\ChessOnlineApp\ChessOnlineApp.csproj -c Release -p:Platform=x64`. |
+
+## P4G2 Phase 20 - Two-Window UI Play Smoke
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Two-window WPF client state | Microsoft Learn, WPF application model/data binding docs | Separate app instances keep separate in-memory auth/session state and can connect independently to SignalR. | Launch two `ChessOnlineApp` processes and drive manual matchmaking through public HTTP 80 with temporary users. | `docs/P4G2_TWO_WINDOW_UI_PLAY_RESULT.md` | UI Automation click path: register temp users, manual matchmaking, ready/start, snapshot, legal preview submit, peer action log. |
+| Realtime/action-log proof | Microsoft Learn, ASP.NET Core SignalR .NET client | A second client should be able to request authoritative action log after the first client submits an accepted action. | Treat B-window action-log request after A-window legal-preview submit as the practical two-window smoke proof for this phase. | docs only | Public diagnostics counters and sanitized UIA log summary. |
