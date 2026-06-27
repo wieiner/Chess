@@ -469,3 +469,12 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | Append-only diagnostics contract | Existing `/chess3d/diagnostics` DTO and Microsoft Learn ASP.NET Core minimal APIs: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis | Existing clients already read diagnostics as JSON; adding fields is backward-compatible. | Extend existing diagnostics JSON with feature flags instead of replacing the endpoint. | `src/ChessOnlineProtocol/OnlineProtocolDtos.cs`, `src/ChessOnlineServer`, `docs/P4G2_SERVER_CAPABILITIES.md` | Contract tests verify new flags and existing fields. |
 | Operator feature visibility | GitHub Actions docs and existing smoke failures | Remote smoke should know whether fallback was needed because server lacks preview. | Expose `requestLegalPreview`, `matchmaking`, `actionLog`, and `realtimeResync` capability booleans. | diagnostics DTO/docs | Server build and online contract tests. |
+
+## P4G2 Phase 15 - Hetzner Deploy Package
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Linux publish boundary | Microsoft Learn, .NET publish command and ASP.NET Core Linux hosting guidance | Framework-dependent `linux-x64` publish can package the server without changing Nginx/systemd/firewall. | Use existing deploy publish script or equivalent `dotnet publish`; package only server binaries/assets/native `.so`, not runtime stores/keyrings. | `docs/P4G2_HETZNER_DEPLOY_PACKAGE.md` | Inspect package contents and exclude secrets before copy/deploy. |
+| Secret exclusion | OWASP Secrets Management / Logging guidance | Deployment archives must not contain generated stores, keyrings, certs, or tokens. | Keep package under `.tmp`, document contents, and do not commit archive/binaries. | docs only unless script needs correction | `rg`/package listing review. |
