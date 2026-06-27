@@ -496,3 +496,12 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | Server-only deploy boundary | Microsoft Learn, Host ASP.NET Core on Linux with Nginx: https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/linux-nginx | Restarting a Kestrel systemd service does not require changing Nginx, TLS, firewall, or other services. | Replace only `/opt/chessonline/server` with the prepared package and restart `chessonline.service`; leave 443/x-ui/Xray/Outline/Albatronix/Unreal untouched. | `docs/P4G2_HETZNER_LEGAL_PREVIEW_DEPLOY_RESULT.md` | Loopback health, public HTTP health, diagnostics capability flags, Classic/Asgard remote smoke. |
 | Runtime data safety | OWASP secrets guidance and existing deployment layout | Runtime stores/keyrings must not be bundled into deploy archives or accidentally exposed in Git. | Inspect remote service configuration before deploy; preserve runtime data paths if they are outside the published payload. | docs only unless deployment layout requires a safe copy step | `systemctl cat`, server directory listing, no runtime artifacts in Git. |
+
+## P4G2 Phase 18 - Remote Legal Preview Smoke
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| SignalR legal preview validation | Microsoft Learn, ASP.NET Core SignalR .NET client: https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | Hub method invocation should be verified through the same operator client path that users will use for diagnostics. | Run the smoke tool against public HTTP 80 for Asgard and Classic and require `action-source=server-preview`. | `docs/P4G2_REMOTE_LEGAL_PREVIEW_SMOKE_RESULT.md` | Remote smoke with `-BuildSmokeTool`, no fallback, snapshot/action log PASS. |
+| Security/logging boundary | Microsoft Learn SignalR security and OWASP Logging guidance | Access tokens and temporary passwords must not be printed in operator smoke logs. | Use `-NoSecretLog`; commit only sanitized result docs, not raw `.tmp` logs. | docs only | Review stdout summaries for no tokens/passwords. |
