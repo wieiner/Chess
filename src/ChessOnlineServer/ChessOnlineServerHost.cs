@@ -136,6 +136,12 @@ public static class ChessOnlineServerHost
             {
                 protocolId = OnlineProtocolVersion.ProtocolId,
                 protocolVersion = OnlineProtocolVersion.ProtocolVersion,
+                serverCommit = diagnostics.ServerCommit,
+                requestLegalPreview = diagnostics.RequestLegalPreviewSupported,
+                realtimeResync = diagnostics.RealtimeResyncSupported,
+                actionLog = diagnostics.ActionLogSupported,
+                matchmaking = diagnostics.MatchmakingSupported,
+                supportedHubMethods = diagnostics.SupportedHubMethods,
                 startedUtc = AppStart.StartedUtc,
                 diagnostics.RoomCount,
                 diagnostics.TableCount,

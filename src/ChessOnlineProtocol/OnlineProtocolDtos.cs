@@ -329,6 +329,13 @@ public sealed class OnlineError
 
 public sealed class OnlineDiagnostics
 {
+    public string ServerCommit { get; set; } = "";
+    public string ProtocolVersion { get; set; } = OnlineProtocolVersion.ProtocolVersion;
+    public bool RequestLegalPreviewSupported { get; set; } = true;
+    public bool RealtimeResyncSupported { get; set; } = true;
+    public bool ActionLogSupported { get; set; } = true;
+    public bool MatchmakingSupported { get; set; } = true;
+    public List<string> SupportedHubMethods { get; set; } = new();
     public int RoomCount { get; set; }
     public int TableCount { get; set; }
     public int ConnectionCount { get; set; }

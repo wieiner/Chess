@@ -434,6 +434,26 @@ public sealed class OnlineRoomRegistry
         {
             return new OnlineDiagnostics
             {
+                ProtocolVersion = OnlineProtocolVersion.ProtocolVersion,
+                RequestLegalPreviewSupported = true,
+                RealtimeResyncSupported = true,
+                ActionLogSupported = true,
+                MatchmakingSupported = true,
+                SupportedHubMethods =
+                [
+                    OnlineMessageTypes.Hello,
+                    OnlineMessageTypes.JoinMatchmaking,
+                    OnlineMessageTypes.CancelMatchmaking,
+                    OnlineMessageTypes.GetMatchmakingStatus,
+                    OnlineMessageTypes.Ready,
+                    OnlineMessageTypes.StartGame,
+                    OnlineMessageTypes.SubmitAction,
+                    OnlineMessageTypes.RequestSnapshot,
+                    OnlineMessageTypes.RequestActionLog,
+                    OnlineMessageTypes.RequestLegalPreview,
+                    OnlineMessageTypes.RequestDiagnostics,
+                    OnlineMessageTypes.Ping
+                ],
                 RoomCount = _rooms.Count,
                 TableCount = _rooms.Values.Sum(r => r.Tables.Count),
                 ConnectionCount = _rooms.Values.Sum(r => r.Players.Count),

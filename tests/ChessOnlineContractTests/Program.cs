@@ -41,6 +41,13 @@ static void AuthorityRuntimeDiagnosticsTests(ContractTest test, string profileRo
     var linuxPath = NativeChessOnlineGameSessionFactory.GetExpectedNativeLibraryPathForPlatform("Linux", "/opt/chessonline");
     test.Check(linuxPath.Replace('\\', '/').EndsWith("/opt/chessonline/libChess3DEngine.so", StringComparison.Ordinal), "online authority computes Linux native library path");
     test.Check(NativeChessOnlineGameSessionFactory.GetExpectedNativeLibraryNameForPlatform("Windows") == "Chess3DEngine.dll", "online authority keeps Windows native library name");
+
+    var onlineDiagnostics = registry.GetDiagnostics();
+    test.Check(onlineDiagnostics.RequestLegalPreviewSupported, "online diagnostics exposes legal preview capability");
+    test.Check(onlineDiagnostics.RealtimeResyncSupported, "online diagnostics exposes realtime resync capability");
+    test.Check(onlineDiagnostics.ActionLogSupported, "online diagnostics exposes action log capability");
+    test.Check(onlineDiagnostics.MatchmakingSupported, "online diagnostics exposes matchmaking capability");
+    test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestLegalPreview), "online diagnostics lists RequestLegalPreview hub method");
 }
 
 static void ProtocolRoundtripTests(ContractTest test)

@@ -460,3 +460,12 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | ASP.NET Core behind Nginx deployment boundary | Microsoft Learn, Host ASP.NET Core on Linux with Nginx: https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/linux-nginx | Updating the app payload and restarting its service is separate from changing Nginx/TLS/firewall. | Audit only the ChessOnlineServer binary set and systemd service metadata in Phase 13; do not touch Nginx, UFW, 443, or x-ui/Xray. | `docs/P4G2_HETZNER_SERVER_VERSION_GAP.md` | Local server build, public health/diagnostics, read-only SSH file timestamps. |
 | SignalR hub method availability | Microsoft Learn, ASP.NET Core SignalR hubs and .NET client: https://learn.microsoft.com/en-us/aspnet/core/signalr/hubs | A missing hub method at runtime indicates the deployed server binary does not match the client/hub contract. | Treat `Method does not exist` as a server-version gap, not a client or rules bug. | `docs/P4G2_HETZNER_SERVER_VERSION_GAP.md` | `rg RequestLegalPreview`, local server build, remote smoke result. |
+
+## P4G2 Phase 14 - Server Capabilities
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Append-only diagnostics contract | Existing `/chess3d/diagnostics` DTO and Microsoft Learn ASP.NET Core minimal APIs: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis | Existing clients already read diagnostics as JSON; adding fields is backward-compatible. | Extend existing diagnostics JSON with feature flags instead of replacing the endpoint. | `src/ChessOnlineProtocol/OnlineProtocolDtos.cs`, `src/ChessOnlineServer`, `docs/P4G2_SERVER_CAPABILITIES.md` | Contract tests verify new flags and existing fields. |
+| Operator feature visibility | GitHub Actions docs and existing smoke failures | Remote smoke should know whether fallback was needed because server lacks preview. | Expose `requestLegalPreview`, `matchmaking`, `actionLog`, and `realtimeResync` capability booleans. | diagnostics DTO/docs | Server build and online contract tests. |
