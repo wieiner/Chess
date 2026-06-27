@@ -478,3 +478,12 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | Linux publish boundary | Microsoft Learn, .NET publish command and ASP.NET Core Linux hosting guidance | Framework-dependent `linux-x64` publish can package the server without changing Nginx/systemd/firewall. | Use existing deploy publish script or equivalent `dotnet publish`; package only server binaries/assets/native `.so`, not runtime stores/keyrings. | `docs/P4G2_HETZNER_DEPLOY_PACKAGE.md` | Inspect package contents and exclude secrets before copy/deploy. |
 | Secret exclusion | OWASP Secrets Management / Logging guidance | Deployment archives must not contain generated stores, keyrings, certs, or tokens. | Keep package under `.tmp`, document contents, and do not commit archive/binaries. | docs only unless script needs correction | `rg`/package listing review. |
+
+## P4G2 Phase 16 - Hetzner Backup Before Deploy
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Linux service rollback boundary | Microsoft Learn, Host ASP.NET Core on Linux with Nginx: https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/linux-nginx | The ASP.NET Core app payload and systemd unit can be backed up independently of Nginx/TLS/firewall. | Back up only `/opt/chessonline/server` and `/etc/systemd/system/chessonline.service`; do not touch nginx, UFW, 443, x-ui/Xray, Outline, Albatronix, or Unreal. | `docs/P4G2_HETZNER_BACKUP_RESULT.md` | SSH backup command, systemd status, loopback health/diagnostics before deploy. |
+| Rollback readiness | Existing Hetzner deployment layout | A timestamped tarball under `/opt/chessonline/backups` is sufficient for the next server-only deploy rollback. | Record backup path and pre-deploy health in docs before copying the new package. | docs only | Confirm backup file exists and service remains active. |
