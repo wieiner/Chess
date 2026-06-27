@@ -409,3 +409,13 @@ Date: 2026-06-27
 | Seat ownership | Existing `OnlineRoomRegistry.JoinTableSeat`, `ActorMatchesSeat`, and matchmaking status | Non-Hodge seats map seat index to side id; Hodge seats map seat index to macro-player. | Document the current mapping and use it for Phase 09 UI indicators instead of changing protocol semantics. | `docs/P4G2_SEAT_TURN_AUDIT.md` | Documentation-only phase plus CI. |
 | Current turn data | Existing `OnlineSnapshot.TurnSummary` and `SaveGameJson` fields | Snapshot already carries turn summary, and savegame includes current side/macro-player parsed by the online board adapter. | Phase 09 can display current side/macro-player from existing snapshot data. | `docs/P4G2_SEAT_TURN_AUDIT.md` | Later UI build. |
 | Wrong actor rejection | Existing `SubmitAction` and `RequestLegalPreview` actor checks | Server rejects wrong actor at authority boundary; UI should explain it before submit when possible. | Document "can act now" as a UI-derived hint, not a replacement for server validation. | `docs/P4G2_SEAT_TURN_AUDIT.md` | Future UI tests and manual smoke. |
+
+## P4G2 Phase 09 - Seat And Turn UI
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| WPF state display | Microsoft Learn, WPF data binding overview: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/data/ | A compact status line can expose computed UI state without a large MVVM rewrite. | Add a small seat/turn status helper and render it in the existing online tab. | `src/ChessOnlineClient/OnlineSeatTurnState.cs`, `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp` and run contract tests. |
+| UI thread updates | Microsoft Learn, WPF threading model: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/threading-model | SignalR callbacks that update WPF controls must use the dispatcher. | Keep seat/turn refresh inside existing dispatcher-backed relay event handling. | `src/ChessOnlineApp/MainWindow.xaml.cs` | Build app; no remote smoke in CI. |
+| Authority boundary | Existing `OnlineRoomRegistry.ActorMatchesSeat` and `OnlineMatchmakingStatus.Tickets` | Client-side "can act now" is only a usability hint; server still validates seat ownership and action legality. | Disable local submit when the primary player clearly does not own the current side/macro, but do not weaken server checks. | `src/ChessOnlineClient/OnlineSeatTurnState.cs`, `docs/P4G2_SEAT_TURN_UI.md` | Contract tests for disconnected, no snapshot, my turn, opponent turn, and Hodge macro turns. |

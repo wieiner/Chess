@@ -258,6 +258,106 @@ static void OnlineClientSdkTests(ContractTest test)
     var stalePreviewState = LegalPreviewState.FromMessage(stalePreview);
     test.Check(stalePreviewState.IsStale &&
         stalePreviewState.Reason.Contains("expected hash", StringComparison.OrdinalIgnoreCase), "online legal preview state surfaces stale reason");
+
+    var disconnectedTurn = OnlineSeatTurnState.Empty();
+    test.Check(!disconnectedTurn.CanPrimaryAct &&
+        disconnectedTurn.Summary.Contains("canAct=no", StringComparison.OrdinalIgnoreCase), "online seat turn state handles disconnected UI");
+
+    var noMatchTurn = OnlineSeatTurnState.FromMatch(
+        "classic-six-side-3d-8x8x8-v0.1",
+        "player-a",
+        "player-b",
+        primarySeatIndex: 0,
+        opponentSeatIndex: 0,
+        board: null);
+    test.Check(!noMatchTurn.CanPrimaryAct &&
+        noMatchTurn.DisabledReason.Contains("seat", StringComparison.OrdinalIgnoreCase), "online seat turn state explains missing seat");
+
+    var noSnapshotTurn = OnlineSeatTurnState.FromMatch(
+        "classic-six-side-3d-8x8x8-v0.1",
+        "player-a",
+        "player-b",
+        primarySeatIndex: 1,
+        opponentSeatIndex: 2,
+        board: null);
+    test.Check(!noSnapshotTurn.CanPrimaryAct &&
+        noSnapshotTurn.DisabledReason.Contains("snapshot", StringComparison.OrdinalIgnoreCase), "online seat turn state explains missing snapshot");
+
+    var classicMyTurn = OnlineSeatTurnState.FromMatch(
+        "classic-six-side-3d-8x8x8-v0.1",
+        "player-a",
+        "player-b",
+        primarySeatIndex: 1,
+        opponentSeatIndex: 2,
+        board: Board("classic-six-side-3d-8x8x8-v0.1", currentSide: 1, currentMacroPlayer: 0));
+    test.Check(classicMyTurn.CanPrimaryAct &&
+        classicMyTurn.PrimarySideId == 1 &&
+        classicMyTurn.Summary.Contains("canAct=yes", StringComparison.OrdinalIgnoreCase), "online seat turn state detects Classic primary turn");
+
+    var classicOpponentTurn = OnlineSeatTurnState.FromMatch(
+        "classic-six-side-3d-8x8x8-v0.1",
+        "player-a",
+        "player-b",
+        primarySeatIndex: 1,
+        opponentSeatIndex: 2,
+        board: Board("classic-six-side-3d-8x8x8-v0.1", currentSide: 2, currentMacroPlayer: 0));
+    test.Check(!classicOpponentTurn.CanPrimaryAct &&
+        classicOpponentTurn.DisabledReason.Contains("side 2", StringComparison.OrdinalIgnoreCase), "online seat turn state detects opponent side turn");
+
+    var hodgeMyTurn = OnlineSeatTurnState.FromMatch(
+        "hodge-projection-duel-3d-8x8x8-v0.1",
+        "player-a",
+        "player-b",
+        primarySeatIndex: 1,
+        opponentSeatIndex: 2,
+        board: Board("hodge-projection-duel-3d-8x8x8-v0.1", currentSide: 0, currentMacroPlayer: 1));
+    test.Check(hodgeMyTurn.CanPrimaryAct &&
+        hodgeMyTurn.IsHodge &&
+        hodgeMyTurn.PrimaryMacroPlayer == 1, "online seat turn state detects Hodge primary macro turn");
+
+    var hodgeOpponentTurn = OnlineSeatTurnState.FromMatch(
+        "hodge-projection-duel-3d-8x8x8-v0.1",
+        "player-a",
+        "player-b",
+        primarySeatIndex: 1,
+        opponentSeatIndex: 2,
+        board: Board("hodge-projection-duel-3d-8x8x8-v0.1", currentSide: 0, currentMacroPlayer: 2));
+    test.Check(!hodgeOpponentTurn.CanPrimaryAct &&
+        hodgeOpponentTurn.DisabledReason.Contains("macro-player 2", StringComparison.OrdinalIgnoreCase), "online seat turn state detects Hodge opponent macro turn");
+
+    var statusTurn = OnlineSeatTurnState.FromStatus(new OnlineMatchmakingStatus
+    {
+        State = "Matched",
+        RoomId = "room-a",
+        TableId = "table-a",
+        Tickets =
+        {
+            new OnlineMatchmakingTicket { PlayerId = "player-a", SeatIndex = 1, RequestedRulesetId = "classic-six-side-3d-8x8x8-v0.1" },
+            new OnlineMatchmakingTicket { PlayerId = "player-b", SeatIndex = 2, RequestedRulesetId = "classic-six-side-3d-8x8x8-v0.1" }
+        }
+    }, "player-a", "player-b", Board("classic-six-side-3d-8x8x8-v0.1", currentSide: 1, currentMacroPlayer: 0));
+    test.Check(statusTurn.PrimarySeatIndex == 1 &&
+        statusTurn.OpponentSeatIndex == 2 &&
+        statusTurn.CanPrimaryAct, "online seat turn state derives seats from matchmaking status");
+}
+
+static OnlineChess3DBoardSnapshot Board(string rulesetId, int currentSide, int currentMacroPlayer)
+{
+    return new OnlineChess3DBoardSnapshot(
+        rulesetId,
+        "room-a",
+        "table-a",
+        serverSeq: 1,
+        stateHash: $"hash-{rulesetId}-{currentSide}-{currentMacroPlayer}",
+        actionCount: 0,
+        lastActionNotation: "",
+        width: 8,
+        height: 8,
+        depth: 8,
+        currentSide,
+        currentMacroPlayer,
+        currentTurnKind: 1,
+        projectedBoard: Enumerable.Repeat(0, 512).ToArray());
 }
 
 static void AuthorityClassicTests(ContractTest test, string profileRoot)

@@ -27,12 +27,16 @@ public partial class MainWindow : Window
     private ChessOnlineRelayClient? _p4fSecondaryRelay;
     private string _p4fRoomId = "";
     private string _p4fTableId = "";
+    private int _p4fPrimarySeatIndex;
+    private int _p4fSecondarySeatIndex;
+    private OnlineMatchmakingStatus? _p4fLastMatchmakingStatus;
     private OnlineSnapshot? _p4fLastSnapshot;
     private OnlineChess3DBoardSnapshot? _p4gBoardSnapshot;
     private OnlineChess3DBoardCell? _p4gSelectedCell;
     private OnlineChess3DBoardCell? _p4gMoveFrom;
     private OnlineChess3DBoardCell? _p4gMoveTo;
     private LegalPreviewState _p4gLegalPreview = LegalPreviewState.Empty();
+    private OnlineSeatTurnState _p4fSeatTurnState = OnlineSeatTurnState.Empty();
     private bool _p4gSubmitPending;
     private int _p4fAcceptedActionCount;
     private int _p4fRejectedActionCount;
@@ -51,6 +55,7 @@ public partial class MainWindow : Window
         Log("Online hub started. Main chess boards are intentionally separate.");
         P3EStatusText.Text = "P3E local authority harness idle.";
         RenderP4GBoard();
+        UpdateP4FSeatTurnStatus();
     }
 
     protected override void OnClosed(EventArgs e)
@@ -562,6 +567,10 @@ public partial class MainWindow : Window
         _p3fSessionToken = "";
         _p4fRoomId = "";
         _p4fTableId = "";
+        _p4fPrimarySeatIndex = 0;
+        _p4fSecondarySeatIndex = 0;
+        _p4fLastMatchmakingStatus = null;
+        _p4fSeatTurnState = OnlineSeatTurnState.Empty();
         _p4fLastSnapshot = null;
         _p4gBoardSnapshot = null;
         _p4gSelectedCell = null;
@@ -575,6 +584,7 @@ public partial class MainWindow : Window
         P4FActionLogList.Items.Clear();
         P4FSnapshotStatusText.Text = "Snapshot: none.";
         RenderP4GBoard();
+        UpdateP4FSeatTurnStatus();
         UpdateP4FActionCounters();
         P4FAuthPasswordBox.Password = "";
         P4FMatchStatusText.Text = "Match status: none.";
@@ -764,11 +774,12 @@ public partial class MainWindow : Window
                 throw new InvalidOperationException($"Matchmaking did not produce MatchFound: {found.Error?.ReasonCode} {found.Error?.ReasonText}".Trim());
             }
 
+            RememberP4FMatchmakingStatus(status);
             _p4fRoomId = status.RoomId;
             _p4fTableId = status.TableId;
             P3ERoomBox.Text = _p4fRoomId;
             P3ETableBox.Text = _p4fTableId;
-            P4FMatchStatusText.Text = $"MatchFound ruleset={rulesetId} room={_p4fRoomId} table={_p4fTableId} primary={ShortId(_p4fPrimarySession!.PlayerId)} secondary={ShortId(_p4fSecondarySession!.PlayerId)}";
+            P4FMatchStatusText.Text = $"MatchFound ruleset={rulesetId} room={_p4fRoomId} table={_p4fTableId} primary={ShortId(_p4fPrimarySession!.PlayerId)} seat={DisplaySeat(_p4fPrimarySeatIndex)} secondary={ShortId(_p4fSecondarySession!.PlayerId)} seat={DisplaySeat(_p4fSecondarySeatIndex)}";
             Log($"P4F {P4FMatchStatusText.Text}");
         }
         catch (Exception ex)
@@ -872,6 +883,10 @@ public partial class MainWindow : Window
                 var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
                 RememberP4FSnapshot(snapshot);
             }
+            if (!CanP4FPrimaryAct(out var disabledReason))
+            {
+                throw new InvalidOperationException($"Primary player cannot submit now: {disabledReason}");
+            }
 
             var action = new OnlineActionCommand
             {
@@ -942,6 +957,16 @@ public partial class MainWindow : Window
                 tableId = _p4fTableId,
                 primaryPlayer = ShortId(_p4fPrimarySession?.PlayerId ?? ""),
                 secondaryPlayer = ShortId(_p4fSecondarySession?.PlayerId ?? ""),
+                primarySeat = _p4fPrimarySeatIndex,
+                secondarySeat = _p4fSecondarySeatIndex,
+                seatTurn = new
+                {
+                    _p4fSeatTurnState.CurrentSide,
+                    _p4fSeatTurnState.CurrentMacroPlayer,
+                    _p4fSeatTurnState.CanPrimaryAct,
+                    _p4fSeatTurnState.DisabledReason,
+                    _p4fSeatTurnState.Summary
+                },
                 snapshot = _p4fLastSnapshot == null ? null : new
                 {
                     _p4fLastSnapshot.RulesetId,
@@ -1049,6 +1074,10 @@ public partial class MainWindow : Window
         }
         _p4fRoomId = "";
         _p4fTableId = "";
+        _p4fPrimarySeatIndex = 0;
+        _p4fSecondarySeatIndex = 0;
+        _p4fLastMatchmakingStatus = null;
+        _p4fSeatTurnState = OnlineSeatTurnState.Empty();
         _p4fLastSnapshot = null;
         _p4gBoardSnapshot = null;
         _p4gSelectedCell = null;
@@ -1062,6 +1091,7 @@ public partial class MainWindow : Window
         P4FActionLogList.Items.Clear();
         P4FSnapshotStatusText.Text = "Snapshot: none.";
         RenderP4GBoard();
+        UpdateP4FSeatTurnStatus();
         UpdateP4FActionCounters();
     }
 
@@ -1074,6 +1104,66 @@ public partial class MainWindow : Window
             throw new InvalidOperationException("Create a two-client test match first.");
         }
     }
+
+    private void RememberP4FMatchmakingStatus(OnlineMatchmakingStatus status)
+    {
+        _p4fLastMatchmakingStatus = status;
+        if (!string.IsNullOrWhiteSpace(status.RoomId))
+        {
+            _p4fRoomId = status.RoomId;
+            P3ERoomBox.Text = status.RoomId;
+        }
+        if (!string.IsNullOrWhiteSpace(status.TableId))
+        {
+            _p4fTableId = status.TableId;
+            P3ETableBox.Text = status.TableId;
+        }
+
+        var primarySeat = OnlineSeatTurnState.FindSeat(status, _p4fPrimarySession?.PlayerId ?? "");
+        var secondarySeat = OnlineSeatTurnState.FindSeat(status, _p4fSecondarySession?.PlayerId ?? "");
+        if (primarySeat > 0)
+        {
+            _p4fPrimarySeatIndex = primarySeat;
+        }
+        if (secondarySeat > 0)
+        {
+            _p4fSecondarySeatIndex = secondarySeat;
+        }
+
+        UpdateP4FSeatTurnStatus();
+    }
+
+    private bool CanP4FPrimaryAct(out string reason)
+    {
+        UpdateP4FSeatTurnStatus();
+        reason = _p4fSeatTurnState.DisabledReason;
+        return _p4fSeatTurnState.CanPrimaryAct;
+    }
+
+    private void UpdateP4FSeatTurnStatus()
+    {
+        var rulesetId = _p4gBoardSnapshot?.RulesetId ??
+            _p4fLastSnapshot?.RulesetId ??
+            _p4fLastMatchmakingStatus?.RequestedRulesetId ??
+            _p4fLastMatchmakingStatus?.Tickets.FirstOrDefault(t => !string.IsNullOrWhiteSpace(t.RequestedRulesetId))?.RequestedRulesetId ??
+            SelectedP3FMatchmakingRuleset();
+
+        _p4fSeatTurnState = OnlineSeatTurnState.FromMatch(
+            rulesetId,
+            _p4fPrimarySession?.PlayerId ?? "",
+            _p4fSecondarySession?.PlayerId ?? "",
+            _p4fPrimarySeatIndex,
+            _p4fSecondarySeatIndex,
+            _p4gBoardSnapshot);
+
+        if (P4FSeatTurnStatusText != null)
+        {
+            P4FSeatTurnStatusText.Text = _p4fSeatTurnState.Summary;
+            P4FSeatTurnStatusText.Foreground = _p4fSeatTurnState.CanPrimaryAct ? Brush("#B8F7C6") : Brush("#F4D58D");
+        }
+    }
+
+    private static string DisplaySeat(int seat) => seat > 0 ? seat.ToString() : "none";
 
     private void RememberP4FSnapshot(OnlineProtocolMessage message)
     {
@@ -1103,6 +1193,7 @@ public partial class MainWindow : Window
             ClearP4GLegalPreview("Legal preview: board parse failed.");
             P4GBoardStatusText.Text = $"Board parse failed: {boardError}";
         }
+        UpdateP4FSeatTurnStatus();
         RenderP4GBoard();
         UpdateP4FActionCounters();
     }
@@ -1120,6 +1211,10 @@ public partial class MainWindow : Window
             if (message.Snapshot != null)
             {
                 RememberP4FSnapshot(message);
+            }
+            if (message.MatchmakingStatus != null)
+            {
+                RememberP4FMatchmakingStatus(message.MatchmakingStatus);
             }
             if (message.ActionLog?.Events.Count > 0)
             {
@@ -1252,6 +1347,10 @@ public partial class MainWindow : Window
             {
                 throw new InvalidOperationException("From cell is empty.");
             }
+            if (!CanP4FPrimaryAct(out var disabledReason))
+            {
+                throw new InvalidOperationException($"Primary player cannot submit now: {disabledReason}");
+            }
 
             var action = new OnlineActionCommand
             {
@@ -1379,6 +1478,12 @@ public partial class MainWindow : Window
         if (!IsSupportedP4GPreviewAction(option.ActionKind))
         {
             P4GMoveStatusText.Text = $"Online move: preview action kind is not supported by this UI yet: {option.ActionKind}.";
+            return;
+        }
+        if (!CanP4FPrimaryAct(out var disabledReason))
+        {
+            P4GMoveStatusText.Text = $"Online move disabled: {disabledReason}";
+            Log($"P4G {P4GMoveStatusText.Text}");
             return;
         }
 
