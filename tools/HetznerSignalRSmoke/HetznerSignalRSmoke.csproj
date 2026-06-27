@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.12" />
+    <ProjectReference Include="..\..\src\ChessOnlineClient\ChessOnlineClient.csproj" />
     <ProjectReference Include="..\..\src\ChessOnlineProtocol\ChessOnlineProtocol.csproj" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ChessOnlineClient;
 using ChessOnlineProtocol;
 
 var test = new ContractTest("ChessOnlineContractTests");
@@ -13,6 +14,7 @@ try
     test.Check(RuleProfileCatalog.All.Count == 5, "exactly five Chess3D RuleProfiles are in online catalog");
 
     ProtocolRoundtripTests(test);
+    OnlineClientSdkTests(test);
     AuthorityRuntimeDiagnosticsTests(test, profileRoot);
     AuthorityClassicTests(test, profileRoot);
     AuthorityProfileSmokeTests(test, profileRoot);
@@ -61,6 +63,50 @@ static void ProtocolRoundtripTests(ContractTest test)
     var oversized = new string('x', OnlineProtocolVersion.MaxMessageBytes + 1);
     test.Check(!OnlineProtocolJson.TryDeserialize(oversized, out _, out error) &&
         error.ReasonCode == OnlineRejectReasons.OversizedMessage, "oversized message is rejected");
+}
+
+static void OnlineClientSdkTests(ContractTest test)
+{
+    var endpoint = ChessOnlineServerEndpoint.FromBaseUrl("http://example.test/chess3d/relay/");
+    test.Check(endpoint.ToString() == "http://example.test", "online client endpoint normalizes hub URL to base URL");
+    test.Check(endpoint.HubUri.ToString() == "http://example.test/chess3d/relay", "online client endpoint computes hub URL");
+    test.Check(endpoint.LiveHealthUri.ToString() == "http://example.test/healthz/live", "online client endpoint computes live health URL");
+    test.Check(endpoint.ReadyHealthUri.ToString() == "http://example.test/healthz/ready", "online client endpoint computes ready health URL");
+    test.Check(endpoint.DiagnosticsUri.ToString() == "http://example.test/chess3d/diagnostics", "online client endpoint computes diagnostics URL");
+    test.Check(endpoint.IsDiagnosticHttp, "online client flags non-loopback HTTP as diagnostic-only");
+
+    var local = ChessOnlineServerEndpoint.FromBaseUrl("http://127.0.0.1:5077");
+    test.Check(!local.IsDiagnosticHttp, "online client does not warn for loopback HTTP");
+
+    var redacted = ChessOnlineSecretRedactor.Redact("accessToken=abc refreshToken=def password=s3 Authorization: Bearer secret-token");
+    test.Check(!redacted.Contains("abc", StringComparison.Ordinal) &&
+        !redacted.Contains("def", StringComparison.Ordinal) &&
+        !redacted.Contains("s3", StringComparison.Ordinal) &&
+        !redacted.Contains("secret-token", StringComparison.Ordinal), "online client redacts token-like log fields");
+
+    var session = new ChessOnlineClientSession(endpoint, "test-client");
+    test.Check(!session.IsAuthenticated && session.RedactedStatus == "anonymous", "online client session starts anonymous");
+    session.SetToken(new ChessOnlineAuthTokenResponse
+    {
+        Success = true,
+        PlayerId = "player-123456789",
+        UserName = "sdk-user",
+        AccessToken = "access-secret",
+        RefreshToken = "refresh-secret"
+    });
+    test.Check(session.IsAuthenticated &&
+        session.PlayerId == "player-123456789" &&
+        !session.RedactedStatus.Contains("access-secret", StringComparison.Ordinal), "online client session tracks auth without exposing tokens");
+
+    var eventLog = new ChessOnlineClientEventLog();
+    eventLog.Add("Bearer token-value accessToken=hidden");
+    test.Check(eventLog.Events.Count == 1 &&
+        !eventLog.Events[0].Contains("token-value", StringComparison.Ordinal) &&
+        !eventLog.Events[0].Contains("hidden", StringComparison.Ordinal), "online client event log redacts secrets");
+
+    var connection = ChessOnlineRelayClient.CreateHubConnection(endpoint, () => "in-memory-token");
+    test.Check(connection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected, "online relay client can be constructed without network");
+    connection.DisposeAsync().AsTask().GetAwaiter().GetResult();
 }
 
 static void AuthorityClassicTests(ContractTest test, string profileRoot)

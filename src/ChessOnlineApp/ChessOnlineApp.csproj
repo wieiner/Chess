@@ -14,6 +14,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.12" />
     <Compile Include="..\ChessApp\Chess3DNetworkEndpoint.cs" Link="Integrations\Chess3DNetworkEndpoint.cs" />
+    <ProjectReference Include="..\ChessOnlineClient\ChessOnlineClient.csproj" />
     <ProjectReference Include="..\ChessOnlineProtocol\ChessOnlineProtocol.csproj" />
   </ItemGroup>
 
