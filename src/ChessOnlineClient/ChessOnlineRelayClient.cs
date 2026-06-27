@@ -24,6 +24,8 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
 
     public OnlineProtocolMessage? LastActionLog { get; private set; }
 
+    public OnlineProtocolMessage? LastLegalPreview { get; private set; }
+
     public OnlineMatchmakingStatus? LastMatchmakingStatus { get; private set; }
 
     public event Action<string, OnlineProtocolMessage>? MessageReceived;
@@ -88,6 +90,21 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
     public Task<OnlineProtocolMessage> RequestActionLogAsync(string clientId, string roomId, string tableId, CancellationToken cancellationToken = default)
     {
         return InvokeAsync("RequestActionLog", Message(OnlineMessageTypes.RequestActionLog, clientId, roomId, tableId), cancellationToken);
+    }
+
+    public Task<OnlineProtocolMessage> RequestLegalPreviewAsync(
+        string clientId,
+        string roomId,
+        string tableId,
+        OnlineLegalPreviewRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var message = Message(OnlineMessageTypes.RequestLegalPreview, clientId, roomId, tableId);
+        request.RoomId = string.IsNullOrWhiteSpace(request.RoomId) ? roomId : request.RoomId;
+        request.TableId = string.IsNullOrWhiteSpace(request.TableId) ? tableId : request.TableId;
+        request.PlayerId = string.IsNullOrWhiteSpace(request.PlayerId) ? _session.PlayerId : request.PlayerId;
+        message.LegalPreviewRequest = request;
+        return InvokeAsync("RequestLegalPreview", message, cancellationToken);
     }
 
     public Task<OnlineProtocolMessage> SubmitActionAsync(
@@ -157,6 +174,10 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
         {
             LastActionLog = message;
         }
+        if (message.LegalPreview != null)
+        {
+            LastLegalPreview = message;
+        }
         if (message.MatchmakingStatus != null)
         {
             LastMatchmakingStatus = message.MatchmakingStatus;
@@ -182,6 +203,7 @@ public static class ChessOnlineRelayEvents
         "ReceiveActionRejected",
         "ReceiveAuthoritativeSnapshot",
         "ReceiveActionLogChunk",
+        "ReceiveLegalPreviewResult",
         "ReceiveResyncRequired",
         "ReceiveMatchmakingStatus",
         "ReceiveMatchmakingCancelled",

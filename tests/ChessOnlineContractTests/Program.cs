@@ -211,6 +211,53 @@ static void OnlineClientSdkTests(ContractTest test)
     var connection = ChessOnlineRelayClient.CreateHubConnection(endpoint, () => "in-memory-token");
     test.Check(connection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected, "online relay client can be constructed without network");
     connection.DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+    test.Check(ChessOnlineRelayEvents.All.Contains("ReceiveLegalPreviewResult"), "online relay client registers legal preview callback event");
+
+    var previewMessage = OnlineProtocolJson.Wrap(OnlineMessageTypes.LegalPreviewResult, "client-a", "player-a");
+    previewMessage.LegalPreview = new OnlineLegalPreviewResult
+    {
+        StateHash = "hash-preview",
+        ServerSeq = 7,
+        SourceX = 2,
+        SourceY = 3,
+        SourceZ = 0,
+        ActorSide = 1,
+        Options =
+        {
+            new OnlineLegalActionOption
+            {
+                ActionKind = OnlineActionKinds.NormalMove,
+                ActorSide = 1,
+                From = new OnlineLegalTarget { X = 2, Y = 3, Z = 0 },
+                To = new OnlineLegalTarget { X = 2, Y = 3, Z = 1 },
+                DisplayLabel = "S1P (2,3,0)->(2,3,1)",
+                PieceCode = 11
+            }
+        }
+    };
+    var previewState = LegalPreviewState.FromMessage(previewMessage);
+    test.Check(previewState.Options.Count == 1 &&
+        previewState.Targets.Count == 1 &&
+        previewState.Targets[0].Z == 1 &&
+        previewState.Options[0].Command.ActionKind == OnlineActionKinds.NormalMove &&
+        previewState.Options[0].Command.ToZ == 1,
+        "online legal preview state builds target markers and submit command");
+
+    var stalePreview = OnlineProtocolJson.Wrap(OnlineMessageTypes.LegalPreviewResult, "client-a", "player-a");
+    stalePreview.LegalPreview = new OnlineLegalPreviewResult
+    {
+        IsStale = true,
+        Error = new OnlineLegalPreviewError
+        {
+            ReasonCode = OnlineRejectReasons.StaleStateHash,
+            ReasonText = "Client expected hash does not match authoritative state.",
+            RequiresResync = true
+        }
+    };
+    var stalePreviewState = LegalPreviewState.FromMessage(stalePreview);
+    test.Check(stalePreviewState.IsStale &&
+        stalePreviewState.Reason.Contains("expected hash", StringComparison.OrdinalIgnoreCase), "online legal preview state surfaces stale reason");
 }
 
 static void AuthorityClassicTests(ContractTest test, string profileRoot)
