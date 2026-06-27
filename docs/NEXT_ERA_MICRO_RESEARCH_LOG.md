@@ -379,3 +379,13 @@ Date: 2026-06-27
 | Desktop SignalR invoke shape | Microsoft Learn, SignalR .NET client: https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | The existing client wrapper already centralizes `InvokeAsync` calls and callback registration. | Add `RequestLegalPreviewAsync` to `ChessOnlineRelayClient` using the same message construction path. | `src/ChessOnlineClient/ChessOnlineRelayClient.cs` | Build and contract tests without remote network. |
 | WPF-friendly preview state | Microsoft Learn, WPF data binding overview: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/data/ | UI should bind to stable view state instead of walking raw protocol DTOs in every control handler. | Add small client-side legal preview state/marker view models. | `src/ChessOnlineClient/OnlineLegalPreviewState.cs` | Client model tests in `ChessOnlineContractTests`. |
 | Token-safe event logs | Microsoft Learn SignalR security: https://learn.microsoft.com/en-us/aspnet/core/signalr/security | Hub payload logging must not expose bearer tokens. | Preview event labels contain only message type, seq, and error reason through the existing redacted event log path. | `src/ChessOnlineClient/ChessOnlineRelayClient.cs` | Existing event log redaction tests plus preview state tests. |
+
+## P4G2 Phase 06 - UI Legal Target Highlights
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| WPF click/highlight state | Microsoft Learn, WPF data binding and controls: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/data/ | Incremental UI state can be kept as simple view models and refreshed on selection without embedding the full local Chess3D window. | Add legal-preview status/list and color markers to the existing P4G board slice. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`. |
+| SignalR callback threading | Microsoft Learn, SignalR .NET client: https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | Desktop callbacks can arrive away from the UI thread; UI changes must be marshalled through the dispatcher. | Keep preview display updates inside existing app event/dispatcher patterns. | `src/ChessOnlineApp/MainWindow.xaml.cs` | Build plus existing contract tests. |
+| Preview safety boundary | Existing Phase 04 server no-mutation tests | Preview is authoritative metadata, not a local action. | UI highlights targets but still submits through `SubmitAction` later; no local board mutation. | `docs/P4G2_UI_LEGAL_TARGETS.md` | Manual remote smoke later; no remote smoke in CI. |

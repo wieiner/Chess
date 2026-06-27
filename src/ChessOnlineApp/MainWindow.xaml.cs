@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private OnlineChess3DBoardCell? _p4gSelectedCell;
     private OnlineChess3DBoardCell? _p4gMoveFrom;
     private OnlineChess3DBoardCell? _p4gMoveTo;
+    private LegalPreviewState _p4gLegalPreview = LegalPreviewState.Empty();
     private int _p4fAcceptedActionCount;
     private int _p4fRejectedActionCount;
     private long _p4fLastServerSeq;
@@ -565,6 +566,7 @@ public partial class MainWindow : Window
         _p4gSelectedCell = null;
         _p4gMoveFrom = null;
         _p4gMoveTo = null;
+        ClearP4GLegalPreview("Legal preview: session cleared.");
         _p4fAcceptedActionCount = 0;
         _p4fRejectedActionCount = 0;
         _p4fLastServerSeq = 0;
@@ -1050,6 +1052,7 @@ public partial class MainWindow : Window
         _p4gSelectedCell = null;
         _p4gMoveFrom = null;
         _p4gMoveTo = null;
+        ClearP4GLegalPreview("Legal preview: session cleared.");
         _p4fAcceptedActionCount = 0;
         _p4fRejectedActionCount = 0;
         _p4fLastServerSeq = 0;
@@ -1077,6 +1080,11 @@ public partial class MainWindow : Window
             return;
         }
         _p4fLastSnapshot = message.Snapshot;
+        if (!string.IsNullOrWhiteSpace(_p4gLegalPreview.StateHash) &&
+            !string.Equals(_p4gLegalPreview.StateHash, message.Snapshot.StateHash, StringComparison.Ordinal))
+        {
+            ClearP4GLegalPreview("Legal preview: cleared after authoritative snapshot update.");
+        }
         P4FSnapshotStatusText.Text =
             $"Snapshot: ruleset={message.Snapshot.RulesetId} seq={message.Snapshot.ServerSeq} turn={message.Snapshot.TurnSummary} actions={message.Snapshot.ActionCount} hash={message.Snapshot.StateHash}";
         if (OnlineChess3DBoardSnapshotParser.TryParse(message.Snapshot, out var board, out var boardError))
@@ -1089,6 +1097,7 @@ public partial class MainWindow : Window
         {
             _p4gBoardSnapshot = null;
             _p4gSelectedCell = null;
+            ClearP4GLegalPreview("Legal preview: board parse failed.");
             P4GBoardStatusText.Text = $"Board parse failed: {boardError}";
         }
         RenderP4GBoard();
@@ -1129,6 +1138,22 @@ public partial class MainWindow : Window
         RenderP4GBoard();
     }
 
+    private async void P4GRefreshLegalPreview_Click(object sender, RoutedEventArgs e)
+    {
+        if (_p4gMoveFrom == null && _p4gSelectedCell?.IsOccupied == true)
+        {
+            _p4gMoveFrom = _p4gSelectedCell;
+        }
+        if (_p4gMoveFrom == null)
+        {
+            ClearP4GLegalPreview("Legal preview: select an occupied source cell first.");
+            RenderP4GBoard();
+            return;
+        }
+
+        await RequestP4GLegalPreviewAsync(_p4gMoveFrom);
+    }
+
     private void P4GBoardLayerBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (P4GBoardGrid != null)
@@ -1137,13 +1162,23 @@ public partial class MainWindow : Window
         }
     }
 
-    private void P4GBoardCell_Click(object sender, RoutedEventArgs e)
+    private async void P4GBoardCell_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: OnlineChess3DBoardCell cell })
         {
             _p4gSelectedCell = cell;
             P4GSelectedCellText.Text = $"Selected online cell: {cell.Coordinate} piece={PieceLabel(cell.PieceCode)} index={cell.Index}";
-            P4GMoveStatusText.Text = $"Online move: selected {cell.Coordinate}. Use it as From or To.";
+            if (cell.IsOccupied)
+            {
+                _p4gMoveFrom = cell;
+                _p4gMoveTo = null;
+                P4GMoveStatusText.Text = $"Online move: source={cell.Coordinate}. Requesting legal targets...";
+                await RequestP4GLegalPreviewAsync(cell);
+                return;
+            }
+
+            _p4gMoveTo = cell;
+            P4GMoveStatusText.Text = $"Online move: selected target {cell.Coordinate}. From={DescribeMoveCell(_p4gMoveFrom)}.";
             RenderP4GBoard();
         }
     }
@@ -1231,6 +1266,93 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task RequestP4GLegalPreviewAsync(OnlineChess3DBoardCell source)
+    {
+        try
+        {
+            EnsureP4FMatchReady();
+            if (_p4fLastSnapshot == null)
+            {
+                ClearP4GLegalPreview("Legal preview: request a snapshot first.");
+                RenderP4GBoard();
+                return;
+            }
+            if (!source.IsOccupied)
+            {
+                ClearP4GLegalPreview("Legal preview: selected source is empty.");
+                RenderP4GBoard();
+                return;
+            }
+
+            var result = await _p4fPrimaryRelay!.RequestLegalPreviewAsync(
+                "p4f-client-a",
+                _p4fRoomId,
+                _p4fTableId,
+                new OnlineLegalPreviewRequest
+                {
+                    SourceX = source.X,
+                    SourceY = source.Y,
+                    SourceZ = source.Z,
+                    ActorSide = source.Side,
+                    ExpectedStateHash = _p4fLastSnapshot.StateHash
+                });
+            RememberP4FServerSeq(result);
+            if (result.Envelope.MessageType != OnlineMessageTypes.LegalPreviewResult || result.LegalPreview == null)
+            {
+                ClearP4GLegalPreview($"Legal preview failed: {result.Error?.ReasonCode} {result.Error?.ReasonText}".Trim());
+                RenderP4GBoard();
+                return;
+            }
+
+            _p4gLegalPreview = LegalPreviewState.FromMessage(result);
+            RenderP4GLegalPreviewList();
+            if (_p4gLegalPreview.IsStale)
+            {
+                P4GLegalPreviewStatusText.Text = $"Legal preview stale: {_p4gLegalPreview.Reason}. Requesting snapshot...";
+                var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
+                RememberP4FSnapshot(snapshot);
+                return;
+            }
+
+            P4GLegalPreviewStatusText.Text = _p4gLegalPreview.Options.Count > 0
+                ? $"Legal preview: {_p4gLegalPreview.Options.Count} legal action(s) from {source.Coordinate}."
+                : $"Legal preview: {_p4gLegalPreview.Reason}";
+            P4GMoveStatusText.Text = $"Online move: source={source.Coordinate}; click a highlighted target or use manual To.";
+            RenderP4GBoard();
+        }
+        catch (Exception ex)
+        {
+            ClearP4GLegalPreview($"Legal preview failed: {ex.Message}");
+            RenderP4GBoard();
+            Log(P4GLegalPreviewStatusText.Text);
+        }
+    }
+
+    private void ClearP4GLegalPreview(string reason = "")
+    {
+        _p4gLegalPreview = LegalPreviewState.Empty(reason);
+        if (P4GLegalPreviewList != null)
+        {
+            P4GLegalPreviewList.Items.Clear();
+        }
+        if (P4GLegalPreviewStatusText != null)
+        {
+            P4GLegalPreviewStatusText.Text = string.IsNullOrWhiteSpace(reason)
+                ? "Legal preview: select an occupied source cell."
+                : reason;
+        }
+    }
+
+    private void RenderP4GLegalPreviewList()
+    {
+        P4GLegalPreviewList.Items.Clear();
+        foreach (var option in _p4gLegalPreview.Options)
+        {
+            var suffix = option.IsCapture ? " capture" : option.IsSpecial ? " special" : "";
+            P4GLegalPreviewList.Items.Add($"{option.DisplayLabel}{suffix}");
+        }
+    }
+
     private void RenderP4GBoard()
     {
         if (P4GBoardGrid == null)
@@ -1261,6 +1383,8 @@ public partial class MainWindow : Window
                 var isSelected = _p4gSelectedCell?.Index == cell.Index;
                 var isFrom = _p4gMoveFrom?.Index == cell.Index;
                 var isTo = _p4gMoveTo?.Index == cell.Index;
+                var legalMarker = _p4gLegalPreview.Targets.FirstOrDefault(t => t.X == cell.X && t.Y == cell.Y && t.Z == cell.Z);
+                var isLegalTarget = legalMarker != null;
                 var button = new Button
                 {
                     Content = cell.IsOccupied ? PieceLabel(cell.PieceCode) : ".",
@@ -1270,9 +1394,17 @@ public partial class MainWindow : Window
                     Margin = new Thickness(1),
                     FontSize = 11,
                     Foreground = Brushes.White,
-                    Background = isFrom ? Brush("#3F8F5F") : isTo ? Brush("#9A6A3A") : isSelected ? Brush("#3F7FBF") : CellBrush(cell),
-                    BorderBrush = isSelected || isFrom || isTo ? Brush("#D8F0FF") : Brush("#263442"),
-                    ToolTip = $"{cell.Coordinate} index={cell.Index} piece={PieceLabel(cell.PieceCode)}"
+                    Background = isFrom ? Brush("#3F8F5F") :
+                        isTo ? Brush("#9A6A3A") :
+                        isSelected ? Brush("#3F7FBF") :
+                        legalMarker?.IsCapture == true ? Brush("#A84E32") :
+                        legalMarker?.IsSpecial == true ? Brush("#6F4FA8") :
+                        isLegalTarget ? Brush("#2D5F9A") :
+                        CellBrush(cell),
+                    BorderBrush = isSelected || isFrom || isTo || isLegalTarget ? Brush("#D8F0FF") : Brush("#263442"),
+                    ToolTip = isLegalTarget
+                        ? $"{cell.Coordinate} index={cell.Index} piece={PieceLabel(cell.PieceCode)} legal={legalMarker!.DisplayLabel}"
+                        : $"{cell.Coordinate} index={cell.Index} piece={PieceLabel(cell.PieceCode)}"
                 };
                 button.Click += P4GBoardCell_Click;
                 P4GBoardGrid.Children.Add(button);
@@ -1280,7 +1412,7 @@ public partial class MainWindow : Window
         }
 
         P4GBoardStatusText.Text =
-            $"Board: layer Z={layer} ruleset={_p4gBoardSnapshot.RulesetId} seq={_p4gBoardSnapshot.ServerSeq} occupied={_p4gBoardSnapshot.OccupiedCells.Count()} hash={_p4gBoardSnapshot.StateHash}";
+            $"Board: layer Z={layer} ruleset={_p4gBoardSnapshot.RulesetId} seq={_p4gBoardSnapshot.ServerSeq} occupied={_p4gBoardSnapshot.OccupiedCells.Count()} legalTargets={_p4gLegalPreview.Targets.Count} hash={_p4gBoardSnapshot.StateHash}";
     }
 
     private int SelectedP4GLayer()

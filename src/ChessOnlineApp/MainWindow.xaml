@@ -422,9 +422,12 @@
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                 <Button Content="Use Selected as From" Click="P4GUseSelectedFrom_Click" />
                                 <Button Content="Use Selected as To" Click="P4GUseSelectedTo_Click" />
+                                <Button Content="Refresh Legal Preview" Click="P4GRefreshLegalPreview_Click" MinWidth="150" />
                                 <Button Content="Submit Normal Move" Click="P4GSubmitNormalMove_Click" />
                                 <TextBlock x:Name="P4GMoveStatusText" Foreground="#AFC0D0" Margin="8,0,0,0" TextWrapping="Wrap" Text="Online move: choose From and To." />
                             </StackPanel>
+                            <TextBlock x:Name="P4GLegalPreviewStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Legal preview: select an occupied source cell." />
+                            <ListBox x:Name="P4GLegalPreviewList" Height="72" Margin="0,6,0,0" />
                         </StackPanel>
                     </Border>
                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
