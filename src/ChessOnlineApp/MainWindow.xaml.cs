@@ -26,6 +26,10 @@ public partial class MainWindow : Window
     private ChessOnlineRelayClient? _p4fSecondaryRelay;
     private string _p4fRoomId = "";
     private string _p4fTableId = "";
+    private OnlineSnapshot? _p4fLastSnapshot;
+    private int _p4fAcceptedActionCount;
+    private int _p4fRejectedActionCount;
+    private long _p4fLastServerSeq;
     private const string P4FHetznerHttpBaseUrl = "http://178.105.220.117";
 
     public MainWindow()
@@ -550,6 +554,13 @@ public partial class MainWindow : Window
         _p3fSessionToken = "";
         _p4fRoomId = "";
         _p4fTableId = "";
+        _p4fLastSnapshot = null;
+        _p4fAcceptedActionCount = 0;
+        _p4fRejectedActionCount = 0;
+        _p4fLastServerSeq = 0;
+        P4FActionLogList.Items.Clear();
+        P4FSnapshotStatusText.Text = "Snapshot: none.";
+        UpdateP4FActionCounters();
         P4FAuthPasswordBox.Password = "";
         P4FMatchStatusText.Text = "Match status: none.";
         UpdateP4FAuthStatus("Session cleared.");
@@ -773,6 +784,7 @@ public partial class MainWindow : Window
         {
             EnsureP4FMatchReady();
             var started = await _p4fPrimaryRelay!.StartGameAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
+            RememberP4FSnapshot(started);
             P4FMatchStatusText.Text = $"Started: {started.Envelope.MessageType} ruleset={started.Snapshot?.RulesetId} hash={started.Snapshot?.StateHash}";
             Log($"P4F {P4FMatchStatusText.Text}");
         }
@@ -789,6 +801,7 @@ public partial class MainWindow : Window
         {
             EnsureP4FMatchReady();
             var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
+            RememberP4FSnapshot(snapshot);
             P4FMatchStatusText.Text = $"Snapshot: ruleset={snapshot.Snapshot?.RulesetId} seq={snapshot.Envelope.ServerSeq} actions={snapshot.Snapshot?.ActionCount} hash={snapshot.Snapshot?.StateHash}";
             Log($"P4F {P4FMatchStatusText.Text}");
         }
@@ -805,20 +818,131 @@ public partial class MainWindow : Window
         {
             EnsureP4FMatchReady();
             var actionLog = await _p4fPrimaryRelay!.RequestActionLogAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
+            RememberP4FServerSeq(actionLog);
             var count = actionLog.ActionLog?.Events.Count ?? 0;
             P4FMatchStatusText.Text = $"ActionLog: seq={actionLog.Envelope.ServerSeq} events={count}";
             Log($"P4F {P4FMatchStatusText.Text}");
             if (actionLog.ActionLog != null)
             {
+                P4FActionLogList.Items.Clear();
                 foreach (var actionEvent in actionLog.ActionLog.Events)
                 {
-                    Log($"P4F event #{actionEvent.ServerSeq}: {actionEvent.Notation} hash={actionEvent.StateHashAfter}");
+                    var line = $"#{actionEvent.ServerSeq}: {actionEvent.Notation} hash={actionEvent.StateHashAfter}";
+                    P4FActionLogList.Items.Add(line);
+                    Log($"P4F event {line}");
                 }
             }
         }
         catch (Exception ex)
         {
             P4FMatchStatusText.Text = $"Action log failed: {ex.Message}";
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private async void P4FSubmitSafeAsgardAction_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            EnsureP4FMatchReady();
+            if (!string.Equals(SelectedP3FMatchmakingRuleset(), "asgard-convergence-3d-8x8x8-v0.1", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Safe test action is currently defined only for the Asgard profile.");
+            }
+
+            if (_p4fLastSnapshot == null)
+            {
+                var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
+                RememberP4FSnapshot(snapshot);
+            }
+
+            var action = new OnlineActionCommand
+            {
+                ActionKind = OnlineActionKinds.NormalMove,
+                ActorSide = 1,
+                ExpectedStateHashBefore = _p4fLastSnapshot?.StateHash ?? "",
+                FromX = 2,
+                FromY = 3,
+                FromZ = 0,
+                ToX = 2,
+                ToY = 3,
+                ToZ = 1
+            };
+
+            var result = await _p4fPrimaryRelay!.SubmitActionAsync("p4f-client-a", _p4fRoomId, _p4fTableId, action);
+            RememberP4FServerSeq(result);
+            if (result.Envelope.MessageType == OnlineMessageTypes.ActionAccepted)
+            {
+                _p4fAcceptedActionCount++;
+                var notation = result.ActionLog?.Events.LastOrDefault()?.Notation ?? "accepted";
+                P4FMatchStatusText.Text = $"Action accepted: {notation}";
+                if (!string.IsNullOrWhiteSpace(notation))
+                {
+                    P4FActionLogList.Items.Add($"#{result.Envelope.ServerSeq}: {notation}");
+                }
+            }
+            else
+            {
+                _p4fRejectedActionCount++;
+                P4FMatchStatusText.Text = $"Action rejected: {result.Error?.ReasonCode} {result.Error?.ReasonText}".Trim();
+            }
+            UpdateP4FActionCounters();
+            Log($"P4F {P4FMatchStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            _p4fRejectedActionCount++;
+            UpdateP4FActionCounters();
+            P4FMatchStatusText.Text = $"Submit safe action failed: {ex.Message}";
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private void P4FClearEventLog_Click(object sender, RoutedEventArgs e)
+    {
+        P4FActionLogList.Items.Clear();
+        LogBox.Clear();
+        Log("P4F event log cleared.");
+    }
+
+    private void P4FSaveSessionReport_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var root = Path.Combine(FindRepoRoot(), ".tmp", "manual-smoke");
+            Directory.CreateDirectory(root);
+            var path = Path.Combine(root, $"p4f-online-client-session-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json");
+            var report = new
+            {
+                format = "p4f-online-client-session",
+                createdUtc = DateTime.UtcNow.ToString("O"),
+                baseUrl = P4FBaseUrlBox.Text.Trim(),
+                hubUrl = P3FServerUrlBox.Text.Trim(),
+                rulesetId = SelectedP3FMatchmakingRuleset(),
+                roomId = _p4fRoomId,
+                tableId = _p4fTableId,
+                primaryPlayer = ShortId(_p4fPrimarySession?.PlayerId ?? ""),
+                secondaryPlayer = ShortId(_p4fSecondarySession?.PlayerId ?? ""),
+                snapshot = _p4fLastSnapshot == null ? null : new
+                {
+                    _p4fLastSnapshot.RulesetId,
+                    _p4fLastSnapshot.ServerSeq,
+                    _p4fLastSnapshot.StateHash,
+                    _p4fLastSnapshot.ActionCount,
+                    _p4fLastSnapshot.LastActionNotation
+                },
+                acceptedActionCount = _p4fAcceptedActionCount,
+                rejectedActionCount = _p4fRejectedActionCount,
+                lastServerSeq = _p4fLastServerSeq,
+                actionLogItems = P4FActionLogList.Items.Cast<object>().Select(item => item.ToString()).ToArray()
+            };
+            File.WriteAllText(path, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
+            P4FMatchStatusText.Text = $"Session report saved: {path}";
+            Log($"P4F session report saved: {path}");
+        }
+        catch (Exception ex)
+        {
+            P4FMatchStatusText.Text = $"Save session report failed: {ex.Message}";
             Log(P4FMatchStatusText.Text);
         }
     }
@@ -906,6 +1030,13 @@ public partial class MainWindow : Window
         }
         _p4fRoomId = "";
         _p4fTableId = "";
+        _p4fLastSnapshot = null;
+        _p4fAcceptedActionCount = 0;
+        _p4fRejectedActionCount = 0;
+        _p4fLastServerSeq = 0;
+        P4FActionLogList.Items.Clear();
+        P4FSnapshotStatusText.Text = "Snapshot: none.";
+        UpdateP4FActionCounters();
     }
 
     private void EnsureP4FMatchReady()
@@ -916,6 +1047,48 @@ public partial class MainWindow : Window
         {
             throw new InvalidOperationException("Create a two-client test match first.");
         }
+    }
+
+    private void RememberP4FSnapshot(OnlineProtocolMessage message)
+    {
+        RememberP4FServerSeq(message);
+        if (message.Snapshot == null)
+        {
+            return;
+        }
+        _p4fLastSnapshot = message.Snapshot;
+        P4FSnapshotStatusText.Text =
+            $"Snapshot: ruleset={message.Snapshot.RulesetId} seq={message.Snapshot.ServerSeq} turn={message.Snapshot.TurnSummary} actions={message.Snapshot.ActionCount} hash={message.Snapshot.StateHash}";
+        UpdateP4FActionCounters();
+    }
+
+    private void RememberP4FServerSeq(OnlineProtocolMessage message)
+    {
+        if (message.Envelope.ServerSeq > _p4fLastServerSeq)
+        {
+            _p4fLastServerSeq = message.Envelope.ServerSeq;
+        }
+        UpdateP4FActionCounters();
+    }
+
+    private void UpdateP4FActionCounters()
+    {
+        P4FActionCountersText.Text = $"Accepted={_p4fAcceptedActionCount} Rejected={_p4fRejectedActionCount} LastSeq={_p4fLastServerSeq}";
+    }
+
+    private static string FindRepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null)
+        {
+            if (Directory.Exists(Path.Combine(dir.FullName, "assets", "rules", "profiles")) ||
+                File.Exists(Path.Combine(dir.FullName, "Chess.sln")))
+            {
+                return dir.FullName;
+            }
+            dir = dir.Parent;
+        }
+        return AppContext.BaseDirectory;
     }
 
     private void ApplyP4FEndpointToHubUrl()

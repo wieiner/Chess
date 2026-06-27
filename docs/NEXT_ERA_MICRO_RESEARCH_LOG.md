@@ -244,3 +244,13 @@ Date: 2026-06-27
 | Two-client SignalR smoke UX | Microsoft Learn, "ASP.NET Core SignalR .NET client": https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | A desktop process can own multiple `HubConnection` instances for operator/test workflows. | Add `Create Test Match With Two Local Clients` using the SDK relay client and current five-profile selector. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build app; remote UI smoke remains manual. |
 | Authenticated matchmaking | Microsoft Learn, "Authentication and authorization in ASP.NET Core SignalR": https://learn.microsoft.com/en-us/aspnet/core/signalr/authn-and-authz | Authenticated hub methods depend on the access token bound to each connection. | Use two in-memory temporary users for the two local clients; do not print tokens/passwords. | `src/ChessOnlineApp/MainWindow.xaml.cs`, `docs/P4F_MATCHMAKING_PANEL.md` | Build app. |
 | Incremental WPF control center | Microsoft Learn, WPF layout overview: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/layout | Additional controls can be grouped without replacing the whole window. | Add match buttons/status under the existing P3F panel instead of redesigning the app. | `src/ChessOnlineApp/MainWindow.xaml` | Build app. |
+
+## P4F Phase 06 - Snapshot Viewer
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Test/verify plan |
+| --- | --- | --- | --- | --- | --- |
+| Snapshot/action log UI | Microsoft Learn, "ASP.NET Core SignalR .NET client": https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | Client-side hub method results can be projected into small desktop status views without changing the server contract. | Add compact snapshot status, action counters, and action-log list to `ChessOnlineApp`. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build app. |
+| Safe action smoke | Project remote smoke result and existing online authority contract | The proven Asgard smoke action is a normal move from `(2,3,0)` to `(2,3,1)` with expected state hash. | Add `Submit Safe Asgard Test Action` for the Asgard profile only. | `src/ChessOnlineApp/MainWindow.xaml.cs`, `docs/P4F_ONLINE_SNAPSHOT_VIEWER.md` | Build app; remote UI smoke later. |
+| Session report safety | OWASP Secrets Management Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html | Runtime reports must avoid credentials and tokens. | Save sanitized client session reports under ignored `.tmp/manual-smoke`. | `src/ChessOnlineApp/MainWindow.xaml.cs` | No report files are committed. |

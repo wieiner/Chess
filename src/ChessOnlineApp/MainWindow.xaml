@@ -394,8 +394,16 @@
                         <Button Content="Start Game" Click="P4FStartGame_Click" />
                         <Button Content="Request Snapshot" Click="P4FRequestSnapshot_Click" />
                         <Button Content="Request Action Log" Click="P4FRequestActionLog_Click" />
+                        <Button Content="Submit Safe Asgard Test Action" Click="P4FSubmitSafeAsgardAction_Click" MinWidth="210" />
                     </StackPanel>
                     <TextBlock x:Name="P4FMatchStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Match status: none." />
+                    <TextBlock x:Name="P4FSnapshotStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Snapshot: none." />
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button Content="Clear Event Log" Click="P4FClearEventLog_Click" />
+                        <Button Content="Save Session Report" Click="P4FSaveSessionReport_Click" />
+                        <TextBlock x:Name="P4FActionCountersText" Foreground="#AFC0D0" Margin="8,0,0,0" Text="Accepted=0 Rejected=0 LastSeq=0" />
+                    </StackPanel>
+                    <ListBox x:Name="P4FActionLogList" Height="96" Margin="0,8,0,0" />
                 </StackPanel>
             </TabItem>
         </TabControl>
