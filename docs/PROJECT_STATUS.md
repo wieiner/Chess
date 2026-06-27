@@ -1,8 +1,8 @@
 # Project Status
 
-Last audited locally for Next Era Phase 12 roadmap/status cleanup.
+Last audited locally for P4F playable online client MVP.
 
-Current summary: the repository now contains Windows desktop products, a Linux-capable ChessOnlineServer authority, a proven Hetzner systemd + Nginx public HTTP dry-run, and exactly five real Chess3D RuleProfiles. TLS/domain hardening, HTTPS auth enforcement, public SignalR over HTTPS, deployment rollback/backups/log rotation, Chess2D PGN/UCI portal foundations, and documentation reconciliation remain open. Historical sections below keep phase context; `docs/NEXT_ERA_PROJECT_MAP.md` is the concise current-state map.
+Current summary: the repository now contains Windows desktop products, a Linux-capable ChessOnlineServer authority, a proven Hetzner systemd + Nginx public HTTP dry-run, a playable `ChessOnlineApp` diagnostic client path over HTTP 80, and exactly five real Chess3D RuleProfiles. TLS/domain hardening, HTTPS auth enforcement, reconnect/resume/spectator UX, deployment rollback/backups/log rotation, Chess2D PGN/UCI portal foundations, and older documentation reconciliation remain open. Historical sections below keep phase context; `docs/NEXT_ERA_PROJECT_MAP.md` and `docs/P4F_PLAYABLE_ONLINE_USER_GUIDE.md` are the concise current-state entry points.
 
 P4A added a local production-oriented identity/session/persistence layer around the P3E/P3F online authority contract: persistent player accounts, password hashing, protected access/refresh tokens, authenticated SignalR player identity, durable session records, JSON persistence baseline, identity/persistence fixtures, tests, and packaging checks. It did not add a sixth Chess3D RuleProfile and did not make online play a public production service.
 

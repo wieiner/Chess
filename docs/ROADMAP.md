@@ -2,14 +2,14 @@
 
 ## Current Next Era Priorities
 
-Current source of truth after Next Era Phase 12:
+Current source of truth after P4F:
 
-1. Confirm domain/DNS and configure TLS/HTTPS for ChessOnlineServer.
-2. Enforce HTTPS-safe auth/token behavior before real public accounts.
-3. Add deployment rollback, backup/restore, and log rotation runbooks.
-4. Reconcile older historical docs that still say Linux-native authority or Classic king safety are blocked/draft.
-5. Build Chess2D PGN/SAN and UCI adapter foundations before live portal play.
-6. Prove public SignalR over HTTPS and reconnect/resume semantics.
+1. P4G: integrate the online snapshot/action stream into a fuller realtime Chess3D board experience.
+2. P4H: add reconnect/resume/spectator UX and operator diagnostics.
+3. P4E later: confirm domain/DNS and configure TLS/HTTPS for ChessOnlineServer on a dedicated server or after the x-ui/443 decision.
+4. Enforce HTTPS-safe auth/token behavior before real public accounts.
+5. Add deployment rollback, backup/restore, and log rotation runbooks.
+6. Build Chess2D PGN/SAN and UCI adapter foundations before live portal play.
 7. Add visual QA automation and later AI/search strength work.
 
 Historical phase sections below are retained for context. When an older "Next" line conflicts with this section or `docs/NEXT_ERA_PROJECT_MAP.md`, the Next Era map wins.
