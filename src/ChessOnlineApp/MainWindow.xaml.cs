@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using ChessApp;
 using ChessOnlineClient;
 using ChessOnlineProtocol;
@@ -27,6 +28,8 @@ public partial class MainWindow : Window
     private string _p4fRoomId = "";
     private string _p4fTableId = "";
     private OnlineSnapshot? _p4fLastSnapshot;
+    private OnlineChess3DBoardSnapshot? _p4gBoardSnapshot;
+    private OnlineChess3DBoardCell? _p4gSelectedCell;
     private int _p4fAcceptedActionCount;
     private int _p4fRejectedActionCount;
     private long _p4fLastServerSeq;
@@ -43,6 +46,7 @@ public partial class MainWindow : Window
         _ = ReloadAccountsAsync();
         Log("Online hub started. Main chess boards are intentionally separate.");
         P3EStatusText.Text = "P3E local authority harness idle.";
+        RenderP4GBoard();
     }
 
     protected override void OnClosed(EventArgs e)
@@ -555,11 +559,14 @@ public partial class MainWindow : Window
         _p4fRoomId = "";
         _p4fTableId = "";
         _p4fLastSnapshot = null;
+        _p4gBoardSnapshot = null;
+        _p4gSelectedCell = null;
         _p4fAcceptedActionCount = 0;
         _p4fRejectedActionCount = 0;
         _p4fLastServerSeq = 0;
         P4FActionLogList.Items.Clear();
         P4FSnapshotStatusText.Text = "Snapshot: none.";
+        RenderP4GBoard();
         UpdateP4FActionCounters();
         P4FAuthPasswordBox.Password = "";
         P4FMatchStatusText.Text = "Match status: none.";
@@ -880,6 +887,8 @@ public partial class MainWindow : Window
                 {
                     P4FActionLogList.Items.Add($"#{result.Envelope.ServerSeq}: {notation}");
                 }
+                var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
+                RememberP4FSnapshot(snapshot);
             }
             else
             {
@@ -1031,11 +1040,14 @@ public partial class MainWindow : Window
         _p4fRoomId = "";
         _p4fTableId = "";
         _p4fLastSnapshot = null;
+        _p4gBoardSnapshot = null;
+        _p4gSelectedCell = null;
         _p4fAcceptedActionCount = 0;
         _p4fRejectedActionCount = 0;
         _p4fLastServerSeq = 0;
         P4FActionLogList.Items.Clear();
         P4FSnapshotStatusText.Text = "Snapshot: none.";
+        RenderP4GBoard();
         UpdateP4FActionCounters();
     }
 
@@ -1059,7 +1071,148 @@ public partial class MainWindow : Window
         _p4fLastSnapshot = message.Snapshot;
         P4FSnapshotStatusText.Text =
             $"Snapshot: ruleset={message.Snapshot.RulesetId} seq={message.Snapshot.ServerSeq} turn={message.Snapshot.TurnSummary} actions={message.Snapshot.ActionCount} hash={message.Snapshot.StateHash}";
+        if (OnlineChess3DBoardSnapshotParser.TryParse(message.Snapshot, out var board, out var boardError))
+        {
+            _p4gBoardSnapshot = board;
+            P4GBoardStatusText.Text =
+                $"Board: {board.RulesetId} seq={board.ServerSeq} occupied={board.OccupiedCells.Count()} side={board.CurrentSide} macro={board.CurrentMacroPlayer}";
+        }
+        else
+        {
+            _p4gBoardSnapshot = null;
+            _p4gSelectedCell = null;
+            P4GBoardStatusText.Text = $"Board parse failed: {boardError}";
+        }
+        RenderP4GBoard();
         UpdateP4FActionCounters();
+    }
+
+    private void P4GRefreshBoard_Click(object sender, RoutedEventArgs e)
+    {
+        RenderP4GBoard();
+    }
+
+    private void P4GBoardLayerBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (P4GBoardGrid != null)
+        {
+            RenderP4GBoard();
+        }
+    }
+
+    private void P4GBoardCell_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: OnlineChess3DBoardCell cell })
+        {
+            _p4gSelectedCell = cell;
+            P4GSelectedCellText.Text = $"Selected online cell: {cell.Coordinate} piece={PieceLabel(cell.PieceCode)} index={cell.Index}";
+            RenderP4GBoard();
+        }
+    }
+
+    private void RenderP4GBoard()
+    {
+        if (P4GBoardGrid == null)
+        {
+            return;
+        }
+
+        P4GBoardGrid.Children.Clear();
+        if (_p4gBoardSnapshot == null)
+        {
+            P4GBoardStatusText.Text = "Board: no snapshot.";
+            P4GSelectedCellText.Text = "Selected online cell: none.";
+            return;
+        }
+
+        var layer = SelectedP4GLayer();
+        if (layer < 0 || layer >= _p4gBoardSnapshot.Depth)
+        {
+            layer = 0;
+        }
+
+        for (var y = _p4gBoardSnapshot.Height - 1; y >= 0; y--)
+        {
+            for (var x = 0; x < _p4gBoardSnapshot.Width; x++)
+            {
+                var cell = _p4gBoardSnapshot.GetCell(x, y, layer);
+                var isSelected = _p4gSelectedCell?.Index == cell.Index;
+                var button = new Button
+                {
+                    Content = cell.IsOccupied ? PieceLabel(cell.PieceCode) : ".",
+                    Tag = cell,
+                    MinWidth = 34,
+                    MinHeight = 28,
+                    Margin = new Thickness(1),
+                    FontSize = 11,
+                    Foreground = Brushes.White,
+                    Background = isSelected ? Brush("#3F7FBF") : CellBrush(cell),
+                    BorderBrush = isSelected ? Brush("#D8F0FF") : Brush("#263442"),
+                    ToolTip = $"{cell.Coordinate} index={cell.Index} piece={PieceLabel(cell.PieceCode)}"
+                };
+                button.Click += P4GBoardCell_Click;
+                P4GBoardGrid.Children.Add(button);
+            }
+        }
+
+        P4GBoardStatusText.Text =
+            $"Board: layer Z={layer} ruleset={_p4gBoardSnapshot.RulesetId} seq={_p4gBoardSnapshot.ServerSeq} occupied={_p4gBoardSnapshot.OccupiedCells.Count()} hash={_p4gBoardSnapshot.StateHash}";
+    }
+
+    private int SelectedP4GLayer()
+    {
+        if (P4GBoardLayerBox?.SelectedItem is ComboBoxItem item &&
+            int.TryParse(item.Content?.ToString(), out var layer))
+        {
+            return layer;
+        }
+        return P4GBoardLayerBox?.SelectedIndex ?? 0;
+    }
+
+    private static Brush CellBrush(OnlineChess3DBoardCell cell)
+    {
+        if (!cell.IsOccupied)
+        {
+            return (cell.X + cell.Y + cell.Z) % 2 == 0 ? Brush("#17202A") : Brush("#1F2B37");
+        }
+
+        return cell.Side switch
+        {
+            1 => Brush("#5B6F89"),
+            2 => Brush("#6F5B89"),
+            3 => Brush("#5B8970"),
+            4 => Brush("#897A5B"),
+            5 => Brush("#895B5B"),
+            6 => Brush("#5B8589"),
+            _ => Brush("#4B5563")
+        };
+    }
+
+    private static Brush Brush(string color)
+    {
+        return (Brush)new BrushConverter().ConvertFromString(color)!;
+    }
+
+    private static string PieceLabel(int pieceCode)
+    {
+        if (pieceCode == 0)
+        {
+            return ".";
+        }
+
+        var side = pieceCode / 10;
+        var type = pieceCode % 10;
+        var piece = type switch
+        {
+            1 => "P",
+            2 => "N",
+            3 => "B",
+            4 => "R",
+            5 => "Q",
+            6 => "K",
+            _ => "?"
+        };
+        return $"S{side}{piece}";
     }
 
     private void RememberP4FServerSeq(OnlineProtocolMessage message)

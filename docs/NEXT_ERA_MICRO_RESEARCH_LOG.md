@@ -292,3 +292,12 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | Savegame-to-board adapter | Existing `docs/CHESS3D_SAVEGAME_FORMAT.md` and `OnlineSnapshot.SaveGameJson` | The authoritative snapshot already contains all projected top-piece cells needed for a first online board view. | Add `OnlineChess3DBoardSnapshotParser` in `src/ChessOnlineClient` and keep it read-only. | `src/ChessOnlineClient/OnlineChess3DBoardSnapshot.cs`, `docs/P4G_ONLINE_BOARD_SNAPSHOT_ADAPTER.md` | `ChessOnlineContractTests` parse a real authority snapshot and malformed snapshot. |
 | JSON parsing boundary | Microsoft Learn, `System.Text.Json` DOM docs: https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/use-dom | `JsonDocument` supports lightweight read-only parsing without creating a new protocol dependency. | Parse only the required savegame fields and fail cleanly for malformed or incomplete snapshots. | `src/ChessOnlineClient/OnlineChess3DBoardSnapshot.cs` | Managed online contract tests. |
+
+## P4G Phase 03 - Online Board Renderer
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Test/verify plan |
+| --- | --- | --- | --- | --- | --- |
+| WPF board surface | Microsoft Learn, WPF `UniformGrid` and panel layout docs: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/panels-overview | A compact grid can render a first board slice without embedding the full local `Chess3DWindow`. | Add a `P4G Realtime Board Snapshot` slice grid to `ChessOnlineApp`. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs`, `docs/P4G_ONLINE_BOARD_RENDERER.md` | Build `ChessOnlineApp`; no remote smoke in CI. |
+| Authoritative refresh | Existing P4F SignalR action/snapshot flow | Accepted actions already return action-log data, and the client can request a fresh snapshot immediately after acceptance. | Refresh the online board from server snapshot after safe Asgard action acceptance instead of mutating locally. | `src/ChessOnlineApp/MainWindow.xaml.cs` | Build app and remote smoke remains manual/operator. |

@@ -398,6 +398,29 @@
                     </StackPanel>
                     <TextBlock x:Name="P4FMatchStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Match status: none." />
                     <TextBlock x:Name="P4FSnapshotStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Snapshot: none." />
+                    <Border Background="#101821" BorderBrush="#2B3746" BorderThickness="1" Padding="10" Margin="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock Text="P4G Realtime Board Snapshot" FontWeight="SemiBold" />
+                            <TextBlock Text="Read-only authoritative board from the latest server snapshot. Actions still go through server SubmitAction." Foreground="#AFC0D0" TextWrapping="Wrap" Margin="0,4,0,8" />
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Layer Z" Width="56" />
+                                <ComboBox x:Name="P4GBoardLayerBox" Width="64" SelectedIndex="0" SelectionChanged="P4GBoardLayerBox_SelectionChanged">
+                                    <ComboBoxItem Content="0" />
+                                    <ComboBoxItem Content="1" />
+                                    <ComboBoxItem Content="2" />
+                                    <ComboBoxItem Content="3" />
+                                    <ComboBoxItem Content="4" />
+                                    <ComboBoxItem Content="5" />
+                                    <ComboBoxItem Content="6" />
+                                    <ComboBoxItem Content="7" />
+                                </ComboBox>
+                                <Button Content="Refresh Board View" Click="P4GRefreshBoard_Click" />
+                                <TextBlock x:Name="P4GBoardStatusText" Foreground="#AFC0D0" Margin="8,0,0,0" TextWrapping="Wrap" Text="Board: no snapshot." />
+                            </StackPanel>
+                            <UniformGrid x:Name="P4GBoardGrid" Rows="8" Columns="8" Margin="0,10,0,0" />
+                            <TextBlock x:Name="P4GSelectedCellText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Selected online cell: none." />
+                        </StackPanel>
+                    </Border>
                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                         <Button Content="Clear Event Log" Click="P4FClearEventLog_Click" />
                         <Button Content="Save Session Report" Click="P4FSaveSessionReport_Click" />
