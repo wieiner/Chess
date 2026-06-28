@@ -606,3 +606,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | Secret scanning boundary | OWASP Logging Cheat Sheet and existing repo redaction tests | Secret-related words appear legitimately in DTO names, auth code, redaction tests, and warnings; raw runtime values must not be tracked. | Document scan results and classify expected references versus forbidden artifacts. | `docs/P4G2_SECRET_LOG_AUDIT.md` | `rg` scan plus `.gitignore` checks for `.tmp`, deployment, and production outputs. |
 | Public HTTP endpoint | Microsoft SignalR security guidance | HTTP 80 with auth is diagnostic/dev-only and should use temporary users. | Keep the public IP in operator docs/scripts where already used, but preserve warnings and no-token logging. | docs only | Secret/log audit and future TLS/domain phase. |
+
+## P4G2 Phase 30 - Actual Online Play Verification
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Local verification gate | GitHub Actions docs and existing decomposed runner docs | Local tests should mirror CI enough to catch build/test/package regressions without requiring remote Hetzner smoke in CI. | Run `git diff --check`, test list, full `run-tests -SkipBenchmark`, and `scripts/verify.ps1`. | `docs/P4G2_FINAL_MANUAL_TEST_RESULT.md` | Sequential local commands with controlled MSBuild parallelism. |
+| Remote operator smoke | Microsoft SignalR .NET client guidance | Remote smoke should remain operator-driven and use temporary users over diagnostic HTTP 80. | Re-run Asgard and Classic full action smoke, plus snapshot-only coverage for Single/Rubik/Hodge. | docs only | Smoke tool with `-NoSecretLog`; do not commit raw `.tmp` logs. |
