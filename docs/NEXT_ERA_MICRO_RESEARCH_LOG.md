@@ -542,3 +542,12 @@ Date: 2026-06-28
 | SignalR action dispatch errors | Microsoft Learn, ASP.NET Core SignalR .NET client: https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | Hub calls should surface invocation failures clearly; clients should not reinterpret unsupported commands as another action kind. | Treat unsupported special online actions as UI-disabled or explicit-reject cases, never as `NormalMove`. | `docs/P4G2_SPECIAL_ACTION_BOUNDARY_AUDIT.md` | Audit `OnlineActionKinds`, preview mapping, and `ChessOnlineApp` dispatch path. |
 | WPF command boundary | Microsoft Learn, WPF Dispatcher and data binding docs | UI command state should reflect whether the action can be submitted safely from the current context. | Keep generic board click restricted to normal moves; use dedicated panels for Rubik layer turns, Hodge projections, and reserve restore. | docs now; `ChessOnlineApp` guardrails in Phase 23 | Build app and contract tests after guardrails. |
 | Logging and secrets | OWASP Logging Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html | Logs should avoid secrets and should make security-relevant failures observable. | Log action-kind boundary failures without tokens/passwords and without raw auth headers. | docs now; UI status text in Phase 23 | `rg` secret audit later in Phase 29. |
+
+## P4G2 Phase 23 - Special Action Guardrails
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Generic board submit safety | Existing `OnlineLegalPreviewState`, `OnlineActionKinds`, and Microsoft SignalR client guidance | A SignalR command should preserve its declared action kind; UI should reject unsupported kinds before invocation. | Add a shared dispatch policy that permits only `NormalMove` through generic board click submit. | `src/ChessOnlineClient/OnlinePreviewActionDispatchPolicy.cs`, `src/ChessOnlineApp/MainWindow.xaml.cs` | App build plus contract tests for Normal/Rubik/Hodge/Reserve/unknown action kinds. |
+| User-facing error clarity | WPF status text pattern in `ChessOnlineApp` | Rejections should be visible in the move status and event log, not silently ignored. | Report dedicated panel requirements for Rubik layer turns, Hodge projections, and reserve restores. | `src/ChessOnlineApp/MainWindow.xaml.cs`, docs | Build, targeted online contract tests. |

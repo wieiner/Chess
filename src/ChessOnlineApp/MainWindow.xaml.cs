@@ -1689,9 +1689,10 @@ public partial class MainWindow : Window
             P4GMoveStatusText.Text = "Online move: request a snapshot before submitting.";
             return;
         }
-        if (!IsSupportedP4GPreviewAction(option.ActionKind))
+        if (!OnlinePreviewActionDispatchPolicy.CanSubmitFromGenericBoard(option.ActionKind, out var unsupportedReason))
         {
-            P4GMoveStatusText.Text = $"Online move: preview action kind is not supported by this UI yet: {option.ActionKind}.";
+            P4GMoveStatusText.Text = $"Online move: {unsupportedReason}";
+            Log($"P4G {P4GMoveStatusText.Text}");
             return;
         }
         if (!CanP4FPrimaryAct(out var disabledReason))
@@ -1748,14 +1749,6 @@ public partial class MainWindow : Window
         {
             _p4gSubmitPending = false;
         }
-    }
-
-    private static bool IsSupportedP4GPreviewAction(string actionKind)
-    {
-        return string.Equals(actionKind, OnlineActionKinds.NormalMove, StringComparison.Ordinal) ||
-            string.Equals(actionKind, OnlineActionKinds.RubikLayerTurn, StringComparison.Ordinal) ||
-            string.Equals(actionKind, OnlineActionKinds.HodgeProjectedMove, StringComparison.Ordinal) ||
-            string.Equals(actionKind, OnlineActionKinds.ReserveRestore, StringComparison.Ordinal);
     }
 
     private void ClearP4GLegalPreview(string reason = "")

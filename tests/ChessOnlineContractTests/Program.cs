@@ -266,6 +266,17 @@ static void OnlineClientSdkTests(ContractTest test)
     test.Check(stalePreviewState.IsStale &&
         stalePreviewState.Reason.Contains("expected hash", StringComparison.OrdinalIgnoreCase), "online legal preview state surfaces stale reason");
 
+    test.Check(OnlinePreviewActionDispatchPolicy.CanSubmitFromGenericBoard(OnlineActionKinds.NormalMove, out var normalReason) &&
+        string.IsNullOrWhiteSpace(normalReason), "generic online board dispatch accepts normal move options");
+    test.Check(!OnlinePreviewActionDispatchPolicy.CanSubmitFromGenericBoard(OnlineActionKinds.RubikLayerTurn, out var rubikReason) &&
+        rubikReason.Contains("Rubik Layer Actions", StringComparison.OrdinalIgnoreCase), "generic online board dispatch rejects Rubik layer options");
+    test.Check(!OnlinePreviewActionDispatchPolicy.CanSubmitFromGenericBoard(OnlineActionKinds.HodgeProjectedMove, out var hodgeReason) &&
+        hodgeReason.Contains("Hodge Projection Actions", StringComparison.OrdinalIgnoreCase), "generic online board dispatch rejects Hodge projection options");
+    test.Check(!OnlinePreviewActionDispatchPolicy.CanSubmitFromGenericBoard(OnlineActionKinds.ReserveRestore, out var reserveReason) &&
+        reserveReason.Contains("reserve restore", StringComparison.OrdinalIgnoreCase), "generic online board dispatch rejects reserve restore options");
+    test.Check(!OnlinePreviewActionDispatchPolicy.CanSubmitFromGenericBoard("FutureAction", out var futureReason) &&
+        futureReason.Contains("FutureAction", StringComparison.Ordinal), "generic online board dispatch rejects unknown future action kinds safely");
+
     var disconnectedTurn = OnlineSeatTurnState.Empty();
     test.Check(!disconnectedTurn.CanPrimaryAct &&
         disconnectedTurn.Summary.Contains("canAct=no", StringComparison.OrdinalIgnoreCase), "online seat turn state handles disconnected UI");
