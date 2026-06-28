@@ -651,3 +651,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | Action history usability | WPF list/control guidance and existing online action-log DTOs | A visible action log is more useful if selected notation can be copied/exported without raw session data. | Add selected-action status, copy selected notation, and sanitized action-log export. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | App build and online contract tests. |
 | Secret-free export | OWASP Logging Cheat Sheet | Exported bug artifacts should avoid tokens, passwords, and auth headers. | Export only ruleset, room/table, short player ids, snapshot hash, server seq, counters, and action strings. | `docs/P4I_ONLINE_ACTION_HISTORY_UI.md` | Secret/log scan remains covered by P4G2 audit; export path under `.tmp`. |
+
+## P4I Phase 03 - Playability Micro Polish
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Reduce manual online steps | Existing P4G2 UI click path and Microsoft SignalR client guidance | Accepted actions should refresh authoritative state and visible action history without extra manual clicks. | Reuse the action-log request path and auto-refresh the log after accepted actions while keeping manual buttons. | `src/ChessOnlineApp/MainWindow.xaml.cs` | App build and online contract tests. |
+| Operator fallback | Existing P4G2 user guide | Automation should not remove manual fallback buttons because remote diagnostics can need explicit refresh. | Keep `Request Snapshot` and `Request Action Log`; add auto-refresh as convenience only. | `docs/P4I_PLAYABILITY_MICRO_POLISH.md` | Build/test and docs. |

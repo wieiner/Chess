@@ -928,28 +928,36 @@ public partial class MainWindow : Window
     {
         try
         {
-            EnsureP4FMatchReady();
-            var actionLog = await _p4fPrimaryRelay!.RequestActionLogAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
-            RememberP4FServerSeq(actionLog);
-            var count = actionLog.ActionLog?.Events.Count ?? 0;
-            P4FMatchStatusText.Text = $"ActionLog: seq={actionLog.Envelope.ServerSeq} events={count}";
-            Log($"P4F {P4FMatchStatusText.Text}");
-            if (actionLog.ActionLog != null)
-            {
-                P4FActionLogList.Items.Clear();
-                foreach (var actionEvent in actionLog.ActionLog.Events)
-                {
-                    var line = $"#{actionEvent.ServerSeq}: {actionEvent.Notation} hash={actionEvent.StateHashAfter}";
-                    P4FActionLogList.Items.Add(line);
-                    Log($"P4F event {line}");
-                }
-            }
+            await RefreshP4FActionLogForPrimaryAsync("p4f-client-a", "ActionLog");
         }
         catch (Exception ex)
         {
             P4FMatchStatusText.Text = $"Action log failed: {ex.Message}";
             Log(P4FMatchStatusText.Text);
         }
+    }
+
+    private async Task RefreshP4FActionLogForPrimaryAsync(string clientId, string label)
+    {
+        EnsureP4FMatchReady();
+        var actionLog = await _p4fPrimaryRelay!.RequestActionLogAsync(clientId, _p4fRoomId, _p4fTableId);
+        RememberP4FServerSeq(actionLog);
+        var count = actionLog.ActionLog?.Events.Count ?? 0;
+        P4FMatchStatusText.Text = $"{label}: seq={actionLog.Envelope.ServerSeq} events={count}";
+        Log($"P4F {P4FMatchStatusText.Text}");
+        if (actionLog.ActionLog == null)
+        {
+            return;
+        }
+
+        P4FActionLogList.Items.Clear();
+        foreach (var actionEvent in actionLog.ActionLog.Events)
+        {
+            var line = $"#{actionEvent.ServerSeq}: {actionEvent.Notation} hash={actionEvent.StateHashAfter}";
+            P4FActionLogList.Items.Add(line);
+            Log($"P4F event {line}");
+        }
+        P4IActionHistoryStatusText.Text = $"Action history: {count} event(s), latest seq={actionLog.Envelope.ServerSeq}.";
     }
 
     private async void P4FSubmitSafeAsgardAction_Click(object sender, RoutedEventArgs e)
@@ -998,6 +1006,7 @@ public partial class MainWindow : Window
                 }
                 var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
                 RememberP4FSnapshot(snapshot);
+                await RefreshP4FActionLogForPrimaryAsync("p4f-client-a", "ActionLog after safe action");
             }
             else
             {
@@ -1795,6 +1804,7 @@ public partial class MainWindow : Window
                 P4FActionLogList.Items.Add($"#{result.Envelope.ServerSeq}: {notation}");
                 var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
                 RememberP4FSnapshot(snapshot);
+                await RefreshP4FActionLogForPrimaryAsync("p4f-client-a", "ActionLog after normal move");
             }
             else
             {
@@ -1925,6 +1935,7 @@ public partial class MainWindow : Window
                 ClearP4GLegalPreview("Legal preview: cleared after accepted action.");
                 var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
                 RememberP4FSnapshot(snapshot);
+                await RefreshP4FActionLogForPrimaryAsync("p4f-client-a", "ActionLog after preview action");
             }
             else if (result.Envelope.MessageType == OnlineMessageTypes.ResyncRequired)
             {
