@@ -61,6 +61,7 @@ public partial class MainWindow : Window
         UpdateP4FSeatTurnStatus();
         UpdateP4FRealtimeStatus();
         UpdateP4GSpecialActionPanels();
+        UpdateP4FCompactStatus();
     }
 
     protected override void OnClosed(EventArgs e)
@@ -1300,6 +1301,7 @@ public partial class MainWindow : Window
             P4FSeatTurnStatusText.Text = _p4fSeatTurnState.Summary;
             P4FSeatTurnStatusText.Foreground = _p4fSeatTurnState.CanPrimaryAct ? Brush("#B8F7C6") : Brush("#F4D58D");
         }
+        UpdateP4FCompactStatus();
     }
 
     private OnlineRealtimeObservation ObserveP4FRealtime(string label, OnlineProtocolMessage message)
@@ -1324,6 +1326,7 @@ public partial class MainWindow : Window
             P4FRealtimeStatusText.Text = _p4fRealtimeSync.Summary;
             P4FRealtimeStatusText.Foreground = _p4fRealtimeSync.ResyncRequired ? Brush("#F4D58D") : Brush("#AFC0D0");
         }
+        UpdateP4FCompactStatus();
     }
 
     private async Task RefreshP4FAfterRealtimeResyncAsync(string reason)
@@ -1403,6 +1406,7 @@ public partial class MainWindow : Window
         RenderP4GBoard();
         UpdateP4GSpecialActionPanels();
         UpdateP4FActionCounters();
+        UpdateP4FCompactStatus();
     }
 
     private void P4FRelayMessageReceived(string label, OnlineProtocolMessage message)
@@ -1961,6 +1965,28 @@ public partial class MainWindow : Window
     private void UpdateP4FActionCounters()
     {
         P4FActionCountersText.Text = $"Accepted={_p4fAcceptedActionCount} Rejected={_p4fRejectedActionCount} LastSeq={_p4fLastServerSeq}";
+        UpdateP4FCompactStatus();
+    }
+
+    private void UpdateP4FCompactStatus()
+    {
+        if (P4FCompactStatusText == null)
+        {
+            return;
+        }
+
+        var server = _p4fPrimaryRelay?.State.ToString() ?? "disconnected";
+        var auth = _p4fPrimarySession?.IsAuthenticated == true ? "temp-user" : "anonymous";
+        var match = string.IsNullOrWhiteSpace(_p4fRoomId) || string.IsNullOrWhiteSpace(_p4fTableId)
+            ? "none"
+            : $"{_p4fRoomId}/{_p4fTableId}";
+        var turn = _p4fSeatTurnState.CanPrimaryAct ? "my-turn" : "waiting";
+        var previewCount = _p4gLegalPreview.Options.Count;
+        var realtime = _p4fRealtimeSync.ResyncRequired ? "resync-needed" : "ok";
+
+        P4FCompactStatusText.Text =
+            $"Status: server={server} auth={auth} match={match} turn={turn} preview={previewCount} " +
+            $"realtime={realtime} accepted={_p4fAcceptedActionCount} rejected={_p4fRejectedActionCount} lastSeq={_p4fLastServerSeq}";
     }
 
     private static string FindRepoRoot()

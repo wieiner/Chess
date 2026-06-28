@@ -408,6 +408,7 @@
                         <Button Content="Submit Safe Asgard Test Action" Click="P4FSubmitSafeAsgardAction_Click" MinWidth="210" />
                     </StackPanel>
                     <TextBlock x:Name="P4FMatchStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Match status: none." />
+                    <TextBlock x:Name="P4FCompactStatusText" Foreground="#F0DFA6" Margin="0,8,0,0" TextWrapping="Wrap" Text="Status: server=disconnected auth=anonymous match=none turn=waiting preview=0 realtime=idle accepted=0 rejected=0 lastSeq=0" />
                     <TextBlock x:Name="P4FSeatTurnStatusText" Foreground="#D8E9FF" Margin="0,8,0,0" TextWrapping="Wrap" Text="Turn: no online match." />
                     <TextBlock x:Name="P4FRealtimeStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Realtime: idle." />
                     <TextBlock x:Name="P4FSnapshotStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Snapshot: none." />

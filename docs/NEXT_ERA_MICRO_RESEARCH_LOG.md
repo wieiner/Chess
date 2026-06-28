@@ -578,3 +578,13 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | Operator play instructions | Existing P4G2 remote/UI smoke docs and Microsoft SignalR client guidance | The user needs exact health, build, run, one-app, and two-window steps, not only smoke logs. | Add a player/operator guide that describes actual UI click paths and profile coverage. | `docs/P4G2_ACTUAL_ONLINE_PLAY_USER_GUIDE.md`, `README.md`, project status docs | Docs-only diff check and CI after commit. |
 | HTTP security warning | Microsoft SignalR security docs and OWASP logging guidance | Public HTTP 80 is diagnostic-only; users must not enter real credentials. | Repeat temp-user-only and no-real-password guidance in the user guide and current status docs. | docs only | Phase 29 secret/log audit. |
+
+## P4G2 Phase 27 - Online Playability UI Polish
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| WPF status readability | Microsoft Learn WPF data binding and threading guidance | Operator-facing UI should update from existing UI event paths and avoid background-thread mutation. | Add a compact WPF status line fed by existing match, turn, realtime, preview, and action counter state. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`; verify disconnected startup has no null-reference crash. |
+| SignalR client observability | Microsoft Learn, ASP.NET Core SignalR .NET client guidance | Clients should expose connection and action state clearly, while hub calls remain explicit and bounded. | Surface connection state, action counts, server sequence, realtime resync state, and preview count in one line. | `docs/P4G2_PLAYABILITY_UI_POLISH.md` | App build and targeted smoke path through existing online controls. |
+| Secret-free status text | Microsoft SignalR security guidance and OWASP Logging Cheat Sheet | UI/log status should avoid access tokens, refresh tokens, passwords, and raw authorization values. | Show only `anonymous` or `temp-user`; do not display credentials or token material. | `src/ChessOnlineApp/MainWindow.xaml.cs`, docs | Phase 29 secret/log audit plus code inspection. |
