@@ -532,3 +532,13 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | Profile isolation | Existing rule-profile catalog and online smoke tooling | Scenario/playthrough JSON are not modes; online selector must continue to expose exactly five real profiles. | Record five-profile online coverage without adding profiles or pretending special actions are normal moves. | `docs/P4G2_FIVE_PROFILE_ONLINE_COVERAGE_MATRIX.md` | Remote smoke where safe; document untested/unsupported special-action boundaries honestly. |
 | Special-action boundary | Microsoft Learn SignalR client and existing protocol DTOs | A legal-preview transport can list actions, but UI submit must respect action kind. | Use snapshot-only smoke for profiles whose special action UX is not yet fully operator-proven. | docs only unless smoke uncovers a targeted issue | Asgard/Classic full action smoke; Rubik/Hodge/Single startup/snapshot where supported. |
+
+## P4G2 Phase 22 - Special Action Boundary Audit
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| SignalR action dispatch errors | Microsoft Learn, ASP.NET Core SignalR .NET client: https://learn.microsoft.com/en-us/aspnet/core/signalr/dotnet-client | Hub calls should surface invocation failures clearly; clients should not reinterpret unsupported commands as another action kind. | Treat unsupported special online actions as UI-disabled or explicit-reject cases, never as `NormalMove`. | `docs/P4G2_SPECIAL_ACTION_BOUNDARY_AUDIT.md` | Audit `OnlineActionKinds`, preview mapping, and `ChessOnlineApp` dispatch path. |
+| WPF command boundary | Microsoft Learn, WPF Dispatcher and data binding docs | UI command state should reflect whether the action can be submitted safely from the current context. | Keep generic board click restricted to normal moves; use dedicated panels for Rubik layer turns, Hodge projections, and reserve restore. | docs now; `ChessOnlineApp` guardrails in Phase 23 | Build app and contract tests after guardrails. |
+| Logging and secrets | OWASP Logging Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html | Logs should avoid secrets and should make security-relevant failures observable. | Log action-kind boundary failures without tokens/passwords and without raw auth headers. | docs now; UI status text in Phase 23 | `rg` secret audit later in Phase 29. |
