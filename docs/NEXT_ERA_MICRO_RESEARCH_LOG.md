@@ -597,3 +597,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | Bug report reproducibility | Microsoft SignalR client guidance and existing P4G2 replay/resync docs | Online issues need enough room/table/snapshot/seq context to reproduce without requiring raw tokens. | Expand local session reports with snapshot hash, legal-preview details, realtime counters, UI status strings, and action/event log tails. | `src/ChessOnlineApp/MainWindow.xaml.cs`, `docs/P4G2_PLAY_SESSION_REPORTS.md` | Build `ChessOnlineApp`; inspect report fields for no token/password values. |
 | Clipboard-safe summaries | OWASP Logging Cheat Sheet | Logs and copied summaries should be useful but not include secrets or raw authorization material. | Add `Copy Sanitized Summary` for concise bug reports with shortened player ids and redacted token/password markers. | `src/ChessOnlineApp/MainWindow.xaml` | App build and Phase 29 secret/log audit. |
+
+## P4G2 Phase 29 - Secret and Log Audit
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Secret scanning boundary | OWASP Logging Cheat Sheet and existing repo redaction tests | Secret-related words appear legitimately in DTO names, auth code, redaction tests, and warnings; raw runtime values must not be tracked. | Document scan results and classify expected references versus forbidden artifacts. | `docs/P4G2_SECRET_LOG_AUDIT.md` | `rg` scan plus `.gitignore` checks for `.tmp`, deployment, and production outputs. |
+| Public HTTP endpoint | Microsoft SignalR security guidance | HTTP 80 with auth is diagnostic/dev-only and should use temporary users. | Keep the public IP in operator docs/scripts where already used, but preserve warnings and no-token logging. | docs only | Secret/log audit and future TLS/domain phase. |
