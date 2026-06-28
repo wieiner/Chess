@@ -1030,41 +1030,7 @@ public partial class MainWindow : Window
             var root = Path.Combine(FindRepoRoot(), ".tmp", "manual-smoke");
             Directory.CreateDirectory(root);
             var path = Path.Combine(root, $"p4f-online-client-session-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json");
-            var report = new
-            {
-                format = "p4f-online-client-session",
-                createdUtc = DateTime.UtcNow.ToString("O"),
-                playMode = SelectedP4FPlayMode(),
-                baseUrl = P4FBaseUrlBox.Text.Trim(),
-                hubUrl = P3FServerUrlBox.Text.Trim(),
-                rulesetId = SelectedP3FMatchmakingRuleset(),
-                roomId = _p4fRoomId,
-                tableId = _p4fTableId,
-                primaryPlayer = ShortId(_p4fPrimarySession?.PlayerId ?? ""),
-                secondaryPlayer = ShortId(_p4fSecondarySession?.PlayerId ?? ""),
-                primarySeat = _p4fPrimarySeatIndex,
-                secondarySeat = _p4fSecondarySeatIndex,
-                seatTurn = new
-                {
-                    _p4fSeatTurnState.CurrentSide,
-                    _p4fSeatTurnState.CurrentMacroPlayer,
-                    _p4fSeatTurnState.CanPrimaryAct,
-                    _p4fSeatTurnState.DisabledReason,
-                    _p4fSeatTurnState.Summary
-                },
-                snapshot = _p4fLastSnapshot == null ? null : new
-                {
-                    _p4fLastSnapshot.RulesetId,
-                    _p4fLastSnapshot.ServerSeq,
-                    _p4fLastSnapshot.StateHash,
-                    _p4fLastSnapshot.ActionCount,
-                    _p4fLastSnapshot.LastActionNotation
-                },
-                acceptedActionCount = _p4fAcceptedActionCount,
-                rejectedActionCount = _p4fRejectedActionCount,
-                lastServerSeq = _p4fLastServerSeq,
-                actionLogItems = P4FActionLogList.Items.Cast<object>().Select(item => item.ToString()).ToArray()
-            };
+            var report = BuildP4FSanitizedSessionReport();
             File.WriteAllText(path, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
             P4FMatchStatusText.Text = $"Session report saved: {path}";
             Log($"P4F session report saved: {path}");
@@ -1074,6 +1040,165 @@ public partial class MainWindow : Window
             P4FMatchStatusText.Text = $"Save session report failed: {ex.Message}";
             Log(P4FMatchStatusText.Text);
         }
+    }
+
+    private void P4FCopySanitizedSummary_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Clipboard.SetText(BuildP4FSanitizedSessionSummary());
+            P4FMatchStatusText.Text = "Sanitized session summary copied.";
+            Log("P4F sanitized session summary copied.");
+        }
+        catch (Exception ex)
+        {
+            P4FMatchStatusText.Text = $"Copy sanitized summary failed: {ex.Message}";
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private object BuildP4FSanitizedSessionReport()
+    {
+        return new
+        {
+            format = "p4f-online-client-session",
+            version = "0.2",
+            createdUtc = DateTime.UtcNow.ToString("O"),
+            app = new
+            {
+                name = "ChessOnlineApp",
+                runtime = Environment.Version.ToString()
+            },
+            playMode = SelectedP4FPlayMode(),
+            endpoint = new
+            {
+                baseUrl = P4FBaseUrlBox.Text.Trim(),
+                hubUrl = P3FServerUrlBox.Text.Trim(),
+                serverStatus = P4FServerStatusText.Text,
+                compactStatus = P4FCompactStatusText.Text
+            },
+            rulesetId = SelectedP3FMatchmakingRuleset(),
+            match = new
+            {
+                roomId = _p4fRoomId,
+                tableId = _p4fTableId,
+                primaryPlayer = ShortId(_p4fPrimarySession?.PlayerId ?? ""),
+                secondaryPlayer = ShortId(_p4fSecondarySession?.PlayerId ?? ""),
+                primarySeat = _p4fPrimarySeatIndex,
+                secondarySeat = _p4fSecondarySeatIndex
+            },
+            seatTurn = new
+            {
+                _p4fSeatTurnState.CurrentSide,
+                _p4fSeatTurnState.CurrentMacroPlayer,
+                _p4fSeatTurnState.CanPrimaryAct,
+                _p4fSeatTurnState.DisabledReason,
+                _p4fSeatTurnState.Summary
+            },
+            realtime = new
+            {
+                _p4fRealtimeSync.Summary,
+                _p4fRealtimeSync.LastServerSeq,
+                _p4fRealtimeSync.DuplicateEventCount,
+                _p4fRealtimeSync.GapEventCount,
+                _p4fRealtimeSync.ResyncRequired,
+                _p4fResyncRefreshPending
+            },
+            snapshot = _p4fLastSnapshot == null ? null : new
+            {
+                _p4fLastSnapshot.RulesetId,
+                _p4fLastSnapshot.ServerSeq,
+                _p4fLastSnapshot.StateHash,
+                _p4fLastSnapshot.ActionCount,
+                _p4fLastSnapshot.LastActionNotation
+            },
+            board = _p4gBoardSnapshot == null ? null : new
+            {
+                _p4gBoardSnapshot.RulesetId,
+                _p4gBoardSnapshot.ServerSeq,
+                _p4gBoardSnapshot.StateHash,
+                _p4gBoardSnapshot.CurrentSide,
+                _p4gBoardSnapshot.CurrentMacroPlayer,
+                occupiedCellCount = _p4gBoardSnapshot.OccupiedCells.Count()
+            },
+            selection = new
+            {
+                selected = DescribeMoveCell(_p4gSelectedCell),
+                from = DescribeMoveCell(_p4gMoveFrom),
+                to = DescribeMoveCell(_p4gMoveTo)
+            },
+            legalPreview = new
+            {
+                _p4gLegalPreview.StateHash,
+                _p4gLegalPreview.Reason,
+                _p4gLegalPreview.IsStale,
+                optionCount = _p4gLegalPreview.Options.Count,
+                targets = _p4gLegalPreview.Targets.Select(t => new { t.X, t.Y, t.Z, t.IsCapture, t.IsSpecial }).ToArray(),
+                options = _p4gLegalPreview.Options.Take(20).Select(o => new
+                {
+                    o.ActionKind,
+                    o.DisplayLabel,
+                    o.FromX,
+                    o.FromY,
+                    o.FromZ,
+                    o.ToX,
+                    o.ToY,
+                    o.ToZ,
+                    o.IsCapture,
+                    o.IsSpecial
+                }).ToArray()
+            },
+            actionCounters = new
+            {
+                accepted = _p4fAcceptedActionCount,
+                rejected = _p4fRejectedActionCount,
+                lastServerSeq = _p4fLastServerSeq
+            },
+            uiStatus = new
+            {
+                match = P4FMatchStatusText.Text,
+                snapshot = P4FSnapshotStatusText.Text,
+                move = P4GMoveStatusText.Text,
+                preview = P4GLegalPreviewStatusText.Text,
+                board = P4GBoardStatusText.Text,
+                turn = P4FSeatTurnStatusText.Text,
+                realtime = P4FRealtimeStatusText.Text
+            },
+            actionLogItems = P4FActionLogList.Items.Cast<object>().Select(item => item.ToString()).TakeLast(80).ToArray(),
+            eventLogTail = LogBox.Text.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).TakeLast(80).ToArray(),
+            security = new
+            {
+                tokensRedacted = true,
+                passwordsRedacted = true,
+                http80DiagnosticOnly = P4FBaseUrlBox.Text.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            }
+        };
+    }
+
+    private string BuildP4FSanitizedSessionSummary()
+    {
+        var snapshotHash = _p4fLastSnapshot?.StateHash ?? _p4gBoardSnapshot?.StateHash ?? "none";
+        return string.Join(Environment.NewLine, new[]
+        {
+            "P4F sanitized online session summary",
+            $"createdUtc={DateTime.UtcNow:O}",
+            $"baseUrl={P4FBaseUrlBox.Text.Trim()}",
+            $"rulesetId={SelectedP3FMatchmakingRuleset()}",
+            $"roomId={_p4fRoomId}",
+            $"tableId={_p4fTableId}",
+            $"playMode={SelectedP4FPlayMode()}",
+            $"players={ShortId(_p4fPrimarySession?.PlayerId ?? "")}/{ShortId(_p4fSecondarySession?.PlayerId ?? "")}",
+            $"seatTurn={_p4fSeatTurnState.Summary}",
+            $"snapshotHash={snapshotHash}",
+            $"actionCount={_p4fLastSnapshot?.ActionCount ?? 0}",
+            $"legalPreviewOptions={_p4gLegalPreview.Options.Count}",
+            $"selected={DescribeMoveCell(_p4gSelectedCell)} from={DescribeMoveCell(_p4gMoveFrom)} to={DescribeMoveCell(_p4gMoveTo)}",
+            $"accepted={_p4fAcceptedActionCount} rejected={_p4fRejectedActionCount} lastSeq={_p4fLastServerSeq}",
+            $"realtime={_p4fRealtimeSync.Summary}",
+            $"lastMoveStatus={P4GMoveStatusText.Text}",
+            "tokens=redacted",
+            "passwords=redacted"
+        });
     }
 
     private ChessOnlineServerEndpoint ResolveP4FEndpoint()

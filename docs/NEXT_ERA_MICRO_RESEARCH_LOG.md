@@ -588,3 +588,12 @@ Date: 2026-06-28
 | WPF status readability | Microsoft Learn WPF data binding and threading guidance | Operator-facing UI should update from existing UI event paths and avoid background-thread mutation. | Add a compact WPF status line fed by existing match, turn, realtime, preview, and action counter state. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`; verify disconnected startup has no null-reference crash. |
 | SignalR client observability | Microsoft Learn, ASP.NET Core SignalR .NET client guidance | Clients should expose connection and action state clearly, while hub calls remain explicit and bounded. | Surface connection state, action counts, server sequence, realtime resync state, and preview count in one line. | `docs/P4G2_PLAYABILITY_UI_POLISH.md` | App build and targeted smoke path through existing online controls. |
 | Secret-free status text | Microsoft SignalR security guidance and OWASP Logging Cheat Sheet | UI/log status should avoid access tokens, refresh tokens, passwords, and raw authorization values. | Show only `anonymous` or `temp-user`; do not display credentials or token material. | `src/ChessOnlineApp/MainWindow.xaml.cs`, docs | Phase 29 secret/log audit plus code inspection. |
+
+## P4G2 Phase 28 - Play Session Reports
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Bug report reproducibility | Microsoft SignalR client guidance and existing P4G2 replay/resync docs | Online issues need enough room/table/snapshot/seq context to reproduce without requiring raw tokens. | Expand local session reports with snapshot hash, legal-preview details, realtime counters, UI status strings, and action/event log tails. | `src/ChessOnlineApp/MainWindow.xaml.cs`, `docs/P4G2_PLAY_SESSION_REPORTS.md` | Build `ChessOnlineApp`; inspect report fields for no token/password values. |
+| Clipboard-safe summaries | OWASP Logging Cheat Sheet | Logs and copied summaries should be useful but not include secrets or raw authorization material. | Add `Copy Sanitized Summary` for concise bug reports with shortened player ids and redacted token/password markers. | `src/ChessOnlineApp/MainWindow.xaml` | App build and Phase 29 secret/log audit. |
