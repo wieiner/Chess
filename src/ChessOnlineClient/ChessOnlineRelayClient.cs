@@ -18,6 +18,8 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
 
     public HubConnectionState State => _connection.State;
 
+    public OnlineReconnectState ReconnectState { get; } = new();
+
     public ChessOnlineClientEventLog EventLog { get; } = new();
 
     public OnlineProtocolMessage? LastSnapshot { get; private set; }
@@ -29,6 +31,8 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
     public OnlineMatchmakingStatus? LastMatchmakingStatus { get; private set; }
 
     public event Action<string, OnlineProtocolMessage>? MessageReceived;
+
+    public event Action<OnlineReconnectSummary>? ReconnectStateChanged;
 
     public static HubConnection CreateHubConnection(ChessOnlineServerEndpoint endpoint, Func<string> accessTokenProvider)
     {
@@ -43,12 +47,18 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
 
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
+        ReconnectState.MarkConnecting();
+        PublishReconnectState("SignalR connecting");
         await _connection.StartAsync(cancellationToken);
+        ReconnectState.MarkConnected(_connection.ConnectionId ?? "");
+        PublishReconnectState("SignalR connected");
     }
 
     public async Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
         await _connection.StopAsync(cancellationToken);
+        ReconnectState.MarkDisconnected();
+        PublishReconnectState("SignalR disconnected");
     }
 
     public Task<OnlineProtocolMessage> HelloAsync(string clientId, CancellationToken cancellationToken = default)
@@ -156,11 +166,33 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
             connection.On<OnlineProtocolMessage>(eventName, message => Remember(eventName, message));
         }
 
-        connection.Closed += error =>
+        connection.Reconnecting += error =>
         {
-            EventLog.Add(error == null ? "SignalR closed" : $"SignalR closed: {error.Message}");
+            ReconnectState.MarkReconnecting(error);
+            PublishReconnectState("SignalR reconnecting");
             return Task.CompletedTask;
         };
+
+        connection.Reconnected += connectionId =>
+        {
+            ReconnectState.MarkReconnected(connectionId ?? "");
+            PublishReconnectState("SignalR reconnected");
+            return Task.CompletedTask;
+        };
+
+        connection.Closed += error =>
+        {
+            ReconnectState.MarkClosed(error);
+            PublishReconnectState("SignalR closed");
+            return Task.CompletedTask;
+        };
+    }
+
+    private void PublishReconnectState(string label)
+    {
+        var summary = ReconnectState.Summary;
+        EventLog.Add($"{label}: {summary}");
+        ReconnectStateChanged?.Invoke(summary);
     }
 
     private void Remember(string label, OnlineProtocolMessage message)

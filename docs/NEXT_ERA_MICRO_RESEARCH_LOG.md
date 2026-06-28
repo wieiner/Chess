@@ -706,3 +706,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | Testable reconnect state | Microsoft Learn SignalR .NET client lifecycle docs and Phase 01 audit | SignalR lifecycle events should be represented by a client state model before being wired into WPF. | Add `OnlineReconnectState`, `OnlineConnectionState`, `OnlineReconnectEvent`, summaries, and health snapshots in `ChessOnlineClient`. | `src/ChessOnlineClient/OnlineReconnectState.cs` | Build client and run `ChessOnlineContractTests`. |
 | Safe reconnect errors | Microsoft Learn SignalR security and OWASP Logging guidance | Reconnect errors can include token-like strings; UI summaries should show redacted messages only. | Reuse `ChessOnlineSecretRedactor` in reconnect state and test redaction. | `tests/ChessOnlineContractTests/Program.cs` | Contract tests for token/password redaction in state summaries. |
+
+## P4J Phase 03 - SignalR Automatic Reconnect Wiring
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| SignalR lifecycle events | Microsoft Learn SignalR .NET client docs | `HubConnection` exposes `Reconnecting`, `Reconnected`, and `Closed`; callbacks should be lightweight. | Wire lifecycle callbacks inside `ChessOnlineRelayClient` and publish compact `OnlineReconnectSummary` events. | `src/ChessOnlineClient/ChessOnlineRelayClient.cs` | Build client/app and run online contract tests. |
+| UI resync boundary | Phase 01 audit and current P4G realtime resync code | Low-level client does not know room/table context for snapshot/action-log requests. | Mark post-reconnect snapshot/action-log flags in the shared client, but leave actual refresh to the UI layer in Phase 04. | `docs/P4J_SIGNALR_AUTORECONNECT.md` | Contract tests ensure client can be constructed without network. |
