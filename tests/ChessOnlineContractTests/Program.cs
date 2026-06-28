@@ -221,6 +221,39 @@ static void OnlineClientSdkTests(ContractTest test)
 
     test.Check(ChessOnlineRelayEvents.All.Contains("ReceiveLegalPreviewResult"), "online relay client registers legal preview callback event");
 
+    var reconnect = new OnlineReconnectState();
+    test.Check(reconnect.State == OnlineConnectionState.Disconnected &&
+        reconnect.ShouldDisableSubmit &&
+        !reconnect.IsPlayable, "online reconnect state starts disconnected");
+    reconnect.MarkConnecting(new DateTime(2026, 6, 28, 0, 0, 0, DateTimeKind.Utc));
+    test.Check(reconnect.State == OnlineConnectionState.Connecting &&
+        reconnect.ShouldDisableSubmit, "online reconnect state disables submit while connecting");
+    reconnect.MarkConnected("connection-abcdef123456", new DateTime(2026, 6, 28, 0, 0, 1, DateTimeKind.Utc));
+    test.Check(reconnect.State == OnlineConnectionState.Connected &&
+        reconnect.IsPlayable &&
+        !reconnect.ShouldDisableSubmit &&
+        reconnect.Summary.ConnectionIdShort == "conn...3456", "online reconnect state becomes playable when connected");
+    reconnect.MarkReconnecting(new InvalidOperationException("Authorization: Bearer secret-token accessToken=hidden"), new DateTime(2026, 6, 28, 0, 0, 2, DateTimeKind.Utc));
+    test.Check(reconnect.State == OnlineConnectionState.Reconnecting &&
+        reconnect.ShouldDisableSubmit &&
+        reconnect.ReconnectAttemptCount == 1 &&
+        !reconnect.LastSafeError.Contains("secret-token", StringComparison.Ordinal) &&
+        !reconnect.LastSafeError.Contains("hidden", StringComparison.Ordinal), "online reconnect state redacts errors while reconnecting");
+    reconnect.MarkReconnected("connection-fedcba654321", new DateTime(2026, 6, 28, 0, 0, 3, DateTimeKind.Utc));
+    test.Check(reconnect.State == OnlineConnectionState.Reconnected &&
+        reconnect.IsPlayable &&
+        !reconnect.ShouldDisableSubmit &&
+        reconnect.ShouldRequestSnapshotAfterReconnect &&
+        reconnect.ShouldRequestActionLogAfterReconnect, "online reconnect state requests snapshot/action log after reconnect");
+    reconnect.ClearResyncRequest();
+    test.Check(!reconnect.ShouldRequestSnapshotAfterReconnect &&
+        !reconnect.ShouldRequestActionLogAfterReconnect, "online reconnect state can clear post-reconnect resync request");
+    reconnect.MarkClosed(new Exception("password=s3 refreshToken=abc"), new DateTime(2026, 6, 28, 0, 0, 4, DateTimeKind.Utc));
+    test.Check(reconnect.State == OnlineConnectionState.Closed &&
+        reconnect.ShouldDisableSubmit &&
+        !reconnect.IsPlayable &&
+        !reconnect.Summary.ToString().Contains("abc", StringComparison.Ordinal), "online reconnect state closes safely without leaking secrets");
+
     var previewMessage = OnlineProtocolJson.Wrap(OnlineMessageTypes.LegalPreviewResult, "client-a", "player-a");
     previewMessage.LegalPreview = new OnlineLegalPreviewResult
     {

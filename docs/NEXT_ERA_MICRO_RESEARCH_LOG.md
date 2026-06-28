@@ -697,3 +697,12 @@ Date: 2026-06-28
 | SignalR reconnect lifecycle | Microsoft Learn, ASP.NET Core SignalR .NET client | ASP.NET Core SignalR automatic reconnect is opt-in through `WithAutomaticReconnect`, and clients can observe reconnecting/reconnected/closed events. | Document that the shared relay client already opts in, but does not yet expose a testable reconnect state model to UI. | `docs/P4J_SIGNALR_RECONNECT_AUDIT.md` | Docs-only audit plus code search. |
 | WPF callback threading | Microsoft Learn, WPF threading model / Dispatcher | SignalR callbacks must marshal UI updates to the WPF dispatcher, and dispatcher work should stay small. | Keep UI updates in dispatcher callbacks, but future phases should surface compact reconnect events rather than doing heavy work in callbacks. | docs only | Code audit of `P4FRelayMessageReceived` and P3F callbacks. |
 | SignalR token safety | Microsoft Learn, SignalR security | Access tokens may appear in transport URLs/logs in some SignalR transports; logs should avoid token values and HTTP remains diagnostic-only. | Reconnect UI/errors must use safe messages and never print access/refresh tokens. | docs only | Future reconnect model tests should include redaction. |
+
+## P4J Phase 02 - Client Reconnect State Model
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Testable reconnect state | Microsoft Learn SignalR .NET client lifecycle docs and Phase 01 audit | SignalR lifecycle events should be represented by a client state model before being wired into WPF. | Add `OnlineReconnectState`, `OnlineConnectionState`, `OnlineReconnectEvent`, summaries, and health snapshots in `ChessOnlineClient`. | `src/ChessOnlineClient/OnlineReconnectState.cs` | Build client and run `ChessOnlineContractTests`. |
+| Safe reconnect errors | Microsoft Learn SignalR security and OWASP Logging guidance | Reconnect errors can include token-like strings; UI summaries should show redacted messages only. | Reuse `ChessOnlineSecretRedactor` in reconnect state and test redaction. | `tests/ChessOnlineContractTests/Program.cs` | Contract tests for token/password redaction in state summaries. |
