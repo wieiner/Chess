@@ -624,3 +624,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | Final operator handoff | Existing P4G2 docs, GitHub Actions results, and Microsoft SignalR guidance | The final report should distinguish playable paths from bounded special-action work and avoid claiming production readiness. | Summarize commits, CI, local verify, remote smokes, UI click paths, security boundaries, and next phases. | `docs/P4G2_ACTUAL_ONLINE_PLAY_FINAL_REPORT.md` | `git diff --check`, `run-tests -List`, and CI after docs commit. |
 | Production boundary | Microsoft SignalR security guidance | HTTP 80 with temporary users is useful for diagnostics but not production account traffic. | Keep TLS/domain/443 deferred and explicitly note that x-ui/Xray/Outline/Albatronix/Unreal were untouched. | final report docs | Secret/log audit plus final status check. |
+
+## P4I Phase 00 - Visual Online Board Path Audit
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| WPF incremental UI polish | Microsoft Learn WPF controls/data binding guidance | A simple existing `UniformGrid` can be improved safely without embedding the full local Chess3D rendering stack. | Keep the compact snapshot grid as a reliable fallback and add readability polish incrementally. | `docs/P4I_VISUAL_ONLINE_BOARD_AUDIT.md` | Docs-only audit, then app build when code changes begin. |
+| Online authority boundary | Existing P4G2 snapshot/legal-preview docs | The online board must render authoritative server snapshots, not local engine guesses. | Use `OnlineChess3DBoardSnapshotParser`, legal-preview targets, and action log as the visual source of truth. | docs only | Future Phase 33/34 app build and contract tests. |
