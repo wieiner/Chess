@@ -1,6 +1,6 @@
 # Chess Advisor
 
-Current map: see `docs/NEXT_ERA_PROJECT_MAP.md` for the latest product/deploy status. In short, the repository contains Chess2D, Chess3D, Rubik, online integration apps, a portable `net8.0` ChessOnlineServer, and exactly five real Chess3D RuleProfiles. Linux server smoke has passed through Hetzner systemd + Nginx public HTTP, and `ChessOnlineApp` now has a P4F playable diagnostic client flow documented in `docs/P4F_PLAYABLE_ONLINE_USER_GUIDE.md`; TLS/domain and production hardening are still open.
+Current map: see `docs/NEXT_ERA_PROJECT_MAP.md` for the latest product/deploy status. In short, the repository contains Chess2D, Chess3D, Rubik, online integration apps, a portable `net8.0` ChessOnlineServer, and exactly five real Chess3D RuleProfiles. Linux server smoke has passed through Hetzner systemd + Nginx public HTTP, and `ChessOnlineApp` now has a P4G2 actual online play path with one-app/two-window UI flows documented in `docs/P4G2_ACTUAL_ONLINE_PLAY_USER_GUIDE.md`; TLS/domain and production hardening are still open.
 
 ## Structure
 

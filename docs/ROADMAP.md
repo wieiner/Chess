@@ -2,9 +2,9 @@
 
 ## Current Next Era Priorities
 
-Current source of truth after P4F:
+Current source of truth after P4G2:
 
-1. P4G: integrate the online snapshot/action stream into a fuller realtime Chess3D board experience.
+1. P4I: improve the online board readability, action-history UI, and reduce manual click steps.
 2. P4H: add reconnect/resume/spectator UX and operator diagnostics.
 3. P4E later: confirm domain/DNS and configure TLS/HTTPS for ChessOnlineServer on a dedicated server or after the x-ui/443 decision.
 4. Enforce HTTPS-safe auth/token behavior before real public accounts.

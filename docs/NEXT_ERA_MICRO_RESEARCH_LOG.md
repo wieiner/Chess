@@ -569,3 +569,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | Hodge action separation | Existing `OnlineActionKinds.HodgeProjectedMove`, Hodge online fixtures, and legal-preview DTOs | Hodge projected moves need primary plus mirror preview and all-or-nothing explanation. | Add a Hodge-only UI group with disabled dispatch status until explicit projection submit is finalized. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs`, `src/ChessOnlineClient/OnlinePreviewActionDispatchPolicy.cs` | App build and contract tests for Hodge panel visibility policy. |
 | NormalMove protection | Existing Phase 23 dispatch policy | Projection composite actions must not be downgraded to generic normal moves. | Keep generic board submit blocked for `HodgeProjectedMove`; route future work to the Hodge panel. | `docs/P4G2_HODGE_PROJECTION_UI_BOUNDARY.md` | Contract tests for Hodge action rejection and panel visibility. |
+
+## P4G2 Phase 26 - Actual Online Play User Guide
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Operator play instructions | Existing P4G2 remote/UI smoke docs and Microsoft SignalR client guidance | The user needs exact health, build, run, one-app, and two-window steps, not only smoke logs. | Add a player/operator guide that describes actual UI click paths and profile coverage. | `docs/P4G2_ACTUAL_ONLINE_PLAY_USER_GUIDE.md`, `README.md`, project status docs | Docs-only diff check and CI after commit. |
+| HTTP security warning | Microsoft SignalR security docs and OWASP logging guidance | Public HTTP 80 is diagnostic-only; users must not enter real credentials. | Repeat temp-user-only and no-real-password guidance in the user guide and current status docs. | docs only | Phase 29 secret/log audit. |

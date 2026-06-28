@@ -2,9 +2,9 @@
 
 Date: 2026-06-21
 
-Reachability refresh: 2026-06-27
+Reachability refresh: 2026-06-28
 
-This report closes the current Next Era hardening sequence. It records what is actually proven, what is still only planned, and which work should come next.
+This report records the Next Era hardening sequence and the later P4G2 actual online play pass. It records what is actually proven, what is still only planned, and which work should come next.
 
 ## Executive status
 
