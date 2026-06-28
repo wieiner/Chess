@@ -551,3 +551,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | Generic board submit safety | Existing `OnlineLegalPreviewState`, `OnlineActionKinds`, and Microsoft SignalR client guidance | A SignalR command should preserve its declared action kind; UI should reject unsupported kinds before invocation. | Add a shared dispatch policy that permits only `NormalMove` through generic board click submit. | `src/ChessOnlineClient/OnlinePreviewActionDispatchPolicy.cs`, `src/ChessOnlineApp/MainWindow.xaml.cs` | App build plus contract tests for Normal/Rubik/Hodge/Reserve/unknown action kinds. |
 | User-facing error clarity | WPF status text pattern in `ChessOnlineApp` | Rejections should be visible in the move status and event log, not silently ignored. | Report dedicated panel requirements for Rubik layer turns, Hodge projections, and reserve restores. | `src/ChessOnlineApp/MainWindow.xaml.cs`, docs | Build, targeted online contract tests. |
+
+## P4G2 Phase 24 - Rubik Layer Action UI Boundary
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Rubik action separation | Existing `OnlineActionKinds.RubikLayerTurn`, Rubik online fixtures, WPF control state guidance | Layer turns need axis/layer/quarter-turn context and should not be hidden behind source/target click-to-move. | Add a Rubik-only UI group with controls and disabled dispatch status until explicit online layer-turn submit is finalized. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs`, `src/ChessOnlineClient/OnlinePreviewActionDispatchPolicy.cs` | App build and contract tests for Rubik panel visibility policy. |
+| Operator clarity | Existing P4G2 coverage matrix | Rubik match/snapshot works, but special action UX remains bounded. | Show a visible boundary for Rubik so the profile does not look broken or silently unsupported. | `docs/P4G2_RUBIK_LAYER_ACTION_UI.md` | Build, targeted online contract tests. |

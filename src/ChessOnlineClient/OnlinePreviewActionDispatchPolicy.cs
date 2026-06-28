@@ -4,6 +4,11 @@ namespace ChessOnlineClient;
 
 public static class OnlinePreviewActionDispatchPolicy
 {
+    public static bool ShouldShowRubikLayerPanel(string? rulesetId)
+    {
+        return rulesetId?.Contains("rubik-convergence", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
     public static bool CanSubmitFromGenericBoard(string? actionKind, out string disabledReason)
     {
         if (string.Equals(actionKind, OnlineActionKinds.NormalMove, StringComparison.Ordinal))

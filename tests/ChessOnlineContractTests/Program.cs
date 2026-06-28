@@ -276,6 +276,10 @@ static void OnlineClientSdkTests(ContractTest test)
         reserveReason.Contains("reserve restore", StringComparison.OrdinalIgnoreCase), "generic online board dispatch rejects reserve restore options");
     test.Check(!OnlinePreviewActionDispatchPolicy.CanSubmitFromGenericBoard("FutureAction", out var futureReason) &&
         futureReason.Contains("FutureAction", StringComparison.Ordinal), "generic online board dispatch rejects unknown future action kinds safely");
+    test.Check(OnlinePreviewActionDispatchPolicy.ShouldShowRubikLayerPanel("rubik-convergence-3d-8x8x8-v0.1"),
+        "Rubik special action panel appears for Rubik profile");
+    test.Check(!OnlinePreviewActionDispatchPolicy.ShouldShowRubikLayerPanel("classic-six-side-3d-8x8x8-v0.1"),
+        "Rubik special action panel does not appear for Classic profile");
 
     var disconnectedTurn = OnlineSeatTurnState.Empty();
     test.Check(!disconnectedTurn.CanPrimaryAct &&

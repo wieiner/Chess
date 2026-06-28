@@ -60,6 +60,7 @@ public partial class MainWindow : Window
         RenderP4GBoard();
         UpdateP4FSeatTurnStatus();
         UpdateP4FRealtimeStatus();
+        UpdateP4GSpecialActionPanels();
     }
 
     protected override void OnClosed(EventArgs e)
@@ -1400,6 +1401,7 @@ public partial class MainWindow : Window
         }
         UpdateP4FSeatTurnStatus();
         RenderP4GBoard();
+        UpdateP4GSpecialActionPanels();
         UpdateP4FActionCounters();
     }
 
@@ -1483,6 +1485,11 @@ public partial class MainWindow : Window
         {
             RenderP4GBoard();
         }
+    }
+
+    private void P3FMatchmakingProfileBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateP4GSpecialActionPanels();
     }
 
     private async void P4GBoardCell_Click(object sender, RoutedEventArgs e)
@@ -1783,6 +1790,24 @@ public partial class MainWindow : Window
         {
             var suffix = option.IsCapture ? " capture" : option.IsSpecial ? " special" : "";
             P4GLegalPreviewList.Items.Add($"{option.DisplayLabel}{suffix}");
+        }
+    }
+
+    private void UpdateP4GSpecialActionPanels()
+    {
+        if (P4GRubikLayerPanel == null)
+        {
+            return;
+        }
+
+        var rulesetId = _p4gBoardSnapshot?.RulesetId ??
+            _p4fLastSnapshot?.RulesetId ??
+            SelectedP3FMatchmakingRuleset();
+        var showRubik = OnlinePreviewActionDispatchPolicy.ShouldShowRubikLayerPanel(rulesetId);
+        P4GRubikLayerPanel.Visibility = showRubik ? Visibility.Visible : Visibility.Collapsed;
+        if (showRubik && P4GRubikStatusText != null)
+        {
+            P4GRubikStatusText.Text = "Rubik layer-turn online dispatch is not finalized yet; layer actions are not sent as NormalMove.";
         }
     }
 
