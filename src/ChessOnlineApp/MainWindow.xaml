@@ -411,6 +411,7 @@
                     <TextBlock x:Name="P4FCompactStatusText" Foreground="#F0DFA6" Margin="0,8,0,0" TextWrapping="Wrap" Text="Status: server=disconnected auth=anonymous match=none turn=waiting preview=0 realtime=idle accepted=0 rejected=0 lastSeq=0" />
                     <TextBlock x:Name="P4FSeatTurnStatusText" Foreground="#D8E9FF" Margin="0,8,0,0" TextWrapping="Wrap" Text="Turn: no online match." />
                     <TextBlock x:Name="P4FRealtimeStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Realtime: idle." />
+                    <TextBlock x:Name="P4JReconnectStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Reconnect: disconnected." />
                     <TextBlock x:Name="P4FSnapshotStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Snapshot: none." />
                     <Border Background="#101821" BorderBrush="#2B3746" BorderThickness="1" Padding="10" Margin="0,10,0,0">
                         <StackPanel>

@@ -715,3 +715,13 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | SignalR lifecycle events | Microsoft Learn SignalR .NET client docs | `HubConnection` exposes `Reconnecting`, `Reconnected`, and `Closed`; callbacks should be lightweight. | Wire lifecycle callbacks inside `ChessOnlineRelayClient` and publish compact `OnlineReconnectSummary` events. | `src/ChessOnlineClient/ChessOnlineRelayClient.cs` | Build client/app and run online contract tests. |
 | UI resync boundary | Phase 01 audit and current P4G realtime resync code | Low-level client does not know room/table context for snapshot/action-log requests. | Mark post-reconnect snapshot/action-log flags in the shared client, but leave actual refresh to the UI layer in Phase 04. | `docs/P4J_SIGNALR_AUTORECONNECT.md` | Contract tests ensure client can be constructed without network. |
+
+## P4J Phase 04 - Reconnect UI Guards
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| WPF dispatcher safety | Microsoft Learn WPF threading model / Dispatcher | SignalR callbacks do not run as WPF UI events; UI mutations must be marshalled back to the Dispatcher. | Handle `ReconnectStateChanged` in `ChessOnlineApp` through `Dispatcher.InvokeAsync` and keep the handler limited to status/resync refresh. | `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`; run online contract tests. |
+| Guarded online actions | Microsoft Learn SignalR .NET client reconnect lifecycle and Phase 03 client state | During reconnecting/closed/disconnected states, UI buttons can still be clickable unless explicitly guarded. | Add a visible reconnect status line and a shared `CanUseP4FPrimaryRelay`/`EnsureP4FPrimaryRelayUsable` guard for ready/start/snapshot/action-log/legal-preview/action submit paths. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineClient` and `ChessOnlineApp`; targeted `ChessOnlineContractTests`. |
+| Post-reconnect resync | Existing P4G realtime resync code | After SignalR reconnected, the safe recovery operation is to refresh server snapshot and action log from authoritative state. | When `OnlineReconnectSummary` requests resync, `ChessOnlineApp` calls the existing snapshot/action-log refresh path and clears the resync request flag. | `docs/P4J_RECONNECT_UI.md` | Manual UI smoke later; no remote smoke required for Phase 04. |

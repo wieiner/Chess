@@ -773,8 +773,8 @@ public partial class MainWindow : Window
 
             _p4fPrimaryRelay = new ChessOnlineRelayClient(_p4fPrimarySession!);
             _p4fSecondaryRelay = new ChessOnlineRelayClient(_p4fSecondarySession!);
-            _p4fPrimaryRelay.MessageReceived += P4FRelayMessageReceived;
-            _p4fSecondaryRelay.MessageReceived += P4FRelayMessageReceived;
+            WireP4FRelay(_p4fPrimaryRelay);
+            WireP4FRelay(_p4fSecondaryRelay);
             await _p4fPrimaryRelay.ConnectAsync();
             await _p4fSecondaryRelay.ConnectAsync();
             await _p4fPrimaryRelay.HelloAsync("p4f-client-a");
@@ -811,6 +811,7 @@ public partial class MainWindow : Window
         try
         {
             EnsureP4FTestPairReady();
+            EnsureP4FPrimaryRelayUsable();
             await _p4fPrimaryRelay!.ReadyAsync("p4f-client-a", _p4fRoomId, _p4fTableId);
             await _p4fSecondaryRelay!.ReadyAsync("p4f-client-b", _p4fRoomId, _p4fTableId);
             P4FMatchStatusText.Text = $"Ready both: room={_p4fRoomId} table={_p4fTableId}";
@@ -856,6 +857,7 @@ public partial class MainWindow : Window
         try
         {
             EnsureP4FMatchReady();
+            EnsureP4FPrimaryRelayUsable();
             var ready = await _p4fPrimaryRelay!.ReadyAsync("p4f-manual", _p4fRoomId, _p4fTableId);
             RememberP4FServerSeq(ready);
             P4FMatchStatusText.Text = ready.Envelope.MessageType == OnlineMessageTypes.TableState
@@ -895,6 +897,7 @@ public partial class MainWindow : Window
         try
         {
             EnsureP4FMatchReady();
+            EnsureP4FPrimaryRelayUsable();
             var started = await _p4fPrimaryRelay!.StartGameAsync(clientId, _p4fRoomId, _p4fTableId);
             RememberP4FServerSeq(started);
             if (started.Snapshot != null)
@@ -918,6 +921,7 @@ public partial class MainWindow : Window
         try
         {
             EnsureP4FMatchReady();
+            EnsureP4FPrimaryRelayUsable();
             var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync(clientId, _p4fRoomId, _p4fTableId);
             RememberP4FSnapshot(snapshot);
             P4FMatchStatusText.Text = $"{label}: ruleset={snapshot.Snapshot?.RulesetId} seq={snapshot.Envelope.ServerSeq} actions={snapshot.Snapshot?.ActionCount} hash={snapshot.Snapshot?.StateHash}";
@@ -946,6 +950,7 @@ public partial class MainWindow : Window
     private async Task RefreshP4FActionLogForPrimaryAsync(string clientId, string label)
     {
         EnsureP4FMatchReady();
+        EnsureP4FPrimaryRelayUsable();
         var actionLog = await _p4fPrimaryRelay!.RequestActionLogAsync(clientId, _p4fRoomId, _p4fTableId);
         RememberP4FServerSeq(actionLog);
         var count = actionLog.ActionLog?.Events.Count ?? 0;
@@ -1439,11 +1444,44 @@ public partial class MainWindow : Window
         }
 
         _p4fPrimaryRelay = new ChessOnlineRelayClient(_p4fPrimarySession!);
-        _p4fPrimaryRelay.MessageReceived += P4FRelayMessageReceived;
+        WireP4FRelay(_p4fPrimaryRelay);
         await _p4fPrimaryRelay.ConnectAsync();
         await _p4fPrimaryRelay.HelloAsync(clientId);
         _p4fRealtimeSync.MarkConnectionState("primary relay connected");
         UpdateP4FRealtimeStatus();
+    }
+
+    private void WireP4FRelay(ChessOnlineRelayClient relay)
+    {
+        relay.MessageReceived += P4FRelayMessageReceived;
+        relay.ReconnectStateChanged += P4FReconnectStateChanged;
+    }
+
+    private void P4FReconnectStateChanged(OnlineReconnectSummary summary)
+    {
+        _ = Dispatcher.InvokeAsync(async () => await HandleP4FReconnectStateChangedAsync(summary));
+    }
+
+    private async Task HandleP4FReconnectStateChangedAsync(OnlineReconnectSummary summary)
+    {
+        P4JReconnectStatusText.Text = $"Reconnect: {summary}";
+        P4JReconnectStatusText.Foreground = summary.State switch
+        {
+            OnlineConnectionState.Connected or OnlineConnectionState.Reconnected => Brush("#B8F7C6"),
+            OnlineConnectionState.Reconnecting => Brush("#F4D58D"),
+            OnlineConnectionState.Closed => Brush("#FFB4A8"),
+            _ => Brush("#AFC0D0")
+        };
+        _p4fRealtimeSync.MarkConnectionState($"relay {summary.State}");
+        UpdateP4FRealtimeStatus();
+        UpdateP4FCompactStatus();
+
+        if (summary.ShouldRequestSnapshotAfterReconnect || summary.ShouldRequestActionLogAfterReconnect)
+        {
+            await RefreshP4FAfterRealtimeResyncAsync("SignalR reconnected");
+            _p4fPrimaryRelay?.ReconnectState.ClearResyncRequest();
+            UpdateP4FCompactStatus();
+        }
     }
 
     private async Task ResetP4FRelaysAsync()
@@ -1482,6 +1520,8 @@ public partial class MainWindow : Window
         _p4iHistoryFrom = null;
         _p4iHistoryTo = null;
         P4FSnapshotStatusText.Text = "Snapshot: none.";
+        P4JReconnectStatusText.Text = "Reconnect: disconnected.";
+        P4JReconnectStatusText.Foreground = Brush("#AFC0D0");
         RenderP4GBoard();
         UpdateP4FSeatTurnStatus();
         UpdateP4FRealtimeStatus();
@@ -1495,6 +1535,39 @@ public partial class MainWindow : Window
             string.IsNullOrWhiteSpace(_p4fTableId))
         {
             throw new InvalidOperationException("Join matchmaking and wait for MatchFound first.");
+        }
+    }
+
+    private bool CanUseP4FPrimaryRelay(out string reason)
+    {
+        if (_p4fPrimaryRelay == null)
+        {
+            reason = "connect to SignalR and join a match first";
+            return false;
+        }
+
+        var summary = _p4fPrimaryRelay.ReconnectState.Summary;
+        if (summary.ShouldDisableSubmit)
+        {
+            reason = $"connection state is {summary.State}";
+            return false;
+        }
+
+        if (_p4fPrimaryRelay.State != HubConnectionState.Connected)
+        {
+            reason = $"SignalR state is {_p4fPrimaryRelay.State}";
+            return false;
+        }
+
+        reason = "";
+        return true;
+    }
+
+    private void EnsureP4FPrimaryRelayUsable()
+    {
+        if (!CanUseP4FPrimaryRelay(out var reason))
+        {
+            throw new InvalidOperationException($"Online relay is not ready: {reason}.");
         }
     }
 
@@ -1538,6 +1611,11 @@ public partial class MainWindow : Window
 
     private bool CanP4FPrimaryAct(out string reason)
     {
+        if (!CanUseP4FPrimaryRelay(out reason))
+        {
+            return false;
+        }
+
         UpdateP4FSeatTurnStatus();
         reason = _p4fSeatTurnState.DisabledReason;
         return _p4fSeatTurnState.CanPrimaryAct;
@@ -1887,6 +1965,7 @@ public partial class MainWindow : Window
         try
         {
             EnsureP4FMatchReady();
+            EnsureP4FPrimaryRelayUsable();
             if (_p4fLastSnapshot == null)
             {
                 ClearP4GLegalPreview("Legal preview: request a snapshot first.");
@@ -2445,6 +2524,7 @@ public partial class MainWindow : Window
         }
 
         var server = _p4fPrimaryRelay?.State.ToString() ?? "disconnected";
+        var reconnect = _p4fPrimaryRelay?.ReconnectState.Summary.State.ToString() ?? "disconnected";
         var auth = _p4fPrimarySession?.IsAuthenticated == true ? "temp-user" : "anonymous";
         var match = string.IsNullOrWhiteSpace(_p4fRoomId) || string.IsNullOrWhiteSpace(_p4fTableId)
             ? "none"
@@ -2455,7 +2535,7 @@ public partial class MainWindow : Window
 
         P4FCompactStatusText.Text =
             $"Status: server={server} auth={auth} match={match} turn={turn} preview={previewCount} " +
-            $"realtime={realtime} accepted={_p4fAcceptedActionCount} rejected={_p4fRejectedActionCount} lastSeq={_p4fLastServerSeq}";
+            $"reconnect={reconnect} realtime={realtime} accepted={_p4fAcceptedActionCount} rejected={_p4fRejectedActionCount} lastSeq={_p4fLastServerSeq}";
     }
 
     private static string FindRepoRoot()
