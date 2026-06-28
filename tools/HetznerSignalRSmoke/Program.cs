@@ -83,15 +83,25 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
     Console.WriteLine("STEP PASS SignalR connect");
 
     Console.WriteLine($"STEP START matchmaking ruleset={options.RulesetId}");
+    var onePlayerProfile = options.RulesetId.Contains("single-side", StringComparison.OrdinalIgnoreCase);
     var queue1 = Message(OnlineMessageTypes.JoinMatchmaking, "smoke-client-a", token1.PlayerId);
     queue1.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = options.RulesetId, ExpireSeconds = 120 };
     var queued = await InvokeAsync(client1, "JoinMatchmaking", queue1, cancellationToken);
-    Require(queued.Envelope.MessageType == OnlineMessageTypes.MatchmakingJoined, "first player queued");
 
-    var queue2 = Message(OnlineMessageTypes.JoinMatchmaking, "smoke-client-b", token2.PlayerId);
-    queue2.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = options.RulesetId, ExpireSeconds = 120 };
-    var found = await InvokeAsync(client2, "JoinMatchmaking", queue2, cancellationToken);
-    Require(found.Envelope.MessageType == OnlineMessageTypes.MatchFound, "second player matched");
+    OnlineProtocolMessage found;
+    if (onePlayerProfile)
+    {
+        Require(queued.Envelope.MessageType == OnlineMessageTypes.MatchFound, "single-side first player matched");
+        found = queued;
+    }
+    else
+    {
+        Require(queued.Envelope.MessageType == OnlineMessageTypes.MatchmakingJoined, "first player queued");
+        var queue2 = Message(OnlineMessageTypes.JoinMatchmaking, "smoke-client-b", token2.PlayerId);
+        queue2.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = options.RulesetId, ExpireSeconds = 120 };
+        found = await InvokeAsync(client2, "JoinMatchmaking", queue2, cancellationToken);
+        Require(found.Envelope.MessageType == OnlineMessageTypes.MatchFound, "second player matched");
+    }
     var roomId = found.MatchmakingStatus?.RoomId ?? "";
     var tableId = found.MatchmakingStatus?.TableId ?? "";
     Require(!string.IsNullOrWhiteSpace(roomId) && !string.IsNullOrWhiteSpace(tableId), "match contains room/table");
@@ -100,10 +110,13 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
     Console.WriteLine("STEP START game start");
     var ready1 = Message(OnlineMessageTypes.Ready, "smoke-client-a", token1.PlayerId, roomId, tableId);
     ready1.Table = new OnlineTableCommand { Ready = true };
-    var ready2 = Message(OnlineMessageTypes.Ready, "smoke-client-b", token2.PlayerId, roomId, tableId);
-    ready2.Table = new OnlineTableCommand { Ready = true };
     await InvokeAsync(client1, "Ready", ready1, cancellationToken);
-    await InvokeAsync(client2, "Ready", ready2, cancellationToken);
+    if (!onePlayerProfile)
+    {
+        var ready2 = Message(OnlineMessageTypes.Ready, "smoke-client-b", token2.PlayerId, roomId, tableId);
+        ready2.Table = new OnlineTableCommand { Ready = true };
+        await InvokeAsync(client2, "Ready", ready2, cancellationToken);
+    }
     var started = await InvokeAsync(client1, "StartGame", Message(OnlineMessageTypes.StartGame, "smoke-client-a", token1.PlayerId, roomId, tableId), cancellationToken);
     Require(started.Envelope.MessageType == OnlineMessageTypes.GameStarted, "game started");
     Require(started.Snapshot?.RulesetId == options.RulesetId, "snapshot ruleset matches requested ruleset");

@@ -523,3 +523,12 @@ Date: 2026-06-27
 | --- | --- | --- | --- | --- | --- |
 | Two-window WPF client state | Microsoft Learn, WPF application model/data binding docs | Separate app instances keep separate in-memory auth/session state and can connect independently to SignalR. | Launch two `ChessOnlineApp` processes and drive manual matchmaking through public HTTP 80 with temporary users. | `docs/P4G2_TWO_WINDOW_UI_PLAY_RESULT.md` | UI Automation click path: register temp users, manual matchmaking, ready/start, snapshot, legal preview submit, peer action log. |
 | Realtime/action-log proof | Microsoft Learn, ASP.NET Core SignalR .NET client | A second client should be able to request authoritative action log after the first client submits an accepted action. | Treat B-window action-log request after A-window legal-preview submit as the practical two-window smoke proof for this phase. | docs only | Public diagnostics counters and sanitized UIA log summary. |
+
+## P4G2 Phase 21 - Five-Profile Online Coverage Matrix
+
+Date: 2026-06-27
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Profile isolation | Existing rule-profile catalog and online smoke tooling | Scenario/playthrough JSON are not modes; online selector must continue to expose exactly five real profiles. | Record five-profile online coverage without adding profiles or pretending special actions are normal moves. | `docs/P4G2_FIVE_PROFILE_ONLINE_COVERAGE_MATRIX.md` | Remote smoke where safe; document untested/unsupported special-action boundaries honestly. |
+| Special-action boundary | Microsoft Learn SignalR client and existing protocol DTOs | A legal-preview transport can list actions, but UI submit must respect action kind. | Use snapshot-only smoke for profiles whose special action UX is not yet fully operator-proven. | docs only unless smoke uncovers a targeted issue | Asgard/Classic full action smoke; Rubik/Hodge/Single startup/snapshot where supported. |
