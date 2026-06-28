@@ -669,3 +669,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | 3D board slice usability | Existing P4I grid-board docs and WPF controls guidance | A single visible Z slice can hide legal targets on other layers, making a valid preview feel empty. | Add a per-layer occupied/legal/capture/special summary and quick buttons for layers that contain legal targets. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`; run online contract tests. |
 | Authoritative preview boundary | Existing `LegalPreviewState` and server legal-preview contract | Layer navigation should not generate moves locally; it should only summarize server-provided preview targets. | Compute layer counts from `OnlineChess3DBoardSnapshot` plus `LegalPreviewState.Targets`, and auto-focus only after server preview exists. | `docs/P4I_ONLINE_LAYER_NAVIGATION.md` | App build and targeted tests; no remote server change. |
+
+## P4I Phase 05 - Online Action History Board Highlight
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Action log readability | Existing action-log UI and WPF selection event guidance | Selecting a notation row is more useful if the board shows the move's from/to cells. | Parse coordinate pairs from selected action notation and highlight them as read-only history markers. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`; run online contract tests. |
+| Submit safety | Existing generic dispatch guardrails | History selection must not mutate the current action command fields or turn into a replay/submit action. | Keep history markers separate from `_p4gMoveFrom`/`_p4gMoveTo`; selecting history does not submit anything. | `docs/P4I_ACTION_HISTORY_BOARD_HIGHLIGHT.md` | App build and targeted tests; no server change. |

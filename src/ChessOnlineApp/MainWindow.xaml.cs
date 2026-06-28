@@ -36,6 +36,8 @@ public partial class MainWindow : Window
     private OnlineChess3DBoardCell? _p4gSelectedCell;
     private OnlineChess3DBoardCell? _p4gMoveFrom;
     private OnlineChess3DBoardCell? _p4gMoveTo;
+    private OnlineChess3DBoardCell? _p4iHistoryFrom;
+    private OnlineChess3DBoardCell? _p4iHistoryTo;
     private LegalPreviewState _p4gLegalPreview = LegalPreviewState.Empty();
     private OnlineSeatTurnState _p4fSeatTurnState = OnlineSeatTurnState.Empty();
     private OnlineRealtimeSyncState _p4fRealtimeSync = new();
@@ -584,12 +586,16 @@ public partial class MainWindow : Window
         _p4gSelectedCell = null;
         _p4gMoveFrom = null;
         _p4gMoveTo = null;
+        _p4iHistoryFrom = null;
+        _p4iHistoryTo = null;
         ClearP4GLegalPreview("Legal preview: session cleared.");
         _p4gSubmitPending = false;
         _p4fAcceptedActionCount = 0;
         _p4fRejectedActionCount = 0;
         _p4fLastServerSeq = 0;
         P4FActionLogList.Items.Clear();
+        _p4iHistoryFrom = null;
+        _p4iHistoryTo = null;
         P4FSnapshotStatusText.Text = "Snapshot: none.";
         RenderP4GBoard();
         UpdateP4FSeatTurnStatus();
@@ -1028,6 +1034,8 @@ public partial class MainWindow : Window
     private void P4FClearEventLog_Click(object sender, RoutedEventArgs e)
     {
         P4FActionLogList.Items.Clear();
+        _p4iHistoryFrom = null;
+        _p4iHistoryTo = null;
         LogBox.Clear();
         P4IActionHistoryStatusText.Text = "Action history: cleared.";
         Log("P4F event log cleared.");
@@ -1035,9 +1043,56 @@ public partial class MainWindow : Window
 
     private void P4FActionLogList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        P4IActionHistoryStatusText.Text = P4FActionLogList.SelectedItem == null
-            ? "Action history: select an entry to copy/export notation."
-            : $"Action history selected: {P4FActionLogList.SelectedItem}";
+        var selected = P4FActionLogList.SelectedItem?.ToString();
+        if (string.IsNullOrWhiteSpace(selected))
+        {
+            _p4iHistoryFrom = null;
+            _p4iHistoryTo = null;
+            P4IActionHistoryStatusText.Text = "Action history: select an entry to copy/export notation.";
+            RenderP4GBoard();
+            return;
+        }
+
+        if (_p4gBoardSnapshot != null &&
+            TryExtractP4IActionMove(selected, out var from, out var to))
+        {
+            _p4iHistoryFrom = _p4gBoardSnapshot.GetCell(from.X, from.Y, from.Z);
+            _p4iHistoryTo = _p4gBoardSnapshot.GetCell(to.X, to.Y, to.Z);
+            SetP4GBoardLayer(to.Z);
+            P4IActionHistoryStatusText.Text = $"Action history selected: {selected}; highlighted {from}->{to}.";
+            return;
+        }
+
+        _p4iHistoryFrom = null;
+        _p4iHistoryTo = null;
+        P4IActionHistoryStatusText.Text = $"Action history selected: {selected}";
+        RenderP4GBoard();
+    }
+
+    private static bool TryExtractP4IActionMove(
+        string line,
+        out (int X, int Y, int Z) from,
+        out (int X, int Y, int Z) to)
+    {
+        from = default;
+        to = default;
+        var fromOpen = line.IndexOf('(');
+        if (fromOpen < 0)
+        {
+            return false;
+        }
+
+        var fromClose = line.IndexOf(')', fromOpen + 1);
+        var arrow = line.IndexOf("->", fromClose + 1, StringComparison.Ordinal);
+        var toOpen = arrow >= 0 ? line.IndexOf('(', arrow + 2) : -1;
+        var toClose = toOpen >= 0 ? line.IndexOf(')', toOpen + 1) : -1;
+        if (fromClose < 0 || arrow < 0 || toOpen < 0 || toClose < 0)
+        {
+            return false;
+        }
+
+        return TryParseCell(line[(fromOpen + 1)..fromClose], out from) &&
+            TryParseCell(line[(toOpen + 1)..toClose], out to);
     }
 
     private void P4ICopySelectedAction_Click(object sender, RoutedEventArgs e)
@@ -1416,12 +1471,16 @@ public partial class MainWindow : Window
         _p4gSelectedCell = null;
         _p4gMoveFrom = null;
         _p4gMoveTo = null;
+        _p4iHistoryFrom = null;
+        _p4iHistoryTo = null;
         ClearP4GLegalPreview("Legal preview: session cleared.");
         _p4gSubmitPending = false;
         _p4fAcceptedActionCount = 0;
         _p4fRejectedActionCount = 0;
         _p4fLastServerSeq = 0;
         P4FActionLogList.Items.Clear();
+        _p4iHistoryFrom = null;
+        _p4iHistoryTo = null;
         P4FSnapshotStatusText.Text = "Snapshot: none.";
         RenderP4GBoard();
         UpdateP4FSeatTurnStatus();
@@ -2072,27 +2131,31 @@ public partial class MainWindow : Window
                 var isSelected = _p4gSelectedCell?.Index == cell.Index;
                 var isFrom = _p4gMoveFrom?.Index == cell.Index;
                 var isTo = _p4gMoveTo?.Index == cell.Index;
+                var isHistoryFrom = _p4iHistoryFrom?.Index == cell.Index;
+                var isHistoryTo = _p4iHistoryTo?.Index == cell.Index;
                 var legalMarker = _p4gLegalPreview.Targets.FirstOrDefault(t => t.X == cell.X && t.Y == cell.Y && t.Z == cell.Z);
                 var isLegalTarget = legalMarker != null;
                 var button = new Button
                 {
-                    Content = BoardCellLabel(cell, isSelected, isFrom, isTo, legalMarker),
+                    Content = BoardCellLabel(cell, isSelected, isFrom, isTo, isHistoryFrom, isHistoryTo, legalMarker),
                     Tag = cell,
                     MinWidth = 42,
                     MinHeight = 34,
                     Margin = new Thickness(1),
-                    FontSize = 12,
-                    FontWeight = cell.IsOccupied || isLegalTarget || isFrom || isTo ? FontWeights.SemiBold : FontWeights.Normal,
+                    FontSize = isHistoryFrom || isHistoryTo ? 13 : 12,
+                    FontWeight = cell.IsOccupied || isLegalTarget || isFrom || isTo || isHistoryFrom || isHistoryTo ? FontWeights.SemiBold : FontWeights.Normal,
                     Foreground = CellForeground(cell, isLegalTarget),
                     Background = isFrom ? Brush("#3F8F5F") :
                         isTo ? Brush("#9A6A3A") :
+                        isHistoryFrom ? Brush("#345C52") :
+                        isHistoryTo ? Brush("#70543B") :
                         isSelected ? Brush("#3F7FBF") :
                         legalMarker?.IsCapture == true ? Brush("#A84E32") :
                         legalMarker?.IsSpecial == true ? Brush("#6F4FA8") :
                         isLegalTarget ? Brush("#2D5F9A") :
                         CellBrush(cell),
-                    BorderBrush = isSelected || isFrom || isTo || isLegalTarget ? Brush("#F0DFA6") : Brush("#263442"),
-                    BorderThickness = isSelected || isFrom || isTo || isLegalTarget ? new Thickness(2) : new Thickness(1),
+                    BorderBrush = isSelected || isFrom || isTo || isHistoryFrom || isHistoryTo || isLegalTarget ? Brush("#F0DFA6") : Brush("#263442"),
+                    BorderThickness = isSelected || isFrom || isTo || isHistoryFrom || isHistoryTo || isLegalTarget ? new Thickness(2) : new Thickness(1),
                     ToolTip = isLegalTarget
                         ? $"{cell.Coordinate} index={cell.Index} piece={PieceLabel(cell.PieceCode)} legal={legalMarker!.DisplayLabel}"
                         : $"{cell.Coordinate} index={cell.Index} piece={PieceLabel(cell.PieceCode)}"
@@ -2272,10 +2335,14 @@ public partial class MainWindow : Window
         bool isSelected,
         bool isFrom,
         bool isTo,
+        bool isHistoryFrom,
+        bool isHistoryTo,
         LegalTargetMarker? legalMarker)
     {
         var marker = isFrom ? "F" :
             isTo ? "T" :
+            isHistoryFrom ? "f" :
+            isHistoryTo ? "t" :
             legalMarker?.IsCapture == true ? "X" :
             legalMarker?.IsSpecial == true ? "*" :
             legalMarker != null ? "L" :
