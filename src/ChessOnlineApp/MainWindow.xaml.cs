@@ -1875,6 +1875,7 @@ public partial class MainWindow : Window
                 ? $"Legal preview: {_p4gLegalPreview.Options.Count} legal action(s) from {source.Coordinate}."
                 : $"Legal preview: {_p4gLegalPreview.Reason}";
             P4GMoveStatusText.Text = $"Online move: source={source.Coordinate}; click a highlighted target or use manual To.";
+            FocusP4GLegalTargetLayerIfNeeded();
             RenderP4GBoard();
         }
         catch (Exception ex)
@@ -2044,6 +2045,7 @@ public partial class MainWindow : Window
             P4GBoardStatusText.Text = "Board: no snapshot.";
             P4GSelectedCellText.Text = "Selected online cell: none.";
             P4GMoveStatusText.Text = "Online move: choose From and To.";
+            UpdateP4ILayerNavigation();
             return;
         }
 
@@ -2109,6 +2111,145 @@ public partial class MainWindow : Window
             $"Board: layer Z={layer} dims={_p4gBoardSnapshot.Width}x{_p4gBoardSnapshot.Height}x{_p4gBoardSnapshot.Depth} " +
             $"ruleset={_p4gBoardSnapshot.RulesetId} side={_p4gBoardSnapshot.CurrentSide} macro={_p4gBoardSnapshot.CurrentMacroPlayer} " +
             $"seq={_p4gBoardSnapshot.ServerSeq} occupied={_p4gBoardSnapshot.OccupiedCells.Count()} legalTargets={_p4gLegalPreview.Targets.Count} hash={_p4gBoardSnapshot.StateHash}";
+        UpdateP4ILayerNavigation();
+    }
+
+    private void UpdateP4ILayerNavigation()
+    {
+        if (P4ILayerSummaryText == null || P4ILegalLayerButtonsPanel == null)
+        {
+            return;
+        }
+
+        P4ILegalLayerButtonsPanel.Children.Clear();
+        if (_p4gBoardSnapshot == null)
+        {
+            P4ILayerSummaryText.Text = "Layers: request a snapshot to see occupied cells and legal targets by Z layer.";
+            return;
+        }
+
+        var depth = Math.Max(0, _p4gBoardSnapshot.Depth);
+        var occupiedByLayer = new int[depth];
+        foreach (var cell in _p4gBoardSnapshot.OccupiedCells)
+        {
+            if (cell.Z >= 0 && cell.Z < depth)
+            {
+                occupiedByLayer[cell.Z]++;
+            }
+        }
+
+        var legalByLayer = new int[depth];
+        var captureByLayer = new int[depth];
+        var specialByLayer = new int[depth];
+        foreach (var target in _p4gLegalPreview.Targets)
+        {
+            if (target.Z < 0 || target.Z >= depth)
+            {
+                continue;
+            }
+
+            legalByLayer[target.Z]++;
+            if (target.IsCapture)
+            {
+                captureByLayer[target.Z]++;
+            }
+            if (target.IsSpecial)
+            {
+                specialByLayer[target.Z]++;
+            }
+        }
+
+        var layerSummary = Enumerable.Range(0, depth)
+            .Select(z =>
+            {
+                var legal = legalByLayer[z] > 0 ? $", legal={legalByLayer[z]}" : "";
+                var capture = captureByLayer[z] > 0 ? $", capture={captureByLayer[z]}" : "";
+                var special = specialByLayer[z] > 0 ? $", special={specialByLayer[z]}" : "";
+                return $"Z{z}: occupied={occupiedByLayer[z]}{legal}{capture}{special}";
+            });
+        P4ILayerSummaryText.Text = $"Layers: {string.Join(" | ", layerSummary)}";
+
+        foreach (var z in Enumerable.Range(0, depth).Where(layer => legalByLayer[layer] > 0))
+        {
+            var button = new Button
+            {
+                Content = $"Legal Z{z} ({legalByLayer[z]})",
+                Tag = z,
+                MinWidth = 96,
+                Margin = new Thickness(4, 0, 4, 4),
+                ToolTip = $"Show Z layer {z}: legal={legalByLayer[z]}, capture={captureByLayer[z]}, special={specialByLayer[z]}."
+            };
+            AutomationProperties.SetAutomationId(button, $"P4ILegalLayer_{z}");
+            AutomationProperties.SetName(button, $"Show legal target layer {z}");
+            button.Click += P4ILegalLayerButton_Click;
+            P4ILegalLayerButtonsPanel.Children.Add(button);
+        }
+
+        if (P4ILegalLayerButtonsPanel.Children.Count == 0)
+        {
+            var hint = new TextBlock
+            {
+                Text = _p4gLegalPreview.Targets.Count == 0
+                    ? "No legal-target layers yet. Select an occupied source cell."
+                    : "Legal targets are outside the current board depth.",
+                Foreground = Brush("#8FA3B8"),
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            P4ILegalLayerButtonsPanel.Children.Add(hint);
+        }
+    }
+
+    private void P4ILegalLayerButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: int layer })
+        {
+            return;
+        }
+
+        SetP4GBoardLayer(layer);
+    }
+
+    private void SetP4GBoardLayer(int layer)
+    {
+        if (P4GBoardLayerBox == null)
+        {
+            return;
+        }
+
+        var clamped = Math.Clamp(layer, 0, Math.Max(0, P4GBoardLayerBox.Items.Count - 1));
+        if (P4GBoardLayerBox.SelectedIndex != clamped)
+        {
+            P4GBoardLayerBox.SelectedIndex = clamped;
+        }
+        else
+        {
+            RenderP4GBoard();
+        }
+    }
+
+    private void FocusP4GLegalTargetLayerIfNeeded()
+    {
+        if (_p4gBoardSnapshot == null || _p4gLegalPreview.Targets.Count == 0)
+        {
+            return;
+        }
+
+        var selectedLayer = SelectedP4GLayer();
+        if (_p4gLegalPreview.Targets.Any(t => t.Z == selectedLayer))
+        {
+            return;
+        }
+
+        var firstLayer = _p4gLegalPreview.Targets
+            .Select(t => t.Z)
+            .Where(z => z >= 0 && z < _p4gBoardSnapshot.Depth)
+            .OrderBy(z => Math.Abs(z - selectedLayer))
+            .ThenBy(z => z)
+            .FirstOrDefault(selectedLayer);
+        if (firstLayer != selectedLayer)
+        {
+            SetP4GBoardLayer(firstLayer);
+        }
     }
 
     private static TextBlock BoardHeader(string text)

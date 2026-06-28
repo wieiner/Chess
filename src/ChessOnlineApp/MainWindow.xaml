@@ -432,6 +432,8 @@
                                 <TextBlock x:Name="P4GBoardStatusText" Foreground="#AFC0D0" Margin="8,0,0,0" TextWrapping="Wrap" Text="Board: no snapshot." />
                             </StackPanel>
                             <TextBlock x:Name="P4GBoardLegendText" Foreground="#F0DFA6" Margin="0,8,0,0" TextWrapping="Wrap" Text="Board legend: F=from, T=to, L=legal, X=capture, *=special. Headers show X/Y on current Z layer." />
+                            <TextBlock x:Name="P4ILayerSummaryText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Layers: request a snapshot to see occupied cells and legal targets by Z layer." />
+                            <WrapPanel x:Name="P4ILegalLayerButtonsPanel" Margin="0,6,0,0" />
                             <UniformGrid x:Name="P4GBoardGrid" Rows="9" Columns="9" Margin="0,10,0,0" />
                             <TextBlock x:Name="P4GSelectedCellText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Selected online cell: none." />
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">

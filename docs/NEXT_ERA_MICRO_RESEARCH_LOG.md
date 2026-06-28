@@ -660,3 +660,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | Reduce manual online steps | Existing P4G2 UI click path and Microsoft SignalR client guidance | Accepted actions should refresh authoritative state and visible action history without extra manual clicks. | Reuse the action-log request path and auto-refresh the log after accepted actions while keeping manual buttons. | `src/ChessOnlineApp/MainWindow.xaml.cs` | App build and online contract tests. |
 | Operator fallback | Existing P4G2 user guide | Automation should not remove manual fallback buttons because remote diagnostics can need explicit refresh. | Keep `Request Snapshot` and `Request Action Log`; add auto-refresh as convenience only. | `docs/P4I_PLAYABILITY_MICRO_POLISH.md` | Build/test and docs. |
+
+## P4I Phase 04 - Online Board Layer Navigation
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| 3D board slice usability | Existing P4I grid-board docs and WPF controls guidance | A single visible Z slice can hide legal targets on other layers, making a valid preview feel empty. | Add a per-layer occupied/legal/capture/special summary and quick buttons for layers that contain legal targets. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`; run online contract tests. |
+| Authoritative preview boundary | Existing `LegalPreviewState` and server legal-preview contract | Layer navigation should not generate moves locally; it should only summarize server-provided preview targets. | Compute layer counts from `OnlineChess3DBoardSnapshot` plus `LegalPreviewState.Targets`, and auto-focus only after server preview exists. | `docs/P4I_ONLINE_LAYER_NAVIGATION.md` | App build and targeted tests; no remote server change. |
