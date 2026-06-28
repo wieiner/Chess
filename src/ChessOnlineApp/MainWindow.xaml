@@ -498,9 +498,12 @@
                         <Button Content="Clear Event Log" Click="P4FClearEventLog_Click" />
                         <Button Content="Save Session Report" Click="P4FSaveSessionReport_Click" />
                         <Button Content="Copy Sanitized Summary" Click="P4FCopySanitizedSummary_Click" />
+                        <Button Content="Copy Selected Action" Click="P4ICopySelectedAction_Click" />
+                        <Button Content="Export Action Log" Click="P4IExportActionLog_Click" />
                         <TextBlock x:Name="P4FActionCountersText" Foreground="#AFC0D0" Margin="8,0,0,0" Text="Accepted=0 Rejected=0 LastSeq=0" />
                     </StackPanel>
-                    <ListBox x:Name="P4FActionLogList" Height="96" Margin="0,8,0,0" />
+                    <TextBlock x:Name="P4IActionHistoryStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Action history: select an entry to copy/export notation." />
+                    <ListBox x:Name="P4FActionLogList" Height="96" Margin="0,8,0,0" SelectionChanged="P4FActionLogList_SelectionChanged" />
                 </StackPanel>
             </TabItem>
         </TabControl>

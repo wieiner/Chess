@@ -642,3 +642,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | WPF grid readability | Microsoft Learn WPF controls and layout docs | Small button grids need stable dimensions and concise labels to remain usable. | Add coordinate headers, marker labels, and a board legend while keeping the existing `UniformGrid` fallback. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`; run online contract tests. |
 | Server-snapshot authority | Existing online snapshot/legal-preview contracts | Visual markers should reflect authoritative snapshot and preview state only. | Render selected/from/to/legal/capture/special markers from local UI state plus server legal preview; no speculative local engine moves. | `docs/P4I_BOARD_READABILITY.md` | App build and contract tests; remote smoke unchanged. |
+
+## P4I Phase 02 - Online Action History UI
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Action history usability | WPF list/control guidance and existing online action-log DTOs | A visible action log is more useful if selected notation can be copied/exported without raw session data. | Add selected-action status, copy selected notation, and sanitized action-log export. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | App build and online contract tests. |
+| Secret-free export | OWASP Logging Cheat Sheet | Exported bug artifacts should avoid tokens, passwords, and auth headers. | Export only ruleset, room/table, short player ids, snapshot hash, server seq, counters, and action strings. | `docs/P4I_ONLINE_ACTION_HISTORY_UI.md` | Secret/log scan remains covered by P4G2 audit; export path under `.tmp`. |

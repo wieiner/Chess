@@ -1020,7 +1020,77 @@ public partial class MainWindow : Window
     {
         P4FActionLogList.Items.Clear();
         LogBox.Clear();
+        P4IActionHistoryStatusText.Text = "Action history: cleared.";
         Log("P4F event log cleared.");
+    }
+
+    private void P4FActionLogList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        P4IActionHistoryStatusText.Text = P4FActionLogList.SelectedItem == null
+            ? "Action history: select an entry to copy/export notation."
+            : $"Action history selected: {P4FActionLogList.SelectedItem}";
+    }
+
+    private void P4ICopySelectedAction_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var selected = P4FActionLogList.SelectedItem?.ToString();
+            if (string.IsNullOrWhiteSpace(selected))
+            {
+                P4IActionHistoryStatusText.Text = "Action history: select an action first.";
+                return;
+            }
+
+            Clipboard.SetText(selected);
+            P4IActionHistoryStatusText.Text = "Action history: selected notation copied.";
+            Log("P4I selected action notation copied.");
+        }
+        catch (Exception ex)
+        {
+            P4IActionHistoryStatusText.Text = $"Copy selected action failed: {ex.Message}";
+            Log(P4IActionHistoryStatusText.Text);
+        }
+    }
+
+    private void P4IExportActionLog_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var root = Path.Combine(FindRepoRoot(), ".tmp", "manual-smoke");
+            Directory.CreateDirectory(root);
+            var path = Path.Combine(root, $"p4i-online-action-log-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json");
+            var export = new
+            {
+                format = "p4i-online-action-log",
+                version = "0.1",
+                createdUtc = DateTime.UtcNow.ToString("O"),
+                rulesetId = SelectedP3FMatchmakingRuleset(),
+                roomId = _p4fRoomId,
+                tableId = _p4fTableId,
+                primaryPlayer = ShortId(_p4fPrimarySession?.PlayerId ?? ""),
+                secondaryPlayer = ShortId(_p4fSecondarySession?.PlayerId ?? ""),
+                snapshotHash = _p4fLastSnapshot?.StateHash ?? _p4gBoardSnapshot?.StateHash ?? "",
+                lastServerSeq = _p4fLastServerSeq,
+                acceptedActionCount = _p4fAcceptedActionCount,
+                rejectedActionCount = _p4fRejectedActionCount,
+                actionLogItems = P4FActionLogList.Items.Cast<object>().Select(item => item.ToString()).ToArray(),
+                security = new
+                {
+                    tokensRedacted = true,
+                    passwordsRedacted = true,
+                    authorizationHeadersRedacted = true
+                }
+            };
+            File.WriteAllText(path, JsonSerializer.Serialize(export, new JsonSerializerOptions { WriteIndented = true }));
+            P4IActionHistoryStatusText.Text = $"Action history exported: {path}";
+            Log($"P4I action history exported: {path}");
+        }
+        catch (Exception ex)
+        {
+            P4IActionHistoryStatusText.Text = $"Export action history failed: {ex.Message}";
+            Log(P4IActionHistoryStatusText.Text);
+        }
     }
 
     private void P4FSaveSessionReport_Click(object sender, RoutedEventArgs e)
