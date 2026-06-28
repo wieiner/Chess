@@ -280,6 +280,10 @@ static void OnlineClientSdkTests(ContractTest test)
         "Rubik special action panel appears for Rubik profile");
     test.Check(!OnlinePreviewActionDispatchPolicy.ShouldShowRubikLayerPanel("classic-six-side-3d-8x8x8-v0.1"),
         "Rubik special action panel does not appear for Classic profile");
+    test.Check(OnlinePreviewActionDispatchPolicy.ShouldShowHodgeProjectionPanel("hodge-projection-duel-3d-8x8x8-v0.1"),
+        "Hodge projection panel appears for Hodge profile");
+    test.Check(!OnlinePreviewActionDispatchPolicy.ShouldShowHodgeProjectionPanel("classic-six-side-3d-8x8x8-v0.1"),
+        "Hodge projection panel does not appear for Classic profile");
 
     var disconnectedTurn = OnlineSeatTurnState.Empty();
     test.Check(!disconnectedTurn.CanPrimaryAct &&

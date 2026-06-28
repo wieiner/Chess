@@ -9,6 +9,11 @@ public static class OnlinePreviewActionDispatchPolicy
         return rulesetId?.Contains("rubik-convergence", StringComparison.OrdinalIgnoreCase) == true;
     }
 
+    public static bool ShouldShowHodgeProjectionPanel(string? rulesetId)
+    {
+        return rulesetId?.Contains("hodge-projection", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
     public static bool CanSubmitFromGenericBoard(string? actionKind, out string disabledReason)
     {
         if (string.Equals(actionKind, OnlineActionKinds.NormalMove, StringComparison.Ordinal))

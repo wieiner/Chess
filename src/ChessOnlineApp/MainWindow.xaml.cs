@@ -1809,6 +1809,16 @@ public partial class MainWindow : Window
         {
             P4GRubikStatusText.Text = "Rubik layer-turn online dispatch is not finalized yet; layer actions are not sent as NormalMove.";
         }
+
+        if (P4GHodgeProjectionPanel != null)
+        {
+            var showHodge = OnlinePreviewActionDispatchPolicy.ShouldShowHodgeProjectionPanel(rulesetId);
+            P4GHodgeProjectionPanel.Visibility = showHodge ? Visibility.Visible : Visibility.Collapsed;
+            if (showHodge && P4GHodgeStatusText != null)
+            {
+                P4GHodgeStatusText.Text = "Hodge projected-move online dispatch requires primary and mirror preview; projection actions are not sent as NormalMove.";
+            }
+        }
     }
 
     private void RenderP4GBoard()

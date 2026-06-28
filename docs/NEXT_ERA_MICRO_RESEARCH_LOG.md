@@ -560,3 +560,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | Rubik action separation | Existing `OnlineActionKinds.RubikLayerTurn`, Rubik online fixtures, WPF control state guidance | Layer turns need axis/layer/quarter-turn context and should not be hidden behind source/target click-to-move. | Add a Rubik-only UI group with controls and disabled dispatch status until explicit online layer-turn submit is finalized. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs`, `src/ChessOnlineClient/OnlinePreviewActionDispatchPolicy.cs` | App build and contract tests for Rubik panel visibility policy. |
 | Operator clarity | Existing P4G2 coverage matrix | Rubik match/snapshot works, but special action UX remains bounded. | Show a visible boundary for Rubik so the profile does not look broken or silently unsupported. | `docs/P4G2_RUBIK_LAYER_ACTION_UI.md` | Build, targeted online contract tests. |
+
+## P4G2 Phase 25 - Hodge Projection UI Boundary
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Hodge action separation | Existing `OnlineActionKinds.HodgeProjectedMove`, Hodge online fixtures, and legal-preview DTOs | Hodge projected moves need primary plus mirror preview and all-or-nothing explanation. | Add a Hodge-only UI group with disabled dispatch status until explicit projection submit is finalized. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs`, `src/ChessOnlineClient/OnlinePreviewActionDispatchPolicy.cs` | App build and contract tests for Hodge panel visibility policy. |
+| NormalMove protection | Existing Phase 23 dispatch policy | Projection composite actions must not be downgraded to generic normal moves. | Keep generic board submit blocked for `HodgeProjectedMove`; route future work to the Hodge panel. | `docs/P4G2_HODGE_PROJECTION_UI_BOUNDARY.md` | Contract tests for Hodge action rejection and panel visibility. |
