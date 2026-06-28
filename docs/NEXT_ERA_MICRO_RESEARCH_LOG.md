@@ -633,3 +633,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | WPF incremental UI polish | Microsoft Learn WPF controls/data binding guidance | A simple existing `UniformGrid` can be improved safely without embedding the full local Chess3D rendering stack. | Keep the compact snapshot grid as a reliable fallback and add readability polish incrementally. | `docs/P4I_VISUAL_ONLINE_BOARD_AUDIT.md` | Docs-only audit, then app build when code changes begin. |
 | Online authority boundary | Existing P4G2 snapshot/legal-preview docs | The online board must render authoritative server snapshots, not local engine guesses. | Use `OnlineChess3DBoardSnapshotParser`, legal-preview targets, and action log as the visual source of truth. | docs only | Future Phase 33/34 app build and contract tests. |
+
+## P4I Phase 01 - Online Board Readability
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| WPF grid readability | Microsoft Learn WPF controls and layout docs | Small button grids need stable dimensions and concise labels to remain usable. | Add coordinate headers, marker labels, and a board legend while keeping the existing `UniformGrid` fallback. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`; run online contract tests. |
+| Server-snapshot authority | Existing online snapshot/legal-preview contracts | Visual markers should reflect authoritative snapshot and preview state only. | Render selected/from/to/legal/capture/special markers from local UI state plus server legal preview; no speculative local engine moves. | `docs/P4I_BOARD_READABILITY.md` | App build and contract tests; remote smoke unchanged. |

@@ -1972,8 +1972,17 @@ public partial class MainWindow : Window
             layer = 0;
         }
 
+        P4GBoardGrid.Rows = _p4gBoardSnapshot.Height + 1;
+        P4GBoardGrid.Columns = _p4gBoardSnapshot.Width + 1;
+        P4GBoardGrid.Children.Add(BoardHeader("Y\\X"));
+        for (var x = 0; x < _p4gBoardSnapshot.Width; x++)
+        {
+            P4GBoardGrid.Children.Add(BoardHeader($"X{x}"));
+        }
+
         for (var y = _p4gBoardSnapshot.Height - 1; y >= 0; y--)
         {
+            P4GBoardGrid.Children.Add(BoardHeader($"Y{y}"));
             for (var x = 0; x < _p4gBoardSnapshot.Width; x++)
             {
                 var cell = _p4gBoardSnapshot.GetCell(x, y, layer);
@@ -1984,13 +1993,14 @@ public partial class MainWindow : Window
                 var isLegalTarget = legalMarker != null;
                 var button = new Button
                 {
-                    Content = cell.IsOccupied ? PieceLabel(cell.PieceCode) : ".",
+                    Content = BoardCellLabel(cell, isSelected, isFrom, isTo, legalMarker),
                     Tag = cell,
-                    MinWidth = 34,
-                    MinHeight = 28,
+                    MinWidth = 42,
+                    MinHeight = 34,
                     Margin = new Thickness(1),
-                    FontSize = 11,
-                    Foreground = Brushes.White,
+                    FontSize = 12,
+                    FontWeight = cell.IsOccupied || isLegalTarget || isFrom || isTo ? FontWeights.SemiBold : FontWeights.Normal,
+                    Foreground = CellForeground(cell, isLegalTarget),
                     Background = isFrom ? Brush("#3F8F5F") :
                         isTo ? Brush("#9A6A3A") :
                         isSelected ? Brush("#3F7FBF") :
@@ -1998,7 +2008,8 @@ public partial class MainWindow : Window
                         legalMarker?.IsSpecial == true ? Brush("#6F4FA8") :
                         isLegalTarget ? Brush("#2D5F9A") :
                         CellBrush(cell),
-                    BorderBrush = isSelected || isFrom || isTo || isLegalTarget ? Brush("#D8F0FF") : Brush("#263442"),
+                    BorderBrush = isSelected || isFrom || isTo || isLegalTarget ? Brush("#F0DFA6") : Brush("#263442"),
+                    BorderThickness = isSelected || isFrom || isTo || isLegalTarget ? new Thickness(2) : new Thickness(1),
                     ToolTip = isLegalTarget
                         ? $"{cell.Coordinate} index={cell.Index} piece={PieceLabel(cell.PieceCode)} legal={legalMarker!.DisplayLabel}"
                         : $"{cell.Coordinate} index={cell.Index} piece={PieceLabel(cell.PieceCode)}"
@@ -2014,7 +2025,51 @@ public partial class MainWindow : Window
         }
 
         P4GBoardStatusText.Text =
-            $"Board: layer Z={layer} ruleset={_p4gBoardSnapshot.RulesetId} seq={_p4gBoardSnapshot.ServerSeq} occupied={_p4gBoardSnapshot.OccupiedCells.Count()} legalTargets={_p4gLegalPreview.Targets.Count} hash={_p4gBoardSnapshot.StateHash}";
+            $"Board: layer Z={layer} dims={_p4gBoardSnapshot.Width}x{_p4gBoardSnapshot.Height}x{_p4gBoardSnapshot.Depth} " +
+            $"ruleset={_p4gBoardSnapshot.RulesetId} side={_p4gBoardSnapshot.CurrentSide} macro={_p4gBoardSnapshot.CurrentMacroPlayer} " +
+            $"seq={_p4gBoardSnapshot.ServerSeq} occupied={_p4gBoardSnapshot.OccupiedCells.Count()} legalTargets={_p4gLegalPreview.Targets.Count} hash={_p4gBoardSnapshot.StateHash}";
+    }
+
+    private static TextBlock BoardHeader(string text)
+    {
+        return new TextBlock
+        {
+            Text = text,
+            Foreground = Brush("#AFC0D0"),
+            Background = Brush("#0C1219"),
+            TextAlignment = TextAlignment.Center,
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Padding = new Thickness(4),
+            Margin = new Thickness(1)
+        };
+    }
+
+    private static string BoardCellLabel(
+        OnlineChess3DBoardCell cell,
+        bool isSelected,
+        bool isFrom,
+        bool isTo,
+        LegalTargetMarker? legalMarker)
+    {
+        var marker = isFrom ? "F" :
+            isTo ? "T" :
+            legalMarker?.IsCapture == true ? "X" :
+            legalMarker?.IsSpecial == true ? "*" :
+            legalMarker != null ? "L" :
+            isSelected ? "S" :
+            " ";
+        var piece = cell.IsOccupied ? PieceLabel(cell.PieceCode) : ".";
+        return $"{marker} {piece}";
+    }
+
+    private static Brush CellForeground(OnlineChess3DBoardCell cell, bool isLegalTarget)
+    {
+        if (cell.IsOccupied || isLegalTarget)
+        {
+            return Brushes.White;
+        }
+        return Brush("#8FA3B8");
     }
 
     private int SelectedP4GLayer()
