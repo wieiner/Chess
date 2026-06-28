@@ -615,3 +615,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | Local verification gate | GitHub Actions docs and existing decomposed runner docs | Local tests should mirror CI enough to catch build/test/package regressions without requiring remote Hetzner smoke in CI. | Run `git diff --check`, test list, full `run-tests -SkipBenchmark`, and `scripts/verify.ps1`. | `docs/P4G2_FINAL_MANUAL_TEST_RESULT.md` | Sequential local commands with controlled MSBuild parallelism. |
 | Remote operator smoke | Microsoft SignalR .NET client guidance | Remote smoke should remain operator-driven and use temporary users over diagnostic HTTP 80. | Re-run Asgard and Classic full action smoke, plus snapshot-only coverage for Single/Rubik/Hodge. | docs only | Smoke tool with `-NoSecretLog`; do not commit raw `.tmp` logs. |
+
+## P4G2 Phase 31 - Final Actual Online Play Report
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Final operator handoff | Existing P4G2 docs, GitHub Actions results, and Microsoft SignalR guidance | The final report should distinguish playable paths from bounded special-action work and avoid claiming production readiness. | Summarize commits, CI, local verify, remote smokes, UI click paths, security boundaries, and next phases. | `docs/P4G2_ACTUAL_ONLINE_PLAY_FINAL_REPORT.md` | `git diff --check`, `run-tests -List`, and CI after docs commit. |
+| Production boundary | Microsoft SignalR security guidance | HTTP 80 with temporary users is useful for diagnostics but not production account traffic. | Keep TLS/domain/443 deferred and explicitly note that x-ui/Xray/Outline/Albatronix/Unreal were untouched. | final report docs | Secret/log audit plus final status check. |
