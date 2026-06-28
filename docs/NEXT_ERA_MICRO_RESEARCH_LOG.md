@@ -678,3 +678,12 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | Action log readability | Existing action-log UI and WPF selection event guidance | Selecting a notation row is more useful if the board shows the move's from/to cells. | Parse coordinate pairs from selected action notation and highlight them as read-only history markers. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`; run online contract tests. |
 | Submit safety | Existing generic dispatch guardrails | History selection must not mutate the current action command fields or turn into a replay/submit action. | Keep history markers separate from `_p4gMoveFrom`/`_p4gMoveTo`; selecting history does not submit anything. | `docs/P4I_ACTION_HISTORY_BOARD_HIGHLIGHT.md` | App build and targeted tests; no server change. |
+
+## P4J Phase 00 - Online Match UX Baseline
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Current playable online state | Existing P4G2/P4I reports and GitHub Actions history | Classic and Asgard already pass server-preview action smoke; P4I improved the board but match lifecycle UX is still diagnostic-heavy. | Record a clean baseline before adding reconnect/resume/spectator/lobby work. | `docs/P4J_ONLINE_MATCH_UX_BASELINE.md` | Git status, latest CI, Hetzner health, Classic/Asgard remote smoke, `ChessOnlineApp` build. |
+| HTTP diagnostic boundary | Existing Hetzner docs and SignalR security guidance | Public HTTP 80 is acceptable only for temporary diagnostic users; TLS/domain/443 remain deferred. | Keep remote smoke operator-driven and do not touch nginx/UFW/x-ui/443 in P4J Phase 00. | docs only | Curl health/ready/diagnostics plus smoke tool with `-NoSecretLog`. |
