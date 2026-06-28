@@ -687,3 +687,13 @@ Date: 2026-06-28
 | --- | --- | --- | --- | --- | --- |
 | Current playable online state | Existing P4G2/P4I reports and GitHub Actions history | Classic and Asgard already pass server-preview action smoke; P4I improved the board but match lifecycle UX is still diagnostic-heavy. | Record a clean baseline before adding reconnect/resume/spectator/lobby work. | `docs/P4J_ONLINE_MATCH_UX_BASELINE.md` | Git status, latest CI, Hetzner health, Classic/Asgard remote smoke, `ChessOnlineApp` build. |
 | HTTP diagnostic boundary | Existing Hetzner docs and SignalR security guidance | Public HTTP 80 is acceptable only for temporary diagnostic users; TLS/domain/443 remain deferred. | Keep remote smoke operator-driven and do not touch nginx/UFW/x-ui/443 in P4J Phase 00. | docs only | Curl health/ready/diagnostics plus smoke tool with `-NoSecretLog`. |
+
+## P4J Phase 01 - SignalR Reconnect Path Audit
+
+Date: 2026-06-28
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| SignalR reconnect lifecycle | Microsoft Learn, ASP.NET Core SignalR .NET client | ASP.NET Core SignalR automatic reconnect is opt-in through `WithAutomaticReconnect`, and clients can observe reconnecting/reconnected/closed events. | Document that the shared relay client already opts in, but does not yet expose a testable reconnect state model to UI. | `docs/P4J_SIGNALR_RECONNECT_AUDIT.md` | Docs-only audit plus code search. |
+| WPF callback threading | Microsoft Learn, WPF threading model / Dispatcher | SignalR callbacks must marshal UI updates to the WPF dispatcher, and dispatcher work should stay small. | Keep UI updates in dispatcher callbacks, but future phases should surface compact reconnect events rather than doing heavy work in callbacks. | docs only | Code audit of `P4FRelayMessageReceived` and P3F callbacks. |
+| SignalR token safety | Microsoft Learn, SignalR security | Access tokens may appear in transport URLs/logs in some SignalR transports; logs should avoid token values and HTTP remains diagnostic-only. | Reconnect UI/errors must use safe messages and never print access/refresh tokens. | docs only | Future reconnect model tests should include redaction. |
