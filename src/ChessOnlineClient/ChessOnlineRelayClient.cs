@@ -28,6 +28,8 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
 
     public OnlineProtocolMessage? LastLegalPreview { get; private set; }
 
+    public OnlineProtocolMessage? LastResumeResult { get; private set; }
+
     public OnlineMatchmakingStatus? LastMatchmakingStatus { get; private set; }
 
     public event Action<string, OnlineProtocolMessage>? MessageReceived;
@@ -100,6 +102,21 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
     public Task<OnlineProtocolMessage> RequestActionLogAsync(string clientId, string roomId, string tableId, CancellationToken cancellationToken = default)
     {
         return InvokeAsync("RequestActionLog", Message(OnlineMessageTypes.RequestActionLog, clientId, roomId, tableId), cancellationToken);
+    }
+
+    public Task<OnlineProtocolMessage> RequestResumeMatchAsync(
+        string clientId,
+        OnlineResumeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var roomId = string.IsNullOrWhiteSpace(request.RoomId) ? "" : request.RoomId;
+        var tableId = string.IsNullOrWhiteSpace(request.TableId) ? "" : request.TableId;
+        var message = Message(OnlineMessageTypes.RequestResumeMatch, clientId, roomId, tableId);
+        request.PlayerId = string.IsNullOrWhiteSpace(request.PlayerId) ? _session.PlayerId : request.PlayerId;
+        request.RoomId = string.IsNullOrWhiteSpace(request.RoomId) ? roomId : request.RoomId;
+        request.TableId = string.IsNullOrWhiteSpace(request.TableId) ? tableId : request.TableId;
+        message.ResumeRequest = request;
+        return InvokeAsync("RequestResumeMatch", message, cancellationToken);
     }
 
     public Task<OnlineProtocolMessage> RequestLegalPreviewAsync(
@@ -210,6 +227,10 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
         {
             LastLegalPreview = message;
         }
+        if (message.ResumeResult != null)
+        {
+            LastResumeResult = message;
+        }
         if (message.MatchmakingStatus != null)
         {
             LastMatchmakingStatus = message.MatchmakingStatus;
@@ -235,6 +256,7 @@ public static class ChessOnlineRelayEvents
         "ReceiveActionRejected",
         "ReceiveAuthoritativeSnapshot",
         "ReceiveActionLogChunk",
+        "ReceiveResumeMatchResult",
         "ReceiveLegalPreviewResult",
         "ReceiveResyncRequired",
         "ReceiveMatchmakingStatus",

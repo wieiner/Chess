@@ -393,7 +393,15 @@ public sealed class OnlineRoomRegistry
                 .Take(64)
                 .Select(CloneEvent)
                 .ToList();
-            return Reply(OnlineMessageTypes.ResumeMatchResult, envelope, resumeResult: new OnlineResumeResult
+            var actionLog = new OnlineActionLogChunk
+            {
+                RoomId = table.RoomId,
+                TableId = table.TableId,
+                FromServerSeq = events.FirstOrDefault()?.ServerSeq ?? fromSeq,
+                ToServerSeq = events.LastOrDefault()?.ServerSeq ?? fromSeq - 1,
+                Events = events
+            };
+            return Reply(OnlineMessageTypes.ResumeMatchResult, envelope, snapshot: snapshot, actionLog: actionLog, resumeResult: new OnlineResumeResult
             {
                 Success = true,
                 RoomId = table.RoomId,
@@ -401,14 +409,7 @@ public sealed class OnlineRoomRegistry
                 SeatIndex = seat.SeatIndex,
                 RulesetId = table.RulesetId,
                 Snapshot = snapshot,
-                ActionLog = new OnlineActionLogChunk
-                {
-                    RoomId = table.RoomId,
-                    TableId = table.TableId,
-                    FromServerSeq = events.FirstOrDefault()?.ServerSeq ?? fromSeq,
-                    ToServerSeq = events.LastOrDefault()?.ServerSeq ?? fromSeq - 1,
-                    Events = events
-                }
+                ActionLog = actionLog
             });
         }
     }

@@ -765,3 +765,13 @@ Date: 2026-06-29
 | Active match resume | Existing `OnlineRoomRegistry` authority and Microsoft SignalR group guidance | A reconnecting player must be re-added to room/table groups and receive authoritative snapshot/action log, but board state must not mutate. | Add `RequestResumeMatch` for active in-memory tables, returning snapshot and action-log tail. | `src/ChessOnlineProtocol/OnlineRoomRegistry.cs`, `src/ChessOnlineServer/Chess3DRelayHub.cs` | Registry tests for success, wrong player, wrong table, no mutation. |
 | Runtime rehydration boundary | Phase 06 persistence audit | Persisted tables are not yet rehydrated into active native sessions after server restart. | Keep server-restart resume deferred; the active resume method returns clear failure for missing/non-active runtime tables. | `docs/P4J_SERVER_RESUME_MATCH.md` | Documentation and tests avoid claiming restart resume. |
 | Capability flip | Existing diagnostics endpoint | Once the hub method exists, clients need a machine-readable capability flag. | Set `ResumeMatchSupported=true`, list `RequestResumeMatch`, and expose `/chess3d/diagnostics.resumeMatch=true`. | `src/ChessOnlineServer/ChessOnlineServerHost.cs`, tests | Build server and targeted online contract tests. |
+
+## P4J Phase 09 - Client Resume Support
+
+Date: 2026-06-29
+
+| Topic | Internet/source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| SignalR resume client method | Microsoft Learn, ASP.NET Core SignalR .NET client | Hub methods should be invoked through the shared `HubConnection` client and treated as server-authoritative responses. | Add `RequestResumeMatchAsync` to `ChessOnlineRelayClient` and remember the last resume result for UI/session reporting. | `src/ChessOnlineClient/ChessOnlineRelayClient.cs` | Build `ChessOnlineClient`; targeted online contract tests. |
+| UI thread and state updates | Microsoft Learn, WPF threading model / Dispatcher | WPF UI state must be updated from UI event handlers or marshalled through the dispatcher. | Keep resume as a button-driven UI action that reuses existing snapshot/action-log render helpers. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`. |
+| Resume context security | OWASP Logging Cheat Sheet and Phase 06 resume audit | Resume context should be non-secret: room/table/seat/hash/seq are useful, tokens/passwords are not. | Store resume context in memory and sanitized session reports only; do not persist credentials. | `src/ChessOnlineApp/MainWindow.xaml.cs`, `docs/P4J_CLIENT_RESUME.md` | Contract tests for callback registration and no-token DTOs; diff audit. |

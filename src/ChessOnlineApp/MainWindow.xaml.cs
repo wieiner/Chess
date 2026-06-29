@@ -1008,12 +1008,74 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void P4JResumeCurrentMatch_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            EnsureP4FMatchReady();
+            EnsureP4FPrimaryRelayUsable();
+            if (_p4fPrimarySession?.IsAuthenticated != true)
+            {
+                throw new InvalidOperationException("Create or login a temporary primary user first.");
+            }
+
+            var request = new OnlineResumeRequest
+            {
+                PlayerId = _p4fPrimarySession.PlayerId,
+                RoomId = _p4fRoomId,
+                TableId = _p4fTableId,
+                SeatIndex = _p4fPrimarySeatIndex,
+                ExpectedRulesetId = SelectedP3FMatchmakingRuleset(),
+                LastKnownStateHash = _p4fLastSnapshot?.StateHash ?? _p4gBoardSnapshot?.StateHash ?? "",
+                LastKnownServerSeq = _p4fLastServerSeq
+            };
+            var result = await _p4fPrimaryRelay!.RequestResumeMatchAsync("p4j-resume", request);
+            RememberP4FServerSeq(result);
+            if (result.ResumeResult?.Success == true)
+            {
+                if (result.Snapshot != null)
+                {
+                    RememberP4FSnapshot(result);
+                }
+                if (result.ActionLog != null)
+                {
+                    RenderP4FActionLogChunk(result, "Resume action log");
+                }
+                P4FMatchStatusText.Text = $"Resume succeeded: room={result.ResumeResult.RoomId} table={result.ResumeResult.TableId} seat={DisplaySeat(result.ResumeResult.SeatIndex)} hash={result.ResumeResult.Snapshot?.StateHash ?? result.Snapshot?.StateHash}";
+                P4JReconnectStatusText.Text = "Reconnect: resume current match succeeded.";
+                P4JReconnectStatusText.Foreground = Brush("#B8F7C6");
+            }
+            else
+            {
+                P4FMatchStatusText.Text = $"Resume rejected: {result.ResumeResult?.FailureReason} {result.ResumeResult?.FailureText}".Trim();
+                P4JReconnectStatusText.Text = $"Reconnect: resume rejected ({result.ResumeResult?.FailureReason ?? "unknown"}).";
+                P4JReconnectStatusText.Foreground = Brush("#FFB4A8");
+            }
+            UpdateP4FSeatTurnStatus();
+            UpdateP4FRealtimeStatus();
+            UpdateP4FCompactStatus();
+            Log($"P4J {P4FMatchStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4FMatchStatusText.Text = $"Resume current match failed: {ex.Message}";
+            P4JReconnectStatusText.Text = P4FMatchStatusText.Text;
+            P4JReconnectStatusText.Foreground = Brush("#FFB4A8");
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
     private async Task RefreshP4FActionLogForPrimaryAsync(string clientId, string label)
     {
         EnsureP4FMatchReady();
         EnsureP4FPrimaryRelayUsable();
         var actionLog = await _p4fPrimaryRelay!.RequestActionLogAsync(clientId, _p4fRoomId, _p4fTableId);
         RememberP4FServerSeq(actionLog);
+        RenderP4FActionLogChunk(actionLog, label);
+    }
+
+    private void RenderP4FActionLogChunk(OnlineProtocolMessage actionLog, string label)
+    {
         var count = actionLog.ActionLog?.Events.Count ?? 0;
         P4FMatchStatusText.Text = $"{label}: seq={actionLog.Envelope.ServerSeq} events={count}";
         Log($"P4F {P4FMatchStatusText.Text}");
@@ -1303,6 +1365,17 @@ public partial class MainWindow : Window
                 _p4fRealtimeSync.GapEventCount,
                 _p4fRealtimeSync.ResyncRequired,
                 _p4fResyncRefreshPending
+            },
+            resume = new
+            {
+                roomId = _p4fRoomId,
+                tableId = _p4fTableId,
+                seat = _p4fPrimarySeatIndex,
+                lastKnownStateHash = _p4fLastSnapshot?.StateHash ?? _p4gBoardSnapshot?.StateHash ?? "",
+                lastKnownServerSeq = _p4fLastServerSeq,
+                lastResumeSuccess = _p4fPrimaryRelay?.LastResumeResult?.ResumeResult?.Success,
+                lastResumeFailureReason = _p4fPrimaryRelay?.LastResumeResult?.ResumeResult?.FailureReason ?? "",
+                lastResumeFailureText = _p4fPrimaryRelay?.LastResumeResult?.ResumeResult?.FailureText ?? ""
             },
             snapshot = _p4fLastSnapshot == null ? null : new
             {

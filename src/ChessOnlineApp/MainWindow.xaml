@@ -410,6 +410,7 @@
                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                         <Button Content="Disconnect Primary Relay" Click="P4JDisconnectPrimaryRelay_Click" MinWidth="170" />
                         <Button Content="Reconnect Primary Relay" Click="P4JReconnectPrimaryRelay_Click" MinWidth="170" />
+                        <Button Content="Resume Current Match" Click="P4JResumeCurrentMatch_Click" MinWidth="170" />
                     </StackPanel>
                     <TextBlock x:Name="P4FMatchStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Match status: none." />
                     <TextBlock x:Name="P4FCompactStatusText" Foreground="#F0DFA6" Margin="0,8,0,0" TextWrapping="Wrap" Text="Status: server=disconnected auth=anonymous match=none turn=waiting preview=0 realtime=idle accepted=0 rejected=0 lastSeq=0" />

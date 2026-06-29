@@ -274,10 +274,12 @@ static void OnlineClientSdkTests(ContractTest test)
     connection.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
     test.Check(ChessOnlineRelayEvents.All.Contains("ReceiveLegalPreviewResult"), "online relay client registers legal preview callback event");
+    test.Check(ChessOnlineRelayEvents.All.Contains("ReceiveResumeMatchResult"), "online relay client registers resume result callback event");
 
     var relayClient = new ChessOnlineRelayClient(session);
     test.Check(relayClient.ReconnectState.State == OnlineConnectionState.Disconnected &&
         relayClient.ReconnectState.ShouldDisableSubmit &&
+        relayClient.LastResumeResult == null &&
         relayClient.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected, "online relay client exposes initial reconnect state without network");
     relayClient.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
