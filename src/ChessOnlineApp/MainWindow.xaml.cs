@@ -947,6 +947,67 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void P4JDisconnectPrimaryRelay_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_p4fPrimaryRelay == null)
+            {
+                P4JReconnectStatusText.Text = "Reconnect: primary relay already disconnected.";
+                P4JReconnectStatusText.Foreground = Brush("#AFC0D0");
+                UpdateP4FCompactStatus();
+                return;
+            }
+
+            await _p4fPrimaryRelay.DisposeAsync();
+            _p4fPrimaryRelay = null;
+            _p4fRealtimeSync.MarkConnectionState("primary relay manually disconnected");
+            P4JReconnectStatusText.Text = "Reconnect: primary relay manually disconnected; match context retained.";
+            P4JReconnectStatusText.Foreground = Brush("#F4D58D");
+            ClearP4GLegalPreview("Legal preview: cleared while primary relay is disconnected.");
+            UpdateP4FRealtimeStatus();
+            UpdateP4FCompactStatus();
+            Log("P4J primary relay manually disconnected; room/table/session context retained for reconnect smoke.");
+        }
+        catch (Exception ex)
+        {
+            P4JReconnectStatusText.Text = $"Reconnect disconnect failed: {ex.Message}";
+            P4JReconnectStatusText.Foreground = Brush("#FFB4A8");
+            Log(P4JReconnectStatusText.Text);
+        }
+    }
+
+    private async void P4JReconnectPrimaryRelay_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_p4fPrimarySession?.IsAuthenticated != true)
+            {
+                throw new InvalidOperationException("Create or login a temporary primary user first.");
+            }
+            if (string.IsNullOrWhiteSpace(_p4fRoomId) || string.IsNullOrWhiteSpace(_p4fTableId))
+            {
+                throw new InvalidOperationException("Join matchmaking and wait for MatchFound before reconnect smoke.");
+            }
+
+            await EnsureP4FPrimaryRelayAsync("p4j-reconnect");
+            P4JReconnectStatusText.Text = "Reconnect: primary relay reconnected; refreshing snapshot and action log.";
+            P4JReconnectStatusText.Foreground = Brush("#B8F7C6");
+            await RefreshP4FAfterRealtimeResyncAsync("manual reconnect smoke");
+            _p4fPrimaryRelay?.ReconnectState.ClearResyncRequest();
+            UpdateP4FSeatTurnStatus();
+            UpdateP4FRealtimeStatus();
+            UpdateP4FCompactStatus();
+            Log("P4J primary relay reconnected and authoritative snapshot/action log refresh was requested.");
+        }
+        catch (Exception ex)
+        {
+            P4JReconnectStatusText.Text = $"Reconnect failed: {ex.Message}";
+            P4JReconnectStatusText.Foreground = Brush("#FFB4A8");
+            Log(P4JReconnectStatusText.Text);
+        }
+    }
+
     private async Task RefreshP4FActionLogForPrimaryAsync(string clientId, string label)
     {
         EnsureP4FMatchReady();
