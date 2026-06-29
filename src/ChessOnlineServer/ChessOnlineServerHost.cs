@@ -141,6 +141,7 @@ public static class ChessOnlineServerHost
                 realtimeResync = diagnostics.RealtimeResyncSupported,
                 actionLog = diagnostics.ActionLogSupported,
                 matchmaking = diagnostics.MatchmakingSupported,
+                resumeMatch = diagnostics.ResumeMatchSupported,
                 supportedHubMethods = diagnostics.SupportedHubMethods,
                 startedUtc = AppStart.StartedUtc,
                 diagnostics.RoomCount,

@@ -439,6 +439,7 @@ public sealed class OnlineRoomRegistry
                 RealtimeResyncSupported = true,
                 ActionLogSupported = true,
                 MatchmakingSupported = true,
+                ResumeMatchSupported = false,
                 SupportedHubMethods =
                 [
                     OnlineMessageTypes.Hello,

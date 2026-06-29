@@ -47,7 +47,9 @@ static void AuthorityRuntimeDiagnosticsTests(ContractTest test, string profileRo
     test.Check(onlineDiagnostics.RealtimeResyncSupported, "online diagnostics exposes realtime resync capability");
     test.Check(onlineDiagnostics.ActionLogSupported, "online diagnostics exposes action log capability");
     test.Check(onlineDiagnostics.MatchmakingSupported, "online diagnostics exposes matchmaking capability");
+    test.Check(!onlineDiagnostics.ResumeMatchSupported, "online diagnostics reports resume match unsupported until hub method is added");
     test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestLegalPreview), "online diagnostics lists RequestLegalPreview hub method");
+    test.Check(!onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestResumeMatch), "online diagnostics does not list RequestResumeMatch before implementation");
 }
 
 static void ProtocolRoundtripTests(ContractTest test)
@@ -110,6 +112,58 @@ static void ProtocolRoundtripTests(ContractTest test)
         parsedPreviewRequest.LegalPreviewRequest?.SourceX == 2 &&
         parsedPreviewRequest.LegalPreviewRequest.ExpectedStateHash == "hash-a",
         "legal preview request serializes");
+
+    var resumeRequest = OnlineProtocolJson.Wrap(OnlineMessageTypes.RequestResumeMatch, "client-a", "player-a");
+    resumeRequest.ResumeRequest = new OnlineResumeRequest
+    {
+        PlayerId = "player-a",
+        RoomId = "room-a",
+        TableId = "table-a",
+        SeatIndex = 1,
+        ExpectedRulesetId = "classic-six-side-3d-8x8x8-v0.1",
+        LastKnownStateHash = "hash-a",
+        LastKnownServerSeq = 7
+    };
+    var resumeRequestJson = OnlineProtocolJson.Serialize(resumeRequest);
+    test.Check(OnlineProtocolJson.TryDeserialize(resumeRequestJson, out var parsedResumeRequest, out error) &&
+        parsedResumeRequest.Envelope.MessageType == OnlineMessageTypes.RequestResumeMatch &&
+        parsedResumeRequest.ResumeRequest?.SeatIndex == 1 &&
+        parsedResumeRequest.ResumeRequest.LastKnownServerSeq == 7,
+        "resume request serializes without token fields");
+
+    var resumeResult = OnlineProtocolJson.Wrap(OnlineMessageTypes.ResumeMatchResult, "server", "player-a");
+    resumeResult.ResumeResult = new OnlineResumeResult
+    {
+        Success = false,
+        FailureReason = OnlineResumeFailureReasons.CannotResumeAfterServerRestartYet,
+        FailureText = "Runtime table rehydration is not implemented yet.",
+        RoomId = "room-a",
+        TableId = "table-a",
+        SeatIndex = 1,
+        RulesetId = "classic-six-side-3d-8x8x8-v0.1",
+        Candidates =
+        {
+            new OnlineResumeCandidate
+            {
+                RoomId = "room-a",
+                TableId = "table-a",
+                SeatIndex = 1,
+                RulesetId = "classic-six-side-3d-8x8x8-v0.1",
+                StateHash = "hash-a",
+                ServerSeq = 7,
+                TableState = OnlineMessageTypes.GameStarted,
+                UpdatedAtUtc = "2026-06-29T00:00:00Z"
+            }
+        }
+    };
+    var resumeResultJson = OnlineProtocolJson.Serialize(resumeResult);
+    test.Check(OnlineProtocolJson.TryDeserialize(resumeResultJson, out var parsedResumeResult, out error) &&
+        parsedResumeResult.Envelope.MessageType == OnlineMessageTypes.ResumeMatchResult &&
+        parsedResumeResult.ResumeResult?.FailureReason == OnlineResumeFailureReasons.CannotResumeAfterServerRestartYet &&
+        parsedResumeResult.ResumeResult.Candidates.Count == 1 &&
+        !resumeResultJson.Contains("accessToken", StringComparison.OrdinalIgnoreCase) &&
+        !resumeResultJson.Contains("refreshToken", StringComparison.OrdinalIgnoreCase),
+        "resume result serializes failure/candidate without token fields");
 
     var preview = OnlineProtocolJson.Wrap(OnlineMessageTypes.LegalPreviewResult, "client-a", "player-a");
     preview.LegalPreview = new OnlineLegalPreviewResult
