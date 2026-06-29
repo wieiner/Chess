@@ -47,9 +47,9 @@ static void AuthorityRuntimeDiagnosticsTests(ContractTest test, string profileRo
     test.Check(onlineDiagnostics.RealtimeResyncSupported, "online diagnostics exposes realtime resync capability");
     test.Check(onlineDiagnostics.ActionLogSupported, "online diagnostics exposes action log capability");
     test.Check(onlineDiagnostics.MatchmakingSupported, "online diagnostics exposes matchmaking capability");
-    test.Check(!onlineDiagnostics.ResumeMatchSupported, "online diagnostics reports resume match unsupported until hub method is added");
+    test.Check(onlineDiagnostics.ResumeMatchSupported, "online diagnostics exposes resume match capability");
     test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestLegalPreview), "online diagnostics lists RequestLegalPreview hub method");
-    test.Check(!onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestResumeMatch), "online diagnostics does not list RequestResumeMatch before implementation");
+    test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestResumeMatch), "online diagnostics lists RequestResumeMatch hub method");
 }
 
 static void ProtocolRoundtripTests(ContractTest test)
@@ -614,6 +614,47 @@ static void AuthorityClassicTests(ContractTest test, string profileRoot)
 
     var log = registry.RequestActionLog(Envelope(OnlineMessageTypes.RequestActionLog, "room-classic", "classic", "client-1", "player-1"));
     test.Check(log.ActionLog?.Events.Count == 1 && log.ActionLog.Events[0].ServerSeq == 1, "action log chunk exposes serverSeq");
+
+    var beforeResumeHash = registry.RequestSnapshot(Envelope(OnlineMessageTypes.RequestSnapshot, "room-classic", "classic", "client-1", "player-1")).Snapshot?.StateHash ?? "";
+    var resume = registry.RequestResumeMatch(Envelope(OnlineMessageTypes.RequestResumeMatch, "room-classic", "classic", "client-1", "player-1"), new OnlineResumeRequest
+    {
+        PlayerId = "player-1",
+        RoomId = "room-classic",
+        TableId = "classic",
+        SeatIndex = 1,
+        ExpectedRulesetId = "classic-six-side-3d-8x8x8-v0.1",
+        LastKnownServerSeq = 0
+    });
+    var afterResumeHash = registry.RequestSnapshot(Envelope(OnlineMessageTypes.RequestSnapshot, "room-classic", "classic", "client-1", "player-1")).Snapshot?.StateHash ?? "";
+    test.Check(resume.Envelope.MessageType == OnlineMessageTypes.ResumeMatchResult &&
+        resume.ResumeResult?.Success == true &&
+        resume.ResumeResult.Snapshot?.StateHash == beforeResumeHash &&
+        resume.ResumeResult.ActionLog?.Events.Count == 1 &&
+        beforeResumeHash == afterResumeHash,
+        "active match resume returns snapshot/action log without mutating state");
+
+    var wrongResumePlayer = registry.RequestResumeMatch(Envelope(OnlineMessageTypes.RequestResumeMatch, "room-classic", "classic", "client-2", "player-2"), new OnlineResumeRequest
+    {
+        PlayerId = "player-2",
+        RoomId = "room-classic",
+        TableId = "classic",
+        SeatIndex = 1,
+        ExpectedRulesetId = "classic-six-side-3d-8x8x8-v0.1"
+    });
+    test.Check(wrongResumePlayer.ResumeResult?.Success == false &&
+        wrongResumePlayer.ResumeResult.FailureReason == OnlineResumeFailureReasons.PlayerNotInTable,
+        "resume rejects player that does not own the seat");
+
+    var wrongResumeTable = registry.RequestResumeMatch(Envelope(OnlineMessageTypes.RequestResumeMatch, "room-classic", "missing", "client-1", "player-1"), new OnlineResumeRequest
+    {
+        PlayerId = "player-1",
+        RoomId = "room-classic",
+        TableId = "missing",
+        SeatIndex = 1
+    });
+    test.Check(wrongResumeTable.ResumeResult?.Success == false &&
+        wrongResumeTable.ResumeResult.FailureReason == OnlineResumeFailureReasons.TableNotFound,
+        "resume rejects missing table cleanly");
 }
 
 static void AuthorityProfileSmokeTests(ContractTest test, string profileRoot)

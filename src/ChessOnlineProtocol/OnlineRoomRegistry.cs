@@ -349,6 +349,70 @@ public sealed class OnlineRoomRegistry
         }
     }
 
+    public OnlineProtocolMessage RequestResumeMatch(OnlineMessageEnvelope envelope, OnlineResumeRequest request)
+    {
+        lock (_gate)
+        {
+            request.RoomId = string.IsNullOrWhiteSpace(request.RoomId) ? envelope.RoomId : request.RoomId.Trim();
+            request.TableId = string.IsNullOrWhiteSpace(request.TableId) ? envelope.TableId : request.TableId.Trim();
+            request.PlayerId = string.IsNullOrWhiteSpace(request.PlayerId) ? RequirePlayerId(envelope) : request.PlayerId.Trim();
+
+            if (!TryGetTable(request.RoomId, request.TableId, out _, out var table))
+            {
+                return ResumeFailure(envelope, request, OnlineResumeFailureReasons.TableNotFound, "Table not found in active runtime registry.");
+            }
+
+            var seat = request.SeatIndex > 0 && table.Seats.TryGetValue(request.SeatIndex, out var requestedSeat)
+                ? requestedSeat
+                : table.Seats.Values.FirstOrDefault(s => string.Equals(s.PlayerId, request.PlayerId, StringComparison.OrdinalIgnoreCase));
+            if (seat == null || !string.Equals(seat.PlayerId, request.PlayerId, StringComparison.OrdinalIgnoreCase))
+            {
+                return ResumeFailure(envelope, request, OnlineResumeFailureReasons.PlayerNotInTable, "Player is not seated at this table.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ExpectedRulesetId) &&
+                !string.Equals(request.ExpectedRulesetId, table.RulesetId, StringComparison.OrdinalIgnoreCase))
+            {
+                return ResumeFailure(envelope, request, OnlineResumeFailureReasons.RulesetMismatch, "Requested ruleset does not match active table.");
+            }
+
+            if (table.State != OnlineTableState.InGame)
+            {
+                return ResumeFailure(envelope, request, OnlineResumeFailureReasons.TableNotActive, "Table is not in game.");
+            }
+
+            if (table.Session == null)
+            {
+                return ResumeFailure(envelope, request, OnlineResumeFailureReasons.CannotResumeAfterServerRestartYet, "Active native game session is not available.");
+            }
+
+            var snapshot = table.Session.CreateSnapshot(table.RoomId, table.TableId, table.ServerSeq);
+            var fromSeq = Math.Max(1, request.LastKnownServerSeq + 1);
+            var events = table.ActionLog
+                .Where(e => e.ServerSeq >= fromSeq)
+                .Take(64)
+                .Select(CloneEvent)
+                .ToList();
+            return Reply(OnlineMessageTypes.ResumeMatchResult, envelope, resumeResult: new OnlineResumeResult
+            {
+                Success = true,
+                RoomId = table.RoomId,
+                TableId = table.TableId,
+                SeatIndex = seat.SeatIndex,
+                RulesetId = table.RulesetId,
+                Snapshot = snapshot,
+                ActionLog = new OnlineActionLogChunk
+                {
+                    RoomId = table.RoomId,
+                    TableId = table.TableId,
+                    FromServerSeq = events.FirstOrDefault()?.ServerSeq ?? fromSeq,
+                    ToServerSeq = events.LastOrDefault()?.ServerSeq ?? fromSeq - 1,
+                    Events = events
+                }
+            });
+        }
+    }
+
     public OnlineProtocolMessage RequestLegalPreview(OnlineMessageEnvelope envelope, OnlineLegalPreviewRequest request)
     {
         lock (_gate)
@@ -439,7 +503,7 @@ public sealed class OnlineRoomRegistry
                 RealtimeResyncSupported = true,
                 ActionLogSupported = true,
                 MatchmakingSupported = true,
-                ResumeMatchSupported = false,
+                ResumeMatchSupported = true,
                 SupportedHubMethods =
                 [
                     OnlineMessageTypes.Hello,
@@ -451,6 +515,7 @@ public sealed class OnlineRoomRegistry
                     OnlineMessageTypes.SubmitAction,
                     OnlineMessageTypes.RequestSnapshot,
                     OnlineMessageTypes.RequestActionLog,
+                    OnlineMessageTypes.RequestResumeMatch,
                     OnlineMessageTypes.RequestLegalPreview,
                     OnlineMessageTypes.RequestDiagnostics,
                     OnlineMessageTypes.Ping
@@ -541,6 +606,7 @@ public sealed class OnlineRoomRegistry
         OnlineActionCommand? action = null,
         OnlineSnapshot? snapshot = null,
         OnlineActionLogChunk? actionLog = null,
+        OnlineResumeResult? resumeResult = null,
         OnlineLegalPreviewResult? legalPreview = null,
         OnlineError? error = null,
         string text = "")
@@ -564,10 +630,25 @@ public sealed class OnlineRoomRegistry
             Action = action,
             Snapshot = snapshot,
             ActionLog = actionLog,
+            ResumeResult = resumeResult,
             LegalPreview = legalPreview,
             Error = error,
             Text = text
         };
+    }
+
+    private OnlineProtocolMessage ResumeFailure(OnlineMessageEnvelope envelope, OnlineResumeRequest request, string reason, string text)
+    {
+        return Reply(OnlineMessageTypes.ResumeMatchResult, envelope, resumeResult: new OnlineResumeResult
+        {
+            Success = false,
+            FailureReason = reason,
+            FailureText = text,
+            RoomId = request.RoomId,
+            TableId = request.TableId,
+            SeatIndex = request.SeatIndex,
+            RulesetId = request.ExpectedRulesetId
+        });
     }
 
     private bool TryGetRoom(string roomId, out OnlineRoom room)

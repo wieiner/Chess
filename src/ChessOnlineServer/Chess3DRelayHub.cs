@@ -255,6 +255,20 @@ public sealed class Chess3DRelayHub : Hub
         return result;
     }
 
+    public async Task<OnlineProtocolMessage> RequestResumeMatch(OnlineProtocolMessage message)
+    {
+        var result = InvokeRegistry(message, OnlineMessageTypes.RequestResumeMatch, env => _registry.RequestResumeMatch(env, message.ResumeRequest ?? new OnlineResumeRequest()));
+        if (result.ResumeResult?.Success == true)
+        {
+            _connections.SetMembership(Context.ConnectionId, result.ResumeResult.RoomId, result.ResumeResult.TableId);
+            await PersistSessionMembership(result.ResumeResult.RoomId, result.ResumeResult.TableId, result.ResumeResult.SeatIndex);
+            await Groups.AddToGroupAsync(Context.ConnectionId, RoomGroup(result.ResumeResult.RoomId));
+            await Groups.AddToGroupAsync(Context.ConnectionId, TableGroup(result.ResumeResult.TableId));
+        }
+        await SendCaller("ReceiveResumeMatchResult", result);
+        return result;
+    }
+
     public async Task<OnlineProtocolMessage> RequestLegalPreview(OnlineProtocolMessage message)
     {
         var result = InvokeRegistry(message, OnlineMessageTypes.RequestLegalPreview, env => _registry.RequestLegalPreview(env, message.LegalPreviewRequest ?? new OnlineLegalPreviewRequest()));

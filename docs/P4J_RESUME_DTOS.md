@@ -74,7 +74,7 @@ The HTTP diagnostics endpoint exposes:
 "resumeMatch": false
 ```
 
-This is intentionally false until `Chess3DRelayHub.RequestResumeMatch` is implemented. Clients should not enable resume UI as a working server feature until the flag becomes true.
+In Phase 07 this was intentionally false until `Chess3DRelayHub.RequestResumeMatch` existed. Phase 08 flips the server capability to true for active in-memory matches. Clients should still distinguish active-match resume from full server-restart rehydration.
 
 ## Security Boundary
 
