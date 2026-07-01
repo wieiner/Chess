@@ -875,3 +875,13 @@ Date: 2026-07-01
 | Append-only lobby protocol | Existing `OnlineProtocolMessage` optional payload pattern | New request/result DTOs can be added without breaking old clients. | Add `RequestLobbySnapshot` and `LobbySnapshot` with optional payloads. | `src/ChessOnlineProtocol/OnlineProtocolDtos.cs`, `OnlineProtocolJson.cs` | JSON roundtrip tests. |
 | Registry-owned active tables | Current `OnlineRoomRegistry` state model | Active room/table/seat state already exists in memory and can be projected into safe rows. | Add a dedicated snapshot builder instead of exposing raw room/table objects. | `src/ChessOnlineProtocol/OnlineRoomRegistry.cs` | Empty and active lobby contract tests. |
 | Privacy and capability reporting | OWASP Logging Cheat Sheet and current diagnostics pattern | Lobby must advertise capability while omitting tokens, connection IDs, and full private player data. | Add `LobbySnapshotSupported` and `RequestLobbySnapshot` in supported methods. Seat labels are shortened. | server/protocol/tests/docs | Targeted online contract tests and server build. |
+
+## P4J Phase 19 - Client Lobby Support
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| SignalR client method parity | Microsoft Learn, ASP.NET Core SignalR .NET client | Client SDK should expose the same hub methods UI needs, instead of building raw messages in WPF. | Add `RequestLobbySnapshotAsync` and remember `LastLobbySnapshot`. | `src/ChessOnlineClient/ChessOnlineRelayClient.cs` | Build `ChessOnlineClient`; targeted contract tests. |
+| UI-friendly lobby rows | WPF binding guidance | WPF should bind/display compact rows, not raw protocol DTOs with nested seat data. | Add `OnlineLobbyTableDisplayRow` and `OnlineLobbyFilterState`. | `src/ChessOnlineClient/OnlineLobbyClientState.cs` | Unit-style contract tests without network. |
+| Secret-safe display | OWASP Logging Cheat Sheet | Lobby display labels should not contain tokens or raw connection ids. | Use protocol-provided short player labels and no auth data in display rows. | client/tests/docs | Redaction/display tests. |

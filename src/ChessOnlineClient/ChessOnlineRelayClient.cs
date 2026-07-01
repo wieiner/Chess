@@ -34,6 +34,8 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
 
     public OnlineProtocolMessage? LastSpectatorResult { get; private set; }
 
+    public OnlineProtocolMessage? LastLobbySnapshot { get; private set; }
+
     public OnlineMatchmakingStatus? LastMatchmakingStatus { get; private set; }
 
     public event Action<string, OnlineProtocolMessage>? MessageReceived;
@@ -106,6 +108,16 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
     public Task<OnlineProtocolMessage> RequestActionLogAsync(string clientId, string roomId, string tableId, CancellationToken cancellationToken = default)
     {
         return InvokeAsync("RequestActionLog", Message(OnlineMessageTypes.RequestActionLog, clientId, roomId, tableId), cancellationToken);
+    }
+
+    public Task<OnlineProtocolMessage> RequestLobbySnapshotAsync(
+        string clientId,
+        OnlineLobbySnapshotRequest? request = null,
+        CancellationToken cancellationToken = default)
+    {
+        var message = Message(OnlineMessageTypes.RequestLobbySnapshot, clientId);
+        message.LobbyRequest = request ?? new OnlineLobbySnapshotRequest();
+        return InvokeAsync("RequestLobbySnapshot", message, cancellationToken);
     }
 
     public Task<OnlineProtocolMessage> RequestResumeMatchAsync(
@@ -255,6 +267,10 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
             LastSpectatorResult = message;
             SpectatorState.Apply(message.SpectatorResult);
         }
+        if (message.LobbySnapshot != null)
+        {
+            LastLobbySnapshot = message;
+        }
         if (message.MatchmakingStatus != null)
         {
             LastMatchmakingStatus = message.MatchmakingStatus;
@@ -282,6 +298,7 @@ public static class ChessOnlineRelayEvents
         "ReceiveActionLogChunk",
         "ReceiveResumeMatchResult",
         "ReceiveJoinSpectatorResult",
+        "ReceiveLobbySnapshot",
         "ReceiveLegalPreviewResult",
         "ReceiveResyncRequired",
         "ReceiveMatchmakingStatus",
