@@ -795,3 +795,13 @@ Date: 2026-07-01
 | Resume smoke prerequisite | Microsoft Learn, ASP.NET Core SignalR .NET client and local Phase 08/09 code | A client can only invoke a hub method that the deployed server exposes; current Hetzner diagnostics omit `RequestResumeMatch`. | Do not claim remote resume PASS until the server package containing Phase 08 is deployed. Record a blocked smoke result instead. | `docs/P4J_RESUME_MANUAL_SMOKE_RESULT.md` | Build `ChessOnlineApp`, curl diagnostics, `git diff --check`. |
 | WPF state recovery | Microsoft Learn, WPF Dispatcher/threading guidance | The `Resume Current Match` button runs on the UI event path and should render authoritative snapshot/action-log only after server response. | Keep the manual checklist focused on active match, disconnect/reconnect, then resume; no background UI automation committed. | docs only | Manual operator checklist in result doc. |
 | Safe reporting | OWASP Logging Cheat Sheet and Microsoft SignalR security | Manual smoke notes must not include temporary passwords, bearer tokens, or raw logs. | Store only sanitized status and capability facts in docs; `.tmp/manual-smoke` remains untracked. | docs only | Inspect docs before commit. |
+
+## P4J Phase 11 - Spectator Contract Audit
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| SignalR table groups | Microsoft Learn, ASP.NET Core SignalR groups | SignalR groups are the right lightweight boundary for broadcasting table events to all interested connections. | Spectators should join the existing table group, but without allocating a player seat. | `docs/P4J_SPECTATOR_CONTRACT_AUDIT.md` | Docs-only audit and code search. |
+| Authenticated spectators | Microsoft Learn, SignalR authentication/authorization | Authenticated hub connections provide a player/user identity without exposing tokens to hub method payloads. | Require temporary authenticated users for spectator mode in P4J; anonymous public spectating is deferred. | docs only | Later DTO/server tests. |
+| Read-only privacy boundary | OWASP Logging Cheat Sheet | Lobby/spectator output must not expose tokens, connection ids, passwords, or full private player data. | Spectator may receive snapshot/action-log table state, but cannot call mutating methods or receive secrets. | docs only | Future secret/privacy audit. |
