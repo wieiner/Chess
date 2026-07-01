@@ -925,3 +925,13 @@ Date: 2026-07-01
 | Sensitive log scanning | OWASP Logging Cheat Sheet | Access tokens, refresh tokens, passwords, private keys, and Authorization headers require explicit exclusion/redaction. | Run repo-wide targeted `rg` audit and document expected code identifiers versus disallowed literal secrets. | `docs/P4J_SECRET_LOG_AUDIT.md` | Search output review and `git diff --check`. |
 | SignalR auth privacy | Microsoft Learn, SignalR security considerations | Bearer tokens may be transported by the SignalR client but must not be printed in client logs or bug reports. | Keep token-bearing values inside client session objects and report only redacted status/short player IDs. | UI/client docs | Inspect report builders and smoke docs. |
 | Local artifact boundary | GitHub Actions docs and existing `.gitignore` | Local `.tmp` reports should never become CI artifacts or tracked content. | Confirm `.tmp/`, manual smoke reports, logs, stores, and keyrings are ignored/documented. | `.gitignore`, docs | `git status --short` after local checks. |
+
+## P4J Phase 24 - Full Local Verify
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Bounded local gate | Existing P4D1 test-runner decomposition | Full local verification should use the decomposed runner with controlled MSBuild parallelism and watchdog timeouts. | Run `run-tests -SkipBenchmark -MSBuildMaxCpuCount 1` before `scripts/verify.ps1`. | docs only | Record exact command outcomes in Phase 24 result doc. |
+| Remote smoke boundary | GitHub Actions docs and project policy | Remote Hetzner smoke remains manual/operator-only and must not become a required CI step. | Local verify remains self-contained; remote capability blockers are documented separately. | docs only | Check local commands only. |
+| Secret-safe verification output | OWASP Logging Cheat Sheet | Local logs under `.tmp` are ignored and should not be committed. | Record summaries, not raw logs. | docs only | `git status --short` before commit. |
