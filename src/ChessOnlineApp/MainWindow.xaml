@@ -430,6 +430,29 @@
                             <TextBlock x:Name="P4JSpectatorStatusText" Foreground="#AFC0D0" Margin="0,6,0,0" TextWrapping="Wrap" Text="Spectator: inactive." />
                         </StackPanel>
                     </Border>
+                    <Border BorderBrush="#314257" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,8,0,0" Background="#101821">
+                        <StackPanel>
+                            <TextBlock Text="Lobby" FontWeight="SemiBold" Foreground="#EAF1F8" />
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <TextBlock Text="Ruleset" Width="52" Foreground="#AFC0D0" />
+                                <ComboBox x:Name="P4JLobbyRulesetFilterBox" Width="270" SelectedIndex="0">
+                                    <ComboBoxItem Content="All" />
+                                    <ComboBoxItem Content="classic-six-side-3d-8x8x8-v0.1" />
+                                    <ComboBoxItem Content="single-side-3d-8x8x8-v0.1" />
+                                    <ComboBoxItem Content="asgard-convergence-3d-8x8x8-v0.1" />
+                                    <ComboBoxItem Content="rubik-convergence-3d-8x8x8-v0.1" />
+                                    <ComboBoxItem Content="hodge-projection-duel-3d-8x8x8-v0.1" />
+                                </ComboBox>
+                                <Button Content="Refresh Lobby" Click="P4JRefreshLobby_Click" Margin="8,0,0,0" />
+                                <Button Content="Use Selected For Spectator" Click="P4JUseLobbySelectionForSpectator_Click" Margin="6,0,0,0" MinWidth="170" />
+                                <Button Content="Spectate Selected" Click="P4JSpectateLobbySelection_Click" Margin="6,0,0,0" MinWidth="130" />
+                                <Button Content="Resume Selected" Click="P4JResumeLobbySelection_Click" Margin="6,0,0,0" />
+                                <Button Content="Join Player Selected" Click="P4JJoinLobbySelectionAsPlayer_Click" Margin="6,0,0,0" />
+                            </StackPanel>
+                            <ListBox x:Name="P4JLobbyTableList" Height="86" Margin="0,6,0,0" SelectionChanged="P4JLobbyTableList_SelectionChanged" />
+                            <TextBlock x:Name="P4JLobbyStatusText" Foreground="#AFC0D0" Margin="0,6,0,0" TextWrapping="Wrap" Text="Lobby: not loaded." />
+                        </StackPanel>
+                    </Border>
                     <TextBlock x:Name="P4FMatchStatusText" Foreground="#AFC0D0" Margin="0,8,0,0" TextWrapping="Wrap" Text="Match status: none." />
                     <TextBlock x:Name="P4FCompactStatusText" Foreground="#F0DFA6" Margin="0,8,0,0" TextWrapping="Wrap" Text="Status: server=disconnected auth=anonymous match=none turn=waiting preview=0 realtime=idle accepted=0 rejected=0 lastSeq=0" />
                     <TextBlock x:Name="P4FSeatTurnStatusText" Foreground="#D8E9FF" Margin="0,8,0,0" TextWrapping="Wrap" Text="Turn: no online match." />

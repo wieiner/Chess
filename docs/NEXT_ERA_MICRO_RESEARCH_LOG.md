@@ -885,3 +885,13 @@ Date: 2026-07-01
 | SignalR client method parity | Microsoft Learn, ASP.NET Core SignalR .NET client | Client SDK should expose the same hub methods UI needs, instead of building raw messages in WPF. | Add `RequestLobbySnapshotAsync` and remember `LastLobbySnapshot`. | `src/ChessOnlineClient/ChessOnlineRelayClient.cs` | Build `ChessOnlineClient`; targeted contract tests. |
 | UI-friendly lobby rows | WPF binding guidance | WPF should bind/display compact rows, not raw protocol DTOs with nested seat data. | Add `OnlineLobbyTableDisplayRow` and `OnlineLobbyFilterState`. | `src/ChessOnlineClient/OnlineLobbyClientState.cs` | Unit-style contract tests without network. |
 | Secret-safe display | OWASP Logging Cheat Sheet | Lobby display labels should not contain tokens or raw connection ids. | Use protocol-provided short player labels and no auth data in display rows. | client/tests/docs | Redaction/display tests. |
+
+## P4J Phase 20 - Lobby UI
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| WPF list display | Microsoft Learn, WPF data binding and controls | A compact list/detail view is safer than a large redesign and can use display rows from the client SDK. | Add Refresh Lobby, ruleset filter, active table list and selected details in `ChessOnlineApp`. | `src/ChessOnlineApp/MainWindow.xaml`, `.xaml.cs` | Build `ChessOnlineApp`. |
+| Lobby to spectator flow | Phase 15 spectator UI and Phase 19 client lobby SDK | Lobby rows provide room/table IDs; spectator UI can reuse those IDs. | Add copy/spectate selected table actions and keep submit read-only in spectator mode. | WPF code-behind | App build and targeted online contract tests. |
+| Safe lobby status | OWASP Logging Cheat Sheet | Active table UI must not display tokens, full connection IDs, or passwords. | Use `OnlineLobbyTableDisplayRow.DisplayLabel` and short seat summaries only. | docs/tests/UI | Inspect docs and run targeted tests. |

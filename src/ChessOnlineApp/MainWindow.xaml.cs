@@ -41,6 +41,7 @@ public partial class MainWindow : Window
     private LegalPreviewState _p4gLegalPreview = LegalPreviewState.Empty();
     private OnlineSeatTurnState _p4fSeatTurnState = OnlineSeatTurnState.Empty();
     private OnlineRealtimeSyncState _p4fRealtimeSync = new();
+    private IReadOnlyList<OnlineLobbyTableDisplayRow> _p4jLobbyRows = Array.Empty<OnlineLobbyTableDisplayRow>();
     private bool _p4fResyncRefreshPending;
     private bool _p4gSubmitPending;
     private int _p4fAcceptedActionCount;
@@ -589,6 +590,7 @@ public partial class MainWindow : Window
         _p4gMoveTo = null;
         _p4iHistoryFrom = null;
         _p4iHistoryTo = null;
+        _p4jLobbyRows = Array.Empty<OnlineLobbyTableDisplayRow>();
         ClearP4GLegalPreview("Legal preview: session cleared.");
         _p4gSubmitPending = false;
         _p4fAcceptedActionCount = 0;
@@ -1252,6 +1254,123 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void P4JRefreshLobby_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await EnsureP4FPrimaryRelayAsync("p4j-lobby");
+            var filter = new OnlineLobbyFilterState
+            {
+                RulesetIdFilter = SelectedP4JLobbyRulesetFilter(),
+                IncludeWaitingTables = true,
+                IncludeInGameTables = true,
+                IncludeFinishedTables = false
+            };
+            var result = await _p4fPrimaryRelay!.RequestLobbySnapshotAsync("p4j-lobby", filter.ToRequest());
+            RememberP4FServerSeq(result);
+            RenderP4JLobbySnapshot(result.LobbySnapshot);
+            P4JLobbyStatusText.Text = $"Lobby: refreshed {result.LobbySnapshot?.Tables.Count ?? 0} table(s), seq={result.Envelope.ServerSeq}.";
+            P4JLobbyStatusText.Foreground = Brush("#B8F7C6");
+            Log($"P4J {P4JLobbyStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4JLobbyStatusText.Text = $"Lobby refresh failed: {ex.Message}";
+            P4JLobbyStatusText.Foreground = Brush("#FFB4A8");
+            Log(P4JLobbyStatusText.Text);
+        }
+    }
+
+    private void P4JLobbyTableList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var row = SelectedP4JLobbyRow();
+        if (row == null)
+        {
+            P4JLobbyStatusText.Text = "Lobby: select an active table.";
+            P4JLobbyStatusText.Foreground = Brush("#AFC0D0");
+            return;
+        }
+
+        P4JLobbyStatusText.Text = $"Lobby selected: {row.DisplayLabel}; seats={row.SeatSummary}";
+        P4JLobbyStatusText.Foreground = Brush("#D8E9FF");
+    }
+
+    private void P4JUseLobbySelectionForSpectator_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var row = RequireP4JLobbyRow();
+            P4JSpectatorRoomIdBox.Text = row.RoomId;
+            P4JSpectatorTableIdBox.Text = row.TableId;
+            P4JLobbyStatusText.Text = $"Lobby: copied {row.RoomId}/{row.TableId} to spectator fields.";
+            P4JLobbyStatusText.Foreground = Brush("#B8F7C6");
+        }
+        catch (Exception ex)
+        {
+            P4JLobbyStatusText.Text = $"Lobby copy failed: {ex.Message}";
+            P4JLobbyStatusText.Foreground = Brush("#FFB4A8");
+        }
+    }
+
+    private void P4JSpectateLobbySelection_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var row = RequireP4JLobbyRow();
+            P4JSpectatorRoomIdBox.Text = row.RoomId;
+            P4JSpectatorTableIdBox.Text = row.TableId;
+            P4FPlayModeBox.SelectedIndex = 2;
+            P4JLobbyStatusText.Text = $"Lobby: joining spectator view for {row.RoomId}/{row.TableId}.";
+            P4JLobbyStatusText.Foreground = Brush("#F4D58D");
+            P4JJoinSpectator_Click(sender, e);
+        }
+        catch (Exception ex)
+        {
+            P4JLobbyStatusText.Text = $"Lobby spectate failed: {ex.Message}";
+            P4JLobbyStatusText.Foreground = Brush("#FFB4A8");
+        }
+    }
+
+    private void P4JResumeLobbySelection_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var row = RequireP4JLobbyRow();
+            _p4fRoomId = row.RoomId;
+            _p4fTableId = row.TableId;
+            P4JSpectatorRoomIdBox.Text = row.RoomId;
+            P4JSpectatorTableIdBox.Text = row.TableId;
+            P3ERoomBox.Text = row.RoomId;
+            P3ETableBox.Text = row.TableId;
+            P4JLobbyStatusText.Text = $"Lobby: attempting resume for selected table {row.RoomId}/{row.TableId}.";
+            P4JLobbyStatusText.Foreground = Brush("#F4D58D");
+            P4JResumeCurrentMatch_Click(sender, e);
+        }
+        catch (Exception ex)
+        {
+            P4JLobbyStatusText.Text = $"Lobby resume failed: {ex.Message}";
+            P4JLobbyStatusText.Foreground = Brush("#FFB4A8");
+        }
+    }
+
+    private void P4JJoinLobbySelectionAsPlayer_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var row = RequireP4JLobbyRow();
+            P4JLobbyStatusText.Text = row.CanJoinAsPlayer
+                ? "Lobby player join is not wired directly yet; use matchmaking/manual player flow for now."
+                : "Lobby player join unavailable: selected table has no open player seat.";
+            P4JLobbyStatusText.Foreground = Brush("#F4D58D");
+            Log($"P4J {P4JLobbyStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4JLobbyStatusText.Text = $"Lobby player join failed: {ex.Message}";
+            P4JLobbyStatusText.Foreground = Brush("#FFB4A8");
+        }
+    }
+
     private async Task RefreshP4FActionLogForPrimaryAsync(string clientId, string label)
     {
         EnsureP4FMatchReady();
@@ -1565,6 +1684,13 @@ public partial class MainWindow : Window
                 lastResumeFailureText = _p4fPrimaryRelay?.LastResumeResult?.ResumeResult?.FailureText ?? ""
             },
             spectator = BuildP4JSpectatorReportBlock(),
+            lobby = new
+            {
+                filter = SelectedP4JLobbyRulesetFilter(),
+                rowCount = _p4jLobbyRows.Count,
+                selected = SelectedP4JLobbyRow()?.DisplayLabel ?? "",
+                status = P4JLobbyStatusText.Text
+            },
             snapshot = _p4fLastSnapshot == null ? null : new
             {
                 _p4fLastSnapshot.RulesetId,
@@ -1649,6 +1775,7 @@ public partial class MainWindow : Window
             $"tableId={_p4fTableId}",
             $"playMode={SelectedP4FPlayMode()}",
             $"spectator={IsP4FSpectatorMode()} status={P4JSpectatorStatusText.Text}",
+            $"lobbyRows={_p4jLobbyRows.Count} lobbySelected={SelectedP4JLobbyRow()?.DisplayLabel ?? ""}",
             $"players={ShortId(_p4fPrimarySession?.PlayerId ?? "")}/{ShortId(_p4fSecondarySession?.PlayerId ?? "")}",
             $"seatTurn={_p4fSeatTurnState.Summary}",
             $"snapshotHash={snapshotHash}",
@@ -1748,6 +1875,43 @@ public partial class MainWindow : Window
             throw new InvalidOperationException("Paste a RoomId and TableId, or join/create a match first.");
         }
         return (roomId, tableId);
+    }
+
+    private string SelectedP4JLobbyRulesetFilter()
+    {
+        if (P4JLobbyRulesetFilterBox?.SelectedItem is ComboBoxItem item &&
+            item.Content is string text &&
+            !string.Equals(text, "All", StringComparison.OrdinalIgnoreCase))
+        {
+            return text;
+        }
+        return "";
+    }
+
+    private void RenderP4JLobbySnapshot(OnlineLobbySnapshot? snapshot)
+    {
+        _p4jLobbyRows = OnlineLobbyTableDisplayRow.FromSnapshot(snapshot);
+        P4JLobbyTableList.Items.Clear();
+        foreach (var row in _p4jLobbyRows)
+        {
+            P4JLobbyTableList.Items.Add(row.DisplayLabel);
+        }
+        if (_p4jLobbyRows.Count == 0)
+        {
+            P4JLobbyStatusText.Text = "Lobby: no active tables match the current filter.";
+            P4JLobbyStatusText.Foreground = Brush("#F4D58D");
+        }
+    }
+
+    private OnlineLobbyTableDisplayRow? SelectedP4JLobbyRow()
+    {
+        var index = P4JLobbyTableList?.SelectedIndex ?? -1;
+        return index >= 0 && index < _p4jLobbyRows.Count ? _p4jLobbyRows[index] : null;
+    }
+
+    private OnlineLobbyTableDisplayRow RequireP4JLobbyRow()
+    {
+        return SelectedP4JLobbyRow() ?? throw new InvalidOperationException("Refresh lobby and select a table first.");
     }
 
     private object BuildP4JSpectatorReportBlock()
@@ -1918,6 +2082,9 @@ public partial class MainWindow : Window
         P4JReconnectStatusText.Foreground = Brush("#AFC0D0");
         P4JSpectatorStatusText.Text = "Spectator: inactive.";
         P4JSpectatorStatusText.Foreground = Brush("#AFC0D0");
+        P4JLobbyTableList.Items.Clear();
+        P4JLobbyStatusText.Text = "Lobby: not loaded.";
+        P4JLobbyStatusText.Foreground = Brush("#AFC0D0");
         RenderP4GBoard();
         UpdateP4FSeatTurnStatus();
         UpdateP4FRealtimeStatus();
