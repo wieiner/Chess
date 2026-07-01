@@ -845,3 +845,13 @@ Date: 2026-07-01
 | WPF read-only interaction | Microsoft Learn, WPF controls and event handling | Disabling mutating buttons in the UI is a clarity layer, not the security boundary; server-side seat checks remain authoritative. | Add a Spectator play mode and route all submit checks through the existing `CanP4FPrimaryAct` guard. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`; targeted online contract tests. |
 | SignalR spectator client flow | Microsoft Learn, ASP.NET Core SignalR .NET client | The client can invoke `JoinSpectator` once connected and authenticated, then request snapshot/action-log over the same hub. | Add Join/Snapshot/ActionLog/Follow/Report spectator controls using `ChessOnlineRelayClient.JoinSpectatorAsync`. | WPF code-behind and docs | App build and manual smoke checklist. |
 | Secret-free session reports | OWASP Logging Cheat Sheet | UI reports may include room/table IDs and state hashes, but must not include tokens, passwords, or Authorization headers. | Save spectator reports under `.tmp/manual-smoke` with explicit redaction flags and short spectator IDs only. | `docs/P4J_SPECTATOR_UI.md` | `git diff --check`; inspect report schema. |
+
+## P4J Phase 16 - Spectator Manual Smoke
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Deployed capability check | Current Hetzner `/chess3d/diagnostics` | The deployed server reports `requestLegalPreview=true`, but does not list `JoinSpectator` and has no `spectatorMode` field. | Do not fake a remote spectator PASS; record the blocker until the Phase 13+ server package is deployed. | `docs/P4J_SPECTATOR_MANUAL_SMOKE_RESULT.md` | Curl diagnostics and local app build. |
+| Manual smoke honesty | GitHub Actions and operator-smoke boundary | Remote smoke is not a CI gate and should only be claimed when the deployed server exposes the required hub method. | Phase 16 documents local UI readiness and remote deployment gap separately. | docs only | `dotnet build ChessOnlineApp`; `git diff --check`. |
+| Safe reporting | OWASP Logging Cheat Sheet | Manual smoke docs should contain capability facts and no temp credentials or bearer tokens. | Include sanitized endpoint/capability summary only. | docs only | Inspect generated docs before commit. |
