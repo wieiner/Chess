@@ -835,3 +835,13 @@ Date: 2026-07-01
 | Shared client boundary | Microsoft Learn, ASP.NET Core SignalR .NET client | WPF should call a reusable client method instead of constructing raw hub messages in code-behind. | Add `JoinSpectatorAsync` to `ChessOnlineRelayClient`. | `src/ChessOnlineClient/ChessOnlineRelayClient.cs` | Build `ChessOnlineClient`; targeted contract tests. |
 | Read-only client state | Phase 11 spectator contract and WPF UI safety guidance | UI needs a compact state to disable submit and display the spectator context. | Add `OnlineSpectatorClientState` with room/table/ruleset/id/seq and submit-disabled reason. | `src/ChessOnlineClient/OnlineSpectatorClientState.cs` | State tests without network. |
 | Secret-safe event handling | OWASP Logging Cheat Sheet | Spectator callbacks should store only sanitized table state, not auth secrets. | Remember `LastSpectatorResult` and register `ReceiveJoinSpectatorResult`; DTO tests already cover no token fields. | client/tests | Contract tests check callback registration and initial state. |
+
+## P4J Phase 15 - Spectator UI
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| WPF read-only interaction | Microsoft Learn, WPF controls and event handling | Disabling mutating buttons in the UI is a clarity layer, not the security boundary; server-side seat checks remain authoritative. | Add a Spectator play mode and route all submit checks through the existing `CanP4FPrimaryAct` guard. | `src/ChessOnlineApp/MainWindow.xaml`, `src/ChessOnlineApp/MainWindow.xaml.cs` | Build `ChessOnlineApp`; targeted online contract tests. |
+| SignalR spectator client flow | Microsoft Learn, ASP.NET Core SignalR .NET client | The client can invoke `JoinSpectator` once connected and authenticated, then request snapshot/action-log over the same hub. | Add Join/Snapshot/ActionLog/Follow/Report spectator controls using `ChessOnlineRelayClient.JoinSpectatorAsync`. | WPF code-behind and docs | App build and manual smoke checklist. |
+| Secret-free session reports | OWASP Logging Cheat Sheet | UI reports may include room/table IDs and state hashes, but must not include tokens, passwords, or Authorization headers. | Save spectator reports under `.tmp/manual-smoke` with explicit redaction flags and short spectator IDs only. | `docs/P4J_SPECTATOR_UI.md` | `git diff --check`; inspect report schema. |

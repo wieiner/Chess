@@ -63,6 +63,7 @@ public partial class MainWindow : Window
         UpdateP4FSeatTurnStatus();
         UpdateP4FRealtimeStatus();
         UpdateP4GSpecialActionPanels();
+        UpdateP4JSpectatorUiState();
         UpdateP4FCompactStatus();
     }
 
@@ -1065,6 +1066,192 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void P4JJoinSpectator_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await EnsureP4FPrimaryRelayAsync("p4j-spectator");
+            var (roomId, tableId) = ResolveP4JSpectatorRoomTable();
+            var request = new OnlineJoinSpectatorRequest
+            {
+                PlayerId = _p4fPrimarySession?.PlayerId ?? "",
+                RoomId = roomId,
+                TableId = tableId,
+                ExpectedRulesetId = SelectedP3FMatchmakingRuleset(),
+                LastKnownServerSeq = _p4fLastServerSeq
+            };
+            var result = await _p4fPrimaryRelay!.JoinSpectatorAsync("p4j-spectator", request);
+            RememberP4FServerSeq(result);
+
+            if (result.SpectatorResult?.Success == true)
+            {
+                _p4fRoomId = result.SpectatorResult.RoomId;
+                _p4fTableId = result.SpectatorResult.TableId;
+                P4JSpectatorRoomIdBox.Text = _p4fRoomId;
+                P4JSpectatorTableIdBox.Text = _p4fTableId;
+                P3ERoomBox.Text = _p4fRoomId;
+                P3ETableBox.Text = _p4fTableId;
+                _p4fPrimarySeatIndex = 0;
+                _p4fSecondarySeatIndex = 0;
+                if (result.Snapshot != null)
+                {
+                    RememberP4FSnapshot(result);
+                }
+                if (result.ActionLog != null)
+                {
+                    RenderP4FActionLogChunk(result, "Spectator action log");
+                }
+                ClearP4GLegalPreview("Legal preview: spectator mode is read-only.");
+                P4JSpectatorStatusText.Text = $"SPECTATOR: room={_p4fRoomId} table={_p4fTableId} ruleset={result.SpectatorResult.RulesetId} seq={result.SpectatorResult.State.LastKnownServerSeq} read-only.";
+                P4JSpectatorStatusText.Foreground = Brush("#B8F7C6");
+                P4FMatchStatusText.Text = "Spectator joined. Ready/Start/Submit are disabled; snapshot and action history remain available.";
+            }
+            else
+            {
+                P4JSpectatorStatusText.Text = $"Spectator rejected: {result.SpectatorResult?.FailureReason} {result.SpectatorResult?.FailureText}".Trim();
+                P4JSpectatorStatusText.Foreground = Brush("#FFB4A8");
+                P4FMatchStatusText.Text = P4JSpectatorStatusText.Text;
+            }
+
+            UpdateP4FSeatTurnStatus();
+            UpdateP4JSpectatorUiState();
+            UpdateP4FRealtimeStatus();
+            UpdateP4FCompactStatus();
+            Log($"P4J {P4FMatchStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4JSpectatorStatusText.Text = $"Spectator join failed: {ex.Message}";
+            P4JSpectatorStatusText.Foreground = Brush("#FFB4A8");
+            P4FMatchStatusText.Text = P4JSpectatorStatusText.Text;
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private async void P4JRequestSpectatorSnapshot_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            EnsureP4FPrimaryRelayUsable();
+            var (roomId, tableId) = ResolveP4JSpectatorRoomTable();
+            var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4j-spectator-snapshot", roomId, tableId);
+            RememberP4FSnapshot(snapshot);
+            P4JSpectatorStatusText.Text = $"SPECTATOR snapshot: ruleset={snapshot.Snapshot?.RulesetId} seq={snapshot.Envelope.ServerSeq} hash={snapshot.Snapshot?.StateHash}";
+            P4JSpectatorStatusText.Foreground = Brush("#B8F7C6");
+            P4FMatchStatusText.Text = P4JSpectatorStatusText.Text;
+            UpdateP4FSeatTurnStatus();
+            UpdateP4JSpectatorUiState();
+            UpdateP4FCompactStatus();
+            Log($"P4J {P4FMatchStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4JSpectatorStatusText.Text = $"Spectator snapshot failed: {ex.Message}";
+            P4JSpectatorStatusText.Foreground = Brush("#FFB4A8");
+            P4FMatchStatusText.Text = P4JSpectatorStatusText.Text;
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private async void P4JRequestSpectatorActionLog_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            EnsureP4FPrimaryRelayUsable();
+            var (roomId, tableId) = ResolveP4JSpectatorRoomTable();
+            var actionLog = await _p4fPrimaryRelay!.RequestActionLogAsync("p4j-spectator-action-log", roomId, tableId);
+            RememberP4FServerSeq(actionLog);
+            RenderP4FActionLogChunk(actionLog, "Spectator action log");
+            P4JSpectatorStatusText.Text = $"SPECTATOR action log: seq={actionLog.Envelope.ServerSeq} events={actionLog.ActionLog?.Events.Count ?? 0}";
+            P4JSpectatorStatusText.Foreground = Brush("#B8F7C6");
+            UpdateP4JSpectatorUiState();
+            UpdateP4FCompactStatus();
+        }
+        catch (Exception ex)
+        {
+            P4JSpectatorStatusText.Text = $"Spectator action log failed: {ex.Message}";
+            P4JSpectatorStatusText.Foreground = Brush("#FFB4A8");
+            P4FMatchStatusText.Text = P4JSpectatorStatusText.Text;
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private async void P4JFollowSpectatorLastMove_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            EnsureP4FPrimaryRelayUsable();
+            var (roomId, tableId) = ResolveP4JSpectatorRoomTable();
+            var actionLog = await _p4fPrimaryRelay!.RequestActionLogAsync("p4j-spectator-follow-log", roomId, tableId);
+            RememberP4FServerSeq(actionLog);
+            RenderP4FActionLogChunk(actionLog, "Spectator follow action log");
+            var snapshot = await _p4fPrimaryRelay!.RequestSnapshotAsync("p4j-spectator-follow-snapshot", roomId, tableId);
+            RememberP4FSnapshot(snapshot);
+            P4JSpectatorStatusText.Text = $"SPECTATOR follow: latest seq={Math.Max(actionLog.Envelope.ServerSeq, snapshot.Envelope.ServerSeq)} hash={snapshot.Snapshot?.StateHash}.";
+            P4JSpectatorStatusText.Foreground = Brush("#B8F7C6");
+            UpdateP4FSeatTurnStatus();
+            UpdateP4JSpectatorUiState();
+            UpdateP4FCompactStatus();
+            Log($"P4J {P4JSpectatorStatusText.Text}");
+        }
+        catch (Exception ex)
+        {
+            P4JSpectatorStatusText.Text = $"Spectator follow failed: {ex.Message}";
+            P4JSpectatorStatusText.Foreground = Brush("#FFB4A8");
+            P4FMatchStatusText.Text = P4JSpectatorStatusText.Text;
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private void P4JSaveSpectatorReport_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var root = Path.Combine(FindRepoRoot(), ".tmp", "manual-smoke");
+            Directory.CreateDirectory(root);
+            var path = Path.Combine(root, $"p4j-spectator-report-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json");
+            var report = new
+            {
+                format = "p4j-spectator-report",
+                version = "0.1",
+                createdUtc = DateTime.UtcNow.ToString("O"),
+                endpoint = new
+                {
+                    baseUrl = P4FBaseUrlBox.Text.Trim(),
+                    hubUrl = P3FServerUrlBox.Text.Trim()
+                },
+                spectator = BuildP4JSpectatorReportBlock(),
+                snapshot = _p4fLastSnapshot == null ? null : new
+                {
+                    _p4fLastSnapshot.RulesetId,
+                    _p4fLastSnapshot.ServerSeq,
+                    _p4fLastSnapshot.StateHash,
+                    _p4fLastSnapshot.ActionCount,
+                    _p4fLastSnapshot.LastActionNotation
+                },
+                actionLogItems = P4FActionLogList.Items.Cast<object>().Select(item => item.ToString()).TakeLast(80).ToArray(),
+                security = new
+                {
+                    tokensRedacted = true,
+                    passwordsRedacted = true,
+                    http80DiagnosticOnly = P4FBaseUrlBox.Text.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                }
+            };
+            File.WriteAllText(path, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
+            P4JSpectatorStatusText.Text = $"SPECTATOR report saved: {path}";
+            P4JSpectatorStatusText.Foreground = Brush("#B8F7C6");
+            P4FMatchStatusText.Text = P4JSpectatorStatusText.Text;
+            Log($"P4J spectator report saved: {path}");
+        }
+        catch (Exception ex)
+        {
+            P4JSpectatorStatusText.Text = $"Save spectator report failed: {ex.Message}";
+            P4JSpectatorStatusText.Foreground = Brush("#FFB4A8");
+            P4FMatchStatusText.Text = P4JSpectatorStatusText.Text;
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
     private async Task RefreshP4FActionLogForPrimaryAsync(string clientId, string label)
     {
         EnsureP4FMatchReady();
@@ -1377,6 +1564,7 @@ public partial class MainWindow : Window
                 lastResumeFailureReason = _p4fPrimaryRelay?.LastResumeResult?.ResumeResult?.FailureReason ?? "",
                 lastResumeFailureText = _p4fPrimaryRelay?.LastResumeResult?.ResumeResult?.FailureText ?? ""
             },
+            spectator = BuildP4JSpectatorReportBlock(),
             snapshot = _p4fLastSnapshot == null ? null : new
             {
                 _p4fLastSnapshot.RulesetId,
@@ -1460,6 +1648,7 @@ public partial class MainWindow : Window
             $"roomId={_p4fRoomId}",
             $"tableId={_p4fTableId}",
             $"playMode={SelectedP4FPlayMode()}",
+            $"spectator={IsP4FSpectatorMode()} status={P4JSpectatorStatusText.Text}",
             $"players={ShortId(_p4fPrimarySession?.PlayerId ?? "")}/{ShortId(_p4fSecondarySession?.PlayerId ?? "")}",
             $"seatTurn={_p4fSeatTurnState.Summary}",
             $"snapshotHash={snapshotHash}",
@@ -1527,6 +1716,77 @@ public partial class MainWindow : Window
         return P4FPlayModeBox?.SelectedItem is ComboBoxItem item && item.Content is string text
             ? text
             : "Single-App Test Pair";
+    }
+
+    private bool IsP4FSpectatorMode()
+    {
+        return SelectedP4FPlayMode().Contains("Spectator", StringComparison.OrdinalIgnoreCase) ||
+            _p4fPrimaryRelay?.SpectatorState.IsSpectator == true;
+    }
+
+    private void P4FPlayModeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateP4JSpectatorUiState();
+        UpdateP4FSeatTurnStatus();
+        UpdateP4FCompactStatus();
+    }
+
+    private (string RoomId, string TableId) ResolveP4JSpectatorRoomTable()
+    {
+        var roomId = P4JSpectatorRoomIdBox?.Text?.Trim() ?? "";
+        var tableId = P4JSpectatorTableIdBox?.Text?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(roomId))
+        {
+            roomId = _p4fRoomId;
+        }
+        if (string.IsNullOrWhiteSpace(tableId))
+        {
+            tableId = _p4fTableId;
+        }
+        if (string.IsNullOrWhiteSpace(roomId) || string.IsNullOrWhiteSpace(tableId))
+        {
+            throw new InvalidOperationException("Paste a RoomId and TableId, or join/create a match first.");
+        }
+        return (roomId, tableId);
+    }
+
+    private object BuildP4JSpectatorReportBlock()
+    {
+        var state = _p4fPrimaryRelay?.SpectatorState;
+        return new
+        {
+            selectedMode = SelectedP4FPlayMode(),
+            isSpectator = IsP4FSpectatorMode(),
+            roomId = state?.SpectatorRoomId ?? P4JSpectatorRoomIdBox?.Text?.Trim() ?? _p4fRoomId,
+            tableId = state?.SpectatorTableId ?? P4JSpectatorTableIdBox?.Text?.Trim() ?? _p4fTableId,
+            rulesetId = state?.SpectatorRulesetId ?? SelectedP3FMatchmakingRuleset(),
+            spectatorId = ShortId(state?.SpectatorId ?? ""),
+            lastKnownServerSeq = state?.LastKnownServerSeq ?? _p4fLastServerSeq,
+            submitDisabledReason = state?.SubmitDisabledReason ?? "Spectator mode is read-only.",
+            status = P4JSpectatorStatusText?.Text ?? "Spectator: inactive."
+        };
+    }
+
+    private void UpdateP4JSpectatorUiState()
+    {
+        if (P4FReadyBothButton == null)
+        {
+            return;
+        }
+
+        var spectator = IsP4FSpectatorMode();
+        P4FReadyBothButton.IsEnabled = !spectator;
+        P4FReadyThisWindowButton.IsEnabled = !spectator;
+        P4FStartGameButton.IsEnabled = !spectator;
+        P4FStartThisWindowButton.IsEnabled = !spectator;
+        P4FSubmitSafeAsgardActionButton.IsEnabled = !spectator;
+        P4GSubmitNormalMoveButton.IsEnabled = !spectator;
+        P4GSubmitSelectedPreviewActionButton.IsEnabled = !spectator;
+        if (P4JSpectatorStatusText != null && spectator && !P4JSpectatorStatusText.Text.StartsWith("SPECTATOR", StringComparison.OrdinalIgnoreCase))
+        {
+            P4JSpectatorStatusText.Text = "SPECTATOR: read-only mode. Ready/Start/Submit are disabled; snapshot, action log and board navigation remain enabled.";
+            P4JSpectatorStatusText.Foreground = Brush("#F4D58D");
+        }
     }
 
     private async Task EnsureP4FTwoSessionsAsync()
@@ -1656,9 +1916,12 @@ public partial class MainWindow : Window
         P4FSnapshotStatusText.Text = "Snapshot: none.";
         P4JReconnectStatusText.Text = "Reconnect: disconnected.";
         P4JReconnectStatusText.Foreground = Brush("#AFC0D0");
+        P4JSpectatorStatusText.Text = "Spectator: inactive.";
+        P4JSpectatorStatusText.Foreground = Brush("#AFC0D0");
         RenderP4GBoard();
         UpdateP4FSeatTurnStatus();
         UpdateP4FRealtimeStatus();
+        UpdateP4JSpectatorUiState();
         UpdateP4FActionCounters();
     }
 
@@ -1745,6 +2008,12 @@ public partial class MainWindow : Window
 
     private bool CanP4FPrimaryAct(out string reason)
     {
+        if (IsP4FSpectatorMode())
+        {
+            reason = _p4fPrimaryRelay?.SpectatorState.SubmitDisabledReason ?? "Spectator mode is read-only.";
+            return false;
+        }
+
         if (!CanUseP4FPrimaryRelay(out reason))
         {
             return false;
@@ -1773,9 +2042,18 @@ public partial class MainWindow : Window
 
         if (P4FSeatTurnStatusText != null)
         {
-            P4FSeatTurnStatusText.Text = _p4fSeatTurnState.Summary;
-            P4FSeatTurnStatusText.Foreground = _p4fSeatTurnState.CanPrimaryAct ? Brush("#B8F7C6") : Brush("#F4D58D");
+            if (IsP4FSpectatorMode())
+            {
+                P4FSeatTurnStatusText.Text = $"SPECTATOR: read-only. {_p4fSeatTurnState.Summary}";
+                P4FSeatTurnStatusText.Foreground = Brush("#F4D58D");
+            }
+            else
+            {
+                P4FSeatTurnStatusText.Text = _p4fSeatTurnState.Summary;
+                P4FSeatTurnStatusText.Foreground = _p4fSeatTurnState.CanPrimaryAct ? Brush("#B8F7C6") : Brush("#F4D58D");
+            }
         }
+        UpdateP4JSpectatorUiState();
         UpdateP4FCompactStatus();
     }
 
@@ -2663,12 +2941,13 @@ public partial class MainWindow : Window
         var match = string.IsNullOrWhiteSpace(_p4fRoomId) || string.IsNullOrWhiteSpace(_p4fTableId)
             ? "none"
             : $"{_p4fRoomId}/{_p4fTableId}";
-        var turn = _p4fSeatTurnState.CanPrimaryAct ? "my-turn" : "waiting";
+        var spectator = IsP4FSpectatorMode();
+        var turn = spectator ? "spectator-read-only" : _p4fSeatTurnState.CanPrimaryAct ? "my-turn" : "waiting";
         var previewCount = _p4gLegalPreview.Options.Count;
         var realtime = _p4fRealtimeSync.ResyncRequired ? "resync-needed" : "ok";
 
         P4FCompactStatusText.Text =
-            $"Status: server={server} auth={auth} match={match} turn={turn} preview={previewCount} " +
+            $"Status: server={server} auth={auth} mode={(spectator ? "spectator" : "player")} match={match} turn={turn} preview={previewCount} " +
             $"reconnect={reconnect} realtime={realtime} accepted={_p4fAcceptedActionCount} rejected={_p4fRejectedActionCount} lastSeq={_p4fLastServerSeq}";
     }
 
