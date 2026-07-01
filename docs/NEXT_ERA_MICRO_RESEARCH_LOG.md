@@ -825,3 +825,13 @@ Date: 2026-07-01
 | SignalR table groups | Microsoft Learn, ASP.NET Core SignalR groups | Adding a connection to an existing group is sufficient for broadcast delivery without changing game authority. | `JoinSpectator` adds the connection to room/table groups but does not allocate an `OnlineSeat`. | `src/ChessOnlineServer/Chess3DRelayHub.cs`, `src/ChessOnlineProtocol/OnlineRoomRegistry.cs` | Registry tests plus server build. |
 | Read-only server authority | Existing `SubmitAction`, `Ready`, and `StartGame` seat checks | Mutating methods already require `TrySeat`; a spectator with no seat is rejected by the existing server authority. | Keep spectator read-only by construction; do not add UI-only security assumptions. | `tests/ChessOnlineContractTests/Program.cs` | Tests assert spectator submit is rejected and snapshot/action-log requests work. |
 | Capability flip | Existing `/chess3d/diagnostics` feature flags | Once the hub method exists, diagnostics should advertise it for clients and operators. | Set `SpectatorModeSupported=true` and list `JoinSpectator`. | diagnostics/tests/docs | Targeted online contract tests. |
+
+## P4J Phase 14 - Client Spectator Support
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Shared client boundary | Microsoft Learn, ASP.NET Core SignalR .NET client | WPF should call a reusable client method instead of constructing raw hub messages in code-behind. | Add `JoinSpectatorAsync` to `ChessOnlineRelayClient`. | `src/ChessOnlineClient/ChessOnlineRelayClient.cs` | Build `ChessOnlineClient`; targeted contract tests. |
+| Read-only client state | Phase 11 spectator contract and WPF UI safety guidance | UI needs a compact state to disable submit and display the spectator context. | Add `OnlineSpectatorClientState` with room/table/ruleset/id/seq and submit-disabled reason. | `src/ChessOnlineClient/OnlineSpectatorClientState.cs` | State tests without network. |
+| Secret-safe event handling | OWASP Logging Cheat Sheet | Spectator callbacks should store only sanitized table state, not auth secrets. | Remember `LastSpectatorResult` and register `ReceiveJoinSpectatorResult`; DTO tests already cover no token fields. | client/tests | Contract tests check callback registration and initial state. |

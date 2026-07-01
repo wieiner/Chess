@@ -325,13 +325,46 @@ static void OnlineClientSdkTests(ContractTest test)
 
     test.Check(ChessOnlineRelayEvents.All.Contains("ReceiveLegalPreviewResult"), "online relay client registers legal preview callback event");
     test.Check(ChessOnlineRelayEvents.All.Contains("ReceiveResumeMatchResult"), "online relay client registers resume result callback event");
+    test.Check(ChessOnlineRelayEvents.All.Contains("ReceiveJoinSpectatorResult"), "online relay client registers spectator result callback event");
 
     var relayClient = new ChessOnlineRelayClient(session);
     test.Check(relayClient.ReconnectState.State == OnlineConnectionState.Disconnected &&
         relayClient.ReconnectState.ShouldDisableSubmit &&
         relayClient.LastResumeResult == null &&
+        relayClient.LastSpectatorResult == null &&
+        !relayClient.SpectatorState.IsSpectator &&
         relayClient.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected, "online relay client exposes initial reconnect state without network");
     relayClient.DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+    var spectatorState = new OnlineSpectatorClientState();
+    spectatorState.Apply(new OnlineJoinSpectatorResult
+    {
+        Success = true,
+        RoomId = "room-a",
+        TableId = "table-a",
+        RulesetId = "classic-six-side-3d-8x8x8-v0.1",
+        SpectatorId = "spectator-player-a",
+        State = new OnlineSpectatorState
+        {
+            LastKnownServerSeq = 12,
+            SubmitDisabledReason = "Spectator mode is read-only."
+        }
+    });
+    test.Check(spectatorState.IsSpectator &&
+        spectatorState.SpectatorRoomId == "room-a" &&
+        spectatorState.SpectatorTableId == "table-a" &&
+        spectatorState.LastKnownServerSeq == 12 &&
+        spectatorState.SubmitDisabledReason.Contains("read-only", StringComparison.OrdinalIgnoreCase),
+        "online spectator client state disables submit after join");
+    spectatorState.Apply(new OnlineJoinSpectatorResult
+    {
+        Success = false,
+        FailureReason = OnlineSpectatorFailureReasons.TableNotFound,
+        FailureText = "Table not found."
+    });
+    test.Check(!spectatorState.IsSpectator &&
+        spectatorState.SubmitDisabledReason.Contains("Table not found", StringComparison.OrdinalIgnoreCase),
+        "online spectator client state clears on failed join");
 
     var reconnect = new OnlineReconnectState();
     test.Check(reconnect.State == OnlineConnectionState.Disconnected &&

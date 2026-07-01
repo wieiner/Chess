@@ -20,6 +20,8 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
 
     public OnlineReconnectState ReconnectState { get; } = new();
 
+    public OnlineSpectatorClientState SpectatorState { get; } = new();
+
     public ChessOnlineClientEventLog EventLog { get; } = new();
 
     public OnlineProtocolMessage? LastSnapshot { get; private set; }
@@ -29,6 +31,8 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
     public OnlineProtocolMessage? LastLegalPreview { get; private set; }
 
     public OnlineProtocolMessage? LastResumeResult { get; private set; }
+
+    public OnlineProtocolMessage? LastSpectatorResult { get; private set; }
 
     public OnlineMatchmakingStatus? LastMatchmakingStatus { get; private set; }
 
@@ -117,6 +121,21 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
         request.TableId = string.IsNullOrWhiteSpace(request.TableId) ? tableId : request.TableId;
         message.ResumeRequest = request;
         return InvokeAsync("RequestResumeMatch", message, cancellationToken);
+    }
+
+    public Task<OnlineProtocolMessage> JoinSpectatorAsync(
+        string clientId,
+        OnlineJoinSpectatorRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var roomId = string.IsNullOrWhiteSpace(request.RoomId) ? "" : request.RoomId;
+        var tableId = string.IsNullOrWhiteSpace(request.TableId) ? "" : request.TableId;
+        var message = Message(OnlineMessageTypes.JoinSpectator, clientId, roomId, tableId);
+        request.PlayerId = string.IsNullOrWhiteSpace(request.PlayerId) ? _session.PlayerId : request.PlayerId;
+        request.RoomId = string.IsNullOrWhiteSpace(request.RoomId) ? roomId : request.RoomId;
+        request.TableId = string.IsNullOrWhiteSpace(request.TableId) ? tableId : request.TableId;
+        message.SpectatorRequest = request;
+        return InvokeAsync("JoinSpectator", message, cancellationToken);
     }
 
     public Task<OnlineProtocolMessage> RequestLegalPreviewAsync(
@@ -231,6 +250,11 @@ public sealed class ChessOnlineRelayClient : IAsyncDisposable
         {
             LastResumeResult = message;
         }
+        if (message.SpectatorResult != null)
+        {
+            LastSpectatorResult = message;
+            SpectatorState.Apply(message.SpectatorResult);
+        }
         if (message.MatchmakingStatus != null)
         {
             LastMatchmakingStatus = message.MatchmakingStatus;
@@ -257,6 +281,7 @@ public static class ChessOnlineRelayEvents
         "ReceiveAuthoritativeSnapshot",
         "ReceiveActionLogChunk",
         "ReceiveResumeMatchResult",
+        "ReceiveJoinSpectatorResult",
         "ReceiveLegalPreviewResult",
         "ReceiveResyncRequired",
         "ReceiveMatchmakingStatus",
