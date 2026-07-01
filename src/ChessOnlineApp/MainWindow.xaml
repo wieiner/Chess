@@ -547,6 +547,8 @@
                         <Button Content="Clear Event Log" Click="P4FClearEventLog_Click" />
                         <Button Content="Save Session Report" Click="P4FSaveSessionReport_Click" />
                         <Button Content="Copy Sanitized Summary" Click="P4FCopySanitizedSummary_Click" />
+                        <Button Content="Save Network Bug Report" Click="P4JSaveNetworkBugReport_Click" MinWidth="170" />
+                        <Button Content="Copy Network Summary" Click="P4JCopyNetworkSummary_Click" MinWidth="160" />
                         <Button Content="Copy Selected Action" Click="P4ICopySelectedAction_Click" />
                         <Button Content="Export Action Log" Click="P4IExportActionLog_Click" />
                         <TextBlock x:Name="P4FActionCountersText" Foreground="#AFC0D0" Margin="8,0,0,0" Text="Accepted=0 Rejected=0 LastSeq=0" />

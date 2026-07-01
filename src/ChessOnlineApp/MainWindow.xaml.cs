@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     private OnlineSeatTurnState _p4fSeatTurnState = OnlineSeatTurnState.Empty();
     private OnlineRealtimeSyncState _p4fRealtimeSync = new();
     private IReadOnlyList<OnlineLobbyTableDisplayRow> _p4jLobbyRows = Array.Empty<OnlineLobbyTableDisplayRow>();
+    private ChessOnlineDiagnosticsStatus? _p4fLastDiagnostics;
     private bool _p4fResyncRefreshPending;
     private bool _p4gSubmitPending;
     private int _p4fAcceptedActionCount;
@@ -451,6 +452,7 @@ public partial class MainWindow : Window
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
             var health = new ChessOnlineHealthClient(http, endpoint);
             var diagnostics = await health.GetDiagnosticsAsync();
+            _p4fLastDiagnostics = diagnostics;
             var d = diagnostics.Diagnostics;
             P4FServerStatusText.Text =
                 $"diagnostics auth={diagnostics.AuthEnabled} authority={diagnostics.AuthorityPlatform}/{diagnostics.AuthorityNativeLibraryName} supported={diagnostics.AuthorityIsSupported} " +
@@ -1625,6 +1627,182 @@ public partial class MainWindow : Window
         }
     }
 
+    private void P4JSaveNetworkBugReport_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var root = Path.Combine(FindRepoRoot(), ".tmp", "manual-smoke");
+            Directory.CreateDirectory(root);
+            var path = Path.Combine(root, $"p4j-network-report-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json");
+            var report = BuildP4JNetworkBugReport();
+            File.WriteAllText(path, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
+            P4FMatchStatusText.Text = $"Network bug report saved: {path}";
+            Log($"P4J network bug report saved: {path}");
+        }
+        catch (Exception ex)
+        {
+            P4FMatchStatusText.Text = $"Save network bug report failed: {ex.Message}";
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private void P4JCopyNetworkSummary_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Clipboard.SetText(BuildP4JNetworkSummary());
+            P4FMatchStatusText.Text = "Sanitized network summary copied.";
+            Log("P4J sanitized network summary copied.");
+        }
+        catch (Exception ex)
+        {
+            P4FMatchStatusText.Text = $"Copy network summary failed: {ex.Message}";
+            Log(P4FMatchStatusText.Text);
+        }
+    }
+
+    private object BuildP4JNetworkBugReport()
+    {
+        var diagnostics = _p4fLastDiagnostics;
+        var diagnosticBody = diagnostics?.Diagnostics;
+        var selectedLobbyRow = SelectedP4JLobbyRow();
+        return new
+        {
+            format = "p4j-online-network-bug-report",
+            version = "0.1",
+            createdUtc = DateTime.UtcNow.ToString("O"),
+            app = new
+            {
+                name = "ChessOnlineApp",
+                runtime = Environment.Version.ToString()
+            },
+            endpoint = new
+            {
+                baseUrl = P4FBaseUrlBox.Text.Trim(),
+                hubUrl = P3FServerUrlBox.Text.Trim(),
+                http80DiagnosticOnly = P4FBaseUrlBox.Text.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            },
+            serverCapabilities = diagnostics == null ? null : new
+            {
+                diagnostics.AuthEnabled,
+                diagnostics.AuthorityIsSupported,
+                diagnostics.AuthorityPlatform,
+                diagnostics.AuthorityNativeLibraryName,
+                resumeMatch = diagnosticBody?.ResumeMatchSupported,
+                spectatorMode = diagnosticBody?.SpectatorModeSupported,
+                lobbySnapshot = diagnosticBody?.LobbySnapshotSupported,
+                requestLegalPreview = diagnosticBody?.SupportedHubMethods.Contains(OnlineMessageTypes.RequestLegalPreview),
+                supportedHubMethods = diagnosticBody?.SupportedHubMethods.ToArray() ?? Array.Empty<string>(),
+                activeConnections = diagnosticBody?.ActiveConnectionCount,
+                roomCount = diagnosticBody?.RoomCount,
+                tableCount = diagnosticBody?.TableCount,
+                acceptedActionCount = diagnosticBody?.AcceptedActionCount,
+                rejectedActionCount = diagnosticBody?.RejectedActionCount,
+                lastRejectReason = diagnosticBody?.LastRejectReason ?? ""
+            },
+            session = BuildP4FSanitizedSessionReport(),
+            network = new
+            {
+                primaryRelayState = _p4fPrimaryRelay?.State.ToString() ?? "disconnected",
+                secondaryRelayState = _p4fSecondaryRelay?.State.ToString() ?? "disconnected",
+                reconnect = _p4fPrimaryRelay?.ReconnectState.Summary.ToString() ?? "disconnected",
+                realtime = _p4fRealtimeSync.Summary,
+                _p4fRealtimeSync.LastServerSeq,
+                _p4fRealtimeSync.DuplicateEventCount,
+                _p4fRealtimeSync.GapEventCount,
+                _p4fRealtimeSync.ResyncRequired,
+                resyncRefreshPending = _p4fResyncRefreshPending
+            },
+            resume = new
+            {
+                roomId = _p4fRoomId,
+                tableId = _p4fTableId,
+                seat = _p4fPrimarySeatIndex,
+                lastKnownStateHash = _p4fLastSnapshot?.StateHash ?? _p4gBoardSnapshot?.StateHash ?? "",
+                lastKnownServerSeq = _p4fLastServerSeq,
+                lastResumeMessageType = _p4fPrimaryRelay?.LastResumeResult?.Envelope.MessageType ?? "",
+                lastResumeSuccess = _p4fPrimaryRelay?.LastResumeResult?.ResumeResult?.Success,
+                lastResumeFailureReason = _p4fPrimaryRelay?.LastResumeResult?.ResumeResult?.FailureReason ?? "",
+                lastResumeFailureText = _p4fPrimaryRelay?.LastResumeResult?.ResumeResult?.FailureText ?? ""
+            },
+            spectator = BuildP4JSpectatorReportBlock(),
+            lobby = new
+            {
+                filter = SelectedP4JLobbyRulesetFilter(),
+                rowCount = _p4jLobbyRows.Count,
+                selected = selectedLobbyRow == null ? null : new
+                {
+                    selectedLobbyRow.RoomId,
+                    selectedLobbyRow.TableId,
+                    selectedLobbyRow.RulesetId,
+                    selectedLobbyRow.TableState,
+                    selectedLobbyRow.SeatsOccupied,
+                    selectedLobbyRow.MaxSeats,
+                    selectedLobbyRow.SpectatorCount,
+                    selectedLobbyRow.LastServerSeq,
+                    selectedLobbyRow.SeatSummary,
+                    selectedLobbyRow.CanJoinAsPlayer,
+                    selectedLobbyRow.CanSpectate
+                },
+                status = P4JLobbyStatusText.Text
+            },
+            lastSafeErrors = new
+            {
+                server = RedactReportLine(P4FServerStatusText.Text),
+                auth = RedactReportLine(P4FAuthStatusText.Text),
+                match = RedactReportLine(P4FMatchStatusText.Text),
+                move = RedactReportLine(P4GMoveStatusText.Text),
+                legalPreview = RedactReportLine(P4GLegalPreviewStatusText.Text),
+                reconnect = RedactReportLine(P4JReconnectStatusText.Text),
+                spectator = RedactReportLine(P4JSpectatorStatusText.Text),
+                lobby = RedactReportLine(P4JLobbyStatusText.Text),
+                actionHistory = RedactReportLine(P4IActionHistoryStatusText.Text)
+            },
+            actionLogTail = SanitizedTail(P4FActionLogList.Items.Cast<object>().Select(item => item.ToString()), 80),
+            eventLogTail = SanitizedTail(LogBox.Text.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries), 120),
+            security = new
+            {
+                tokensRedacted = true,
+                refreshTokensRedacted = true,
+                passwordsRedacted = true,
+                authorizationHeadersRedacted = true,
+                privateKeysRedacted = true,
+                rawRuntimeStoresExcluded = true,
+                reportDirectory = ".tmp/manual-smoke"
+            }
+        };
+    }
+
+    private string BuildP4JNetworkSummary()
+    {
+        var diagnostics = _p4fLastDiagnostics;
+        var caps = diagnostics?.Diagnostics;
+        var selectedLobby = SelectedP4JLobbyRow()?.DisplayLabel ?? "none";
+        return string.Join(Environment.NewLine, new[]
+        {
+            "P4J sanitized network bug summary",
+            $"createdUtc={DateTime.UtcNow:O}",
+            $"baseUrl={P4FBaseUrlBox.Text.Trim()}",
+            $"hubUrl={P3FServerUrlBox.Text.Trim()}",
+            $"diagnosticsSeen={diagnostics != null}",
+            $"authority={diagnostics?.AuthorityPlatform ?? "unknown"}/{diagnostics?.AuthorityNativeLibraryName ?? "unknown"} supported={diagnostics?.AuthorityIsSupported}",
+            $"features=legalPreview:{caps?.SupportedHubMethods.Contains(OnlineMessageTypes.RequestLegalPreview)} resume:{caps?.ResumeMatchSupported} spectator:{caps?.SpectatorModeSupported} lobby:{caps?.LobbySnapshotSupported}",
+            $"playMode={SelectedP4FPlayMode()} room={_p4fRoomId} table={_p4fTableId}",
+            $"players={ShortId(_p4fPrimarySession?.PlayerId ?? "")}/{ShortId(_p4fSecondarySession?.PlayerId ?? "")}",
+            $"reconnect={_p4fPrimaryRelay?.ReconnectState.Summary.ToString() ?? "disconnected"}",
+            $"realtime={_p4fRealtimeSync.Summary}",
+            $"resumeSuccess={_p4fPrimaryRelay?.LastResumeResult?.ResumeResult?.Success} resumeReason={_p4fPrimaryRelay?.LastResumeResult?.ResumeResult?.FailureReason ?? ""}",
+            $"spectator={IsP4FSpectatorMode()} status={RedactReportLine(P4JSpectatorStatusText.Text)}",
+            $"lobbyRows={_p4jLobbyRows.Count} selected={selectedLobby}",
+            $"snapshotHash={_p4fLastSnapshot?.StateHash ?? _p4gBoardSnapshot?.StateHash ?? "none"}",
+            $"legalPreviewOptions={_p4gLegalPreview.Options.Count} reason={RedactReportLine(_p4gLegalPreview.Reason)}",
+            $"accepted={_p4fAcceptedActionCount} rejected={_p4fRejectedActionCount} lastSeq={_p4fLastServerSeq}",
+            "tokens=redacted",
+            "passwords=redacted",
+            "authorization=redacted"
+        });
+    }
+
     private object BuildP4FSanitizedSessionReport()
     {
         return new
@@ -1751,8 +1929,8 @@ public partial class MainWindow : Window
                 turn = P4FSeatTurnStatusText.Text,
                 realtime = P4FRealtimeStatusText.Text
             },
-            actionLogItems = P4FActionLogList.Items.Cast<object>().Select(item => item.ToString()).TakeLast(80).ToArray(),
-            eventLogTail = LogBox.Text.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).TakeLast(80).ToArray(),
+            actionLogItems = SanitizedTail(P4FActionLogList.Items.Cast<object>().Select(item => item.ToString()), 80),
+            eventLogTail = SanitizedTail(LogBox.Text.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries), 80),
             security = new
             {
                 tokensRedacted = true,
@@ -1788,6 +1966,41 @@ public partial class MainWindow : Window
             "tokens=redacted",
             "passwords=redacted"
         });
+    }
+
+    private static string[] SanitizedTail(IEnumerable<string?> lines, int maxLines)
+    {
+        return lines
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Select(RedactReportLine)
+            .TakeLast(maxLines)
+            .ToArray();
+    }
+
+    private static string RedactReportLine(string? line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return "";
+        }
+
+        var sensitiveTerms = new[]
+        {
+            "accessToken",
+            "refreshToken",
+            "Authorization",
+            "Bearer ",
+            "password",
+            "privateKey",
+            "id_ed25519",
+            ".pfx",
+            ".pem",
+            ".key"
+        };
+
+        return sensitiveTerms.Any(term => line.Contains(term, StringComparison.OrdinalIgnoreCase))
+            ? "[redacted sensitive log line]"
+            : line;
     }
 
     private ChessOnlineServerEndpoint ResolveP4FEndpoint()

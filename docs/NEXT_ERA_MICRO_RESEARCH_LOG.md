@@ -905,3 +905,13 @@ Date: 2026-07-01
 | SignalR client invocation | Microsoft Learn, ASP.NET Core SignalR .NET client | A client can only invoke hub methods that the deployed hub exposes; missing methods must be treated as a deployment/version gap, not a UI failure. | Check `/chess3d/diagnostics` for `RequestLobbySnapshot` before claiming remote lobby smoke PASS. | `docs/P4J_LOBBY_MANUAL_SMOKE_RESULT.md` | Curl diagnostics plus local app build. |
 | SignalR security | Microsoft Learn, SignalR security considerations | Connection/runtime secrets must not be exposed in logs or manual reports. | Lobby smoke docs include only capability flags, counts, room/table flow, and no tokens or passwords. | docs only | Inspect docs before commit. |
 | Operator smoke logging | OWASP Logging Cheat Sheet | Logs and reports should be useful for diagnosis without storing sensitive values. | Record the remote blocker and click path, but keep raw `.tmp/manual-smoke` reports untracked. | docs only | `git diff --check`; `run-tests -List`. |
+
+## P4J Phase 22 - Network Bug Reports
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| SignalR troubleshooting context | Microsoft Learn, ASP.NET Core SignalR .NET client | Network bugs need connection state, last server sequence, reconnect/resync state, and the hub feature surface to be reproducible. | Add a dedicated network bug report that includes reconnect, resume, spectator, lobby, legal preview, counters, capabilities and action-log tail. | `src/ChessOnlineApp/MainWindow.xaml`, `.xaml.cs` | Build `ChessOnlineApp`; targeted online contract tests. |
+| Secret-safe diagnostics | Microsoft Learn, SignalR security considerations | Access tokens and bearer headers must never be logged or copied into operator reports. | Keep tokens in memory only and add redaction for token/password/Authorization/private-key-like log lines. | UI report code and docs | Inspect report builder and run `git diff --check`. |
+| Bug-report logging boundary | OWASP Logging Cheat Sheet | Logs should be sufficient for diagnosis while excluding secrets and high-risk raw runtime artifacts. | Save reports only under `.tmp/manual-smoke` and include explicit redaction/security flags. | docs/UI | Confirm `.tmp` remains untracked and report docs warn not to commit raw reports. |
