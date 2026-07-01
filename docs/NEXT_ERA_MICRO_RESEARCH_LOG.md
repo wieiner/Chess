@@ -855,3 +855,13 @@ Date: 2026-07-01
 | Deployed capability check | Current Hetzner `/chess3d/diagnostics` | The deployed server reports `requestLegalPreview=true`, but does not list `JoinSpectator` and has no `spectatorMode` field. | Do not fake a remote spectator PASS; record the blocker until the Phase 13+ server package is deployed. | `docs/P4J_SPECTATOR_MANUAL_SMOKE_RESULT.md` | Curl diagnostics and local app build. |
 | Manual smoke honesty | GitHub Actions and operator-smoke boundary | Remote smoke is not a CI gate and should only be claimed when the deployed server exposes the required hub method. | Phase 16 documents local UI readiness and remote deployment gap separately. | docs only | `dotnet build ChessOnlineApp`; `git diff --check`. |
 | Safe reporting | OWASP Logging Cheat Sheet | Manual smoke docs should contain capability facts and no temp credentials or bearer tokens. | Include sanitized endpoint/capability summary only. | docs only | Inspect generated docs before commit. |
+
+## P4J Phase 17 - Lobby Contract Audit
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Minimal lobby surface | Microsoft Learn, ASP.NET Core SignalR groups and current `OnlineRoomRegistry` | The registry already owns active rooms/tables/seats, but diagnostics only exposes aggregate counts. | Add a future safe lobby snapshot instead of overloading diagnostics text or exposing raw registry objects. | `docs/P4J_LOBBY_CONTRACT_AUDIT.md` | Docs-only audit and code search. |
+| Privacy boundary | OWASP Logging Cheat Sheet and SignalR security guidance | Lobby rows are public-ish operational state and must not expose tokens, connection IDs, passwords, or full player IDs. | Lobby rows may include counts and short/anonymous seat summaries only. | docs only | Later DTO tests should scan serialized lobby payloads. |
+| Spectator integration | Phase 11-16 spectator design | Lobby is the natural way to choose a table to spectate, but remote spectator still requires deployed `JoinSpectator`. | Phase 18 should include spectatorCount when available and let UI spectate selected tables once server package is aligned. | docs only | Future lobby DTO/server tests. |
