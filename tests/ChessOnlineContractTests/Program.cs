@@ -48,10 +48,10 @@ static void AuthorityRuntimeDiagnosticsTests(ContractTest test, string profileRo
     test.Check(onlineDiagnostics.ActionLogSupported, "online diagnostics exposes action log capability");
     test.Check(onlineDiagnostics.MatchmakingSupported, "online diagnostics exposes matchmaking capability");
     test.Check(onlineDiagnostics.ResumeMatchSupported, "online diagnostics exposes resume match capability");
-    test.Check(!onlineDiagnostics.SpectatorModeSupported, "online diagnostics keeps spectator mode disabled until server method exists");
+    test.Check(onlineDiagnostics.SpectatorModeSupported, "online diagnostics exposes spectator mode capability");
     test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestLegalPreview), "online diagnostics lists RequestLegalPreview hub method");
     test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestResumeMatch), "online diagnostics lists RequestResumeMatch hub method");
-    test.Check(!onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.JoinSpectator), "online diagnostics does not list JoinSpectator before server method exists");
+    test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.JoinSpectator), "online diagnostics lists JoinSpectator hub method");
 }
 
 static void ProtocolRoundtripTests(ContractTest test)
@@ -666,6 +666,44 @@ static void AuthorityClassicTests(ContractTest test, string profileRoot)
 
     var log = registry.RequestActionLog(Envelope(OnlineMessageTypes.RequestActionLog, "room-classic", "classic", "client-1", "player-1"));
     test.Check(log.ActionLog?.Events.Count == 1 && log.ActionLog.Events[0].ServerSeq == 1, "action log chunk exposes serverSeq");
+
+    var beforeSpectatorHash = registry.RequestSnapshot(Envelope(OnlineMessageTypes.RequestSnapshot, "room-classic", "classic", "client-1", "player-1")).Snapshot?.StateHash ?? "";
+    var spectator = registry.JoinSpectator(Envelope(OnlineMessageTypes.JoinSpectator, "room-classic", "classic", "client-s", "player-s"), new OnlineJoinSpectatorRequest
+    {
+        PlayerId = "player-s",
+        RoomId = "room-classic",
+        TableId = "classic",
+        ExpectedRulesetId = "classic-six-side-3d-8x8x8-v0.1",
+        LastKnownServerSeq = 0
+    });
+    var afterSpectatorHash = registry.RequestSnapshot(Envelope(OnlineMessageTypes.RequestSnapshot, "room-classic", "classic", "client-1", "player-1")).Snapshot?.StateHash ?? "";
+    test.Check(spectator.Envelope.MessageType == OnlineMessageTypes.JoinSpectatorResult &&
+        spectator.SpectatorResult?.Success == true &&
+        spectator.SpectatorResult.Snapshot?.StateHash == beforeSpectatorHash &&
+        spectator.SpectatorResult.ActionLog?.Events.Count == 1 &&
+        spectator.SpectatorResult.State.IsSpectator &&
+        beforeSpectatorHash == afterSpectatorHash,
+        "spectator join returns snapshot/action log without mutating state");
+
+    var spectatorSnapshot = registry.RequestSnapshot(Envelope(OnlineMessageTypes.RequestSnapshot, "room-classic", "classic", "client-s", "player-s"));
+    var spectatorLog = registry.RequestActionLog(Envelope(OnlineMessageTypes.RequestActionLog, "room-classic", "classic", "client-s", "player-s"));
+    test.Check(spectatorSnapshot.Envelope.MessageType == OnlineMessageTypes.AuthoritativeSnapshot &&
+        spectatorLog.ActionLog?.Events.Count == 1,
+        "spectator can request snapshot and action log");
+
+    var spectatorSubmit = registry.SubmitAction(Envelope(OnlineMessageTypes.SubmitAction, "room-classic", "classic", "client-s", "player-s"), Clone(legalMove!));
+    test.Check(spectatorSubmit.Error?.ReasonCode == OnlineRejectReasons.PlayerNotSeated, "spectator submit is rejected because no seat is assigned");
+
+    var missingSpectator = registry.JoinSpectator(Envelope(OnlineMessageTypes.JoinSpectator, "room-classic", "missing", "client-s", "player-s"), new OnlineJoinSpectatorRequest
+    {
+        PlayerId = "player-s",
+        RoomId = "room-classic",
+        TableId = "missing",
+        ExpectedRulesetId = "classic-six-side-3d-8x8x8-v0.1"
+    });
+    test.Check(missingSpectator.SpectatorResult?.Success == false &&
+        missingSpectator.SpectatorResult.FailureReason == OnlineSpectatorFailureReasons.TableNotFound,
+        "spectator join rejects missing table cleanly");
 
     var beforeResumeHash = registry.RequestSnapshot(Envelope(OnlineMessageTypes.RequestSnapshot, "room-classic", "classic", "client-1", "player-1")).Snapshot?.StateHash ?? "";
     var resume = registry.RequestResumeMatch(Envelope(OnlineMessageTypes.RequestResumeMatch, "room-classic", "classic", "client-1", "player-1"), new OnlineResumeRequest

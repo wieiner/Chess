@@ -269,6 +269,19 @@ public sealed class Chess3DRelayHub : Hub
         return result;
     }
 
+    public async Task<OnlineProtocolMessage> JoinSpectator(OnlineProtocolMessage message)
+    {
+        var result = InvokeRegistry(message, OnlineMessageTypes.JoinSpectator, env => _registry.JoinSpectator(env, message.SpectatorRequest ?? new OnlineJoinSpectatorRequest()));
+        if (result.SpectatorResult?.Success == true)
+        {
+            _connections.SetMembership(Context.ConnectionId, result.SpectatorResult.RoomId, result.SpectatorResult.TableId);
+            await Groups.AddToGroupAsync(Context.ConnectionId, RoomGroup(result.SpectatorResult.RoomId));
+            await Groups.AddToGroupAsync(Context.ConnectionId, TableGroup(result.SpectatorResult.TableId));
+        }
+        await SendCaller("ReceiveJoinSpectatorResult", result);
+        return result;
+    }
+
     public async Task<OnlineProtocolMessage> RequestLegalPreview(OnlineProtocolMessage message)
     {
         var result = InvokeRegistry(message, OnlineMessageTypes.RequestLegalPreview, env => _registry.RequestLegalPreview(env, message.LegalPreviewRequest ?? new OnlineLegalPreviewRequest()));

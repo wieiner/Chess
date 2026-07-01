@@ -414,6 +414,78 @@ public sealed class OnlineRoomRegistry
         }
     }
 
+    public OnlineProtocolMessage JoinSpectator(OnlineMessageEnvelope envelope, OnlineJoinSpectatorRequest request)
+    {
+        lock (_gate)
+        {
+            request.RoomId = string.IsNullOrWhiteSpace(request.RoomId) ? envelope.RoomId : request.RoomId.Trim();
+            request.TableId = string.IsNullOrWhiteSpace(request.TableId) ? envelope.TableId : request.TableId.Trim();
+            request.PlayerId = string.IsNullOrWhiteSpace(request.PlayerId) ? RequirePlayerId(envelope) : request.PlayerId.Trim();
+            envelope.RoomId = request.RoomId;
+            envelope.TableId = request.TableId;
+            envelope.PlayerId = request.PlayerId;
+
+            if (string.IsNullOrWhiteSpace(request.PlayerId))
+            {
+                return SpectatorFailure(envelope, request, OnlineSpectatorFailureReasons.NotAuthenticated, "Spectator requires an authenticated temporary user.");
+            }
+
+            if (!TryGetTable(request.RoomId, request.TableId, out _, out var table))
+            {
+                return SpectatorFailure(envelope, request, OnlineSpectatorFailureReasons.TableNotFound, "Table not found.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ExpectedRulesetId) &&
+                !string.Equals(request.ExpectedRulesetId, table.RulesetId, StringComparison.OrdinalIgnoreCase))
+            {
+                return SpectatorFailure(envelope, request, OnlineSpectatorFailureReasons.RulesetMismatch, "Requested ruleset does not match active table.");
+            }
+
+            if (table.State != OnlineTableState.InGame || table.Session == null)
+            {
+                return SpectatorFailure(envelope, request, OnlineSpectatorFailureReasons.TableNotActive, "Table is not in game.");
+            }
+
+            var snapshot = table.Session.CreateSnapshot(table.RoomId, table.TableId, table.ServerSeq);
+            var fromSeq = Math.Max(1, request.LastKnownServerSeq + 1);
+            var events = table.ActionLog
+                .Where(e => e.ServerSeq >= fromSeq)
+                .Take(64)
+                .Select(CloneEvent)
+                .ToList();
+            var actionLog = new OnlineActionLogChunk
+            {
+                RoomId = table.RoomId,
+                TableId = table.TableId,
+                FromServerSeq = events.FirstOrDefault()?.ServerSeq ?? fromSeq,
+                ToServerSeq = events.LastOrDefault()?.ServerSeq ?? fromSeq - 1,
+                Events = events
+            };
+            var state = new OnlineSpectatorState
+            {
+                IsSpectator = true,
+                RoomId = table.RoomId,
+                TableId = table.TableId,
+                RulesetId = table.RulesetId,
+                SpectatorId = $"spectator-{request.PlayerId}",
+                ViewerPlayerId = request.PlayerId,
+                LastKnownServerSeq = table.ServerSeq,
+                SubmitDisabledReason = "Spectator mode is read-only."
+            };
+            return Reply(OnlineMessageTypes.JoinSpectatorResult, envelope, snapshot: snapshot, actionLog: actionLog, spectatorResult: new OnlineJoinSpectatorResult
+            {
+                Success = true,
+                RoomId = table.RoomId,
+                TableId = table.TableId,
+                RulesetId = table.RulesetId,
+                SpectatorId = state.SpectatorId,
+                State = state,
+                Snapshot = snapshot,
+                ActionLog = actionLog
+            });
+        }
+    }
+
     public OnlineProtocolMessage RequestLegalPreview(OnlineMessageEnvelope envelope, OnlineLegalPreviewRequest request)
     {
         lock (_gate)
@@ -505,6 +577,7 @@ public sealed class OnlineRoomRegistry
                 ActionLogSupported = true,
                 MatchmakingSupported = true,
                 ResumeMatchSupported = true,
+                SpectatorModeSupported = true,
                 SupportedHubMethods =
                 [
                     OnlineMessageTypes.Hello,
@@ -517,6 +590,7 @@ public sealed class OnlineRoomRegistry
                     OnlineMessageTypes.RequestSnapshot,
                     OnlineMessageTypes.RequestActionLog,
                     OnlineMessageTypes.RequestResumeMatch,
+                    OnlineMessageTypes.JoinSpectator,
                     OnlineMessageTypes.RequestLegalPreview,
                     OnlineMessageTypes.RequestDiagnostics,
                     OnlineMessageTypes.Ping
@@ -608,6 +682,7 @@ public sealed class OnlineRoomRegistry
         OnlineSnapshot? snapshot = null,
         OnlineActionLogChunk? actionLog = null,
         OnlineResumeResult? resumeResult = null,
+        OnlineJoinSpectatorResult? spectatorResult = null,
         OnlineLegalPreviewResult? legalPreview = null,
         OnlineError? error = null,
         string text = "")
@@ -632,6 +707,7 @@ public sealed class OnlineRoomRegistry
             Snapshot = snapshot,
             ActionLog = actionLog,
             ResumeResult = resumeResult,
+            SpectatorResult = spectatorResult,
             LegalPreview = legalPreview,
             Error = error,
             Text = text
@@ -649,6 +725,27 @@ public sealed class OnlineRoomRegistry
             TableId = request.TableId,
             SeatIndex = request.SeatIndex,
             RulesetId = request.ExpectedRulesetId
+        });
+    }
+
+    private OnlineProtocolMessage SpectatorFailure(OnlineMessageEnvelope envelope, OnlineJoinSpectatorRequest request, string reason, string text)
+    {
+        return Reply(OnlineMessageTypes.JoinSpectatorResult, envelope, spectatorResult: new OnlineJoinSpectatorResult
+        {
+            Success = false,
+            FailureReason = reason,
+            FailureText = text,
+            RoomId = request.RoomId,
+            TableId = request.TableId,
+            RulesetId = request.ExpectedRulesetId,
+            State = new OnlineSpectatorState
+            {
+                RoomId = request.RoomId,
+                TableId = request.TableId,
+                RulesetId = request.ExpectedRulesetId,
+                ViewerPlayerId = request.PlayerId,
+                SubmitDisabledReason = "Spectator mode is read-only."
+            }
         });
     }
 

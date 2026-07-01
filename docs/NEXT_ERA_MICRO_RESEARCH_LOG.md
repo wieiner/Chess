@@ -815,3 +815,13 @@ Date: 2026-07-01
 | Append-only protocol evolution | Existing online protocol JSON envelope and SignalR hub method patterns | Optional payload properties allow new client/server capabilities without breaking older messages. | Add `JoinSpectator`/`JoinSpectatorResult` DTOs and message constants append-only. | `src/ChessOnlineProtocol/OnlineProtocolDtos.cs`, `src/ChessOnlineProtocol/OnlineProtocolJson.cs` | Protocol roundtrip tests. |
 | Honest capability reporting | Existing diagnostics endpoint and GitHub Actions compatibility checks | Advertising spectator mode before server hub implementation would mislead clients. | Add `SpectatorModeSupported`, but keep it false and do not list `JoinSpectator` until Phase 13. | `src/ChessOnlineServer/ChessOnlineServerHost.cs`, tests | Diagnostics tests assert false/no method. |
 | Secret-free spectator payload | OWASP Logging Cheat Sheet | Read-only viewer state should carry room/table/ruleset/seq, not credentials. | Spectator DTOs contain no token/password/Authorization fields. | tests/docs | Contract tests check serialized payload text. |
+
+## P4J Phase 13 - Server Spectator Mode
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| SignalR table groups | Microsoft Learn, ASP.NET Core SignalR groups | Adding a connection to an existing group is sufficient for broadcast delivery without changing game authority. | `JoinSpectator` adds the connection to room/table groups but does not allocate an `OnlineSeat`. | `src/ChessOnlineServer/Chess3DRelayHub.cs`, `src/ChessOnlineProtocol/OnlineRoomRegistry.cs` | Registry tests plus server build. |
+| Read-only server authority | Existing `SubmitAction`, `Ready`, and `StartGame` seat checks | Mutating methods already require `TrySeat`; a spectator with no seat is rejected by the existing server authority. | Keep spectator read-only by construction; do not add UI-only security assumptions. | `tests/ChessOnlineContractTests/Program.cs` | Tests assert spectator submit is rejected and snapshot/action-log requests work. |
+| Capability flip | Existing `/chess3d/diagnostics` feature flags | Once the hub method exists, diagnostics should advertise it for clients and operators. | Set `SpectatorModeSupported=true` and list `JoinSpectator`. | diagnostics/tests/docs | Targeted online contract tests. |
