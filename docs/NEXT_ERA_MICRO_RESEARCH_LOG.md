@@ -785,3 +785,13 @@ Date: 2026-07-01
 | Baseline commit and CI | GitHub Actions run list and local git history | `origin/main` is at `34e8101f9 P4J phase 09: add client resume support`, and the latest Windows Build succeeded. | Continue from Phase 09 without reset or rescue work. | `docs/P4J_PHASE09_BASELINE_CHECK.md` | `git rev-parse`, `gh run list`, `git diff --check`. |
 | Remote capability drift | Hetzner `/chess3d/diagnostics` and Microsoft SignalR client guidance | The deployed HTTP 80 server is healthy and supports legal preview, but does not yet advertise `resumeMatch` or `RequestResumeMatch`. | Record the deployment gap honestly before resume manual smoke; local client/server code is ahead of deployed Hetzner package. | `docs/P4J_PHASE09_BASELINE_CHECK.md` | Curl health/ready/diagnostics and local client/app builds. |
 | Token-safe diagnostics | Microsoft SignalR security guidance and OWASP Logging Cheat Sheet | SignalR/auth diagnostics can leak tokens if raw URLs or bearer values are logged. | Baseline doc records only capability booleans and sanitized status, not tokens/passwords. | docs only | Review generated docs before commit. |
+
+## P4J Phase 10 - Resume Manual Smoke
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Resume smoke prerequisite | Microsoft Learn, ASP.NET Core SignalR .NET client and local Phase 08/09 code | A client can only invoke a hub method that the deployed server exposes; current Hetzner diagnostics omit `RequestResumeMatch`. | Do not claim remote resume PASS until the server package containing Phase 08 is deployed. Record a blocked smoke result instead. | `docs/P4J_RESUME_MANUAL_SMOKE_RESULT.md` | Build `ChessOnlineApp`, curl diagnostics, `git diff --check`. |
+| WPF state recovery | Microsoft Learn, WPF Dispatcher/threading guidance | The `Resume Current Match` button runs on the UI event path and should render authoritative snapshot/action-log only after server response. | Keep the manual checklist focused on active match, disconnect/reconnect, then resume; no background UI automation committed. | docs only | Manual operator checklist in result doc. |
+| Safe reporting | OWASP Logging Cheat Sheet and Microsoft SignalR security | Manual smoke notes must not include temporary passwords, bearer tokens, or raw logs. | Store only sanitized status and capability facts in docs; `.tmp/manual-smoke` remains untracked. | docs only | Inspect docs before commit. |
