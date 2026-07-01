@@ -935,3 +935,13 @@ Date: 2026-07-01
 | Bounded local gate | Existing P4D1 test-runner decomposition | Full local verification should use the decomposed runner with controlled MSBuild parallelism and watchdog timeouts. | Run `run-tests -SkipBenchmark -MSBuildMaxCpuCount 1` before `scripts/verify.ps1`. | docs only | Record exact command outcomes in Phase 24 result doc. |
 | Remote smoke boundary | GitHub Actions docs and project policy | Remote Hetzner smoke remains manual/operator-only and must not become a required CI step. | Local verify remains self-contained; remote capability blockers are documented separately. | docs only | Check local commands only. |
 | Secret-safe verification output | OWASP Logging Cheat Sheet | Local logs under `.tmp` are ignored and should not be committed. | Record summaries, not raw logs. | docs only | `git status --short` before commit. |
+
+## P4J Phase 25 - Final Report and User Guide
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Operator play guide | Microsoft Learn, ASP.NET Core SignalR .NET client | Users need a concrete click path and capability checks, not only protocol docs. | Add a P4J guide for health, diagnostics, resume, spectator, lobby, network reports, and current remote blockers. | `docs/P4J_ONLINE_MATCH_UX_USER_GUIDE.md` | Docs review and `git diff --check`. |
+| Deployment boundary | Microsoft Learn, host ASP.NET Core on Linux with Nginx; project Hetzner docs | Current public deployment is HTTP 80 behind nginx and should not be changed in P4J finalization. | State that no server/network change was made; lobby/spectator remote PASS requires later server package deployment. | final report docs | Curl health/diagnostics only. |
+| Final status summary | GitHub Actions docs and project CI runs | CI success should reference exact run ids and local verify commands. | Record phase commits, latest CI, local verify, and remaining work. | `docs/P4J_ONLINE_MATCH_UX_FINAL_REPORT.md`, project docs | `git diff --check`; final CI after commit. |

@@ -285,7 +285,13 @@ The full verify built Release x64 outputs, checked assets/profiles/scenarios/mod
 
 ## Recommended next phases
 
-1. P4E - TLS/domain/public deployment hardening:
+1. P4K - Deploy updated online UX server package:
+   - Deploy the current `ChessOnlineServer` package that exposes `RequestResumeMatch`, `JoinSpectator`, and `RequestLobbySnapshot`.
+   - Keep HTTP 80 diagnostic deployment unchanged at the network layer.
+   - Do not touch 443/TLS/x-ui/Xray during this deploy.
+   - Re-run remote resume, spectator, lobby, Classic, and Asgard smoke.
+
+2. P4E - TLS/domain/public deployment hardening:
    - DNS/domain confirmation.
    - Keep port 80 available for ACME/HTTP redirect as needed.
    - Certbot/HTTPS.
@@ -294,23 +300,22 @@ The full verify built Release x64 outputs, checked assets/profiles/scenarios/mod
    - Rollback rehearsal.
    - Public HTTPS health and SignalR smoke.
 
-2. P4F - Reconnect/spectator UX:
-   - Reconnect/resume.
-   - Spectator snapshots.
-   - Better public room/table lifecycle.
+3. P4L - Public online hardening:
    - Rate limiting and user-facing online errors.
+   - Reconnect/spectator persistence across server restart.
+   - Operator-facing lobby health and room cleanup.
 
-3. P4G - Asgard gameplay deepening:
+4. P4G - Asgard gameplay deepening:
    - Core/fusion/reserve UX.
    - Destructive implosion rules if selected.
    - More complete Asgard playthroughs and balance passes.
 
-4. P5 - Real generated 3D pieces / glTF pipeline:
+5. P5 - Real generated 3D pieces / glTF pipeline:
    - GLB/glTF import/export direction.
    - Better material/animation fidelity.
    - Visual QA screenshots.
 
-5. P6 - Chess2D Lichess/UCI/PGN integration:
+6. P6 - Chess2D Lichess/UCI/PGN integration:
    - PGN/SAN import/export.
    - UCI process adapter.
    - Lichess token-safe client.

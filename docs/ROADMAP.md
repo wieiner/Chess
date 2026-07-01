@@ -406,13 +406,27 @@ Deferred:
 
 Current priority order after the stalled-area audit:
 
-1. TLS/domain + HTTPS auth enforcement.
-2. Deployment rollback, backup, and log rotation.
-3. Documentation consistency pass for stale `draft`/`blocked` notes.
-4. Chess2D PGN/SAN and UCI adapter.
-5. Reconnect/resume and public SignalR smoke over HTTPS.
-6. Visual QA automation and screenshot checklist execution.
-7. AI/search quality work and anti-cheat policy.
+1. Deploy the updated ChessOnlineServer package that exposes `RequestResumeMatch`, `JoinSpectator`, and `RequestLobbySnapshot` on the existing HTTP 80 diagnostic deployment.
+2. Re-run remote resume/spectator/lobby smoke without touching 443/TLS/x-ui/Xray.
+3. TLS/domain + HTTPS auth enforcement on a dedicated plan/server after the x-ui/443 decision.
+4. Deployment rollback, backup, and log rotation.
+5. Documentation consistency pass for stale `draft`/`blocked` notes.
+6. Chess2D PGN/SAN and UCI adapter.
+7. Visual QA automation and screenshot checklist execution.
+8. AI/search quality work and anti-cheat policy.
+
+## P4J Online Match UX
+
+Completed locally:
+
+- reconnect/resync UI;
+- resume contract and UI controls;
+- spectator contract/client/UI;
+- lobby snapshot contract/client/UI;
+- sanitized network bug reports;
+- full local verify.
+
+Remote public Hetzner still needs a server package deploy before resume/spectator/lobby can pass against HTTP 80. Current public play with legal preview remains available.
 
 ## Next Era - Mode Incubator
 

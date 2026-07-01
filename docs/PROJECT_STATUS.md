@@ -519,3 +519,15 @@ The stalled-area audit found no hidden branch/tag line to recover: `main` is the
 ## Next Era Mode Incubator
 
 `docs/NEXT_ERA_MODE_INCUBATOR.md` records future 3D mode ideas as concepts only. It does not add JSON RuleProfiles, schema values, tests, engine hooks, UI panels, or online protocol actions. Runtime Chess3D still has exactly five real RuleProfiles.
+
+## P4J Online Match UX
+
+P4J completes the repository/local UX layer for online match play:
+
+- legal-preview one-click action dispatch remains the player action path;
+- reconnect/resync status is visible and bounded by snapshot/action-log refresh;
+- resume, spectator, and lobby contracts are implemented in server/protocol/client/UI code;
+- `ChessOnlineApp` has spectator read-only mode, lobby table list, and sanitized network bug reports;
+- full local `run-tests -SkipBenchmark -MSBuildMaxCpuCount 1` and `scripts/verify.ps1` passed.
+
+The current public Hetzner HTTP 80 deployment still exposes legal preview, matchmaking, snapshot, action log, and action submit, but does not yet expose `RequestResumeMatch`, `JoinSpectator`, or `RequestLobbySnapshot`. Remote resume/spectator/lobby PASS requires a later server package deployment; P4J did not touch TLS/443, x-ui/Xray, nginx, systemd, UFW, Outline, Albatronix, or Unreal.
