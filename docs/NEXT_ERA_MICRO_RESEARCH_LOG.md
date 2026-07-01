@@ -915,3 +915,13 @@ Date: 2026-07-01
 | SignalR troubleshooting context | Microsoft Learn, ASP.NET Core SignalR .NET client | Network bugs need connection state, last server sequence, reconnect/resync state, and the hub feature surface to be reproducible. | Add a dedicated network bug report that includes reconnect, resume, spectator, lobby, legal preview, counters, capabilities and action-log tail. | `src/ChessOnlineApp/MainWindow.xaml`, `.xaml.cs` | Build `ChessOnlineApp`; targeted online contract tests. |
 | Secret-safe diagnostics | Microsoft Learn, SignalR security considerations | Access tokens and bearer headers must never be logged or copied into operator reports. | Keep tokens in memory only and add redaction for token/password/Authorization/private-key-like log lines. | UI report code and docs | Inspect report builder and run `git diff --check`. |
 | Bug-report logging boundary | OWASP Logging Cheat Sheet | Logs should be sufficient for diagnosis while excluding secrets and high-risk raw runtime artifacts. | Save reports only under `.tmp/manual-smoke` and include explicit redaction/security flags. | docs/UI | Confirm `.tmp` remains untracked and report docs warn not to commit raw reports. |
+
+## P4J Phase 23 - Secret and Privacy Audit
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Sensitive log scanning | OWASP Logging Cheat Sheet | Access tokens, refresh tokens, passwords, private keys, and Authorization headers require explicit exclusion/redaction. | Run repo-wide targeted `rg` audit and document expected code identifiers versus disallowed literal secrets. | `docs/P4J_SECRET_LOG_AUDIT.md` | Search output review and `git diff --check`. |
+| SignalR auth privacy | Microsoft Learn, SignalR security considerations | Bearer tokens may be transported by the SignalR client but must not be printed in client logs or bug reports. | Keep token-bearing values inside client session objects and report only redacted status/short player IDs. | UI/client docs | Inspect report builders and smoke docs. |
+| Local artifact boundary | GitHub Actions docs and existing `.gitignore` | Local `.tmp` reports should never become CI artifacts or tracked content. | Confirm `.tmp/`, manual smoke reports, logs, stores, and keyrings are ignored/documented. | `.gitignore`, docs | `git status --short` after local checks. |
