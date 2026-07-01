@@ -895,3 +895,13 @@ Date: 2026-07-01
 | WPF list display | Microsoft Learn, WPF data binding and controls | A compact list/detail view is safer than a large redesign and can use display rows from the client SDK. | Add Refresh Lobby, ruleset filter, active table list and selected details in `ChessOnlineApp`. | `src/ChessOnlineApp/MainWindow.xaml`, `.xaml.cs` | Build `ChessOnlineApp`. |
 | Lobby to spectator flow | Phase 15 spectator UI and Phase 19 client lobby SDK | Lobby rows provide room/table IDs; spectator UI can reuse those IDs. | Add copy/spectate selected table actions and keep submit read-only in spectator mode. | WPF code-behind | App build and targeted online contract tests. |
 | Safe lobby status | OWASP Logging Cheat Sheet | Active table UI must not display tokens, full connection IDs, or passwords. | Use `OnlineLobbyTableDisplayRow.DisplayLabel` and short seat summaries only. | docs/tests/UI | Inspect docs and run targeted tests. |
+
+## P4J Phase 21 - Lobby Manual Smoke
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| SignalR client invocation | Microsoft Learn, ASP.NET Core SignalR .NET client | A client can only invoke hub methods that the deployed hub exposes; missing methods must be treated as a deployment/version gap, not a UI failure. | Check `/chess3d/diagnostics` for `RequestLobbySnapshot` before claiming remote lobby smoke PASS. | `docs/P4J_LOBBY_MANUAL_SMOKE_RESULT.md` | Curl diagnostics plus local app build. |
+| SignalR security | Microsoft Learn, SignalR security considerations | Connection/runtime secrets must not be exposed in logs or manual reports. | Lobby smoke docs include only capability flags, counts, room/table flow, and no tokens or passwords. | docs only | Inspect docs before commit. |
+| Operator smoke logging | OWASP Logging Cheat Sheet | Logs and reports should be useful for diagnosis without storing sensitive values. | Record the remote blocker and click path, but keep raw `.tmp/manual-smoke` reports untracked. | docs only | `git diff --check`; `run-tests -List`. |
