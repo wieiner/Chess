@@ -143,6 +143,7 @@ public static class ChessOnlineServerHost
                 matchmaking = diagnostics.MatchmakingSupported,
                 resumeMatch = diagnostics.ResumeMatchSupported,
                 spectatorMode = diagnostics.SpectatorModeSupported,
+                lobbySnapshot = diagnostics.LobbySnapshotSupported,
                 supportedHubMethods = diagnostics.SupportedHubMethods,
                 startedUtc = AppStart.StartedUtc,
                 diagnostics.RoomCount,

@@ -49,9 +49,11 @@ static void AuthorityRuntimeDiagnosticsTests(ContractTest test, string profileRo
     test.Check(onlineDiagnostics.MatchmakingSupported, "online diagnostics exposes matchmaking capability");
     test.Check(onlineDiagnostics.ResumeMatchSupported, "online diagnostics exposes resume match capability");
     test.Check(onlineDiagnostics.SpectatorModeSupported, "online diagnostics exposes spectator mode capability");
+    test.Check(onlineDiagnostics.LobbySnapshotSupported, "online diagnostics exposes lobby snapshot capability");
     test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestLegalPreview), "online diagnostics lists RequestLegalPreview hub method");
     test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestResumeMatch), "online diagnostics lists RequestResumeMatch hub method");
     test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.JoinSpectator), "online diagnostics lists JoinSpectator hub method");
+    test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestLobbySnapshot), "online diagnostics lists RequestLobbySnapshot hub method");
 }
 
 static void ProtocolRoundtripTests(ContractTest test)
@@ -214,6 +216,62 @@ static void ProtocolRoundtripTests(ContractTest test)
         !spectatorResultJson.Contains("password", StringComparison.OrdinalIgnoreCase) &&
         !spectatorResultJson.Contains("Authorization", StringComparison.OrdinalIgnoreCase),
         "spectator result serializes failure/read-only state without secrets");
+
+    var lobbyRequest = OnlineProtocolJson.Wrap(OnlineMessageTypes.RequestLobbySnapshot, "client-lobby", "player-lobby");
+    lobbyRequest.LobbyRequest = new OnlineLobbySnapshotRequest
+    {
+        RulesetIdFilter = "classic-six-side-3d-8x8x8-v0.1",
+        IncludeInGameTables = true,
+        IncludeWaitingTables = true
+    };
+    var lobbyRequestJson = OnlineProtocolJson.Serialize(lobbyRequest);
+    test.Check(OnlineProtocolJson.TryDeserialize(lobbyRequestJson, out var parsedLobbyRequest, out error) &&
+        parsedLobbyRequest.Envelope.MessageType == OnlineMessageTypes.RequestLobbySnapshot &&
+        parsedLobbyRequest.LobbyRequest?.RulesetIdFilter == "classic-six-side-3d-8x8x8-v0.1" &&
+        !lobbyRequestJson.Contains("accessToken", StringComparison.OrdinalIgnoreCase) &&
+        !lobbyRequestJson.Contains("refreshToken", StringComparison.OrdinalIgnoreCase),
+        "lobby snapshot request serializes without token fields");
+
+    var lobbyResult = OnlineProtocolJson.Wrap(OnlineMessageTypes.LobbySnapshot, "server", "player-lobby");
+    lobbyResult.LobbySnapshot = new OnlineLobbySnapshot
+    {
+        CreatedUtc = "2026-07-01T00:00:00Z",
+        RoomCount = 1,
+        TableCount = 1,
+        ActiveTableCount = 1,
+        Tables =
+        {
+            new OnlineLobbyTableRow
+            {
+                RoomId = "room-a",
+                TableId = "classic",
+                RulesetId = "classic-six-side-3d-8x8x8-v0.1",
+                TableState = "InGame",
+                SeatsOccupied = 1,
+                MaxSeats = 6,
+                LastServerSeq = 7,
+                SeatSummaries =
+                {
+                    new OnlineLobbySeatSummary
+                    {
+                        SeatIndex = 1,
+                        SideId = 1,
+                        Ready = true,
+                        Connected = true,
+                        PlayerLabel = "player-1"
+                    }
+                }
+            }
+        }
+    };
+    var lobbyResultJson = OnlineProtocolJson.Serialize(lobbyResult);
+    test.Check(OnlineProtocolJson.TryDeserialize(lobbyResultJson, out var parsedLobbyResult, out error) &&
+        parsedLobbyResult.Envelope.MessageType == OnlineMessageTypes.LobbySnapshot &&
+        parsedLobbyResult.LobbySnapshot?.Tables.Count == 1 &&
+        parsedLobbyResult.LobbySnapshot.Tables[0].SeatSummaries[0].PlayerLabel == "player-1" &&
+        !lobbyResultJson.Contains("password", StringComparison.OrdinalIgnoreCase) &&
+        !lobbyResultJson.Contains("Authorization", StringComparison.OrdinalIgnoreCase),
+        "lobby snapshot serializes active table rows without secrets");
 
     var preview = OnlineProtocolJson.Wrap(OnlineMessageTypes.LegalPreviewResult, "client-a", "player-a");
     preview.LegalPreview = new OnlineLegalPreviewResult
@@ -625,6 +683,13 @@ static void AuthorityClassicTests(ContractTest test, string profileRoot)
 {
     var registry = new OnlineRoomRegistry(profileRoot);
     var env = Envelope("CreateRoom", "room-classic", "classic", "client-1", "player-1");
+    var emptyLobby = registry.RequestLobbySnapshot(
+        Envelope(OnlineMessageTypes.RequestLobbySnapshot, "", "", "client-lobby", "player-lobby"),
+        new OnlineLobbySnapshotRequest());
+    test.Check(emptyLobby.Envelope.MessageType == OnlineMessageTypes.LobbySnapshot &&
+        emptyLobby.LobbySnapshot?.Tables.Count == 0 &&
+        emptyLobby.LobbySnapshot.RoomCount == 0,
+        "empty lobby snapshot returns empty table list");
 
     test.Check(registry.Hello(Envelope(OnlineMessageTypes.Hello, "", "", "client-1", "player-1")).Envelope.MessageType == OnlineMessageTypes.Welcome,
         "Hello returns Welcome");
@@ -699,6 +764,26 @@ static void AuthorityClassicTests(ContractTest test, string profileRoot)
 
     var log = registry.RequestActionLog(Envelope(OnlineMessageTypes.RequestActionLog, "room-classic", "classic", "client-1", "player-1"));
     test.Check(log.ActionLog?.Events.Count == 1 && log.ActionLog.Events[0].ServerSeq == 1, "action log chunk exposes serverSeq");
+
+    var lobby = registry.RequestLobbySnapshot(
+        Envelope(OnlineMessageTypes.RequestLobbySnapshot, "", "", "client-lobby", "player-lobby"),
+        new OnlineLobbySnapshotRequest { IncludeInGameTables = true, IncludeWaitingTables = true });
+    var lobbyJson = OnlineProtocolJson.Serialize(lobby);
+    var row = lobby.LobbySnapshot?.Tables.SingleOrDefault(t => t.TableId == "classic");
+    test.Check(lobby.Envelope.MessageType == OnlineMessageTypes.LobbySnapshot &&
+        row != null &&
+        row.RoomId == "room-classic" &&
+        row.RulesetId == "classic-six-side-3d-8x8x8-v0.1" &&
+        row.TableState == OnlineTableState.InGame.ToString() &&
+        row.SeatsOccupied == 1 &&
+        row.MaxSeats == 6 &&
+        row.LastServerSeq == 1 &&
+        row.SeatSummaries.Count == 1 &&
+        row.SeatSummaries[0].PlayerLabel == "player-1" &&
+        !lobbyJson.Contains("player-123456789", StringComparison.OrdinalIgnoreCase) &&
+        !lobbyJson.Contains("accessToken", StringComparison.OrdinalIgnoreCase) &&
+        !lobbyJson.Contains("Authorization", StringComparison.OrdinalIgnoreCase),
+        "active lobby snapshot exposes safe table row without secrets");
 
     var beforeSpectatorHash = registry.RequestSnapshot(Envelope(OnlineMessageTypes.RequestSnapshot, "room-classic", "classic", "client-1", "player-1")).Snapshot?.StateHash ?? "";
     var spectator = registry.JoinSpectator(Envelope(OnlineMessageTypes.JoinSpectator, "room-classic", "classic", "client-s", "player-s"), new OnlineJoinSpectatorRequest

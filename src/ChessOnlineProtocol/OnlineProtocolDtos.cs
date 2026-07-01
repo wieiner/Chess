@@ -26,6 +26,7 @@ public static class OnlineMessageTypes
     public const string RequestActionLog = "RequestActionLog";
     public const string RequestResumeMatch = "RequestResumeMatch";
     public const string JoinSpectator = "JoinSpectator";
+    public const string RequestLobbySnapshot = "RequestLobbySnapshot";
     public const string RequestDiagnostics = "RequestDiagnostics";
     public const string RequestLegalPreview = "RequestLegalPreview";
     public const string JoinMatchmaking = "JoinMatchmaking";
@@ -49,6 +50,7 @@ public static class OnlineMessageTypes
     public const string ActionLogChunk = "ActionLogChunk";
     public const string ResumeMatchResult = "ResumeMatchResult";
     public const string JoinSpectatorResult = "JoinSpectatorResult";
+    public const string LobbySnapshot = "LobbySnapshot";
     public const string LegalPreviewResult = "LegalPreviewResult";
     public const string ResyncRequired = "ResyncRequired";
     public const string Pong = "Pong";
@@ -149,6 +151,8 @@ public sealed class OnlineProtocolMessage
     public OnlineResumeResult? ResumeResult { get; set; }
     public OnlineJoinSpectatorRequest? SpectatorRequest { get; set; }
     public OnlineJoinSpectatorResult? SpectatorResult { get; set; }
+    public OnlineLobbySnapshotRequest? LobbyRequest { get; set; }
+    public OnlineLobbySnapshot? LobbySnapshot { get; set; }
     public OnlineLegalPreviewRequest? LegalPreviewRequest { get; set; }
     public OnlineLegalPreviewResult? LegalPreview { get; set; }
     public OnlineMatchmakingCommand? Matchmaking { get; set; }
@@ -207,6 +211,51 @@ public sealed class OnlineTableCommand
     public string RulesetId { get; set; } = "";
     public int SeatIndex { get; set; }
     public bool Ready { get; set; }
+}
+
+public sealed class OnlineLobbySnapshotRequest
+{
+    public string RulesetIdFilter { get; set; } = "";
+    public bool IncludeWaitingTables { get; set; } = true;
+    public bool IncludeInGameTables { get; set; } = true;
+    public bool IncludeFinishedTables { get; set; }
+}
+
+public sealed class OnlineLobbySnapshot
+{
+    public string CreatedUtc { get; set; } = "";
+    public long ServerSeq { get; set; }
+    public int RoomCount { get; set; }
+    public int TableCount { get; set; }
+    public int ActiveTableCount { get; set; }
+    public string WarningText { get; set; } = "";
+    public List<OnlineLobbyTableRow> Tables { get; set; } = new();
+}
+
+public sealed class OnlineLobbyTableRow
+{
+    public string RoomId { get; set; } = "";
+    public string TableId { get; set; } = "";
+    public string RulesetId { get; set; } = "";
+    public string TableState { get; set; } = "";
+    public int SeatsOccupied { get; set; }
+    public int MaxSeats { get; set; }
+    public int SpectatorCount { get; set; }
+    public bool Started { get; set; }
+    public long LastServerSeq { get; set; }
+    public string CreatedUtc { get; set; } = "";
+    public string UpdatedUtc { get; set; } = "";
+    public List<OnlineLobbySeatSummary> SeatSummaries { get; set; } = new();
+}
+
+public sealed class OnlineLobbySeatSummary
+{
+    public int SeatIndex { get; set; }
+    public int SideId { get; set; }
+    public int MacroPlayer { get; set; }
+    public bool Ready { get; set; }
+    public bool Connected { get; set; }
+    public string PlayerLabel { get; set; } = "";
 }
 
 public sealed class OnlineActionCommand
@@ -440,6 +489,7 @@ public sealed class OnlineDiagnostics
     public bool MatchmakingSupported { get; set; } = true;
     public bool ResumeMatchSupported { get; set; }
     public bool SpectatorModeSupported { get; set; }
+    public bool LobbySnapshotSupported { get; set; }
     public List<string> SupportedHubMethods { get; set; } = new();
     public int RoomCount { get; set; }
     public int TableCount { get; set; }
@@ -466,6 +516,10 @@ public sealed class OnlineDiagnostics
 [JsonSerializable(typeof(OnlineJoinSpectatorRequest))]
 [JsonSerializable(typeof(OnlineJoinSpectatorResult))]
 [JsonSerializable(typeof(OnlineSpectatorState))]
+[JsonSerializable(typeof(OnlineLobbySnapshotRequest))]
+[JsonSerializable(typeof(OnlineLobbySnapshot))]
+[JsonSerializable(typeof(OnlineLobbyTableRow))]
+[JsonSerializable(typeof(OnlineLobbySeatSummary))]
 [JsonSerializable(typeof(OnlineLegalPreviewRequest))]
 [JsonSerializable(typeof(OnlineLegalPreviewResult))]
 [JsonSerializable(typeof(OnlineLegalActionOption))]

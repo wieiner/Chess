@@ -311,6 +311,16 @@ public sealed class Chess3DRelayHub : Hub
         return result;
     }
 
+    public async Task<OnlineProtocolMessage> RequestLobbySnapshot(OnlineProtocolMessage message)
+    {
+        var result = InvokeRegistry(
+            message,
+            OnlineMessageTypes.RequestLobbySnapshot,
+            env => _registry.RequestLobbySnapshot(env, message.LobbyRequest ?? new OnlineLobbySnapshotRequest()));
+        await SendCaller(result.Envelope.MessageType == OnlineMessageTypes.LobbySnapshot ? "ReceiveLobbySnapshot" : "ReceiveError", result);
+        return result;
+    }
+
     public async Task<OnlineProtocolMessage> JoinMatchmaking(OnlineProtocolMessage message)
     {
         if (!Validate(message, OnlineMessageTypes.JoinMatchmaking, out var error))

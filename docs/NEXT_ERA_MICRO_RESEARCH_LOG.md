@@ -865,3 +865,13 @@ Date: 2026-07-01
 | Minimal lobby surface | Microsoft Learn, ASP.NET Core SignalR groups and current `OnlineRoomRegistry` | The registry already owns active rooms/tables/seats, but diagnostics only exposes aggregate counts. | Add a future safe lobby snapshot instead of overloading diagnostics text or exposing raw registry objects. | `docs/P4J_LOBBY_CONTRACT_AUDIT.md` | Docs-only audit and code search. |
 | Privacy boundary | OWASP Logging Cheat Sheet and SignalR security guidance | Lobby rows are public-ish operational state and must not expose tokens, connection IDs, passwords, or full player IDs. | Lobby rows may include counts and short/anonymous seat summaries only. | docs only | Later DTO tests should scan serialized lobby payloads. |
 | Spectator integration | Phase 11-16 spectator design | Lobby is the natural way to choose a table to spectate, but remote spectator still requires deployed `JoinSpectator`. | Phase 18 should include spectatorCount when available and let UI spectate selected tables once server package is aligned. | docs only | Future lobby DTO/server tests. |
+
+## P4J Phase 18 - Server Lobby Snapshot
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Append-only lobby protocol | Existing `OnlineProtocolMessage` optional payload pattern | New request/result DTOs can be added without breaking old clients. | Add `RequestLobbySnapshot` and `LobbySnapshot` with optional payloads. | `src/ChessOnlineProtocol/OnlineProtocolDtos.cs`, `OnlineProtocolJson.cs` | JSON roundtrip tests. |
+| Registry-owned active tables | Current `OnlineRoomRegistry` state model | Active room/table/seat state already exists in memory and can be projected into safe rows. | Add a dedicated snapshot builder instead of exposing raw room/table objects. | `src/ChessOnlineProtocol/OnlineRoomRegistry.cs` | Empty and active lobby contract tests. |
+| Privacy and capability reporting | OWASP Logging Cheat Sheet and current diagnostics pattern | Lobby must advertise capability while omitting tokens, connection IDs, and full private player data. | Add `LobbySnapshotSupported` and `RequestLobbySnapshot` in supported methods. Seat labels are shortened. | server/protocol/tests/docs | Targeted online contract tests and server build. |

@@ -578,6 +578,7 @@ public sealed class OnlineRoomRegistry
                 MatchmakingSupported = true,
                 ResumeMatchSupported = true,
                 SpectatorModeSupported = true,
+                LobbySnapshotSupported = true,
                 SupportedHubMethods =
                 [
                     OnlineMessageTypes.Hello,
@@ -591,6 +592,7 @@ public sealed class OnlineRoomRegistry
                     OnlineMessageTypes.RequestActionLog,
                     OnlineMessageTypes.RequestResumeMatch,
                     OnlineMessageTypes.JoinSpectator,
+                    OnlineMessageTypes.RequestLobbySnapshot,
                     OnlineMessageTypes.RequestLegalPreview,
                     OnlineMessageTypes.RequestDiagnostics,
                     OnlineMessageTypes.Ping
@@ -611,6 +613,105 @@ public sealed class OnlineRoomRegistry
                 ResyncCount = _diagnostics.ResyncCount
             };
         }
+    }
+
+    public OnlineProtocolMessage RequestLobbySnapshot(OnlineMessageEnvelope envelope, OnlineLobbySnapshotRequest request)
+    {
+        lock (_gate)
+        {
+            var snapshot = BuildLobbySnapshot(request);
+            return Reply(OnlineMessageTypes.LobbySnapshot, envelope, lobbySnapshot: snapshot);
+        }
+    }
+
+    private OnlineLobbySnapshot BuildLobbySnapshot(OnlineLobbySnapshotRequest request)
+    {
+        var rulesetFilter = request.RulesetIdFilter.Trim();
+        var rows = new List<OnlineLobbyTableRow>();
+        foreach (var room in _rooms.Values.OrderBy(r => r.RoomId, StringComparer.OrdinalIgnoreCase))
+        {
+            foreach (var table in room.Tables.Values.OrderBy(t => t.TableId, StringComparer.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrWhiteSpace(rulesetFilter) &&
+                    !string.Equals(table.RulesetId, rulesetFilter, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                if (!ShouldIncludeLobbyTable(table, request))
+                {
+                    continue;
+                }
+
+                rows.Add(new OnlineLobbyTableRow
+                {
+                    RoomId = room.RoomId,
+                    TableId = table.TableId,
+                    RulesetId = table.RulesetId,
+                    TableState = table.State.ToString(),
+                    SeatsOccupied = table.Seats.Count,
+                    MaxSeats = table.SeatCount,
+                    SpectatorCount = 0,
+                    Started = table.State == OnlineTableState.InGame || table.StartedAtUtc.HasValue,
+                    LastServerSeq = table.ServerSeq,
+                    CreatedUtc = table.CreatedAtUtc.ToString("O"),
+                    UpdatedUtc = LobbyUpdatedUtc(table),
+                    SeatSummaries = table.Seats.Values
+                        .OrderBy(s => s.SeatIndex)
+                        .Select(s => new OnlineLobbySeatSummary
+                        {
+                            SeatIndex = s.SeatIndex,
+                            SideId = s.SideId,
+                            MacroPlayer = s.MacroPlayer,
+                            Ready = s.IsReady,
+                            Connected = s.IsConnected,
+                            PlayerLabel = ShortPlayerLabel(s.PlayerId)
+                        })
+                        .ToList()
+                });
+            }
+        }
+
+        return new OnlineLobbySnapshot
+        {
+            CreatedUtc = DateTime.UtcNow.ToString("O"),
+            ServerSeq = _diagnostics.LastServerSeq,
+            RoomCount = _rooms.Count,
+            TableCount = _rooms.Values.Sum(r => r.Tables.Count),
+            ActiveTableCount = rows.Count,
+            WarningText = "Player labels are shortened and spectator counts are best-effort until durable spectator tracking is added.",
+            Tables = rows
+        };
+    }
+
+    private static bool ShouldIncludeLobbyTable(OnlineTable table, OnlineLobbySnapshotRequest request)
+    {
+        return table.State switch
+        {
+            OnlineTableState.WaitingForPlayers or OnlineTableState.ReadyCheck => request.IncludeWaitingTables,
+            OnlineTableState.InGame => request.IncludeInGameTables,
+            OnlineTableState.Finished or OnlineTableState.Abandoned => request.IncludeFinishedTables,
+            _ => false
+        };
+    }
+
+    private static string LobbyUpdatedUtc(OnlineTable table)
+    {
+        var lastAction = table.ActionLog.LastOrDefault();
+        if (!string.IsNullOrWhiteSpace(lastAction?.CreatedAtUtc))
+        {
+            return lastAction.CreatedAtUtc;
+        }
+        return (table.StartedAtUtc ?? table.CreatedAtUtc).ToString("O");
+    }
+
+    private static string ShortPlayerLabel(string playerId)
+    {
+        if (string.IsNullOrWhiteSpace(playerId))
+        {
+            return "";
+        }
+        var trimmed = playerId.Trim();
+        return trimmed.Length <= 8 ? trimmed : trimmed[..8];
     }
 
     public OnlineAuthorityRuntimeDiagnostics GetAuthorityDiagnostics()
@@ -683,6 +784,7 @@ public sealed class OnlineRoomRegistry
         OnlineActionLogChunk? actionLog = null,
         OnlineResumeResult? resumeResult = null,
         OnlineJoinSpectatorResult? spectatorResult = null,
+        OnlineLobbySnapshot? lobbySnapshot = null,
         OnlineLegalPreviewResult? legalPreview = null,
         OnlineError? error = null,
         string text = "")
@@ -698,7 +800,7 @@ public sealed class OnlineRoomRegistry
                 TableId = request.TableId,
                 ClientId = "server",
                 PlayerId = request.PlayerId,
-                ServerSeq = snapshot?.ServerSeq ?? actionLog?.ToServerSeq ?? legalPreview?.ServerSeq ?? error?.ServerSeq ?? 0,
+                ServerSeq = snapshot?.ServerSeq ?? actionLog?.ToServerSeq ?? lobbySnapshot?.ServerSeq ?? legalPreview?.ServerSeq ?? error?.ServerSeq ?? 0,
                 SentAtUtc = DateTime.UtcNow.ToString("O")
             },
             Room = room,
@@ -708,6 +810,7 @@ public sealed class OnlineRoomRegistry
             ActionLog = actionLog,
             ResumeResult = resumeResult,
             SpectatorResult = spectatorResult,
+            LobbySnapshot = lobbySnapshot,
             LegalPreview = legalPreview,
             Error = error,
             Text = text
