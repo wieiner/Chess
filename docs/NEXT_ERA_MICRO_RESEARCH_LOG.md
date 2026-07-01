@@ -805,3 +805,13 @@ Date: 2026-07-01
 | SignalR table groups | Microsoft Learn, ASP.NET Core SignalR groups | SignalR groups are the right lightweight boundary for broadcasting table events to all interested connections. | Spectators should join the existing table group, but without allocating a player seat. | `docs/P4J_SPECTATOR_CONTRACT_AUDIT.md` | Docs-only audit and code search. |
 | Authenticated spectators | Microsoft Learn, SignalR authentication/authorization | Authenticated hub connections provide a player/user identity without exposing tokens to hub method payloads. | Require temporary authenticated users for spectator mode in P4J; anonymous public spectating is deferred. | docs only | Later DTO/server tests. |
 | Read-only privacy boundary | OWASP Logging Cheat Sheet | Lobby/spectator output must not expose tokens, connection ids, passwords, or full private player data. | Spectator may receive snapshot/action-log table state, but cannot call mutating methods or receive secrets. | docs only | Future secret/privacy audit. |
+
+## P4J Phase 12 - Spectator DTOs
+
+Date: 2026-07-01
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Append-only protocol evolution | Existing online protocol JSON envelope and SignalR hub method patterns | Optional payload properties allow new client/server capabilities without breaking older messages. | Add `JoinSpectator`/`JoinSpectatorResult` DTOs and message constants append-only. | `src/ChessOnlineProtocol/OnlineProtocolDtos.cs`, `src/ChessOnlineProtocol/OnlineProtocolJson.cs` | Protocol roundtrip tests. |
+| Honest capability reporting | Existing diagnostics endpoint and GitHub Actions compatibility checks | Advertising spectator mode before server hub implementation would mislead clients. | Add `SpectatorModeSupported`, but keep it false and do not list `JoinSpectator` until Phase 13. | `src/ChessOnlineServer/ChessOnlineServerHost.cs`, tests | Diagnostics tests assert false/no method. |
+| Secret-free spectator payload | OWASP Logging Cheat Sheet | Read-only viewer state should carry room/table/ruleset/seq, not credentials. | Spectator DTOs contain no token/password/Authorization fields. | tests/docs | Contract tests check serialized payload text. |

@@ -48,8 +48,10 @@ static void AuthorityRuntimeDiagnosticsTests(ContractTest test, string profileRo
     test.Check(onlineDiagnostics.ActionLogSupported, "online diagnostics exposes action log capability");
     test.Check(onlineDiagnostics.MatchmakingSupported, "online diagnostics exposes matchmaking capability");
     test.Check(onlineDiagnostics.ResumeMatchSupported, "online diagnostics exposes resume match capability");
+    test.Check(!onlineDiagnostics.SpectatorModeSupported, "online diagnostics keeps spectator mode disabled until server method exists");
     test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestLegalPreview), "online diagnostics lists RequestLegalPreview hub method");
     test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestResumeMatch), "online diagnostics lists RequestResumeMatch hub method");
+    test.Check(!onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.JoinSpectator), "online diagnostics does not list JoinSpectator before server method exists");
 }
 
 static void ProtocolRoundtripTests(ContractTest test)
@@ -164,6 +166,54 @@ static void ProtocolRoundtripTests(ContractTest test)
         !resumeResultJson.Contains("accessToken", StringComparison.OrdinalIgnoreCase) &&
         !resumeResultJson.Contains("refreshToken", StringComparison.OrdinalIgnoreCase),
         "resume result serializes failure/candidate without token fields");
+
+    var spectatorRequest = OnlineProtocolJson.Wrap(OnlineMessageTypes.JoinSpectator, "client-s", "player-s");
+    spectatorRequest.SpectatorRequest = new OnlineJoinSpectatorRequest
+    {
+        PlayerId = "player-s",
+        RoomId = "room-a",
+        TableId = "table-a",
+        ExpectedRulesetId = "classic-six-side-3d-8x8x8-v0.1",
+        LastKnownServerSeq = 9
+    };
+    var spectatorRequestJson = OnlineProtocolJson.Serialize(spectatorRequest);
+    test.Check(OnlineProtocolJson.TryDeserialize(spectatorRequestJson, out var parsedSpectatorRequest, out error) &&
+        parsedSpectatorRequest.Envelope.MessageType == OnlineMessageTypes.JoinSpectator &&
+        parsedSpectatorRequest.SpectatorRequest?.ExpectedRulesetId == "classic-six-side-3d-8x8x8-v0.1" &&
+        parsedSpectatorRequest.SpectatorRequest.LastKnownServerSeq == 9 &&
+        !spectatorRequestJson.Contains("accessToken", StringComparison.OrdinalIgnoreCase) &&
+        !spectatorRequestJson.Contains("refreshToken", StringComparison.OrdinalIgnoreCase),
+        "spectator request serializes without token fields");
+
+    var spectatorResult = OnlineProtocolJson.Wrap(OnlineMessageTypes.JoinSpectatorResult, "server", "player-s");
+    spectatorResult.SpectatorResult = new OnlineJoinSpectatorResult
+    {
+        Success = false,
+        FailureReason = OnlineSpectatorFailureReasons.Unsupported,
+        FailureText = "Spectator mode is not enabled on this server.",
+        RoomId = "room-a",
+        TableId = "table-a",
+        RulesetId = "classic-six-side-3d-8x8x8-v0.1",
+        SpectatorId = "viewer-s",
+        State = new OnlineSpectatorState
+        {
+            IsSpectator = true,
+            RoomId = "room-a",
+            TableId = "table-a",
+            RulesetId = "classic-six-side-3d-8x8x8-v0.1",
+            SpectatorId = "viewer-s",
+            ViewerPlayerId = "player-s",
+            LastKnownServerSeq = 9
+        }
+    };
+    var spectatorResultJson = OnlineProtocolJson.Serialize(spectatorResult);
+    test.Check(OnlineProtocolJson.TryDeserialize(spectatorResultJson, out var parsedSpectatorResult, out error) &&
+        parsedSpectatorResult.Envelope.MessageType == OnlineMessageTypes.JoinSpectatorResult &&
+        parsedSpectatorResult.SpectatorResult?.FailureReason == OnlineSpectatorFailureReasons.Unsupported &&
+        parsedSpectatorResult.SpectatorResult.State.SubmitDisabledReason.Contains("read-only", StringComparison.OrdinalIgnoreCase) &&
+        !spectatorResultJson.Contains("password", StringComparison.OrdinalIgnoreCase) &&
+        !spectatorResultJson.Contains("Authorization", StringComparison.OrdinalIgnoreCase),
+        "spectator result serializes failure/read-only state without secrets");
 
     var preview = OnlineProtocolJson.Wrap(OnlineMessageTypes.LegalPreviewResult, "client-a", "player-a");
     preview.LegalPreview = new OnlineLegalPreviewResult

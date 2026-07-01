@@ -25,6 +25,7 @@ public static class OnlineMessageTypes
     public const string RequestSnapshot = "RequestSnapshot";
     public const string RequestActionLog = "RequestActionLog";
     public const string RequestResumeMatch = "RequestResumeMatch";
+    public const string JoinSpectator = "JoinSpectator";
     public const string RequestDiagnostics = "RequestDiagnostics";
     public const string RequestLegalPreview = "RequestLegalPreview";
     public const string JoinMatchmaking = "JoinMatchmaking";
@@ -47,6 +48,7 @@ public static class OnlineMessageTypes
     public const string AuthoritativeSnapshot = "AuthoritativeSnapshot";
     public const string ActionLogChunk = "ActionLogChunk";
     public const string ResumeMatchResult = "ResumeMatchResult";
+    public const string JoinSpectatorResult = "JoinSpectatorResult";
     public const string LegalPreviewResult = "LegalPreviewResult";
     public const string ResyncRequired = "ResyncRequired";
     public const string Pong = "Pong";
@@ -107,6 +109,17 @@ public static class OnlineResumeFailureReasons
     public const string CannotResumeAfterServerRestartYet = "cannotResumeAfterServerRestartYet";
 }
 
+public static class OnlineSpectatorFailureReasons
+{
+    public const string None = "none";
+    public const string NotAuthenticated = "notAuthenticated";
+    public const string RoomNotFound = "roomNotFound";
+    public const string TableNotFound = "tableNotFound";
+    public const string RulesetMismatch = "rulesetMismatch";
+    public const string TableNotActive = "tableNotActive";
+    public const string Unsupported = "unsupported";
+}
+
 public sealed class OnlineMessageEnvelope
 {
     public string ProtocolId { get; set; } = OnlineProtocolVersion.ProtocolId;
@@ -134,6 +147,8 @@ public sealed class OnlineProtocolMessage
     public OnlineActionLogChunk? ActionLog { get; set; }
     public OnlineResumeRequest? ResumeRequest { get; set; }
     public OnlineResumeResult? ResumeResult { get; set; }
+    public OnlineJoinSpectatorRequest? SpectatorRequest { get; set; }
+    public OnlineJoinSpectatorResult? SpectatorResult { get; set; }
     public OnlineLegalPreviewRequest? LegalPreviewRequest { get; set; }
     public OnlineLegalPreviewResult? LegalPreview { get; set; }
     public OnlineMatchmakingCommand? Matchmaking { get; set; }
@@ -272,6 +287,41 @@ public sealed class OnlineResumeCandidate
     public string UpdatedAtUtc { get; set; } = "";
 }
 
+public sealed class OnlineJoinSpectatorRequest
+{
+    public string PlayerId { get; set; } = "";
+    public string RoomId { get; set; } = "";
+    public string TableId { get; set; } = "";
+    public string ExpectedRulesetId { get; set; } = "";
+    public long LastKnownServerSeq { get; set; }
+}
+
+public sealed class OnlineJoinSpectatorResult
+{
+    public bool Success { get; set; }
+    public string FailureReason { get; set; } = OnlineSpectatorFailureReasons.None;
+    public string FailureText { get; set; } = "";
+    public string RoomId { get; set; } = "";
+    public string TableId { get; set; } = "";
+    public string RulesetId { get; set; } = "";
+    public string SpectatorId { get; set; } = "";
+    public OnlineSpectatorState State { get; set; } = new();
+    public OnlineSnapshot? Snapshot { get; set; }
+    public OnlineActionLogChunk? ActionLog { get; set; }
+}
+
+public sealed class OnlineSpectatorState
+{
+    public bool IsSpectator { get; set; }
+    public string RoomId { get; set; } = "";
+    public string TableId { get; set; } = "";
+    public string RulesetId { get; set; } = "";
+    public string SpectatorId { get; set; } = "";
+    public string ViewerPlayerId { get; set; } = "";
+    public long LastKnownServerSeq { get; set; }
+    public string SubmitDisabledReason { get; set; } = "Spectator mode is read-only.";
+}
+
 public sealed class OnlineLegalPreviewResult
 {
     public string RoomId { get; set; } = "";
@@ -389,6 +439,7 @@ public sealed class OnlineDiagnostics
     public bool ActionLogSupported { get; set; } = true;
     public bool MatchmakingSupported { get; set; } = true;
     public bool ResumeMatchSupported { get; set; }
+    public bool SpectatorModeSupported { get; set; }
     public List<string> SupportedHubMethods { get; set; } = new();
     public int RoomCount { get; set; }
     public int TableCount { get; set; }
@@ -412,6 +463,9 @@ public sealed class OnlineDiagnostics
 [JsonSerializable(typeof(OnlineResumeRequest))]
 [JsonSerializable(typeof(OnlineResumeResult))]
 [JsonSerializable(typeof(OnlineResumeCandidate))]
+[JsonSerializable(typeof(OnlineJoinSpectatorRequest))]
+[JsonSerializable(typeof(OnlineJoinSpectatorResult))]
+[JsonSerializable(typeof(OnlineSpectatorState))]
 [JsonSerializable(typeof(OnlineLegalPreviewRequest))]
 [JsonSerializable(typeof(OnlineLegalPreviewResult))]
 [JsonSerializable(typeof(OnlineLegalActionOption))]
