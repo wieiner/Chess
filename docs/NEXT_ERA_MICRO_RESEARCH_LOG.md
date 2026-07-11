@@ -1026,3 +1026,13 @@ Date: 2026-07-11
 | Linux service inventory | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | A Kestrel app behind nginx can be inventoried through `systemctl show`, port checks, and local health probes without changing nginx or firewall state. | Capture `chessonline.service` metadata, ports, payload hashes, and health before backup/deploy. | `docs/P4K_HETZNER_PREDEPLOY_INVENTORY.md` | Read-only SSH, `ss`, `stat`, `sha256sum`, `curl`. |
 | Health/readiness baseline | Microsoft Learn, ASP.NET Core health checks | Liveness/readiness endpoints are appropriate deployment gates before package replacement. | Record both local Kestrel and public nginx health results plus capability flags. | docs only | `curl` local and public endpoints. |
 | Runtime secret boundary | Microsoft Learn, ASP.NET Core Data Protection; OWASP Logging Cheat Sheet | Keyrings and persistence stores are sensitive runtime state and should not be printed or copied during deploy inventory. | Read only ownership/mode metadata for `/var/lib/chessonline` and `/var/lib/chessonline/keyring`. | docs only | No `ls` or file reads inside runtime/keyring paths. |
+
+## P4K Phase 08 - Hetzner Server Backup
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Backup before payload replacement | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | App payload replacement behind a systemd service should have an operator rollback point before files are swapped. | Create a server-side tarball of `/opt/chessonline/server` and the `chessonline.service` unit before deployment. | `docs/P4K_HETZNER_BACKUP_RESULT.md` | `tar`, `sha256sum`, `ls -lh`, required-entry listing. |
+| Runtime data separation | Microsoft Learn, ASP.NET Core Data Protection | Data Protection keyrings and app persistence stores are mutable runtime state, not immutable payload. | Do not archive `/var/lib/chessonline` in Phase 08; record only app payload rollback artifact. | docs only | Confirm backup path/entries include server payload and unit only. |
+| Secret-safe backup reporting | OWASP Logging Cheat Sheet | Reports should include enough rollback metadata without printing runtime credentials or key material. | Record archive path, size, SHA-256, mode and required entries; do not print config contents or keyring/store files. | docs only | Inspect command output and doc content. |
