@@ -41,6 +41,12 @@ The script now verifies:
 
 The script rejects `Chess3DEngine.dll` in a Linux package.
 
+The script also removes local/development-only output before manifest generation:
+
+- `appsettings.Development.json`;
+- `appsettings.Local.json`;
+- `*.pdb`.
+
 ## Build Identity
 
 The script writes:

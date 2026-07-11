@@ -996,3 +996,13 @@ Date: 2026-07-11
 | SHA-256 package manifest | GitHub Actions artifact guidance and OWASP logging guidance | Manifests should identify files without embedding secrets or local machine details. | Store relative path, length, and SHA-256 for package files; exclude runtime stores/keyrings. | publish script/docs | Manifest parse via PowerShell JSON conversion. |
 | Controlled cleanup | Existing P4D1 safety policy | Cleanup must not remove arbitrary directories. | `-Clean` is accepted only for output paths under `.tmp/`. | publish script | Self-check uses `.tmp/p4k-phase04-publish`. |
 | Secret-like file guard | OWASP Logging Cheat Sheet | Tokens, passwords, keyrings, and private-key-like files should fail packaging. | Add `-FailOnSecretLikeFiles` filename guard for deploy package output. | publish script | Self-check runs with the switch enabled. |
+
+## P4K Phase 05 - Build Deployment Server Package
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Framework-dependent `linux-x64` publish | Microsoft Learn, `dotnet publish` command and .NET application publishing overview | `dotnet publish -r linux-x64 --self-contained false` is a supported framework-dependent package shape when the target host has the runtime. | Build an untracked `.tmp` package for `ChessOnlineServer` and include the tested Linux native authority library explicitly. | `scripts/deploy/Publish-ChessOnlineServer-Linux.ps1`, `docs/P4K_SERVER_PACKAGE_RESULT.md` | Server build, publish script run, manifest parse, archive hash. |
+| Runtime key separation | Microsoft Learn, ASP.NET Core Data Protection key management | Data Protection key rings are runtime state and must not be embedded in immutable application payloads. | Keep keyring/store paths out of the package and document that `/var/lib/chessonline` remains untouched. | package docs | Inspect archive listing and manifest. |
+| Artifact provenance and secret boundary | GitHub Actions artifact/security guidance and OWASP Logging guidance | Deployable artifacts need file identity while avoiding plaintext secrets or runtime logs. | Generate `server-build.json`, `server-package-manifest.json`, SHA-256 archive hash, and remove PDB/dev appsettings before archive creation. | publish script/docs | Archive listing checks for required files and absence of PDB/dev configs. |

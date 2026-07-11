@@ -115,6 +115,23 @@ function Write-PackageManifest([string]$Directory, [string]$Path) {
         Set-Content -LiteralPath $manifestFull -Encoding UTF8
 }
 
+function Remove-NonDeployFiles([string]$Directory) {
+    $dropNames = @(
+        "appsettings.Development.json",
+        "appsettings.Local.json"
+    )
+
+    foreach ($name in $dropNames) {
+        $path = Join-Path $Directory $name
+        if (Test-Path -LiteralPath $path -PathType Leaf) {
+            Remove-Item -LiteralPath $path -Force
+        }
+    }
+
+    Get-ChildItem -LiteralPath $Directory -Recurse -File -Filter "*.pdb" -ErrorAction SilentlyContinue |
+        Remove-Item -Force
+}
+
 $outputUnderRoot = Resolve-UnderRoot $OutputPath
 if ($Clean) {
     $tmpRoot = Join-Path ([System.IO.Path]::GetFullPath($root)) ".tmp"
@@ -141,6 +158,8 @@ if (-not [string]::IsNullOrWhiteSpace($NativeLibraryPath)) {
 else {
     dotnet publish $project -c $Configuration -r $Runtime --self-contained false -p:Platform=x64 -o $OutputPath
 }
+
+Remove-NonDeployFiles $OutputPath
 
 if ([string]::IsNullOrWhiteSpace($CommitSha)) {
     try {
