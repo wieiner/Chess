@@ -945,3 +945,13 @@ Date: 2026-07-01
 | Operator play guide | Microsoft Learn, ASP.NET Core SignalR .NET client | Users need a concrete click path and capability checks, not only protocol docs. | Add a P4J guide for health, diagnostics, resume, spectator, lobby, network reports, and current remote blockers. | `docs/P4J_ONLINE_MATCH_UX_USER_GUIDE.md` | Docs review and `git diff --check`. |
 | Deployment boundary | Microsoft Learn, host ASP.NET Core on Linux with Nginx; project Hetzner docs | Current public deployment is HTTP 80 behind nginx and should not be changed in P4J finalization. | State that no server/network change was made; lobby/spectator remote PASS requires later server package deployment. | final report docs | Curl health/diagnostics only. |
 | Final status summary | GitHub Actions docs and project CI runs | CI success should reference exact run ids and local verify commands. | Record phase commits, latest CI, local verify, and remaining work. | `docs/P4J_ONLINE_MATCH_UX_FINAL_REPORT.md`, project docs | `git diff --check`; final CI after commit. |
+
+## P4K Phase 00 - Deployment Baseline
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Public health baseline | Microsoft Learn, ASP.NET Core health checks | Health endpoints are suitable for read-only liveness/readiness probes before deploy actions. | Use `/healthz/live`, `/healthz/ready`, and `/chess3d/diagnostics` to record the pre-deploy gap. | `docs/P4K_DEPLOYMENT_BASELINE.md` | Curl public endpoints and record capability flags. |
+| SignalR deployment gap | Microsoft Learn, ASP.NET Core SignalR .NET client and SignalR security | Clients must only claim support for deployed hub methods; missing methods are a version/deployment gap, not a UI success. | Record missing `RequestResumeMatch`, `JoinSpectator`, and `RequestLobbySnapshot` on current public Hetzner package. | docs only | Diagnostics `supportedHubMethods` review. |
+| Linux/nginx boundary | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | Kestrel behind nginx can be inventoried without changing nginx/firewall/ports. | Perform read-only service/port/file metadata inventory and avoid runtime store/keyring contents. | docs only | SSH `systemctl`, `ss`, and `stat` metadata only. |
