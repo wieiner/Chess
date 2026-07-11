@@ -955,3 +955,13 @@ Date: 2026-07-11
 | Public health baseline | Microsoft Learn, ASP.NET Core health checks | Health endpoints are suitable for read-only liveness/readiness probes before deploy actions. | Use `/healthz/live`, `/healthz/ready`, and `/chess3d/diagnostics` to record the pre-deploy gap. | `docs/P4K_DEPLOYMENT_BASELINE.md` | Curl public endpoints and record capability flags. |
 | SignalR deployment gap | Microsoft Learn, ASP.NET Core SignalR .NET client and SignalR security | Clients must only claim support for deployed hub methods; missing methods are a version/deployment gap, not a UI success. | Record missing `RequestResumeMatch`, `JoinSpectator`, and `RequestLobbySnapshot` on current public Hetzner package. | docs only | Diagnostics `supportedHubMethods` review. |
 | Linux/nginx boundary | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | Kestrel behind nginx can be inventoried without changing nginx/firewall/ports. | Perform read-only service/port/file metadata inventory and avoid runtime store/keyring contents. | docs only | SSH `systemctl`, `ss`, and `stat` metadata only. |
+
+## P4K Phase 01 - Package Runtime Boundary
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Framework-dependent Linux publish | Microsoft Learn, .NET application publishing overview and `dotnet publish` command | `dotnet publish -r linux-x64 --self-contained false` is the expected package shape when the server already has the .NET runtime. | Keep P4K packages framework-dependent and include the tested `libChess3DEngine.so` explicitly. | `docs/P4K_PACKAGE_RUNTIME_BOUNDARY.md` | Build `ChessOnlineServer`, inspect package script, and later publish into untracked output only. |
+| Data Protection key ring | Microsoft Learn, Configure ASP.NET Core Data Protection and Key storage providers | Data Protection keys are mutable runtime state and should live outside immutable app package files. | Keep `/var/lib/chessonline/keyring` out of packages and never copy/log/commit key files. | `docs/P4K_PACKAGE_RUNTIME_BOUNDARY.md` | Verify service template path and avoid keyring content reads. |
+| Linux systemd/nginx boundary | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | Updating the Kestrel app payload behind existing nginx does not require changing nginx, TLS, firewall, or 443. | Later P4K deploy can replace `/opt/chessonline/server` and restart only `chessonline.service`; Phase 01 stays docs-only. | `docs/P4K_PACKAGE_RUNTIME_BOUNDARY.md` | Local docs/build/list checks only. |
