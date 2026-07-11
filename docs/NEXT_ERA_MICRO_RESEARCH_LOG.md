@@ -985,3 +985,14 @@ Date: 2026-07-11
 | Hub method parity | Microsoft Learn, ASP.NET Core SignalR .NET client | A remote smoke can only pass if the deployed hub exposes the invoked methods. | Treat local source capability checks as a pre-deploy gate before copying a server package. | `docs/P4K_CAPABILITY_PREDEPLOY_GATE.md` | `rg` for methods/flags and targeted online contract tests. |
 | Diagnostics feature flags | Microsoft Learn, ASP.NET Core health checks and minimal APIs | Machine-readable readiness/diagnostics should expose server capabilities before functional smoke. | Require `resumeMatch`, `spectatorMode`, `lobbySnapshot`, and matching `supportedHubMethods` before claiming remote PASS. | docs only | Contract tests and later public `/chess3d/diagnostics`. |
 | Secret-safe capability reporting | Microsoft Learn SignalR security; OWASP Logging Cheat Sheet | Capability lists do not need tokens, player credentials, or connection IDs. | Keep the pre-deploy gate to method names, booleans, counts, and package identity only. | docs only | Secret scan remains a later P4K gate. |
+
+## P4K Phase 04 - Harden Linux Server Packaging
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Reproducible publish metadata | Microsoft Learn, `dotnet publish` command | Publish output can be inspected and augmented after the build step. | Generate `server-build.json` and `server-package-manifest.json` in the publish output. | `scripts/deploy/Publish-ChessOnlineServer-Linux.ps1` | Run script against `.tmp` output and inspect required files. |
+| SHA-256 package manifest | GitHub Actions artifact guidance and OWASP logging guidance | Manifests should identify files without embedding secrets or local machine details. | Store relative path, length, and SHA-256 for package files; exclude runtime stores/keyrings. | publish script/docs | Manifest parse via PowerShell JSON conversion. |
+| Controlled cleanup | Existing P4D1 safety policy | Cleanup must not remove arbitrary directories. | `-Clean` is accepted only for output paths under `.tmp/`. | publish script | Self-check uses `.tmp/p4k-phase04-publish`. |
+| Secret-like file guard | OWASP Logging Cheat Sheet | Tokens, passwords, keyrings, and private-key-like files should fail packaging. | Add `-FailOnSecretLikeFiles` filename guard for deploy package output. | publish script | Self-check runs with the switch enabled. |
