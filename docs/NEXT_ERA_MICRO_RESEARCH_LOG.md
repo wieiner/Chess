@@ -1066,3 +1066,13 @@ Date: 2026-07-11
 | Staged upload before service mutation | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | A package can be uploaded and verified before stopping the Kestrel service. | Stage the archive under `/opt/chessonline/incoming` and verify checksum/content before any server directory swap. | `docs/P4K_HETZNER_UPLOAD_RESULT.md` | `scp`, remote `sha256sum`, `tar -tzf`, build identity checks. |
 | Capability gap confirmation | Microsoft Learn, ASP.NET Core health checks and SignalR .NET client | The active server should remain unchanged after staging only. | Re-check public health/diagnostics and expect old capability surface until Phase 12 swap. | docs only | Public `curl` after upload. |
 | Secret-safe staging | OWASP Logging Cheat Sheet | Staging logs should not expose tokens, stores, keyrings, or config contents. | Record archive path, mode, hash, required entries and commit only. | docs only | No runtime state read; no token output. |
+
+## P4K Phase 12 - Atomic Server Directory Swap
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| App-only payload replacement | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | Kestrel app payload can be updated behind existing nginx by replacing app files and restarting the app service only. | Swap `/opt/chessonline/server`, keep previous directory, and restart only `chessonline.service`. | `docs/P4K_HETZNER_ATOMIC_SWAP_RESULT.md` | Guarded deploy script plus immediate loopback/public health. |
+| Rollback on failed health | Microsoft Learn, ASP.NET Core health checks | Post-swap health gates should decide whether to keep or rollback the payload. | Use `-RollbackOnFailure`; no rollback was needed because diagnostics passed. | deploy result docs | Check service active, health, expected commit and capabilities. |
+| Neighbor service boundary | OWASP Logging and operational safety guidance | Deployment logs should avoid unrelated services and sensitive runtime data. | Do not touch nginx, 443, x-ui/Xray, Outline, Docker, Unreal, PostgreSQL, or `/var/lib/chessonline`. | docs only | Record allowed/forbidden mutations and immediate diagnostics. |
