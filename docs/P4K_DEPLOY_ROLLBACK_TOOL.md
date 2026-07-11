@@ -22,6 +22,11 @@ Parameters:
 - `-DryRun`
 - `-SkipUpload`
 - `-RollbackOnFailure`
+- `-RollbackTo`
+- `-RollbackDryRun`
+- `-ExpectedCurrentCommit`
+- `-ExpectedRollbackCommit`
+- `-BackupArchivePath`
 - `-HealthTimeoutSeconds`
 - `-NoSecretLog`
 - `-AllowDirtyTree`
@@ -89,6 +94,23 @@ After a real swap, the script polls loopback health and diagnostics. It expects:
 - `RequestLobbySnapshot`.
 
 With `-RollbackOnFailure`, a failed post-swap health/capability check attempts to restore the previous server directory and restart only `chessonline.service`.
+
+## Explicit Rollback Mode
+
+Phase 14 adds an explicit rollback mode for operator use:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy\Deploy-ChessOnlineServer-Hetzner.ps1 `
+  -RollbackTo "/opt/chessonline/server.prev.<timestamp>" `
+  -RollbackDryRun `
+  -BackupArchivePath "/opt/chessonline/backups/server-before-p4k-<timestamp>.tar.gz" `
+  -ExpectedCurrentCommit "<active commit>" `
+  -NoSecretLog
+```
+
+`-RollbackDryRun` validates the target, backup archive, active payload, and expected current build identity without stopping the service or moving directories. A real rollback requires `-RollbackTo` without `-RollbackDryRun`; it is intentionally not run while the deployed server is healthy.
+
+Rollback targets are restricted to exact `/opt/chessonline/server.prev.<timestamp>` paths. Legacy rollback directories that predate `server-build.json` are accepted only when `-ExpectedRollbackCommit` is omitted and are reported as `legacy-missing`.
 
 ## Phase 09 Verification
 

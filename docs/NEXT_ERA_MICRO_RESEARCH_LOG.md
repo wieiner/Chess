@@ -1086,3 +1086,13 @@ Date: 2026-07-11
 | Multi-hop health gate | Microsoft Learn, ASP.NET Core health checks | A deployment should pass loopback service health and public proxy health before gameplay smoke. | Verify Kestrel loopback, nginx-local, and public HTTP live/ready/diagnostics. | `docs/P4K_HETZNER_DEPLOY_RESULT.md` | `curl` on loopback, local nginx, public HTTP. |
 | SignalR capability verification | Microsoft Learn, ASP.NET Core SignalR .NET client | Clients should only use hub methods that deployed diagnostics advertise. | Assert `RequestResumeMatch`, `JoinSpectator`, and `RequestLobbySnapshot` in `supportedHubMethods`. | deploy result docs | Diagnostics grep assertions. |
 | Post-deploy risk scan | OWASP Logging Cheat Sheet and operational logging guidance | Journal checks should look for actionable failure classes without exposing secrets. | Scan recent `chessonline.service` journal for crash/native/persistence/permission/sequence/unhandled failure markers. | docs only | Sanitized journal risk scan summary. |
+
+## P4K Phase 14 - Rollback Command Readiness
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Rollback command safety | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | A Kestrel app payload rollback can be limited to the app service and payload directory while nginx/firewall/TLS stay untouched. | Add an explicit `-RollbackTo` path and `-RollbackDryRun` mode to the existing deploy tool; run only dry-run in this phase. | `scripts/deploy/Deploy-ChessOnlineServer-Hetzner.ps1`, `docs/P4K_ROLLBACK_READINESS.md` | Remote read-only validation of current payload, previous payload, backup archive, and planned command. |
+| Health-gated rollback | Microsoft Learn, ASP.NET Core health checks | A real rollback should be followed by loopback live/ready/diagnostics checks. | The script's actual rollback path includes service restart and health checks, but Phase 14 does not execute it because the deployed server is healthy. | deploy script/docs | Dry-run prints exact health gates and service boundary. |
+| Legacy payload identity | Existing Hetzner deployment layout and OWASP Logging Cheat Sheet | The previous deployed directory predates `server-build.json`, so rollback readiness must not invent a build ID or print secrets. | Verify the new active build ID, allow legacy rollback payloads without build identity, and record the missing identity honestly. | docs only | SSH metadata reads only; no runtime store/keyring content. |

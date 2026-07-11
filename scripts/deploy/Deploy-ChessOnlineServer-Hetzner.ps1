@@ -1,12 +1,17 @@
 param(
-    [Parameter(Mandatory = $true)][string]$ArchivePath,
-    [Parameter(Mandatory = $true)][string]$ArchiveSha256,
+    [string]$ArchivePath = "",
+    [string]$ArchiveSha256 = "",
     [string]$SshTarget = "root@178.105.220.117",
     [string]$SshKeyPath = "",
-    [Parameter(Mandatory = $true)][string]$ExpectedCommit,
+    [string]$ExpectedCommit = "",
     [switch]$DryRun,
     [switch]$SkipUpload,
     [switch]$RollbackOnFailure,
+    [string]$RollbackTo = "",
+    [switch]$RollbackDryRun,
+    [string]$ExpectedCurrentCommit = "",
+    [string]$ExpectedRollbackCommit = "",
+    [string]$BackupArchivePath = "",
     [int]$HealthTimeoutSeconds = 60,
     [switch]$NoSecretLog,
     [switch]$AllowDirtyTree,
@@ -174,10 +179,149 @@ function Invoke-ScpUpload([string]$LocalPath, [string]$RemotePath) {
     }
 }
 
-$ArchivePath = [System.IO.Path]::GetFullPath($ArchivePath)
-Assert-File $ArchivePath "archive"
 Assert-File $SshKeyPath "SSH key"
 Assert-CleanTree
+
+if ($RollbackDryRun -and [string]::IsNullOrWhiteSpace($RollbackTo)) {
+    throw "-RollbackDryRun requires -RollbackTo <remote previous server path>."
+}
+
+if (-not [string]::IsNullOrWhiteSpace($RollbackTo)) {
+    $remoteRollback = @'
+set -euo pipefail
+rollback_to="$1"
+backup_archive="$2"
+expected_current_commit="$3"
+expected_rollback_commit="$4"
+dry_run="$5"
+health_timeout="$6"
+
+service=chessonline.service
+server_root=/opt/chessonline
+current_dir=$server_root/server
+
+case "$rollback_to" in
+  /opt/chessonline/server.prev.*) ;;
+  *)
+    echo "rollback target must be an exact /opt/chessonline/server.prev.<timestamp> path" >&2
+    exit 31
+    ;;
+esac
+
+test -d "$current_dir"
+test -d "$rollback_to"
+test -f "$current_dir/ChessOnlineServer.dll"
+test -f "$current_dir/server-build.json"
+test -f "$rollback_to/ChessOnlineServer.dll"
+
+if [ -z "$backup_archive" ]; then
+  backup_archive=$(ls -1t /opt/chessonline/backups/server-before-p4k-*.tar.gz 2>/dev/null | head -n 1 || true)
+fi
+
+if [ -z "$backup_archive" ] || [ ! -f "$backup_archive" ]; then
+  echo "rollback backup archive not found" >&2
+  exit 32
+fi
+
+if [ -n "$expected_current_commit" ] && ! grep -Fq "$expected_current_commit" "$current_dir/server-build.json"; then
+  echo "expected current commit not found in active server-build.json" >&2
+  exit 33
+fi
+
+if [ -n "$expected_rollback_commit" ]; then
+  if [ ! -f "$rollback_to/server-build.json" ]; then
+    echo "expected rollback commit was provided but rollback server-build.json is missing" >&2
+    exit 34
+  fi
+  if ! grep -Fq "$expected_rollback_commit" "$rollback_to/server-build.json"; then
+    echo "expected rollback commit not found in rollback server-build.json" >&2
+    exit 34
+  fi
+fi
+
+echo "rollback target exists: $rollback_to"
+echo "backup archive exists: $backup_archive"
+echo "current payload: $current_dir"
+if [ -f "$rollback_to/server-build.json" ]; then
+  echo "rollback payload build identity: present"
+else
+  echo "rollback payload build identity: legacy-missing"
+fi
+if [ -n "$expected_current_commit" ]; then
+  echo "expected current commit verified"
+fi
+if [ -n "$expected_rollback_commit" ]; then
+  echo "expected rollback commit verified"
+fi
+
+if [ "$dry_run" = "true" ]; then
+  echo "ROLLBACK DRY RUN ONLY: no service stop/start and no directory move."
+  echo "planned stop/start: $service only"
+  echo "planned archive current payload as: /opt/chessonline/server.rollback-from.<timestamp>"
+  echo "planned restore from: $rollback_to"
+  echo "planned health checks: http://127.0.0.1:5077/healthz/live, /healthz/ready, /chess3d/diagnostics"
+  exit 0
+fi
+
+timestamp=$(date -u +%Y%m%d-%H%M%S)
+rollback_from=$server_root/server.rollback-from.$timestamp
+
+systemctl stop "$service"
+mv "$current_dir" "$rollback_from"
+mv "$rollback_to" "$current_dir"
+systemctl start "$service"
+
+deadline=$((SECONDS + health_timeout))
+until curl -fsS http://127.0.0.1:5077/healthz/live >/dev/null; do
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    echo "loopback live health timed out after rollback" >&2
+    exit 35
+  fi
+  sleep 2
+done
+
+curl -fsS http://127.0.0.1:5077/healthz/ready >/dev/null
+if [ -n "$expected_rollback_commit" ]; then
+  curl -fsS http://127.0.0.1:5077/chess3d/diagnostics | grep -Fq "$expected_rollback_commit"
+fi
+
+echo "rollback complete"
+echo "rollback_from=$rollback_from"
+'@
+
+    Write-Step "Rollback target: $RollbackTo"
+    Write-Step "Rollback dry run: $([bool]$RollbackDryRun)"
+    Write-Step "Expected current commit: $ExpectedCurrentCommit"
+    Write-Step "Expected rollback commit: $ExpectedRollbackCommit"
+    Write-Step "Backup archive path: $BackupArchivePath"
+
+    Invoke-SshBash $remoteRollback @(
+        $RollbackTo,
+        $BackupArchivePath,
+        $ExpectedCurrentCommit,
+        $ExpectedRollbackCommit,
+        ($(if ($RollbackDryRun) { "true" } else { "false" })),
+        ([string]$HealthTimeoutSeconds)
+    )
+
+    Write-Step "Rollback command completed."
+    exit 0
+}
+
+if ([string]::IsNullOrWhiteSpace($ArchivePath)) {
+    throw "-ArchivePath is required for deploy and deploy dry-run modes."
+}
+
+if ([string]::IsNullOrWhiteSpace($ArchiveSha256)) {
+    throw "-ArchiveSha256 is required for deploy and deploy dry-run modes."
+}
+
+if ([string]::IsNullOrWhiteSpace($ExpectedCommit)) {
+    throw "-ExpectedCommit is required for deploy and deploy dry-run modes."
+}
+
+$ArchivePath = [System.IO.Path]::GetFullPath($ArchivePath)
+Assert-File $ArchivePath "archive"
 Assert-ExpectedArchiveName $ArchivePath
 
 $archiveSha = Assert-ArchiveSha $ArchivePath $ArchiveSha256
