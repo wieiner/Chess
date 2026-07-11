@@ -1016,3 +1016,13 @@ Date: 2026-07-11
 | Optional local Linux smoke | Microsoft Learn, .NET on Linux and `dotnet --info` diagnostics | A local Linux preflight is useful only when the distro has the .NET runtime/SDK available. | Check WSL read-only and skip the preflight when `.NET` is absent; do not install toolchains in this phase. | `docs/P4K_WSL_PACKAGE_PREFLIGHT.md` | `wsl -l -v`, `wsl -d Ubuntu -- dotnet --info`, `uname`, `command -v`. |
 | Safe deploy gate | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | The actual app will run behind existing nginx on Hetzner, so local WSL is optional, not a substitute for backup-first remote deployment. | Treat WSL preflight as skipped and continue with Hetzner inventory/backup gates. | docs only | Record skipped prerequisite and no server changes. |
 | Runtime state boundary | Microsoft Learn, ASP.NET Core Data Protection | Runtime keyrings and stores stay on the server and must not be copied into local WSL/package tests. | Do not copy `/var/lib/chessonline`; only package payload would be tested if prerequisites existed. | docs only | Confirm no runtime content read or copied. |
+
+## P4K Phase 07 - Hetzner Predeploy Inventory
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Linux service inventory | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | A Kestrel app behind nginx can be inventoried through `systemctl show`, port checks, and local health probes without changing nginx or firewall state. | Capture `chessonline.service` metadata, ports, payload hashes, and health before backup/deploy. | `docs/P4K_HETZNER_PREDEPLOY_INVENTORY.md` | Read-only SSH, `ss`, `stat`, `sha256sum`, `curl`. |
+| Health/readiness baseline | Microsoft Learn, ASP.NET Core health checks | Liveness/readiness endpoints are appropriate deployment gates before package replacement. | Record both local Kestrel and public nginx health results plus capability flags. | docs only | `curl` local and public endpoints. |
+| Runtime secret boundary | Microsoft Learn, ASP.NET Core Data Protection; OWASP Logging Cheat Sheet | Keyrings and persistence stores are sensitive runtime state and should not be printed or copied during deploy inventory. | Read only ownership/mode metadata for `/var/lib/chessonline` and `/var/lib/chessonline/keyring`. | docs only | No `ls` or file reads inside runtime/keyring paths. |
