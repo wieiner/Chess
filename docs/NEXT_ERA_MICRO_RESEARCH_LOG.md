@@ -1046,3 +1046,13 @@ Date: 2026-07-11
 | Systemd payload replacement | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | Updating a Kestrel app behind nginx can be scoped to the app payload and its service, with nginx/firewall untouched. | Add a script that swaps only `/opt/chessonline/server` and restarts only `chessonline.service`. | `scripts/deploy/Deploy-ChessOnlineServer-Hetzner.ps1` | Parse test and local dry-run. |
 | Health/capability gate | Microsoft Learn, ASP.NET Core health checks and SignalR .NET client docs | Deployment success should be gated by health endpoints and the expected hub capability surface. | Verify live/ready/diagnostics and P4K methods after real deploy; dry-run prints the plan. | deploy script/docs | Dry-run output and later remote phases. |
 | Secret-safe operator tooling | Microsoft Learn SignalR security; OWASP Logging Cheat Sheet | Deploy logs should avoid tokens, runtime store content, and key material. | Validate archives for secret-like names and avoid printing runtime files or credentials. | deploy script/docs | Archive validation plus `git diff --check`. |
+
+## P4K Phase 10 - Deployment Dry Run
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Dry-run deploy safety | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | A deploy plan can be validated locally before touching the remote service. | Run `Deploy-ChessOnlineServer-Hetzner.ps1 -DryRun` from a clean tree against the real archive and expected commit. | `docs/P4K_DEPLOY_DRY_RUN_RESULT.md` | Script dry-run output and public health after dry-run. |
+| Health baseline after no-op | Microsoft Learn, ASP.NET Core health checks | Health endpoints should remain unchanged when no deploy mutation occurred. | Re-check public live/ready/diagnostics after dry-run and expect the old capability surface. | docs only | `curl` public endpoints. |
+| Secret-safe operator output | OWASP Logging Cheat Sheet | Dry-run logs should show plan metadata, not credentials or tokens. | Record archive SHA, package id, target path, and capability plan only. | docs only | Inspect dry-run output and doc. |
