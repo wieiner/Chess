@@ -1036,3 +1036,13 @@ Date: 2026-07-11
 | Backup before payload replacement | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | App payload replacement behind a systemd service should have an operator rollback point before files are swapped. | Create a server-side tarball of `/opt/chessonline/server` and the `chessonline.service` unit before deployment. | `docs/P4K_HETZNER_BACKUP_RESULT.md` | `tar`, `sha256sum`, `ls -lh`, required-entry listing. |
 | Runtime data separation | Microsoft Learn, ASP.NET Core Data Protection | Data Protection keyrings and app persistence stores are mutable runtime state, not immutable payload. | Do not archive `/var/lib/chessonline` in Phase 08; record only app payload rollback artifact. | docs only | Confirm backup path/entries include server payload and unit only. |
 | Secret-safe backup reporting | OWASP Logging Cheat Sheet | Reports should include enough rollback metadata without printing runtime credentials or key material. | Record archive path, size, SHA-256, mode and required entries; do not print config contents or keyring/store files. | docs only | Inspect command output and doc content. |
+
+## P4K Phase 09 - Guarded Deploy/Rollback Tool
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Systemd payload replacement | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | Updating a Kestrel app behind nginx can be scoped to the app payload and its service, with nginx/firewall untouched. | Add a script that swaps only `/opt/chessonline/server` and restarts only `chessonline.service`. | `scripts/deploy/Deploy-ChessOnlineServer-Hetzner.ps1` | Parse test and local dry-run. |
+| Health/capability gate | Microsoft Learn, ASP.NET Core health checks and SignalR .NET client docs | Deployment success should be gated by health endpoints and the expected hub capability surface. | Verify live/ready/diagnostics and P4K methods after real deploy; dry-run prints the plan. | deploy script/docs | Dry-run output and later remote phases. |
+| Secret-safe operator tooling | Microsoft Learn SignalR security; OWASP Logging Cheat Sheet | Deploy logs should avoid tokens, runtime store content, and key material. | Validate archives for secret-like names and avoid printing runtime files or credentials. | deploy script/docs | Archive validation plus `git diff --check`. |
