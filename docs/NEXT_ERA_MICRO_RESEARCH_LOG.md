@@ -965,3 +965,13 @@ Date: 2026-07-11
 | Framework-dependent Linux publish | Microsoft Learn, .NET application publishing overview and `dotnet publish` command | `dotnet publish -r linux-x64 --self-contained false` is the expected package shape when the server already has the .NET runtime. | Keep P4K packages framework-dependent and include the tested `libChess3DEngine.so` explicitly. | `docs/P4K_PACKAGE_RUNTIME_BOUNDARY.md` | Build `ChessOnlineServer`, inspect package script, and later publish into untracked output only. |
 | Data Protection key ring | Microsoft Learn, Configure ASP.NET Core Data Protection and Key storage providers | Data Protection keys are mutable runtime state and should live outside immutable app package files. | Keep `/var/lib/chessonline/keyring` out of packages and never copy/log/commit key files. | `docs/P4K_PACKAGE_RUNTIME_BOUNDARY.md` | Verify service template path and avoid keyring content reads. |
 | Linux systemd/nginx boundary | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | Updating the Kestrel app payload behind existing nginx does not require changing nginx, TLS, firewall, or 443. | Later P4K deploy can replace `/opt/chessonline/server` and restart only `chessonline.service`; Phase 01 stays docs-only. | `docs/P4K_PACKAGE_RUNTIME_BOUNDARY.md` | Local docs/build/list checks only. |
+
+## P4K Phase 02 - Server Build Identity
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Append-only diagnostics JSON | Microsoft Learn, ASP.NET Core minimal APIs | Adding new JSON fields is compatible with existing clients that ignore unknown fields. | Add a `build` object to `/chess3d/diagnostics` while preserving `serverCommit` and all old fields. | `src/ChessOnlineServer/ChessOnlineServerHost.cs`, protocol DTOs | Server build and targeted online contract tests. |
+| Publish metadata file | Microsoft Learn, `dotnet publish` command | Publish output can include additional content files next to the app DLL. | Generate `server-build.json` in the publish output with commit/package/time metadata only. | `scripts/deploy/Publish-ChessOnlineServer-Linux.ps1` | Build/publish later; diagnostics works with or without the file. |
+| Secret-safe build identity | OWASP Logging Cheat Sheet | Build/deploy metadata should not contain local paths, usernames, tokens, or machine names. | Store only commit, UTC build time, package id, and assembly informational version fallback. | `docs/P4K_SERVER_BUILD_IDENTITY.md` | Contract test checks no token/local-path markers in serialized diagnostics. |

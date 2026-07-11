@@ -2,7 +2,9 @@ param(
     [string]$Configuration = "Release",
     [string]$Runtime = "linux-x64",
     [string]$OutputPath = "",
-    [string]$NativeLibraryPath = ""
+    [string]$NativeLibraryPath = "",
+    [string]$CommitSha = "",
+    [string]$PackageId = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,6 +29,31 @@ if (-not [string]::IsNullOrWhiteSpace($NativeLibraryPath)) {
 else {
     dotnet publish $project -c $Configuration -r $Runtime --self-contained false -p:Platform=x64 -o $OutputPath
 }
+
+if ([string]::IsNullOrWhiteSpace($CommitSha)) {
+    try {
+        $CommitSha = (& git -C $root rev-parse HEAD 2>$null).Trim()
+    }
+    catch {
+        $CommitSha = ""
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($PackageId)) {
+    $short = if ($CommitSha.Length -ge 12) { $CommitSha.Substring(0, 12) } else { "unknown" }
+    $PackageId = "chessonline-$Runtime-$short"
+}
+
+$buildIdentity = [ordered]@{
+    commit = $CommitSha
+    builtUtc = [DateTime]::UtcNow.ToString("O")
+    packageId = $PackageId
+    informationalVersion = ""
+}
+
+$buildIdentity |
+    ConvertTo-Json -Depth 3 |
+    Set-Content -LiteralPath (Join-Path $OutputPath "server-build.json") -Encoding UTF8
 
 $serverDll = Join-Path $OutputPath "ChessOnlineServer.dll"
 if (-not (Test-Path -LiteralPath $serverDll)) {

@@ -132,11 +132,13 @@ public static class ChessOnlineServerHost
         {
             var diagnostics = registry.GetDiagnostics();
             var authority = registry.GetAuthorityDiagnostics();
+            var build = ServerBuildIdentity.Load(AppContext.BaseDirectory);
             return Results.Json(new
             {
                 protocolId = OnlineProtocolVersion.ProtocolId,
                 protocolVersion = OnlineProtocolVersion.ProtocolVersion,
-                serverCommit = diagnostics.ServerCommit,
+                serverCommit = string.IsNullOrWhiteSpace(build.Commit) ? diagnostics.ServerCommit : build.Commit,
+                build,
                 requestLegalPreview = diagnostics.RequestLegalPreviewSupported,
                 realtimeResync = diagnostics.RealtimeResyncSupported,
                 actionLog = diagnostics.ActionLogSupported,

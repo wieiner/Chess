@@ -482,6 +482,7 @@ public sealed class OnlineError
 public sealed class OnlineDiagnostics
 {
     public string ServerCommit { get; set; } = "";
+    public OnlineServerBuildIdentity Build { get; set; } = new();
     public string ProtocolVersion { get; set; } = OnlineProtocolVersion.ProtocolVersion;
     public bool RequestLegalPreviewSupported { get; set; } = true;
     public bool RealtimeResyncSupported { get; set; } = true;
@@ -505,6 +506,14 @@ public sealed class OnlineDiagnostics
     public int AcceptedActionCount { get; set; }
     public int RejectedActionCount { get; set; }
     public int ResyncCount { get; set; }
+}
+
+public sealed class OnlineServerBuildIdentity
+{
+    public string Commit { get; set; } = "";
+    public string BuiltUtc { get; set; } = "";
+    public string PackageId { get; set; } = "";
+    public string InformationalVersion { get; set; } = "";
 }
 
 [JsonSerializable(typeof(OnlineProtocolMessage))]
@@ -532,6 +541,7 @@ public sealed class OnlineDiagnostics
 [JsonSerializable(typeof(OnlineMatchmakingStatus))]
 [JsonSerializable(typeof(OnlineMatchmakingTicket))]
 [JsonSerializable(typeof(OnlineDiagnostics))]
+[JsonSerializable(typeof(OnlineServerBuildIdentity))]
 internal partial class OnlineProtocolJsonContext : JsonSerializerContext
 {
 }

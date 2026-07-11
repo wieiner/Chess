@@ -43,6 +43,13 @@ static void AuthorityRuntimeDiagnosticsTests(ContractTest test, string profileRo
     test.Check(NativeChessOnlineGameSessionFactory.GetExpectedNativeLibraryNameForPlatform("Windows") == "Chess3DEngine.dll", "online authority keeps Windows native library name");
 
     var onlineDiagnostics = registry.GetDiagnostics();
+    onlineDiagnostics.Build = new OnlineServerBuildIdentity
+    {
+        Commit = "abc123",
+        BuiltUtc = "2026-07-11T00:00:00Z",
+        PackageId = "chessonline-linux-x64-abc123",
+        InformationalVersion = "1.0.0-test"
+    };
     test.Check(onlineDiagnostics.RequestLegalPreviewSupported, "online diagnostics exposes legal preview capability");
     test.Check(onlineDiagnostics.RealtimeResyncSupported, "online diagnostics exposes realtime resync capability");
     test.Check(onlineDiagnostics.ActionLogSupported, "online diagnostics exposes action log capability");
@@ -54,6 +61,14 @@ static void AuthorityRuntimeDiagnosticsTests(ContractTest test, string profileRo
     test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestResumeMatch), "online diagnostics lists RequestResumeMatch hub method");
     test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.JoinSpectator), "online diagnostics lists JoinSpectator hub method");
     test.Check(onlineDiagnostics.SupportedHubMethods.Contains(OnlineMessageTypes.RequestLobbySnapshot), "online diagnostics lists RequestLobbySnapshot hub method");
+
+    var diagnosticsJson = JsonSerializer.Serialize(onlineDiagnostics, OnlineProtocolJson.Options);
+    var parsedDiagnostics = JsonSerializer.Deserialize<OnlineDiagnostics>(diagnosticsJson, OnlineProtocolJson.Options);
+    test.Check(parsedDiagnostics?.Build.Commit == "abc123" &&
+        parsedDiagnostics.Build.PackageId == "chessonline-linux-x64-abc123" &&
+        !diagnosticsJson.Contains("USERPROFILE", StringComparison.OrdinalIgnoreCase) &&
+        !diagnosticsJson.Contains("accessToken", StringComparison.OrdinalIgnoreCase),
+        "online diagnostics build identity roundtrips without local paths or secrets");
 }
 
 static void ProtocolRoundtripTests(ContractTest test)
