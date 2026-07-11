@@ -1076,3 +1076,13 @@ Date: 2026-07-11
 | App-only payload replacement | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | Kestrel app payload can be updated behind existing nginx by replacing app files and restarting the app service only. | Swap `/opt/chessonline/server`, keep previous directory, and restart only `chessonline.service`. | `docs/P4K_HETZNER_ATOMIC_SWAP_RESULT.md` | Guarded deploy script plus immediate loopback/public health. |
 | Rollback on failed health | Microsoft Learn, ASP.NET Core health checks | Post-swap health gates should decide whether to keep or rollback the payload. | Use `-RollbackOnFailure`; no rollback was needed because diagnostics passed. | deploy result docs | Check service active, health, expected commit and capabilities. |
 | Neighbor service boundary | OWASP Logging and operational safety guidance | Deployment logs should avoid unrelated services and sensitive runtime data. | Do not touch nginx, 443, x-ui/Xray, Outline, Docker, Unreal, PostgreSQL, or `/var/lib/chessonline`. | docs only | Record allowed/forbidden mutations and immediate diagnostics. |
+
+## P4K Phase 13 - Immediate Post-Deploy Health Gate
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Multi-hop health gate | Microsoft Learn, ASP.NET Core health checks | A deployment should pass loopback service health and public proxy health before gameplay smoke. | Verify Kestrel loopback, nginx-local, and public HTTP live/ready/diagnostics. | `docs/P4K_HETZNER_DEPLOY_RESULT.md` | `curl` on loopback, local nginx, public HTTP. |
+| SignalR capability verification | Microsoft Learn, ASP.NET Core SignalR .NET client | Clients should only use hub methods that deployed diagnostics advertise. | Assert `RequestResumeMatch`, `JoinSpectator`, and `RequestLobbySnapshot` in `supportedHubMethods`. | deploy result docs | Diagnostics grep assertions. |
+| Post-deploy risk scan | OWASP Logging Cheat Sheet and operational logging guidance | Journal checks should look for actionable failure classes without exposing secrets. | Scan recent `chessonline.service` journal for crash/native/persistence/permission/sequence/unhandled failure markers. | docs only | Sanitized journal risk scan summary. |
