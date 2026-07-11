@@ -975,3 +975,13 @@ Date: 2026-07-11
 | Append-only diagnostics JSON | Microsoft Learn, ASP.NET Core minimal APIs | Adding new JSON fields is compatible with existing clients that ignore unknown fields. | Add a `build` object to `/chess3d/diagnostics` while preserving `serverCommit` and all old fields. | `src/ChessOnlineServer/ChessOnlineServerHost.cs`, protocol DTOs | Server build and targeted online contract tests. |
 | Publish metadata file | Microsoft Learn, `dotnet publish` command | Publish output can include additional content files next to the app DLL. | Generate `server-build.json` in the publish output with commit/package/time metadata only. | `scripts/deploy/Publish-ChessOnlineServer-Linux.ps1` | Build/publish later; diagnostics works with or without the file. |
 | Secret-safe build identity | OWASP Logging Cheat Sheet | Build/deploy metadata should not contain local paths, usernames, tokens, or machine names. | Store only commit, UTC build time, package id, and assembly informational version fallback. | `docs/P4K_SERVER_BUILD_IDENTITY.md` | Contract test checks no token/local-path markers in serialized diagnostics. |
+
+## P4K Phase 03 - Capability Predeploy Gate
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Hub method parity | Microsoft Learn, ASP.NET Core SignalR .NET client | A remote smoke can only pass if the deployed hub exposes the invoked methods. | Treat local source capability checks as a pre-deploy gate before copying a server package. | `docs/P4K_CAPABILITY_PREDEPLOY_GATE.md` | `rg` for methods/flags and targeted online contract tests. |
+| Diagnostics feature flags | Microsoft Learn, ASP.NET Core health checks and minimal APIs | Machine-readable readiness/diagnostics should expose server capabilities before functional smoke. | Require `resumeMatch`, `spectatorMode`, `lobbySnapshot`, and matching `supportedHubMethods` before claiming remote PASS. | docs only | Contract tests and later public `/chess3d/diagnostics`. |
+| Secret-safe capability reporting | Microsoft Learn SignalR security; OWASP Logging Cheat Sheet | Capability lists do not need tokens, player credentials, or connection IDs. | Keep the pre-deploy gate to method names, booleans, counts, and package identity only. | docs only | Secret scan remains a later P4K gate. |
