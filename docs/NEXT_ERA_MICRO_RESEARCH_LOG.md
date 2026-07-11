@@ -1006,3 +1006,13 @@ Date: 2026-07-11
 | Framework-dependent `linux-x64` publish | Microsoft Learn, `dotnet publish` command and .NET application publishing overview | `dotnet publish -r linux-x64 --self-contained false` is a supported framework-dependent package shape when the target host has the runtime. | Build an untracked `.tmp` package for `ChessOnlineServer` and include the tested Linux native authority library explicitly. | `scripts/deploy/Publish-ChessOnlineServer-Linux.ps1`, `docs/P4K_SERVER_PACKAGE_RESULT.md` | Server build, publish script run, manifest parse, archive hash. |
 | Runtime key separation | Microsoft Learn, ASP.NET Core Data Protection key management | Data Protection key rings are runtime state and must not be embedded in immutable application payloads. | Keep keyring/store paths out of the package and document that `/var/lib/chessonline` remains untouched. | package docs | Inspect archive listing and manifest. |
 | Artifact provenance and secret boundary | GitHub Actions artifact/security guidance and OWASP Logging guidance | Deployable artifacts need file identity while avoiding plaintext secrets or runtime logs. | Generate `server-build.json`, `server-package-manifest.json`, SHA-256 archive hash, and remove PDB/dev appsettings before archive creation. | publish script/docs | Archive listing checks for required files and absence of PDB/dev configs. |
+
+## P4K Phase 06 - WSL Package Preflight
+
+Date: 2026-07-11
+
+| Topic | Source checked | Key finding | Decision for this repo | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Optional local Linux smoke | Microsoft Learn, .NET on Linux and `dotnet --info` diagnostics | A local Linux preflight is useful only when the distro has the .NET runtime/SDK available. | Check WSL read-only and skip the preflight when `.NET` is absent; do not install toolchains in this phase. | `docs/P4K_WSL_PACKAGE_PREFLIGHT.md` | `wsl -l -v`, `wsl -d Ubuntu -- dotnet --info`, `uname`, `command -v`. |
+| Safe deploy gate | Microsoft Learn, Host ASP.NET Core on Linux with Nginx | The actual app will run behind existing nginx on Hetzner, so local WSL is optional, not a substitute for backup-first remote deployment. | Treat WSL preflight as skipped and continue with Hetzner inventory/backup gates. | docs only | Record skipped prerequisite and no server changes. |
+| Runtime state boundary | Microsoft Learn, ASP.NET Core Data Protection | Runtime keyrings and stores stay on the server and must not be copied into local WSL/package tests. | Do not copy `/var/lib/chessonline`; only package payload would be tested if prerequisites existed. | docs only | Confirm no runtime content read or copied. |
