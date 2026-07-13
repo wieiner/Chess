@@ -213,6 +213,34 @@ public sealed class OnlineRoomRegistry
         }
     }
 
+    public bool SetPlayerConnectionState(string roomId, string tableId, string playerId, bool connected)
+    {
+        lock (_gate)
+        {
+            if (!TryGetTable(roomId, tableId, out var room, out var table))
+            {
+                return false;
+            }
+
+            var now = DateTime.UtcNow;
+            var seat = table.Seats.Values.FirstOrDefault(candidate =>
+                string.Equals(candidate.PlayerId, playerId, StringComparison.OrdinalIgnoreCase));
+            if (seat == null)
+            {
+                return false;
+            }
+
+            seat.IsConnected = connected;
+            seat.LastSeenUtc = now;
+            if (room.Players.TryGetValue(playerId, out var player))
+            {
+                player.IsConnected = connected;
+                player.LastSeenUtc = now;
+            }
+            return true;
+        }
+    }
+
     public OnlineProtocolMessage StartGame(OnlineMessageEnvelope envelope)
     {
         lock (_gate)

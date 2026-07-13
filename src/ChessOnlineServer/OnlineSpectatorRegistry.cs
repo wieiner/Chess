@@ -1,4 +1,5 @@
 using ChessOnlineProtocol;
+using System.Globalization;
 using System.Text.Json.Serialization;
 
 namespace ChessOnlineServer;
@@ -8,6 +9,7 @@ public sealed class OnlineSpectatorRegistry
     private readonly object _gate = new();
     private readonly Dictionary<SpectatorKey, SpectatorMembership> _byViewer = new();
     private readonly Dictionary<string, SpectatorKey> _byConnection = new(StringComparer.Ordinal);
+    private readonly Dictionary<TableKey, DateTime> _tableUpdatedUtc = new();
 
     public OnlineSpectatorRegistration Register(
         string roomId,
@@ -29,6 +31,7 @@ public sealed class OnlineSpectatorRegistry
             {
                 _byConnection.Remove(connectionId);
                 _byViewer.Remove(priorKey);
+                TouchLocked(priorKey.RoomId, priorKey.TableId, now);
             }
 
             if (_byViewer.TryGetValue(key, out var existing))
@@ -42,6 +45,10 @@ public sealed class OnlineSpectatorRegistry
                     _byConnection[connectionId] = key;
                 }
                 existing.LastSeenUtc = now;
+                if (!duplicate)
+                {
+                    TouchLocked(key.RoomId, key.TableId, now);
+                }
                 return new OnlineSpectatorRegistration(
                     CountLocked(key.RoomId, key.TableId),
                     duplicate,
@@ -59,7 +66,34 @@ public sealed class OnlineSpectatorRegistry
                 LastSeenUtc = now
             };
             _byConnection[connectionId] = key;
+            TouchLocked(key.RoomId, key.TableId, now);
             return new OnlineSpectatorRegistration(CountLocked(key.RoomId, key.TableId), false, false, "");
+        }
+    }
+
+    public OnlineSpectatorDisconnectResult RemoveConnection(string connectionId)
+    {
+        if (string.IsNullOrWhiteSpace(connectionId))
+        {
+            return new OnlineSpectatorDisconnectResult(false, "", "", 0);
+        }
+
+        lock (_gate)
+        {
+            if (!_byConnection.Remove(connectionId, out var key) ||
+                !_byViewer.TryGetValue(key, out var membership) ||
+                !string.Equals(membership.ConnectionId, connectionId, StringComparison.Ordinal))
+            {
+                return new OnlineSpectatorDisconnectResult(false, "", "", 0);
+            }
+
+            _byViewer.Remove(key);
+            TouchLocked(key.RoomId, key.TableId, DateTime.UtcNow);
+            return new OnlineSpectatorDisconnectResult(
+                true,
+                membership.RoomId,
+                membership.TableId,
+                CountLocked(key.RoomId, key.TableId));
         }
     }
 
@@ -93,13 +127,24 @@ public sealed class OnlineSpectatorRegistry
         {
             foreach (var row in snapshot.Tables)
             {
-                row.SpectatorCount = CountLocked(Normalize(row.RoomId), Normalize(row.TableId));
+                var roomId = Normalize(row.RoomId);
+                var tableId = Normalize(row.TableId);
+                row.SpectatorCount = CountLocked(roomId, tableId);
+                if (_tableUpdatedUtc.TryGetValue(new TableKey(roomId, tableId), out var membershipUpdatedUtc) &&
+                    (!DateTime.TryParse(row.UpdatedUtc, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var rowUpdatedUtc) ||
+                     membershipUpdatedUtc > rowUpdatedUtc))
+                {
+                    row.UpdatedUtc = membershipUpdatedUtc.ToString("O");
+                }
             }
         }
     }
 
     private int CountLocked(string roomId, string tableId) =>
         _byViewer.Keys.Count(key => key.RoomId == roomId && key.TableId == tableId);
+
+    private void TouchLocked(string roomId, string tableId, DateTime now) =>
+        _tableUpdatedUtc[new TableKey(roomId, tableId)] = now;
 
     private static string Normalize(string value) => value.Trim().ToUpperInvariant();
 
@@ -108,6 +153,8 @@ public sealed class OnlineSpectatorRegistry
         public static SpectatorKey Create(string roomId, string tableId, string viewerPlayerId) =>
             new(Normalize(roomId), Normalize(tableId), Normalize(viewerPlayerId));
     }
+
+    private readonly record struct TableKey(string RoomId, string TableId);
 
     private sealed class SpectatorMembership
     {
@@ -125,3 +172,9 @@ public sealed record OnlineSpectatorRegistration(
     bool IsDuplicate,
     bool ReplacedConnection,
     [property: JsonIgnore] string ReplacedConnectionId);
+
+public sealed record OnlineSpectatorDisconnectResult(
+    bool Removed,
+    string RoomId,
+    string TableId,
+    int TableSpectatorCount);

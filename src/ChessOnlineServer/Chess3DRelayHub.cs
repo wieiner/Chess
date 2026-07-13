@@ -41,20 +41,35 @@ public sealed class Chess3DRelayHub : Hub
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        if (_connections.TryGet(Context.ConnectionId, out var session))
+        try
         {
-            if (!string.IsNullOrWhiteSpace(session.RoomId))
+            if (_connections.TryGet(Context.ConnectionId, out var session))
             {
-                await Groups.RemoveFromGroupAsync(Context.ConnectionId, RoomGroup(session.RoomId));
-            }
-            if (!string.IsNullOrWhiteSpace(session.TableId))
-            {
-                await Groups.RemoveFromGroupAsync(Context.ConnectionId, TableGroup(session.TableId));
+                if (!string.IsNullOrWhiteSpace(session.RoomId))
+                {
+                    await Groups.RemoveFromGroupAsync(Context.ConnectionId, RoomGroup(session.RoomId));
+                }
+                if (!string.IsNullOrWhiteSpace(session.TableId))
+                {
+                    await Groups.RemoveFromGroupAsync(Context.ConnectionId, TableGroup(session.TableId));
+                }
+
+                if (session.ConnectionIds.Count <= 1 &&
+                    !string.IsNullOrWhiteSpace(session.RoomId) &&
+                    !string.IsNullOrWhiteSpace(session.TableId) &&
+                    _registry.SetPlayerConnectionState(session.RoomId, session.TableId, session.PlayerId, false))
+                {
+                    await TryPersistPlayerConnectionState(session, false);
+                }
             }
         }
-        _connections.Disconnected(Context.ConnectionId);
-        _registry.SetActiveConnectionCount(_connections.ActiveConnectionCount);
-        await base.OnDisconnectedAsync(exception);
+        finally
+        {
+            _spectators.RemoveConnection(Context.ConnectionId);
+            _connections.Disconnected(Context.ConnectionId);
+            _registry.SetActiveConnectionCount(_connections.ActiveConnectionCount);
+            await base.OnDisconnectedAsync(exception);
+        }
     }
 
     public async Task<OnlineProtocolMessage> Hello(OnlineProtocolMessage message)
@@ -94,6 +109,10 @@ public sealed class Chess3DRelayHub : Hub
         if (!string.IsNullOrWhiteSpace(session.TableId))
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, TableGroup(session.TableId));
+            if (_registry.SetPlayerConnectionState(session.RoomId, session.TableId, session.PlayerId, true))
+            {
+                await TryPersistPlayerConnectionState(session, true);
+            }
         }
 
         await SendCaller("ReceiveWelcome", result);
@@ -597,6 +616,37 @@ public sealed class Chess3DRelayHub : Hub
             IsConnected = true,
             LastSeenAtUtc = DateTime.UtcNow
         });
+    }
+
+    private async Task PersistPlayerConnectionState(OnlineConnectionSession session, bool connected)
+    {
+        var tableKey = PersistenceTableKey(session.RoomId, session.TableId);
+        var seats = await _roomStore.GetSeatsAsync(tableKey);
+        var seat = seats.FirstOrDefault(candidate =>
+            string.Equals(candidate.PlayerId, session.PlayerId, StringComparison.OrdinalIgnoreCase));
+        if (seat == null)
+        {
+            return;
+        }
+
+        seat.IsConnected = connected;
+        seat.LastSeenAtUtc = DateTime.UtcNow;
+        await _roomStore.UpsertSeatAsync(seat);
+    }
+
+    private async Task TryPersistPlayerConnectionState(OnlineConnectionSession session, bool connected)
+    {
+        try
+        {
+            await PersistPlayerConnectionState(session, connected);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                "Online seat presence persistence failed (connected={Connected}, error={ErrorType}).",
+                connected,
+                ex.GetType().Name);
+        }
     }
 
     private async Task PersistMatchFound(OnlineMatchmakingResult result)

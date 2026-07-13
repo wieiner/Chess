@@ -112,7 +112,7 @@ static async Task RoomTableAuthorityTests(ContractTest test, string hubUrl, stri
     await client2.StartAsync();
 
     await Hello(client1, "c1", "p1");
-    await Hello(client2, "c2", "p2");
+    var client2Hello = await Hello(client2, "c2", "p2");
     test.Check((await client1.InvokeAsync<OnlineProtocolMessage>("CreateRoom", Message(OnlineMessageTypes.CreateRoom, "c1", "p1", "room-signalr", ""))).Envelope.MessageType == OnlineMessageTypes.RoomCreated,
         "SignalR create room succeeds");
     test.Check((await client1.InvokeAsync<OnlineProtocolMessage>("JoinRoom", Message(OnlineMessageTypes.JoinRoom, "c1", "p1", "room-signalr", ""))).Envelope.MessageType == OnlineMessageTypes.RoomJoined,
@@ -228,6 +228,68 @@ static async Task RoomTableAuthorityTests(ContractTest test, string hubUrl, stri
     test.Check(!spectatorLobbyJson.Contains("ConnectionId", StringComparison.OrdinalIgnoreCase) &&
         !(spectator1.ConnectionId is { Length: > 0 } connectionId && spectatorLobbyJson.Contains(connectionId, StringComparison.Ordinal)),
         "SignalR lobby spectator count does not expose transport connection identifiers");
+
+    await spectator2.DisposeAsync();
+    OnlineLobbyTableRow? afterSpectatorDisconnect = null;
+    for (var attempt = 0; attempt < 40; attempt++)
+    {
+        var refreshed = await spectator1Reconnect.InvokeAsync<OnlineProtocolMessage>("RequestLobbySnapshot", lobbyRequest);
+        afterSpectatorDisconnect = refreshed.LobbySnapshot?.Tables.SingleOrDefault(row => row.RoomId == "room-signalr" && row.TableId == "classic");
+        if (afterSpectatorDisconnect?.SpectatorCount == 1)
+        {
+            break;
+        }
+        await Task.Delay(25);
+    }
+    test.Check(afterSpectatorDisconnect?.SpectatorCount == 1 && afterSpectatorDisconnect.UpdatedUtc != spectatorRow?.UpdatedUtc,
+        "SignalR spectator disconnect decrements lobby count and updates table timestamp");
+
+    await client2.DisposeAsync();
+    OnlineLobbyTableRow? disconnectedPlayerRow = null;
+    for (var attempt = 0; attempt < 40; attempt++)
+    {
+        var refreshed = await spectator1Reconnect.InvokeAsync<OnlineProtocolMessage>("RequestLobbySnapshot", lobbyRequest);
+        disconnectedPlayerRow = refreshed.LobbySnapshot?.Tables.SingleOrDefault(row => row.RoomId == "room-signalr" && row.TableId == "classic");
+        if (disconnectedPlayerRow?.SeatSummaries.SingleOrDefault(seat => seat.SeatIndex == 2)?.Connected == false)
+        {
+            break;
+        }
+        await Task.Delay(25);
+    }
+    test.Check(disconnectedPlayerRow?.SeatsOccupied == 2 &&
+        disconnectedPlayerRow.SeatSummaries.SingleOrDefault(seat => seat.SeatIndex == 2)?.Connected == false,
+        "SignalR player disconnect preserves seat ownership and marks presence disconnected");
+
+    await using var client2Reconnect = NewClient(hubUrl);
+    await client2Reconnect.StartAsync();
+    var client2ReconnectHello = Message(OnlineMessageTypes.Hello, "c2-reconnect", "p2");
+    client2ReconnectHello.Envelope.SessionToken = client2Hello.Envelope.SessionToken;
+    await client2Reconnect.InvokeAsync<OnlineProtocolMessage>("Hello", client2ReconnectHello);
+    var resumeMessage = Message(OnlineMessageTypes.RequestResumeMatch, "c2-reconnect", "p2", "room-signalr", "classic");
+    resumeMessage.ResumeRequest = new OnlineResumeRequest
+    {
+        PlayerId = "p2",
+        RoomId = "room-signalr",
+        TableId = "classic",
+        SeatIndex = 2,
+        ExpectedRulesetId = "classic-six-side-3d-8x8x8-v0.1",
+        LastKnownStateHash = hashAfterSpectators,
+        LastKnownServerSeq = snapshot.Envelope.ServerSeq
+    };
+    var resumed = await client2Reconnect.InvokeAsync<OnlineProtocolMessage>("RequestResumeMatch", resumeMessage);
+    var afterResumeLobby = await client2Reconnect.InvokeAsync<OnlineProtocolMessage>("RequestLobbySnapshot", lobbyRequest);
+    var resumedPlayerRow = afterResumeLobby.LobbySnapshot?.Tables.SingleOrDefault(row => row.RoomId == "room-signalr" && row.TableId == "classic");
+    var hashAfterResume = (await client1.InvokeAsync<OnlineProtocolMessage>("RequestSnapshot", Message(
+        OnlineMessageTypes.RequestSnapshot,
+        "c1",
+        "p1",
+        "room-signalr",
+        "classic"))).Snapshot?.StateHash ?? "";
+    test.Check(resumed.ResumeResult?.Success == true &&
+        resumedPlayerRow?.SeatSummaries.SingleOrDefault(seat => seat.SeatIndex == 2)?.Connected == true,
+        "SignalR player reconnect restores presence and resume succeeds");
+    test.Check(hashAfterResume == hashAfterSpectators,
+        "SignalR spectator/player disconnect and resume leave state hash unchanged");
 }
 
 static async Task ProfileActionTests(ContractTest test, string hubUrl, string profileRoot)
@@ -562,6 +624,8 @@ static void SpectatorRegistryTests(ContractTest test, string profileRoot)
     var duplicate = spectators.Register("spectator-registry-room", "spectator-registry-table", "viewer-1", "connection-1");
     var second = spectators.Register("spectator-registry-room", "spectator-registry-table", "viewer-2", "connection-2");
     var reconnect = spectators.Register("spectator-registry-room", "spectator-registry-table", "viewer-1", "connection-3");
+    var disconnected = spectators.RemoveConnection("connection-3");
+    var duplicateDisconnect = spectators.RemoveConnection("connection-3");
 
     var lobby = game.RequestLobbySnapshot(
         Envelope(OnlineMessageTypes.RequestLobbySnapshot, "", "", "client-lobby", "viewer-1"),
@@ -580,13 +644,16 @@ static void SpectatorRegistryTests(ContractTest test, string profileRoot)
         "spectator registry first viewer count is one");
     test.Check(duplicate.TableSpectatorCount == 1 && duplicate.IsDuplicate && !duplicate.ReplacedConnection,
         "spectator registry duplicate join is idempotent");
-    test.Check(second.TableSpectatorCount == 2 && spectators.TotalCount == 2,
+    test.Check(second.TableSpectatorCount == 2,
         "spectator registry counts distinct viewers");
     test.Check(reconnect.TableSpectatorCount == 2 && reconnect.ReplacedConnection && reconnect.ReplacedConnectionId == "connection-1",
         "spectator registry reconnect replaces transport without inflating count");
     test.Check(!JsonSerializer.Serialize(reconnect).Contains("connection-1", StringComparison.Ordinal),
         "spectator registry replacement result does not serialize transport identifier");
-    test.Check(row?.SpectatorCount == 2 && row.SeatsOccupied == 1,
+    test.Check(disconnected.Removed && disconnected.TableSpectatorCount == 1 &&
+        !duplicateDisconnect.Removed && spectators.TotalCount == 1,
+        "spectator registry disconnect cleanup is idempotent");
+    test.Check(row?.SpectatorCount == 1 && row.SeatsOccupied == 1,
         "spectator registry projects count without changing player seats");
     test.Check(beforeHash == afterHash,
         "spectator registry operations do not mutate authoritative game state hash");
