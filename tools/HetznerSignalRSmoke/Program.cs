@@ -88,7 +88,7 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
     Require(hello2.Envelope.MessageType == OnlineMessageTypes.Welcome, "player B welcomed");
     Console.WriteLine("STEP PASS SignalR connect");
 
-    if (options.ShouldRun(OnlineUxSmokeScenarios.Lobby))
+    if (options.Scenario == OnlineUxSmokeScenarios.Lobby)
     {
         await RequestLobbySnapshotAsync(client1, token1, options, "initial", cancellationToken);
     }
