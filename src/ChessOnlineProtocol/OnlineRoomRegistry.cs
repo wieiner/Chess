@@ -844,6 +844,13 @@ public sealed class OnlineRoomRegistry
         return _sessionFactory.GetDiagnostics();
     }
 
+    public bool ProbeAuthorityReady()
+    {
+        var profile = RuleProfileCatalog.ResolveRequired(_profileRoot, RuleProfileCatalog.All[0].RulesetId);
+        using var session = _sessionFactory.Create(profile, _profileRoot);
+        return !string.IsNullOrWhiteSpace(session.StateHash);
+    }
+
     public void SetActiveConnectionCount(int count)
     {
         lock (_gate)

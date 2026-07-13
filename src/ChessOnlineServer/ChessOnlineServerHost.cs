@@ -72,6 +72,7 @@ public static class ChessOnlineServerHost
             timeProvider: sp.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton(sp => new OnlineHubConnectionRegistry(sp.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton(sp => new OnlineSpectatorRegistry(sp.GetRequiredService<TimeProvider>()));
+        builder.Services.AddSingleton<OnlineReadinessProbe>();
         builder.Services.AddSingleton<OnlineMatchmakingService>();
         builder.Services.AddSingleton<OnlineRoomCleanupCoordinator>();
         builder.Services.AddHostedService<OnlineRoomCleanupService>();
@@ -159,10 +160,10 @@ public static class ChessOnlineServerHost
         }
         app.UseRateLimiter();
         app.MapHealthChecks("/healthz/live");
-        app.MapGet("/healthz/ready", (OnlineRoomRegistry registry) =>
+        app.MapGet("/healthz/ready", (OnlineReadinessProbe readiness) =>
         {
-            var profileOk = RuleProfileCatalog.All.All(p => File.Exists(Path.Combine(options.ProfileRoot, p.FileName)));
-            return profileOk
+            var result = readiness.Check();
+            return result.IsReady
                 ? Results.Json(new
                 {
                     status = "ready",
@@ -172,7 +173,7 @@ public static class ChessOnlineServerHost
                     authEnabled = options.Auth.EnableAuthentication,
                     persistenceProvider = options.Persistence.Provider
                 })
-                : Results.Json(new { status = "notReady", reason = "missingProfile" }, statusCode: 503);
+                : Results.Json(new { status = "notReady", reasons = result.Reasons }, statusCode: 503);
         });
         MapAuthEndpoints(app, options);
         var diagnosticsEndpoint = app.MapGet("/chess3d/diagnostics", (

@@ -44,6 +44,7 @@ try
     SpectatorRegistryTests(test, profileRoot);
     RoomCleanupTests(test, profileRoot);
     RateLimitPartitionTests(test);
+    ReadinessProbeTests(test, root, profileRoot);
     await ProtocolTests(test, hubUrl);
     await RoomTableAuthorityTests(test, hubUrl, profileRoot);
     await ProfileActionTests(test, hubUrl, profileRoot);
@@ -636,6 +637,68 @@ static void RateLimitPartitionTests(ContractTest test)
     anonymous.Connection.RemoteIpAddress = IPAddress.Parse("198.51.100.17");
     test.Check(OnlineRateLimitPolicies.BuildPartitionKey(anonymous) == "ip:198.51.100.17",
         "P4K anonymous HTTP rate partition uses remote IP fallback");
+}
+
+static void ReadinessProbeTests(ContractTest test, string root, string profileRoot)
+{
+    var fixtureRoot = Path.Combine(root, ".tmp", "chess3d-p4k-readiness-tests", Guid.NewGuid().ToString("N"));
+    var options = new HostedOnlineOptions
+    {
+        HostUrls = "http://127.0.0.1:5077",
+        HubPath = "/chess3d/relay",
+        ProfileRoot = profileRoot,
+        Persistence = new HostedPersistenceOptions
+        {
+            StorePath = Path.Combine(fixtureRoot, "unwritable-persistence-fixture", "store.json")
+        },
+        DataProtection = new HostedDataProtectionOptions
+        {
+            KeyRingPath = Path.Combine(fixtureRoot, "unavailable-keyring-fixture")
+        }
+    };
+    options.Normalize();
+    var registry = new OnlineRoomRegistry(profileRoot);
+
+    OnlineReadinessProbe Probe(
+        bool native = true,
+        bool profiles = true,
+        bool persistence = true,
+        bool keyRing = true,
+        bool registryReady = true,
+        bool configuration = true)
+    {
+        return new OnlineReadinessProbe(options, registry, new OnlineReadinessDependencies
+        {
+            NativeAuthorityReady = () => native,
+            ProfileSetReady = _ => profiles,
+            DirectoryWritable = directory => directory.Contains("unwritable-persistence", StringComparison.Ordinal)
+                ? persistence
+                : keyRing,
+            RegistryReady = () => registryReady,
+            ConfigurationValid = _ => configuration
+        });
+    }
+
+    var healthy = Probe().Check();
+    test.Check(healthy.IsReady && healthy.Reasons.Count == 0,
+        "P4K readiness reports healthy when every required dependency is available");
+    test.Check(Probe(native: false).Check().Reasons.SequenceEqual(new[] { OnlineReadinessReasons.NativeUnavailable }),
+        "P4K readiness reports missing native authority safely");
+    test.Check(Probe(profiles: false).Check().Reasons.SequenceEqual(new[] { OnlineReadinessReasons.ProfileSetInvalid }),
+        "P4K readiness reports a wrong profile set safely");
+    test.Check(Probe(persistence: false).Check().Reasons.SequenceEqual(new[] { OnlineReadinessReasons.PersistenceUnavailable }),
+        "P4K readiness reports an unwritable persistence fixture safely");
+    test.Check(Probe(keyRing: false).Check().Reasons.SequenceEqual(new[] { OnlineReadinessReasons.KeyRingUnavailable }),
+        "P4K readiness reports an unavailable keyring fixture safely");
+
+    var failed = Probe(native: false, profiles: false, persistence: false, keyRing: false, registryReady: false, configuration: false).Check();
+    var publicJson = JsonSerializer.Serialize(new { status = "notReady", reasons = failed.Reasons });
+    test.Check(!publicJson.Contains(fixtureRoot, StringComparison.OrdinalIgnoreCase) &&
+        !publicJson.Contains("permission", StringComparison.OrdinalIgnoreCase) &&
+        !publicJson.Contains("stack", StringComparison.OrdinalIgnoreCase) &&
+        !publicJson.Contains("key-", StringComparison.OrdinalIgnoreCase) &&
+        !publicJson.Contains("Chess3DEngine.dll", StringComparison.OrdinalIgnoreCase),
+        "P4K readiness public response contains only aggregate safe reason codes");
 }
 
 static async Task HttpRateLimitTests(ContractTest test, string root, string profileRoot)
