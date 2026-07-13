@@ -1,28 +1,32 @@
 using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using ChessOnlineClient;
 using ChessOnlineProtocol;
 using Microsoft.AspNetCore.SignalR.Client;
 
 var stopwatch = Stopwatch.StartNew();
+SmokeOptions? parsedOptions = null;
 try
 {
-    var options = SmokeOptions.Parse(args);
-    using var runTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(options.TimeoutSeconds));
-    await RunAsync(options, runTimeout.Token);
-    Console.WriteLine($"SMOKE PASS duration={stopwatch.Elapsed}");
+    parsedOptions = SmokeOptions.Parse(args);
+    using var runTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(parsedOptions.TimeoutSeconds));
+    await RunAsync(parsedOptions, runTimeout.Token);
+    Console.WriteLine($"SMOKE PASS scenario={parsedOptions.Scenario} runId={parsedOptions.RunId} duration={stopwatch.Elapsed}");
     return 0;
 }
 catch (OperationCanceledException)
 {
-    Console.Error.WriteLine($"SMOKE TIMEOUT duration={stopwatch.Elapsed}");
+    Console.Error.WriteLine($"STEP FAIL scenario={parsedOptions?.Scenario ?? "validation"} reason=timeout");
+    Console.Error.WriteLine($"SMOKE FAIL scenario={parsedOptions?.Scenario ?? "validation"} result=timeout duration={stopwatch.Elapsed}");
     return 124;
 }
 catch (Exception ex)
 {
-    Console.Error.WriteLine($"SMOKE FAIL {ex.GetType().Name}: {ex.Message}");
-    Console.Error.WriteLine(ex);
+    var safeReason = SanitizeLogText(ex.Message);
+    Console.Error.WriteLine($"STEP FAIL scenario={parsedOptions?.Scenario ?? "validation"} reason={safeReason}");
+    Console.Error.WriteLine($"SMOKE FAIL scenario={parsedOptions?.Scenario ?? "validation"} error={ex.GetType().Name} duration={stopwatch.Elapsed}");
     return 1;
 }
 
@@ -50,7 +54,9 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
     Require(JsonBool(diagnostics.RootElement, "authEnabled"), "auth is enabled");
     Require(JsonString(diagnostics.RootElement, "authorityNativeLibraryName") == "libChess3DEngine.so", "Linux native library is selected");
     Require(JsonBool(diagnostics.RootElement, "authorityIsSupported"), "native authority is supported");
-    Console.WriteLine("STEP PASS health");
+    var capabilities = SmokeCapabilities.Parse(diagnostics.RootElement);
+    RequireScenarioCapabilities(options, capabilities);
+    Console.WriteLine($"STEP PASS health scenario={options.Scenario} profile={options.ProfileId}");
 
     var suffix = Guid.NewGuid().ToString("N")[..10];
     var password1 = $"Smoke-{suffix}-A!2026";
@@ -82,10 +88,15 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
     Require(hello2.Envelope.MessageType == OnlineMessageTypes.Welcome, "player B welcomed");
     Console.WriteLine("STEP PASS SignalR connect");
 
-    Console.WriteLine($"STEP START matchmaking ruleset={options.RulesetId}");
-    var onePlayerProfile = options.RulesetId.Contains("single-side", StringComparison.OrdinalIgnoreCase);
+    if (options.ShouldRun(OnlineUxSmokeScenarios.Lobby))
+    {
+        await RequestLobbySnapshotAsync(client1, token1, options, "initial", cancellationToken);
+    }
+
+    Console.WriteLine($"STEP START matchmaking ruleset={options.ProfileId}");
+    var onePlayerProfile = options.ProfileId.Contains("single-side", StringComparison.OrdinalIgnoreCase);
     var queue1 = Message(OnlineMessageTypes.JoinMatchmaking, "smoke-client-a", token1.PlayerId);
-    queue1.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = options.RulesetId, ExpireSeconds = 120 };
+    queue1.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = options.ProfileId, ExpireSeconds = 120 };
     var queued = await InvokeAsync(client1, "JoinMatchmaking", queue1, cancellationToken);
 
     OnlineProtocolMessage found;
@@ -98,7 +109,7 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
     {
         Require(queued.Envelope.MessageType == OnlineMessageTypes.MatchmakingJoined, "first player queued");
         var queue2 = Message(OnlineMessageTypes.JoinMatchmaking, "smoke-client-b", token2.PlayerId);
-        queue2.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = options.RulesetId, ExpireSeconds = 120 };
+        queue2.Matchmaking = new OnlineMatchmakingCommand { RequestedRulesetId = options.ProfileId, ExpireSeconds = 120 };
         found = await InvokeAsync(client2, "JoinMatchmaking", queue2, cancellationToken);
         Require(found.Envelope.MessageType == OnlineMessageTypes.MatchFound, "second player matched");
     }
@@ -119,7 +130,7 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
     }
     var started = await InvokeAsync(client1, "StartGame", Message(OnlineMessageTypes.StartGame, "smoke-client-a", token1.PlayerId, roomId, tableId), cancellationToken);
     Require(started.Envelope.MessageType == OnlineMessageTypes.GameStarted, "game started");
-    Require(started.Snapshot?.RulesetId == options.RulesetId, "snapshot ruleset matches requested ruleset");
+    Require(started.Snapshot?.RulesetId == options.ProfileId, "snapshot ruleset matches requested ruleset");
     var startedSnapshot = started.Snapshot ?? throw new InvalidOperationException("started snapshot is missing");
     Require(!string.IsNullOrWhiteSpace(startedSnapshot.StateHash), "snapshot has state hash");
     Console.WriteLine($"STEP PASS game start hash={startedSnapshot.StateHash}");
@@ -131,7 +142,7 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
     }
     else
     {
-        Console.WriteLine($"STEP START profile action ruleset={options.RulesetId}");
+        Console.WriteLine($"STEP START profile action ruleset={options.ProfileId}");
         var command = await BuildLegalActionCommandAsync(client1, token1, roomId, tableId, startedSnapshot, options, cancellationToken);
         if (command == null)
         {
@@ -165,6 +176,225 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
     var actionLog = await InvokeAsync(client1, "RequestActionLog", Message(OnlineMessageTypes.RequestActionLog, "smoke-client-a", token1.PlayerId, roomId, tableId), cancellationToken);
     Require(actionLog.ActionLog != null, "action log returned");
     Console.WriteLine($"STEP PASS snapshot/actionlog finalHash={snapshot.Snapshot?.StateHash}");
+
+    var latestSnapshot = snapshot.Snapshot ?? startedSnapshot;
+    var latestActionLog = actionLog.ActionLog ?? new OnlineActionLogChunk();
+
+    if (options.ShouldRun(OnlineUxSmokeScenarios.Resume))
+    {
+        await RunResumeScenarioAsync(client1, token1, roomId, tableId, latestSnapshot, latestActionLog, options, cancellationToken);
+    }
+
+    if (options.ShouldRun(OnlineUxSmokeScenarios.Lobby))
+    {
+        await RunLobbyScenarioAsync(client1, token1, roomId, tableId, options, cancellationToken);
+    }
+
+    if (options.ShouldRun(OnlineUxSmokeScenarios.Spectator))
+    {
+        await RunSpectatorScenarioAsync(
+            http,
+            hubUrl,
+            onePlayerProfile ? client1 : client2,
+            onePlayerProfile ? token1 : token2,
+            roomId,
+            tableId,
+            latestSnapshot,
+            latestActionLog,
+            options,
+            cancellationToken);
+    }
+
+    if (options.Scenario == OnlineUxSmokeScenarios.All)
+    {
+        Console.WriteLine("STEP START final diagnostics");
+        using var finalDiagnostics = await JsonDocument.ParseAsync(
+            await http.GetStreamAsync("/chess3d/diagnostics", cancellationToken),
+            cancellationToken: cancellationToken);
+        Require(JsonBool(finalDiagnostics.RootElement, "authorityIsSupported"), "final diagnostics authority remains supported");
+        Console.WriteLine("STEP PASS final diagnostics");
+    }
+}
+
+static async Task<OnlineLobbySnapshot> RequestLobbySnapshotAsync(
+    HubConnection client,
+    AuthTokenResponse token,
+    SmokeOptions options,
+    string stage,
+    CancellationToken cancellationToken)
+{
+    Console.WriteLine($"STEP START lobby snapshot stage={stage}");
+    var request = Message(OnlineMessageTypes.RequestLobbySnapshot, "smoke-client-a", token.PlayerId);
+    request.LobbyRequest = new OnlineLobbySnapshotRequest
+    {
+        RulesetIdFilter = options.ProfileId,
+        IncludeInGameTables = true,
+        IncludeWaitingTables = true,
+        IncludeFinishedTables = false
+    };
+    var response = await InvokeAsync(client, "RequestLobbySnapshot", request, cancellationToken);
+    Require(response.Envelope.MessageType == OnlineMessageTypes.LobbySnapshot, $"{stage} lobby snapshot returned");
+    var lobby = response.LobbySnapshot ?? throw new InvalidOperationException($"{stage} lobby snapshot missing");
+    Require(lobby.Tables.All(row => row.SeatSummaries.All(seat => seat.PlayerLabel.Length <= 8)), "lobby exposes shortened player labels only");
+    Console.WriteLine($"STEP PASS lobby snapshot stage={stage} tables={lobby.Tables.Count} seq={lobby.ServerSeq}");
+    return lobby;
+}
+
+static async Task RunLobbyScenarioAsync(
+    HubConnection client,
+    AuthTokenResponse token,
+    string roomId,
+    string tableId,
+    SmokeOptions options,
+    CancellationToken cancellationToken)
+{
+    var lobby = await RequestLobbySnapshotAsync(client, token, options, "active-match", cancellationToken);
+    var row = lobby.Tables.FirstOrDefault(t =>
+        string.Equals(t.RoomId, roomId, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(t.TableId, tableId, StringComparison.OrdinalIgnoreCase));
+    if (row is null)
+    {
+        throw new InvalidOperationException("lobby contains current table");
+    }
+    Require(row.RulesetId == options.ProfileId, "lobby row ruleset matches");
+    Require(row.Started, "lobby row reports started table");
+    Console.WriteLine($"STEP PASS lobby current table state={row.TableState} seq={row.LastServerSeq}");
+}
+
+static async Task RunResumeScenarioAsync(
+    HubConnection client,
+    AuthTokenResponse token,
+    string roomId,
+    string tableId,
+    OnlineSnapshot latestSnapshot,
+    OnlineActionLogChunk latestActionLog,
+    SmokeOptions options,
+    CancellationToken cancellationToken)
+{
+    Console.WriteLine("STEP START resume");
+    var beforeHash = latestSnapshot.StateHash;
+    var beforeSeq = latestSnapshot.ServerSeq;
+    var beforeActionCount = latestSnapshot.ActionCount;
+
+    await client.StopAsync(cancellationToken);
+    await client.StartAsync(cancellationToken);
+    var hello = await InvokeAsync(client, "Hello", Message(OnlineMessageTypes.Hello, "smoke-client-a-resumed", token.PlayerId), cancellationToken);
+    Require(hello.Envelope.MessageType == OnlineMessageTypes.Welcome, "resumed player welcomed");
+
+    var request = Message(OnlineMessageTypes.RequestResumeMatch, "smoke-client-a-resumed", token.PlayerId, roomId, tableId);
+    request.ResumeRequest = new OnlineResumeRequest
+    {
+        PlayerId = token.PlayerId,
+        RoomId = roomId,
+        TableId = tableId,
+        SeatIndex = 1,
+        ExpectedRulesetId = options.ProfileId,
+        LastKnownStateHash = beforeHash,
+        LastKnownServerSeq = 0
+    };
+
+    var response = await InvokeAsync(client, "RequestResumeMatch", request, cancellationToken);
+    Require(response.Envelope.MessageType == OnlineMessageTypes.ResumeMatchResult, "resume result returned");
+    var resume = response.ResumeResult ?? throw new InvalidOperationException("resume result missing");
+    Require(resume.Success, $"resume succeeded, reason={resume.FailureReason}");
+    Require(resume.RoomId == roomId && resume.TableId == tableId, "resume room/table unchanged");
+    Require(resume.RulesetId == options.ProfileId, "resume ruleset unchanged");
+    Require(resume.Snapshot?.StateHash == beforeHash, "resume snapshot hash unchanged");
+    var resumeSnapshot = resume.Snapshot ?? throw new InvalidOperationException("resume snapshot missing");
+    Require(resumeSnapshot.ActionCount == beforeActionCount, "resume action count unchanged");
+    Require((resume.ActionLog?.Events.Count ?? 0) == latestActionLog.Events.Count, "resume action log matches authoritative history");
+    Require(resumeSnapshot.ServerSeq == beforeSeq, "resume server sequence unchanged");
+    Console.WriteLine($"STEP PASS resume seat={resume.SeatIndex} hash={resumeSnapshot.StateHash} seq={resumeSnapshot.ServerSeq}");
+}
+
+static async Task RunSpectatorScenarioAsync(
+    HttpClient http,
+    string hubUrl,
+    HubConnection activePlayer,
+    AuthTokenResponse activePlayerToken,
+    string roomId,
+    string tableId,
+    OnlineSnapshot latestSnapshot,
+    OnlineActionLogChunk latestActionLog,
+    SmokeOptions options,
+    CancellationToken cancellationToken)
+{
+    Console.WriteLine("STEP START spectator");
+    var suffix = Guid.NewGuid().ToString("N")[..10];
+    var user = $"smoke-s-{suffix}";
+    var password = $"Smoke-{suffix}-S!2026";
+    var registered = await RegisterAsync(http, user, "Smoke Spectator", password, cancellationToken);
+    Require(!string.IsNullOrWhiteSpace(registered.PlayerId), "spectator registered");
+    var token = await LoginAsync(http, user, password, cancellationToken);
+    Require(!string.IsNullOrWhiteSpace(token.AccessToken), "spectator login access token issued");
+
+    await using var spectator = NewAuthenticatedClient(hubUrl, token.AccessToken);
+    var receivedAccepted = new TaskCompletionSource<OnlineProtocolMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+    using var acceptedSubscription = spectator.On<OnlineProtocolMessage>("ReceiveActionAccepted", message => receivedAccepted.TrySetResult(message));
+    await spectator.StartAsync(cancellationToken);
+    var hello = await InvokeAsync(spectator, "Hello", Message(OnlineMessageTypes.Hello, "smoke-client-s", token.PlayerId), cancellationToken);
+    Require(hello.Envelope.MessageType == OnlineMessageTypes.Welcome, "spectator welcomed");
+
+    var request = Message(OnlineMessageTypes.JoinSpectator, "smoke-client-s", token.PlayerId, roomId, tableId);
+    request.SpectatorRequest = new OnlineJoinSpectatorRequest
+    {
+        PlayerId = token.PlayerId,
+        RoomId = roomId,
+        TableId = tableId,
+        ExpectedRulesetId = options.ProfileId,
+        LastKnownServerSeq = latestSnapshot.ServerSeq
+    };
+
+    var response = await InvokeAsync(spectator, "JoinSpectator", request, cancellationToken);
+    Require(response.Envelope.MessageType == OnlineMessageTypes.JoinSpectatorResult, "spectator result returned");
+    var result = response.SpectatorResult ?? throw new InvalidOperationException("spectator result missing");
+    Require(result.Success, $"spectator join succeeded, reason={result.FailureReason}");
+    Require(result.State.IsSpectator, "spectator state is read-only spectator");
+    Require(result.RoomId == roomId && result.TableId == tableId, "spectator room/table unchanged");
+    Require(result.RulesetId == options.ProfileId, "spectator ruleset unchanged");
+    Require(result.Snapshot?.StateHash == latestSnapshot.StateHash, "spectator snapshot hash matches latest");
+    var spectatorSnapshot = result.Snapshot ?? throw new InvalidOperationException("spectator snapshot missing");
+    Require((result.ActionLog?.Events.Count ?? 0) <= latestActionLog.Events.Count, "spectator action log tail did not grow unexpectedly");
+    Console.WriteLine($"STEP PASS spectator joined spectatorId={Short(result.SpectatorId)} hash={spectatorSnapshot.StateHash} readonly={result.State.SubmitDisabledReason}");
+
+    Console.WriteLine("STEP START spectator read-only authority");
+    var ready = Message(OnlineMessageTypes.Ready, "smoke-client-s", token.PlayerId, roomId, tableId);
+    ready.Table = new OnlineTableCommand { Ready = true };
+    var readyResult = await InvokeAsync(spectator, "Ready", ready, cancellationToken);
+    Require(readyResult.Envelope.MessageType != OnlineMessageTypes.TableState, "spectator Ready rejected");
+    var startResult = await InvokeAsync(spectator, "StartGame", Message(OnlineMessageTypes.StartGame, "smoke-client-s", token.PlayerId, roomId, tableId), cancellationToken);
+    Require(startResult.Envelope.MessageType != OnlineMessageTypes.GameStarted, "spectator StartGame rejected");
+    var forbiddenAction = Message(OnlineMessageTypes.SubmitAction, "smoke-client-s", token.PlayerId, roomId, tableId);
+    forbiddenAction.Action = new OnlineActionCommand
+    {
+        ActionKind = OnlineActionKinds.NormalMove,
+        ActorSide = 1,
+        ExpectedStateHashBefore = latestSnapshot.StateHash
+    };
+    var forbiddenResult = await InvokeAsync(spectator, "SubmitAction", forbiddenAction, cancellationToken);
+    Require(forbiddenResult.Envelope.MessageType != OnlineMessageTypes.ActionAccepted, "spectator SubmitAction rejected");
+    var unchanged = await InvokeAsync(spectator, "RequestSnapshot", Message(OnlineMessageTypes.RequestSnapshot, "smoke-client-s", token.PlayerId, roomId, tableId), cancellationToken);
+    Require(unchanged.Snapshot?.StateHash == latestSnapshot.StateHash, "spectator mutation attempts leave state unchanged");
+    Console.WriteLine("STEP PASS spectator read-only authority");
+
+    if (options.SkipActionSubmit)
+    {
+        Console.WriteLine("STEP SKIP spectator live update reason=--skip-action-submit");
+        return;
+    }
+
+    Console.WriteLine("STEP START spectator live update");
+    var command = await BuildLegalActionCommandAsync(activePlayer, activePlayerToken, roomId, tableId, latestSnapshot, options, cancellationToken);
+    Require(command != null, "active player has a submit-ready action for spectator update");
+    var playerAction = Message(OnlineMessageTypes.SubmitAction, "smoke-active-player", activePlayerToken.PlayerId, roomId, tableId);
+    playerAction.Action = command;
+    var accepted = await InvokeAsync(activePlayer, "SubmitAction", playerAction, cancellationToken);
+    Require(accepted.Envelope.MessageType == OnlineMessageTypes.ActionAccepted, "active player action accepted while spectator follows");
+    var broadcast = await receivedAccepted.Task.WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
+    Require(broadcast.Envelope.MessageType == OnlineMessageTypes.ActionAccepted, "spectator received action broadcast");
+    var updated = await InvokeAsync(spectator, "RequestSnapshot", Message(OnlineMessageTypes.RequestSnapshot, "smoke-client-s", token.PlayerId, roomId, tableId), cancellationToken);
+    Require(updated.Snapshot != null && updated.Snapshot.StateHash != latestSnapshot.StateHash, "spectator sees updated authoritative state");
+    Console.WriteLine($"STEP PASS spectator live update hash={updated.Snapshot!.StateHash} seq={updated.Snapshot.ServerSeq}");
 }
 
 static async Task<AuthTokenResponse> RegisterAsync(HttpClient http, string userName, string displayName, string password, CancellationToken cancellationToken)
@@ -279,7 +509,7 @@ static async Task<OnlineActionCommand?> BuildLegalActionCommandAsync(
 
 static OnlineActionCommand? LegacyFallbackAction(SmokeOptions options, string expectedStateHash)
 {
-    switch (options.RulesetId)
+    switch (options.ProfileId)
     {
         case "classic-six-side-3d-8x8x8-v0.1":
         case "single-side-3d-8x8x8-v0.1":
@@ -305,7 +535,7 @@ static OnlineActionCommand? LegacyFallbackAction(SmokeOptions options, string ex
                 toY: options.ToY,
                 toZ: options.ToZ);
         default:
-            Console.WriteLine($"STEP SKIP action-source=compat-fallback unsupported-profile={options.RulesetId}");
+            Console.WriteLine($"STEP SKIP action-source=compat-fallback unsupported-profile={options.ProfileId}");
             return null;
     }
 }
@@ -444,6 +674,39 @@ static bool JsonBool(JsonElement element, string propertyName)
     return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.True;
 }
 
+static void RequireScenarioCapabilities(SmokeOptions options, SmokeCapabilities capabilities)
+{
+    if (options.ShouldRun(OnlineUxSmokeScenarios.Resume))
+    {
+        Require(capabilities.ResumeMatch && capabilities.SupportedHubMethods.Contains(OnlineMessageTypes.RequestResumeMatch),
+            "deployed server does not advertise RequestResumeMatch");
+    }
+    if (options.ShouldRun(OnlineUxSmokeScenarios.Spectator))
+    {
+        Require(capabilities.SpectatorMode && capabilities.SupportedHubMethods.Contains(OnlineMessageTypes.JoinSpectator),
+            "deployed server does not advertise JoinSpectator");
+    }
+    if (options.ShouldRun(OnlineUxSmokeScenarios.Lobby))
+    {
+        Require(capabilities.LobbySnapshot && capabilities.SupportedHubMethods.Contains(OnlineMessageTypes.RequestLobbySnapshot),
+            "deployed server does not advertise RequestLobbySnapshot");
+    }
+}
+
+static string SanitizeLogText(string value)
+{
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return "unspecified error";
+    }
+    var sanitized = Regex.Replace(
+        value,
+        "(?i)(access[_-]?token|refresh[_-]?token|authorization|bearer|password|private[_-]?key)\\s*[:=]?\\s*[^\\s,;]+",
+        "$1=<redacted>");
+    sanitized = Regex.Replace(sanitized, "(?i)(https?://[^\\s?]+)\\?[^\\s]+", "$1?<redacted-query>");
+    return sanitized.Replace('\r', ' ').Replace('\n', ' ').Trim();
+}
+
 static string Short(string value)
 {
     return value.Length <= 8 ? value : value[..8];
@@ -461,9 +724,67 @@ internal sealed class AuthTokenResponse
     public string ErrorCode { get; set; } = "";
 }
 
+internal static class OnlineUxSmokeScenarios
+{
+    public const string Play = "play";
+    public const string Resume = "resume";
+    public const string Spectator = "spectator";
+    public const string Lobby = "lobby";
+    public const string All = "all";
+}
+
+internal static class OnlineUxSmokeProfiles
+{
+    public static readonly HashSet<string> All = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "classic-six-side-3d-8x8x8-v0.1",
+        "single-side-3d-8x8x8-v0.1",
+        "asgard-convergence-3d-8x8x8-v0.1",
+        "rubik-convergence-3d-8x8x8-v0.1",
+        "hodge-projection-duel-3d-8x8x8-v0.1"
+    };
+}
+
+internal sealed record SmokeCapabilities(
+    bool ResumeMatch,
+    bool SpectatorMode,
+    bool LobbySnapshot,
+    HashSet<string> SupportedHubMethods)
+{
+    public static SmokeCapabilities Parse(JsonElement diagnostics)
+    {
+        return new SmokeCapabilities(
+            ReadBool(diagnostics, "resumeMatch"),
+            ReadBool(diagnostics, "spectatorMode"),
+            ReadBool(diagnostics, "lobbySnapshot"),
+            ReadStringSet(diagnostics, "supportedHubMethods"));
+    }
+
+    private static bool ReadBool(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.True;
+    }
+
+    private static HashSet<string> ReadStringSet(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var value) || value.ValueKind != JsonValueKind.Array)
+        {
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+        return value.EnumerateArray()
+            .Where(item => item.ValueKind == JsonValueKind.String)
+            .Select(item => item.GetString() ?? "")
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+}
+
 internal sealed record SmokeOptions(
     string BaseUrl,
-    string RulesetId,
+    string ProfileId,
+    string Scenario,
+    string RunId,
+    bool NoSecretLog,
     int TimeoutSeconds,
     int FromX,
     int FromY,
@@ -473,27 +794,61 @@ internal sealed record SmokeOptions(
     int ToZ,
     bool SkipActionSubmit)
 {
+    public bool ShouldRun(string scenario)
+    {
+        return Scenario.Equals(OnlineUxSmokeScenarios.All, StringComparison.OrdinalIgnoreCase) ||
+            Scenario.Equals(scenario, StringComparison.OrdinalIgnoreCase);
+    }
+
     public static SmokeOptions Parse(string[] args)
     {
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "base-url", "profile-id", "ruleset", "scenario", "run-id", "timeout",
+            "from-x", "from-y", "from-z", "to-x", "to-y", "to-z",
+            "skip-action-submit", "no-secret-log"
+        };
         for (var i = 0; i < args.Length; i++)
         {
             if (!args[i].StartsWith("--", StringComparison.Ordinal))
             {
-                continue;
+                throw new ArgumentException($"Unexpected positional argument '{args[i]}'.");
             }
             var key = args[i][2..];
+            if (!known.Contains(key))
+            {
+                throw new ArgumentException($"Unsupported argument '--{key}'.");
+            }
             var value = i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal)
                 ? args[++i]
                 : "true";
             map[key] = value;
         }
 
-        var baseUrl = Required(map, "base-url");
+        var baseUrl = Required(map, "base-url").TrimEnd('/');
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new ArgumentException("--base-url must be an absolute HTTP or HTTPS URL.");
+        }
+        var profileId = map.GetValueOrDefault("profile-id", map.GetValueOrDefault("ruleset", "asgard-convergence-3d-8x8x8-v0.1"));
+        if (!OnlineUxSmokeProfiles.All.Contains(profileId))
+        {
+            throw new ArgumentException($"Unsupported profile '{profileId}'. Expected one of the five tracked Chess3D profiles.");
+        }
+        var runId = map.GetValueOrDefault("run-id", Guid.NewGuid().ToString("N")).Trim();
+        if (string.IsNullOrWhiteSpace(runId))
+        {
+            throw new ArgumentException("--run-id cannot be empty.");
+        }
         return new SmokeOptions(
             baseUrl,
-            map.GetValueOrDefault("ruleset", "asgard-convergence-3d-8x8x8-v0.1"),
-            Int(map, "timeout", 120),
+            profileId,
+            NormalizeScenario(map.GetValueOrDefault("scenario", OnlineUxSmokeScenarios.All)),
+            runId,
+            map.ContainsKey("no-secret-log"),
+            BoundedInt(map, "timeout", 180, 10, 900),
             Int(map, "from-x", 2),
             Int(map, "from-y", 3),
             Int(map, "from-z", 0),
@@ -501,6 +856,20 @@ internal sealed record SmokeOptions(
             Int(map, "to-y", 3),
             Int(map, "to-z", 1),
             map.ContainsKey("skip-action-submit"));
+    }
+
+    private static string NormalizeScenario(string scenario)
+    {
+        var normalized = scenario.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            OnlineUxSmokeScenarios.Play or
+            OnlineUxSmokeScenarios.Resume or
+            OnlineUxSmokeScenarios.Spectator or
+            OnlineUxSmokeScenarios.Lobby or
+            OnlineUxSmokeScenarios.All => normalized,
+            _ => throw new ArgumentException($"Unsupported --scenario '{scenario}'. Expected play, resume, spectator, lobby, or all.")
+        };
     }
 
     private static string Required(Dictionary<string, string> map, string key)
@@ -515,5 +884,15 @@ internal sealed record SmokeOptions(
     private static int Int(Dictionary<string, string> map, string key, int fallback)
     {
         return map.TryGetValue(key, out var value) && int.TryParse(value, out var parsed) ? parsed : fallback;
+    }
+
+    private static int BoundedInt(Dictionary<string, string> map, string key, int fallback, int minimum, int maximum)
+    {
+        var value = Int(map, key, fallback);
+        if (value < minimum || value > maximum)
+        {
+            throw new ArgumentException($"--{key} must be between {minimum} and {maximum}.");
+        }
+        return value;
     }
 }
