@@ -17,6 +17,7 @@ param(
     [switch]$NoSecretLog,
     [switch]$BuildTool,
     [switch]$SkipActionSubmit,
+    [switch]$NegativeResume,
     [Alias("UniqueRunId")]
     [string]$RunId = "",
     [string]$LogDirectory = "",
@@ -73,6 +74,7 @@ Write-Host "StdoutLog: $stdout"
 Write-Host "StderrLog: $stderr"
 Write-Host "NoSecretLog: $($NoSecretLog.IsPresent)"
 Write-Host "SkipActionSubmit: $($SkipActionSubmit.IsPresent)"
+Write-Host "NegativeResume: $($NegativeResume.IsPresent)"
 Write-Host "Health:"
 Write-Host "  $BaseUrl/healthz/live"
 Write-Host "  $BaseUrl/healthz/ready"
@@ -137,6 +139,10 @@ if ($NoSecretLog) {
 
 if ($SkipActionSubmit) {
     $argParts += "--skip-action-submit"
+}
+
+if ($NegativeResume) {
+    $argParts += "--negative-resume"
 }
 
 $childArgs = $argParts -join " "

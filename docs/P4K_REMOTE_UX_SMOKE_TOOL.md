@@ -47,6 +47,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass `
 
 Use `-SkipActionSubmit` only when a scenario intentionally verifies non-mutating connectivity. Resume and spectator positive proof normally require action submission.
 
+Add `-NegativeResume` to the `resume` scenario to probe wrong player, unknown room/table, wrong ruleset, unseated user, stale hash reconciliation, and old-sequence action-log catch-up. The flag is opt-in so ordinary positive and combined scenarios keep their original runtime and output scope.
+
 ## Output contract
 
 The C# tool emits:

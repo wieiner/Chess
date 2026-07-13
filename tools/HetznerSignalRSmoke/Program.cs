@@ -182,7 +182,19 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
 
     if (options.ShouldRun(OnlineUxSmokeScenarios.Resume))
     {
-        await RunResumeScenarioAsync(client1, token1, roomId, tableId, latestSnapshot, latestActionLog, options, cancellationToken);
+        await RunResumeScenarioAsync(
+            http,
+            hubUrl,
+            client1,
+            client2,
+            token1,
+            token2,
+            roomId,
+            tableId,
+            latestSnapshot,
+            latestActionLog,
+            options,
+            cancellationToken);
     }
 
     if (options.ShouldRun(OnlineUxSmokeScenarios.Lobby))
@@ -262,8 +274,12 @@ static async Task RunLobbyScenarioAsync(
 }
 
 static async Task RunResumeScenarioAsync(
+    HttpClient http,
+    string hubUrl,
     HubConnection client,
+    HubConnection otherSeatedClient,
     AuthTokenResponse token,
+    AuthTokenResponse otherSeatedToken,
     string roomId,
     string tableId,
     OnlineSnapshot latestSnapshot,
@@ -305,6 +321,200 @@ static async Task RunResumeScenarioAsync(
     Require((resume.ActionLog?.Events.Count ?? 0) == latestActionLog.Events.Count, "resume action log matches authoritative history");
     Require(resumeSnapshot.ServerSeq == beforeSeq, "resume server sequence unchanged");
     Console.WriteLine($"STEP PASS resume seat={resume.SeatIndex} hash={resumeSnapshot.StateHash} seq={resumeSnapshot.ServerSeq}");
+
+    if (options.NegativeResume)
+    {
+        await RunResumeAuthorityBoundaryScenarioAsync(
+            http,
+            hubUrl,
+            client,
+            otherSeatedClient,
+            token,
+            otherSeatedToken,
+            roomId,
+            tableId,
+            resumeSnapshot,
+            latestActionLog,
+            options,
+            cancellationToken);
+    }
+}
+
+static async Task RunResumeAuthorityBoundaryScenarioAsync(
+    HttpClient http,
+    string hubUrl,
+    HubConnection primaryClient,
+    HubConnection otherSeatedClient,
+    AuthTokenResponse primaryToken,
+    AuthTokenResponse otherSeatedToken,
+    string roomId,
+    string tableId,
+    OnlineSnapshot authoritativeSnapshot,
+    OnlineActionLogChunk authoritativeActionLog,
+    SmokeOptions options,
+    CancellationToken cancellationToken)
+{
+    Console.WriteLine("STEP START resume authority boundaries");
+    var acceptedBefore = await GetAcceptedActionCountAsync(http, cancellationToken);
+    var hashBefore = authoritativeSnapshot.StateHash;
+    var actionCountBefore = authoritativeSnapshot.ActionCount;
+
+    var wrongPlayer = await InvokeResumeProbeAsync(
+        otherSeatedClient,
+        otherSeatedToken.PlayerId,
+        roomId,
+        tableId,
+        seatIndex: 1,
+        options.ProfileId,
+        hashBefore,
+        authoritativeSnapshot.ServerSeq,
+        cancellationToken);
+    RequireResumeFailure(wrongPlayer, OnlineResumeFailureReasons.PlayerNotInTable, "wrong player");
+
+    var unknownRoom = await InvokeResumeProbeAsync(
+        primaryClient,
+        primaryToken.PlayerId,
+        $"{roomId}-missing",
+        tableId,
+        seatIndex: 1,
+        options.ProfileId,
+        hashBefore,
+        authoritativeSnapshot.ServerSeq,
+        cancellationToken);
+    RequireResumeFailure(unknownRoom, OnlineResumeFailureReasons.TableNotFound, "unknown room");
+
+    var unknownTable = await InvokeResumeProbeAsync(
+        primaryClient,
+        primaryToken.PlayerId,
+        roomId,
+        $"{tableId}-missing",
+        seatIndex: 1,
+        options.ProfileId,
+        hashBefore,
+        authoritativeSnapshot.ServerSeq,
+        cancellationToken);
+    RequireResumeFailure(unknownTable, OnlineResumeFailureReasons.TableNotFound, "unknown table");
+
+    var wrongRuleset = OnlineUxSmokeProfiles.All.First(profile => !profile.Equals(options.ProfileId, StringComparison.OrdinalIgnoreCase));
+    var rulesetMismatch = await InvokeResumeProbeAsync(
+        primaryClient,
+        primaryToken.PlayerId,
+        roomId,
+        tableId,
+        seatIndex: 1,
+        wrongRuleset,
+        hashBefore,
+        authoritativeSnapshot.ServerSeq,
+        cancellationToken);
+    RequireResumeFailure(rulesetMismatch, OnlineResumeFailureReasons.RulesetMismatch, "wrong ruleset");
+
+    var suffix = Guid.NewGuid().ToString("N")[..10];
+    var unseatedUser = $"smoke-u-{suffix}";
+    var unseatedPassword = $"Smoke-{suffix}-U!2026";
+    await RegisterAsync(http, unseatedUser, "Smoke Unseated", unseatedPassword, cancellationToken);
+    var unseatedToken = await LoginAsync(http, unseatedUser, unseatedPassword, cancellationToken);
+    await using (var unseatedClient = NewAuthenticatedClient(hubUrl, unseatedToken.AccessToken))
+    {
+        await unseatedClient.StartAsync(cancellationToken);
+        var hello = await InvokeAsync(unseatedClient, "Hello", Message(OnlineMessageTypes.Hello, "smoke-client-u", unseatedToken.PlayerId), cancellationToken);
+        Require(hello.Envelope.MessageType == OnlineMessageTypes.Welcome, "unseated probe player welcomed");
+        var unseated = await InvokeResumeProbeAsync(
+            unseatedClient,
+            unseatedToken.PlayerId,
+            roomId,
+            tableId,
+            seatIndex: 1,
+            options.ProfileId,
+            hashBefore,
+            authoritativeSnapshot.ServerSeq,
+            cancellationToken);
+        RequireResumeFailure(unseated, OnlineResumeFailureReasons.PlayerNotInTable, "unseated player");
+    }
+
+    var staleHash = await InvokeResumeProbeAsync(
+        primaryClient,
+        primaryToken.PlayerId,
+        roomId,
+        tableId,
+        seatIndex: 1,
+        options.ProfileId,
+        $"stale-{hashBefore}",
+        authoritativeSnapshot.ServerSeq,
+        cancellationToken);
+    Require(staleHash.ResumeResult?.Success == true, "stale hash reconciles to authoritative resume state");
+    var staleResume = staleHash.ResumeResult ?? throw new InvalidOperationException("stale hash resume result missing");
+    Require(staleResume.Snapshot?.StateHash == hashBefore, "stale hash response returns authoritative hash");
+    Console.WriteLine("STEP PASS resume negative probe=stale-hash behavior=authoritative-reconcile");
+
+    var oldSequence = await InvokeResumeProbeAsync(
+        primaryClient,
+        primaryToken.PlayerId,
+        roomId,
+        tableId,
+        seatIndex: 1,
+        options.ProfileId,
+        hashBefore,
+        lastKnownServerSeq: 0,
+        cancellationToken);
+    Require(oldSequence.ResumeResult?.Success == true, "old sequence reconciles successfully");
+    var oldSequenceResume = oldSequence.ResumeResult ?? throw new InvalidOperationException("old sequence resume result missing");
+    Require(oldSequenceResume.Snapshot?.StateHash == hashBefore, "old sequence response returns authoritative hash");
+    Require((oldSequenceResume.ActionLog?.Events.Count ?? 0) == authoritativeActionLog.Events.Count, "old sequence response returns complete action-log tail");
+    Console.WriteLine("STEP PASS resume negative probe=old-sequence behavior=action-log-catch-up");
+
+    var after = await InvokeAsync(primaryClient, "RequestSnapshot", Message(OnlineMessageTypes.RequestSnapshot, "smoke-client-a-negative", primaryToken.PlayerId, roomId, tableId), cancellationToken);
+    Require(after.Snapshot?.StateHash == hashBefore, "resume probes leave state hash unchanged");
+    Require(after.Snapshot?.ActionCount == actionCountBefore, "resume probes leave action count unchanged");
+    var acceptedAfter = await GetAcceptedActionCountAsync(http, cancellationToken);
+    Require(acceptedAfter == acceptedBefore, "resume probes leave accepted action diagnostics unchanged");
+    Console.WriteLine($"STEP PASS resume authority boundaries hash={hashBefore} acceptedActions={acceptedAfter}");
+}
+
+static async Task<OnlineProtocolMessage> InvokeResumeProbeAsync(
+    HubConnection client,
+    string playerId,
+    string roomId,
+    string tableId,
+    int seatIndex,
+    string expectedRulesetId,
+    string lastKnownStateHash,
+    long lastKnownServerSeq,
+    CancellationToken cancellationToken)
+{
+    var message = Message(OnlineMessageTypes.RequestResumeMatch, "smoke-resume-probe", playerId, roomId, tableId);
+    message.ResumeRequest = new OnlineResumeRequest
+    {
+        PlayerId = playerId,
+        RoomId = roomId,
+        TableId = tableId,
+        SeatIndex = seatIndex,
+        ExpectedRulesetId = expectedRulesetId,
+        LastKnownStateHash = lastKnownStateHash,
+        LastKnownServerSeq = lastKnownServerSeq
+    };
+    return await InvokeAsync(client, "RequestResumeMatch", message, cancellationToken);
+}
+
+static void RequireResumeFailure(OnlineProtocolMessage response, string expectedReason, string label)
+{
+    Require(response.Envelope.MessageType == OnlineMessageTypes.ResumeMatchResult, $"{label} returns resume result");
+    var result = response.ResumeResult ?? throw new InvalidOperationException($"{label} resume result missing");
+    Require(!result.Success, $"{label} resume is rejected");
+    Require(result.FailureReason == expectedReason, $"{label} reason is {expectedReason}, actual={result.FailureReason}");
+    Require(!string.IsNullOrWhiteSpace(result.FailureText), $"{label} has safe failure text");
+    Require(!result.FailureText.Contains("System.", StringComparison.Ordinal) &&
+        !result.FailureText.Contains('\n') &&
+        !Regex.IsMatch(result.FailureText, "(?i)\\bat\\s+[A-Za-z_][A-Za-z0-9_.<>]+\\("),
+        $"{label} failure text contains no stack trace");
+    Console.WriteLine($"STEP PASS resume negative probe={label.Replace(' ', '-')} reason={result.FailureReason}");
+}
+
+static async Task<int> GetAcceptedActionCountAsync(HttpClient http, CancellationToken cancellationToken)
+{
+    using var diagnostics = await JsonDocument.ParseAsync(
+        await http.GetStreamAsync("/chess3d/diagnostics", cancellationToken),
+        cancellationToken: cancellationToken);
+    return JsonInt(diagnostics.RootElement, "acceptedActionCount");
 }
 
 static async Task RunSpectatorScenarioAsync(
@@ -792,7 +1002,8 @@ internal sealed record SmokeOptions(
     int ToX,
     int ToY,
     int ToZ,
-    bool SkipActionSubmit)
+    bool SkipActionSubmit,
+    bool NegativeResume)
 {
     public bool ShouldRun(string scenario)
     {
@@ -807,7 +1018,7 @@ internal sealed record SmokeOptions(
         {
             "base-url", "profile-id", "ruleset", "scenario", "run-id", "timeout",
             "from-x", "from-y", "from-z", "to-x", "to-y", "to-z",
-            "skip-action-submit", "no-secret-log"
+            "skip-action-submit", "no-secret-log", "negative-resume"
         };
         for (var i = 0; i < args.Length; i++)
         {
@@ -855,7 +1066,8 @@ internal sealed record SmokeOptions(
             Int(map, "to-x", 2),
             Int(map, "to-y", 3),
             Int(map, "to-z", 1),
-            map.ContainsKey("skip-action-submit"));
+            map.ContainsKey("skip-action-submit"),
+            map.ContainsKey("negative-resume"));
     }
 
     private static string NormalizeScenario(string scenario)
