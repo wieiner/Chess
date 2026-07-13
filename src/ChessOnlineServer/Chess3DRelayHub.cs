@@ -458,9 +458,13 @@ public sealed class Chess3DRelayHub : Hub
             {
                 return authError;
             }
-            if (!_connections.AllowCommand(Context.ConnectionId, _options.RateLimitPermitLimit, _options.RateLimitWindowSeconds))
+            if (!_connections.AllowCommand(
+                Context.ConnectionId,
+                AuthenticatedPlayerId(),
+                _options.RateLimitPermitLimit,
+                _options.RateLimitWindowSeconds))
             {
-                return Error(message.Envelope, OnlineRejectReasons.IllegalAction, "Rate limit exceeded.");
+                return Error(message.Envelope, OnlineRejectReasons.RateLimited, "Rate limit exceeded.");
             }
             var envelope = CurrentEnvelope(message.Envelope);
             return call(envelope);

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 using System.Net;
@@ -21,6 +22,8 @@ public static class ChessOnlineServerHost
         builder.Logging.ClearProviders();
         builder.Logging.AddConsole();
         builder.Logging.AddDebug();
+        builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting", LogLevel.Warning);
+        builder.Logging.AddFilter("Microsoft.AspNetCore.Http.Connections", LogLevel.Warning);
         builder.Configuration.AddEnvironmentVariables("CHESS3D_ONLINE_");
 
         var options = new HostedOnlineOptions();
@@ -67,7 +70,7 @@ public static class ChessOnlineServerHost
         builder.Services.AddSingleton(sp => new OnlineRoomRegistry(
             options.ProfileRoot,
             timeProvider: sp.GetRequiredService<TimeProvider>()));
-        builder.Services.AddSingleton<OnlineHubConnectionRegistry>();
+        builder.Services.AddSingleton(sp => new OnlineHubConnectionRegistry(sp.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton(sp => new OnlineSpectatorRegistry(sp.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<OnlineMatchmakingService>();
         builder.Services.AddSingleton<OnlineRoomCleanupCoordinator>();
@@ -108,6 +111,43 @@ public static class ChessOnlineServerHost
             forwarded.KnownProxies.Add(IPAddress.IPv6Loopback);
         });
         builder.Services.AddHealthChecks();
+        builder.Services.AddRateLimiter(limits =>
+        {
+            limits.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            limits.OnRejected = async (context, cancellationToken) =>
+            {
+                if (!context.HttpContext.Response.HasStarted)
+                {
+                    context.HttpContext.Response.ContentType = "application/json";
+                    await context.HttpContext.Response.WriteAsJsonAsync(new
+                    {
+                        success = false,
+                        errorCode = "rateLimited",
+                        errorText = "Too many requests."
+                    }, cancellationToken);
+                }
+            };
+            limits.AddPolicy(OnlineRateLimitPolicies.Register, context =>
+                OnlineRateLimitPolicies.FixedWindow(
+                    context,
+                    options.RateLimits.RegisterPermitLimit,
+                    options.RateLimits.RegisterWindowSeconds));
+            limits.AddPolicy(OnlineRateLimitPolicies.Login, context =>
+                OnlineRateLimitPolicies.FixedWindow(
+                    context,
+                    options.RateLimits.LoginPermitLimit,
+                    options.RateLimits.LoginWindowSeconds));
+            limits.AddPolicy(OnlineRateLimitPolicies.Session, context =>
+                OnlineRateLimitPolicies.FixedWindow(
+                    context,
+                    options.RateLimits.SessionPermitLimit,
+                    options.RateLimits.SessionWindowSeconds));
+            limits.AddPolicy(OnlineRateLimitPolicies.Diagnostics, context =>
+                OnlineRateLimitPolicies.FixedWindow(
+                    context,
+                    options.RateLimits.DiagnosticsPermitLimit,
+                    options.RateLimits.DiagnosticsWindowSeconds));
+        });
 
         var app = builder.Build();
         app.UseForwardedHeaders();
@@ -117,6 +157,7 @@ public static class ChessOnlineServerHost
             app.UseAuthentication();
             app.UseAuthorization();
         }
+        app.UseRateLimiter();
         app.MapHealthChecks("/healthz/live");
         app.MapGet("/healthz/ready", (OnlineRoomRegistry registry) =>
         {
@@ -134,7 +175,7 @@ public static class ChessOnlineServerHost
                 : Results.Json(new { status = "notReady", reason = "missingProfile" }, statusCode: 503);
         });
         MapAuthEndpoints(app, options);
-        app.MapGet("/chess3d/diagnostics", (
+        var diagnosticsEndpoint = app.MapGet("/chess3d/diagnostics", (
             OnlineRoomRegistry registry,
             OnlineHubConnectionRegistry connections,
             OnlineMatchmakingService matchmaking,
@@ -189,6 +230,10 @@ public static class ChessOnlineServerHost
                 matchmakingQueueCount = matchmaking.ActiveQueueCount
             });
         });
+        if (options.RateLimits.Enabled)
+        {
+            diagnosticsEndpoint.RequireRateLimiting(OnlineRateLimitPolicies.Diagnostics);
+        }
         app.MapHub<Chess3DRelayHub>(options.HubPath, hub =>
         {
             hub.Transports = HttpTransportType.WebSockets | HttpTransportType.LongPolling;
@@ -201,7 +246,7 @@ public static class ChessOnlineServerHost
 
     private static void MapAuthEndpoints(WebApplication app, HostedOnlineOptions options)
     {
-        app.MapPost("/api/auth/register", async (AuthRegisterRequest request, HttpContext http, OnlineAccountService accounts, OnlineTokenService tokens, CancellationToken cancellationToken) =>
+        var register = app.MapPost("/api/auth/register", async (AuthRegisterRequest request, HttpContext http, OnlineAccountService accounts, OnlineTokenService tokens, CancellationToken cancellationToken) =>
         {
             if (options.Auth.RequireHttpsForTokens && !IsHttpsOrLoopback(http))
             {
@@ -214,8 +259,12 @@ public static class ChessOnlineServerHost
             }
             return Results.Json(await IssueTokensAsync(result.Account, request.ClientName, accounts, tokens, options, cancellationToken));
         });
+        if (options.RateLimits.Enabled)
+        {
+            register.RequireRateLimiting(OnlineRateLimitPolicies.Register);
+        }
 
-        app.MapPost("/api/auth/login", async (AuthLoginRequest request, HttpContext http, OnlineAccountService accounts, OnlineTokenService tokens, CancellationToken cancellationToken) =>
+        var login = app.MapPost("/api/auth/login", async (AuthLoginRequest request, HttpContext http, OnlineAccountService accounts, OnlineTokenService tokens, CancellationToken cancellationToken) =>
         {
             if (options.Auth.RequireHttpsForTokens && !IsHttpsOrLoopback(http))
             {
@@ -228,8 +277,12 @@ public static class ChessOnlineServerHost
             }
             return Results.Json(await IssueTokensAsync(result.Account, request.ClientName, accounts, tokens, options, cancellationToken));
         });
+        if (options.RateLimits.Enabled)
+        {
+            login.RequireRateLimiting(OnlineRateLimitPolicies.Login);
+        }
 
-        app.MapPost("/api/auth/refresh", async (AuthRefreshRequest request, OnlineTokenService tokens, OnlineAccountService accounts, CancellationToken cancellationToken) =>
+        var refresh = app.MapPost("/api/auth/refresh", async (AuthRefreshRequest request, OnlineTokenService tokens, OnlineAccountService accounts, CancellationToken cancellationToken) =>
         {
             var validation = await tokens.ValidateRefreshTokenAsync(request.RefreshToken, cancellationToken);
             if (!validation.Success || validation.Account == null || validation.Session == null)
@@ -239,8 +292,12 @@ public static class ChessOnlineServerHost
             var accessToken = tokens.CreateAccessToken(validation.Account, validation.Session);
             return Results.Json(AuthTokenResponse.Ok(validation.Account, validation.Session, accessToken, request.RefreshToken, validation.Session.ExpiresAtUtc));
         });
+        if (options.RateLimits.Enabled)
+        {
+            refresh.RequireRateLimiting(OnlineRateLimitPolicies.Session);
+        }
 
-        app.MapPost("/api/auth/logout", async (AuthRefreshRequest request, OnlineTokenService tokens, OnlineAccountService accounts, CancellationToken cancellationToken) =>
+        var logout = app.MapPost("/api/auth/logout", async (AuthRefreshRequest request, OnlineTokenService tokens, OnlineAccountService accounts, CancellationToken cancellationToken) =>
         {
             var validation = await tokens.ValidateRefreshTokenAsync(request.RefreshToken, cancellationToken);
             if (validation.Session != null)
@@ -249,8 +306,12 @@ public static class ChessOnlineServerHost
             }
             return Results.Json(new { success = true });
         });
+        if (options.RateLimits.Enabled)
+        {
+            logout.RequireRateLimiting(OnlineRateLimitPolicies.Session);
+        }
 
-        app.MapGet("/api/auth/me", async (HttpContext http, OnlineAccountService accounts) =>
+        var me = app.MapGet("/api/auth/me", async (HttpContext http, OnlineAccountService accounts) =>
         {
             var playerId = http.User.FindFirst("playerId")?.Value ?? "";
             if (string.IsNullOrWhiteSpace(playerId))
@@ -262,6 +323,10 @@ public static class ChessOnlineServerHost
                 ? Results.Json(AuthTokenResponse.Fail("notFound", "Authenticated player was not found."), statusCode: 404)
                 : Results.Json(new { success = true, account.PlayerId, account.UserName, account.DisplayName });
         });
+        if (options.RateLimits.Enabled)
+        {
+            me.RequireRateLimiting(OnlineRateLimitPolicies.Session);
+        }
     }
 
     private static async Task<AuthTokenResponse> IssueTokensAsync(

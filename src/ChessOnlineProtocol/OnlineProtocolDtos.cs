@@ -93,6 +93,7 @@ public static class OnlineRejectReasons
     public const string UnsupportedRuleset = "unsupportedRuleset";
     public const string UnsupportedAction = "unsupportedAction";
     public const string IllegalAction = "illegalAction";
+    public const string RateLimited = "rateLimited";
     public const string StaleStateHash = "staleStateHash";
     public const string InternalError = "internalError";
     public const string AlreadyQueued = "alreadyQueued";

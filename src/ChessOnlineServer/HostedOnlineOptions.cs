@@ -26,6 +26,7 @@ public sealed class HostedOnlineOptions
     public HostedDataProtectionOptions DataProtection { get; set; } = new();
     public HostedSecurityOptions Security { get; set; } = new();
     public HostedCleanupOptions Cleanup { get; set; } = new();
+    public HostedRateLimitOptions RateLimits { get; set; } = new();
 
     public void Normalize()
     {
@@ -51,6 +52,32 @@ public sealed class HostedOnlineOptions
         DataProtection.Normalize();
         Security.Normalize();
         Cleanup.Normalize();
+        RateLimits.Normalize();
+    }
+}
+
+public sealed class HostedRateLimitOptions
+{
+    public bool Enabled { get; set; } = true;
+    public int RegisterPermitLimit { get; set; } = 5;
+    public int RegisterWindowSeconds { get; set; } = 600;
+    public int LoginPermitLimit { get; set; } = 10;
+    public int LoginWindowSeconds { get; set; } = 60;
+    public int SessionPermitLimit { get; set; } = 30;
+    public int SessionWindowSeconds { get; set; } = 60;
+    public int DiagnosticsPermitLimit { get; set; } = 30;
+    public int DiagnosticsWindowSeconds { get; set; } = 60;
+
+    public void Normalize()
+    {
+        RegisterPermitLimit = Math.Clamp(RegisterPermitLimit, 1, 1000);
+        RegisterWindowSeconds = Math.Clamp(RegisterWindowSeconds, 1, 3600);
+        LoginPermitLimit = Math.Clamp(LoginPermitLimit, 1, 10000);
+        LoginWindowSeconds = Math.Clamp(LoginWindowSeconds, 1, 3600);
+        SessionPermitLimit = Math.Clamp(SessionPermitLimit, 1, 10000);
+        SessionWindowSeconds = Math.Clamp(SessionWindowSeconds, 1, 3600);
+        DiagnosticsPermitLimit = Math.Clamp(DiagnosticsPermitLimit, 1, 10000);
+        DiagnosticsWindowSeconds = Math.Clamp(DiagnosticsWindowSeconds, 1, 3600);
     }
 }
 

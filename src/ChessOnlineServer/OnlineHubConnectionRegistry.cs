@@ -6,9 +6,15 @@ namespace ChessOnlineServer;
 public sealed class OnlineHubConnectionRegistry
 {
     private readonly object _gate = new();
+    private readonly TimeProvider _timeProvider;
     private readonly Dictionary<string, OnlineConnectionSession> _byConnection = new(StringComparer.Ordinal);
     private readonly Dictionary<string, OnlineConnectionSession> _bySessionToken = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<DateTime>> _commandTimes = new(StringComparer.Ordinal);
+
+    public OnlineHubConnectionRegistry(TimeProvider? timeProvider = null)
+    {
+        _timeProvider = timeProvider ?? TimeProvider.System;
+    }
 
     public OnlineConnectionSession Hello(string connectionId, OnlineMessageEnvelope envelope)
     {
@@ -136,22 +142,38 @@ public sealed class OnlineHubConnectionRegistry
                 session.IsConnected = session.ConnectionIds.Count > 0;
                 session.LastSeenUtc = DateTime.UtcNow;
             }
-            _commandTimes.Remove(connectionId);
+            _commandTimes.Remove(ConnectionPartition(connectionId));
         }
     }
 
     public bool AllowCommand(string connectionId, int permitLimit, int windowSeconds)
     {
+        return AllowCommand(connectionId, "", permitLimit, windowSeconds);
+    }
+
+    public bool AllowCommand(string connectionId, string playerId, int permitLimit, int windowSeconds)
+    {
         lock (_gate)
         {
-            var now = DateTime.UtcNow;
-            if (!_commandTimes.TryGetValue(connectionId, out var times))
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            var partition = string.IsNullOrWhiteSpace(playerId)
+                ? ConnectionPartition(connectionId)
+                : PlayerPartition(playerId);
+            var window = Math.Clamp(windowSeconds, 1, 3600);
+            foreach (var key in _commandTimes.Keys.ToArray())
+            {
+                _commandTimes[key].RemoveAll(t => (now - t).TotalSeconds > window);
+                if (_commandTimes[key].Count == 0)
+                {
+                    _commandTimes.Remove(key);
+                }
+            }
+            if (!_commandTimes.TryGetValue(partition, out var times))
             {
                 times = new List<DateTime>();
-                _commandTimes[connectionId] = times;
+                _commandTimes[partition] = times;
             }
-            times.RemoveAll(t => (now - t).TotalSeconds > windowSeconds);
-            if (times.Count >= permitLimit)
+            if (times.Count >= Math.Clamp(permitLimit, 1, 10000))
             {
                 return false;
             }
@@ -159,6 +181,10 @@ public sealed class OnlineHubConnectionRegistry
             return true;
         }
     }
+
+    private static string ConnectionPartition(string connectionId) => $"connection:{connectionId.Trim()}";
+
+    private static string PlayerPartition(string playerId) => $"player:{playerId.Trim().ToUpperInvariant()}";
 
     public int ActiveConnectionCount
     {

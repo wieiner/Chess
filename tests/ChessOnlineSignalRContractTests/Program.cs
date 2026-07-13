@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Net.Sockets;
+using System.Security.Claims;
 using System.Text.Json;
 using ChessOnlinePersistence;
 using ChessOnlinePersistence.Entities;
@@ -9,8 +10,12 @@ using ChessOnlinePersistence.Repositories;
 using ChessOnlineProtocol;
 using ChessOnlineServer;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 var test = new ContractTest("ChessOnlineSignalRContractTests");
 WebApplication? app = null;
@@ -38,6 +43,7 @@ try
     await ServerStartupTests(test, url, hubUrl);
     SpectatorRegistryTests(test, profileRoot);
     RoomCleanupTests(test, profileRoot);
+    RateLimitPartitionTests(test);
     await ProtocolTests(test, hubUrl);
     await RoomTableAuthorityTests(test, hubUrl, profileRoot);
     await ProfileActionTests(test, hubUrl, profileRoot);
@@ -45,6 +51,7 @@ try
     await ConcurrencyTests(test, hubUrl, profileRoot);
     await SecurityTests(test, hubUrl);
     await AuthPersistenceTests(test, root, profileRoot);
+    await HttpRateLimitTests(test, root, profileRoot);
     await PersistenceRestartSequenceTests(test, root);
     FixtureParseTests(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "signalr"));
     FixtureParseTestsWithFormat(test, Path.Combine(root, "assets", "rules", "scenarios", "chess3d", "identity"), "chess3d-identity-regression", "Identity fixture");
@@ -596,6 +603,116 @@ static async Task AuthPersistenceTests(ContractTest test, string root, string pr
     test.Check(storeDoc.RootElement.GetProperty("actions").GetArrayLength() >= 1, "P4A JSON store persists accepted action log event");
 
     await authApp.StopAsync();
+}
+
+static void RateLimitPartitionTests(ContractTest test)
+{
+    var clock = new ManualTimeProvider(new DateTimeOffset(2026, 7, 13, 0, 0, 0, TimeSpan.Zero));
+    var registry = new OnlineHubConnectionRegistry(clock);
+    test.Check(registry.AllowCommand("connection-a", "player-a", 2, 60),
+        "P4K authenticated player rate partition accepts first command");
+    test.Check(registry.AllowCommand("connection-a", "player-a", 2, 60),
+        "P4K authenticated player rate partition accepts second command");
+    test.Check(!registry.AllowCommand("connection-b", "player-a", 2, 60),
+        "P4K reconnect cannot reset authenticated player rate partition");
+    test.Check(registry.AllowCommand("connection-c", "player-b", 2, 60),
+        "P4K independent authenticated player has an independent rate partition");
+    clock.Advance(TimeSpan.FromSeconds(61));
+    test.Check(registry.AllowCommand("connection-d", "player-a", 2, 60),
+        "P4K authenticated player rate partition replenishes after its fixed window");
+
+    var authenticated = new DefaultHttpContext();
+    authenticated.User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+    {
+        new Claim("playerId", "player-a")
+    }, "contract-test"));
+    authenticated.Request.QueryString = new QueryString("?access_token=must-not-be-a-partition-key");
+    var playerKey = OnlineRateLimitPolicies.BuildPartitionKey(authenticated);
+    test.Check(playerKey == "player:PLAYER-A" &&
+        !playerKey.Contains("token", StringComparison.OrdinalIgnoreCase),
+        "P4K HTTP rate partition uses authenticated player identity and never query tokens");
+
+    var anonymous = new DefaultHttpContext();
+    anonymous.Connection.RemoteIpAddress = IPAddress.Parse("198.51.100.17");
+    test.Check(OnlineRateLimitPolicies.BuildPartitionKey(anonymous) == "ip:198.51.100.17",
+        "P4K anonymous HTTP rate partition uses remote IP fallback");
+}
+
+static async Task HttpRateLimitTests(ContractTest test, string root, string profileRoot)
+{
+    var port = FindFreePort();
+    var url = $"http://127.0.0.1:{port}";
+    var tempRoot = Path.Combine(root, ".tmp", "chess3d-p4k-rate-tests", Guid.NewGuid().ToString("N"));
+
+    await using var rateApp = ChessOnlineServerHost.BuildApp(Array.Empty<string>(), options =>
+    {
+        options.HostUrls = url;
+        options.ProfileRoot = profileRoot;
+        options.Auth.EnableAuthentication = true;
+        options.Auth.AllowDevAnonymousSessions = false;
+        options.Persistence.StorePath = Path.Combine(tempRoot, "store", "online-store.json");
+        options.DataProtection.KeyRingPath = Path.Combine(tempRoot, "keys");
+        options.RateLimits.RegisterPermitLimit = 2;
+        options.RateLimits.RegisterWindowSeconds = 600;
+        options.RateLimits.DiagnosticsPermitLimit = 2;
+        options.RateLimits.DiagnosticsWindowSeconds = 600;
+    });
+
+    var filters = rateApp.Services.GetRequiredService<IOptions<LoggerFilterOptions>>().Value.Rules;
+    test.Check(filters.Any(rule => rule.CategoryName == "Microsoft.AspNetCore.Hosting" && rule.LogLevel == LogLevel.Warning) &&
+        filters.Any(rule => rule.CategoryName == "Microsoft.AspNetCore.Http.Connections" && rule.LogLevel == LogLevel.Warning),
+        "P4K hosting and SignalR connection request logs are filtered below Warning");
+
+    await rateApp.StartAsync();
+    try
+    {
+        using var http = new HttpClient { BaseAddress = new Uri(url) };
+        for (var index = 0; index < 2; index++)
+        {
+            var accepted = await http.PostAsJsonAsync("/api/auth/register", new AuthRegisterRequest
+            {
+                UserName = $"p4k-rate-{index}",
+                DisplayName = $"P4K Rate {index}",
+                Password = "correct horse battery staple",
+                ClientName = "rate-contract-test"
+            });
+            test.Check(accepted.IsSuccessStatusCode, $"P4K registration request {index + 1} is inside fixed limit");
+        }
+
+        var rejected = await http.PostAsJsonAsync("/api/auth/register", new AuthRegisterRequest
+        {
+            UserName = "p4k-rate-rejected",
+            DisplayName = "P4K Rate Rejected",
+            Password = "correct horse battery staple",
+            ClientName = "rate-contract-test"
+        });
+        var rejectedBody = await rejected.Content.ReadAsStringAsync();
+        test.Check(rejected.StatusCode == HttpStatusCode.TooManyRequests &&
+            rejectedBody.Contains("rateLimited", StringComparison.Ordinal) &&
+            !rejectedBody.Contains("password", StringComparison.OrdinalIgnoreCase) &&
+            !rejectedBody.Contains("token", StringComparison.OrdinalIgnoreCase),
+            "P4K registration limiter returns safe fixed JSON 429 without credentials");
+
+        test.Check((await http.GetAsync("/chess3d/diagnostics")).IsSuccessStatusCode &&
+            (await http.GetAsync("/chess3d/diagnostics")).IsSuccessStatusCode,
+            "P4K diagnostics requests inside fixed limit succeed");
+        var diagnosticsRejected = await http.GetAsync("/chess3d/diagnostics");
+        test.Check(diagnosticsRejected.StatusCode == HttpStatusCode.TooManyRequests,
+            "P4K diagnostics limiter returns 429 after fixed limit");
+
+        var healthStatuses = new List<HttpStatusCode>();
+        for (var index = 0; index < 4; index++)
+        {
+            healthStatuses.Add((await http.GetAsync("/healthz/live")).StatusCode);
+        }
+        test.Check(healthStatuses.All(status => status == HttpStatusCode.OK),
+            "P4K live health endpoint remains outside public request rate limits");
+    }
+    finally
+    {
+        using var stopCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        try { await rateApp.StopAsync(stopCts.Token); } catch { }
+    }
 }
 
 static async Task<(string RoomId, string TableId)> AssertMatchmakingProfile(
