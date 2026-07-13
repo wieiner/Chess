@@ -24,12 +24,17 @@ public sealed class OnlineRoomRegistry
     private readonly Dictionary<string, OnlineRoom> _rooms = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _profileRoot;
     private readonly IChessOnlineGameSessionFactory _sessionFactory;
+    private readonly TimeProvider _timeProvider;
     private readonly OnlineDiagnostics _diagnostics = new();
 
-    public OnlineRoomRegistry(string profileRoot, IChessOnlineGameSessionFactory? sessionFactory = null)
+    public OnlineRoomRegistry(
+        string profileRoot,
+        IChessOnlineGameSessionFactory? sessionFactory = null,
+        TimeProvider? timeProvider = null)
     {
         _profileRoot = profileRoot;
         _sessionFactory = sessionFactory ?? new NativeChessOnlineGameSessionFactory();
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public IReadOnlyCollection<OnlineRoom> Rooms
@@ -63,7 +68,7 @@ public sealed class OnlineRoomRegistry
                 RoomId = roomId,
                 DisplayName = string.IsNullOrWhiteSpace(command.DisplayName) ? roomId : command.DisplayName.Trim(),
                 MaxTables = Math.Clamp(command.MaxTables, 1, 32),
-                CreatedAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = UtcNow(),
                 State = OnlineRoomState.Open
             };
             _rooms.Add(room.RoomId, room);
@@ -91,7 +96,7 @@ public sealed class OnlineRoomRegistry
                 PlayerId = playerId,
                 DisplayName = playerId,
                 IsConnected = true,
-                LastSeenUtc = DateTime.UtcNow
+                LastSeenUtc = UtcNow()
             };
             _diagnostics.ConnectionCount = room.Players.Count;
             return Reply(OnlineMessageTypes.RoomJoined, envelope, room: new OnlineRoomCommand
@@ -142,7 +147,8 @@ public sealed class OnlineRoomRegistry
                 ProfileFileName = profile.FileName,
                 SeatCount = profile.SeatCount,
                 State = OnlineTableState.WaitingForPlayers,
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = UtcNow(),
+                LastActivityUtc = UtcNow()
             };
             table.Session = _sessionFactory.Create(profile, _profileRoot);
             room.Tables.Add(table.TableId, table);
@@ -181,8 +187,9 @@ public sealed class OnlineRoomRegistry
                 MacroPlayer = table.IsHodge ? seat : 0,
                 PlayerId = RequirePlayerId(envelope),
                 IsConnected = true,
-                LastSeenUtc = DateTime.UtcNow
+                LastSeenUtc = UtcNow()
             };
+            table.LastActivityUtc = UtcNow();
             return Reply(OnlineMessageTypes.SeatAssigned, envelope, table: new OnlineTableCommand
             {
                 TableId = table.TableId,
@@ -203,6 +210,7 @@ public sealed class OnlineRoomRegistry
 
             seat.IsReady = command.Ready;
             table.State = table.Seats.Values.Any(s => s.IsReady) ? OnlineTableState.ReadyCheck : OnlineTableState.WaitingForPlayers;
+            table.LastActivityUtc = UtcNow();
             return Reply(OnlineMessageTypes.TableState, envelope, table: new OnlineTableCommand
             {
                 TableId = table.TableId,
@@ -222,7 +230,7 @@ public sealed class OnlineRoomRegistry
                 return false;
             }
 
-            var now = DateTime.UtcNow;
+            var now = UtcNow();
             var seat = table.Seats.Values.FirstOrDefault(candidate =>
                 string.Equals(candidate.PlayerId, playerId, StringComparison.OrdinalIgnoreCase));
             if (seat == null)
@@ -232,6 +240,15 @@ public sealed class OnlineRoomRegistry
 
             seat.IsConnected = connected;
             seat.LastSeenUtc = now;
+            table.LastActivityUtc = now;
+            if (connected && table.Seats.Values.All(candidate => candidate.IsConnected))
+            {
+                table.DisconnectedUtc = null;
+            }
+            else if (!connected && table.State == OnlineTableState.InGame)
+            {
+                table.DisconnectedUtc ??= now;
+            }
             if (room.Players.TryGetValue(playerId, out var player))
             {
                 player.IsConnected = connected;
@@ -256,7 +273,9 @@ public sealed class OnlineRoomRegistry
 
             table.Session = _sessionFactory.Create(RuleProfileCatalog.ResolveRequired(_profileRoot, table.RulesetId), _profileRoot);
             table.State = OnlineTableState.InGame;
-            table.StartedAtUtc = DateTime.UtcNow;
+            table.StartedAtUtc = UtcNow();
+            table.LastActivityUtc = table.StartedAtUtc.Value;
+            table.DisconnectedUtc = null;
             table.ServerSeq = 0;
             table.ActionLog.Clear();
             table.LastStateHash = table.Session.StateHash;
@@ -320,9 +339,10 @@ public sealed class OnlineRoomRegistry
                 StateHashAfter = table.LastStateHash,
                 GamePhase = table.Session.GamePhase.ToString(),
                 GameOutcome = table.Session.GameOutcome.ToString(),
-                CreatedAtUtc = DateTime.UtcNow.ToString("O")
+                CreatedAtUtc = UtcNow().ToString("O")
             };
             table.ActionLog.Add(actionEvent);
+            table.LastActivityUtc = UtcNow();
             _diagnostics.LastServerSeq = table.ServerSeq;
             _diagnostics.LastAcceptedAction = actionEvent.Notation;
             _diagnostics.LastStateHash = table.LastStateHash;
@@ -638,8 +658,85 @@ public sealed class OnlineRoomRegistry
                 ProtocolErrorCount = _diagnostics.ProtocolErrorCount,
                 AcceptedActionCount = _diagnostics.AcceptedActionCount,
                 RejectedActionCount = _diagnostics.RejectedActionCount,
-                ResyncCount = _diagnostics.ResyncCount
+                ResyncCount = _diagnostics.ResyncCount,
+                ActiveTableCount = _rooms.Values.Sum(room => room.Tables.Values.Count(table =>
+                    table.State == OnlineTableState.InGame && table.Seats.Values.All(seat => seat.IsConnected))),
+                ResumableTableCount = _rooms.Values.Sum(room => room.Tables.Values.Count(table =>
+                    table.State == OnlineTableState.InGame && table.Seats.Values.Any(seat => !seat.IsConnected))),
+                CompletedTableCount = _rooms.Values.Sum(room => room.Tables.Values.Count(table => table.State == OnlineTableState.Finished)),
+                ExpiredTableCount = _diagnostics.ExpiredTableCount,
+                CleanupRunCount = _diagnostics.CleanupRunCount,
+                LastCleanupUtc = _diagnostics.LastCleanupUtc,
+                LastCleanupRemovedCount = _diagnostics.LastCleanupRemovedCount
             };
+        }
+    }
+
+    public bool ContainsTable(string roomId, string tableId)
+    {
+        lock (_gate)
+        {
+            return TryGetTable(roomId, tableId, out _, out _);
+        }
+    }
+
+    public OnlineRoomCleanupResult RunCleanup(OnlineRoomCleanupPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        lock (_gate)
+        {
+            var classified = 0;
+            var removed = 0;
+            foreach (var room in _rooms.Values.ToArray())
+            {
+                foreach (var table in room.Tables.Values.ToArray())
+                {
+                    if (removed >= Math.Max(1, policy.MaxRemovals))
+                    {
+                        break;
+                    }
+
+                    if (table.State == OnlineTableState.InGame || table.Seats.Values.Any(seat => seat.IsConnected))
+                    {
+                        continue;
+                    }
+
+                    var lastActivity = table.LastActivityUtc == default ? table.CreatedAtUtc : table.LastActivityUtc;
+                    if (table.State is OnlineTableState.WaitingForPlayers or OnlineTableState.ReadyCheck)
+                    {
+                        if (policy.NowUtc - lastActivity >= policy.WaitingIdle)
+                        {
+                            table.State = OnlineTableState.Abandoned;
+                            table.LastActivityUtc = policy.NowUtc;
+                            table.ExpiresUtc = policy.NowUtc + policy.AbandonedRetention;
+                            classified++;
+                        }
+                        continue;
+                    }
+
+                    var malformedOrphan = table.Session == null && table.Seats.Count == 0 && table.ActionLog.Count == 0 &&
+                        (string.IsNullOrWhiteSpace(table.RulesetId) || string.IsNullOrWhiteSpace(table.ProfileFileName));
+                    var eligible = table.State == OnlineTableState.Finished
+                        ? policy.NowUtc - (table.CompletedUtc ?? lastActivity) >= policy.CompletedRetention
+                        : table.State == OnlineTableState.Abandoned
+                            ? policy.NowUtc >= (table.ExpiresUtc ?? lastActivity + policy.AbandonedRetention)
+                            : malformedOrphan && policy.NowUtc - lastActivity >= policy.MalformedOrphanGrace;
+                    if (!eligible)
+                    {
+                        continue;
+                    }
+
+                    room.Tables.Remove(table.TableId);
+                    table.Session?.Dispose();
+                    removed++;
+                }
+            }
+
+            _diagnostics.CleanupRunCount++;
+            _diagnostics.LastCleanupUtc = policy.NowUtc.ToString("O");
+            _diagnostics.LastCleanupRemovedCount = removed;
+            _diagnostics.ExpiredTableCount += removed;
+            return new OnlineRoomCleanupResult(classified, removed);
         }
     }
 
@@ -701,12 +798,12 @@ public sealed class OnlineRoomRegistry
 
         return new OnlineLobbySnapshot
         {
-            CreatedUtc = DateTime.UtcNow.ToString("O"),
+            CreatedUtc = UtcNow().ToString("O"),
             ServerSeq = _diagnostics.LastServerSeq,
             RoomCount = _rooms.Count,
             TableCount = _rooms.Values.Sum(r => r.Tables.Count),
             ActiveTableCount = rows.Count,
-            WarningText = "Player labels are shortened and spectator counts are best-effort until durable spectator tracking is added.",
+            WarningText = "Player labels are shortened; spectator counts are live process-local distinct-viewer counts.",
             Tables = rows
         };
     }
@@ -886,6 +983,8 @@ public sealed class OnlineRoomRegistry
         return !string.IsNullOrWhiteSpace(roomId) && _rooms.TryGetValue(roomId, out room!);
     }
 
+    private DateTime UtcNow() => _timeProvider.GetUtcNow().UtcDateTime;
+
     private bool TryGetTable(string roomId, string tableId, out OnlineRoom room, out OnlineTable table)
     {
         table = null!;
@@ -969,6 +1068,10 @@ public sealed class OnlineTable
     public OnlineTableState State { get; set; } = OnlineTableState.WaitingForPlayers;
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? StartedAtUtc { get; set; }
+    public DateTime LastActivityUtc { get; set; }
+    public DateTime? CompletedUtc { get; set; }
+    public DateTime? DisconnectedUtc { get; set; }
+    public DateTime? ExpiresUtc { get; set; }
     public long ServerSeq { get; set; }
     public string LastStateHash { get; set; } = "";
     public Dictionary<int, OnlineSeat> Seats { get; } = new();
@@ -995,3 +1098,17 @@ public sealed class OnlinePlayer
     public bool IsConnected { get; set; }
     public DateTime LastSeenUtc { get; set; }
 }
+
+public sealed class OnlineRoomCleanupPolicy
+{
+    public DateTime NowUtc { get; init; }
+    public int MaxRemovals { get; init; } = 32;
+    public TimeSpan WaitingIdle { get; init; } = TimeSpan.FromHours(6);
+    public TimeSpan CompletedRetention { get; init; } = TimeSpan.FromDays(7);
+    public TimeSpan AbandonedRetention { get; init; } = TimeSpan.FromDays(7);
+    public TimeSpan MalformedOrphanGrace { get; init; } = TimeSpan.FromHours(1);
+}
+
+public sealed record OnlineRoomCleanupResult(
+    int ClassifiedAbandonedCount,
+    int RemovedTableCount);

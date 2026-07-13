@@ -7,9 +7,15 @@ namespace ChessOnlineServer;
 public sealed class OnlineSpectatorRegistry
 {
     private readonly object _gate = new();
+    private readonly TimeProvider _timeProvider;
     private readonly Dictionary<SpectatorKey, SpectatorMembership> _byViewer = new();
     private readonly Dictionary<string, SpectatorKey> _byConnection = new(StringComparer.Ordinal);
     private readonly Dictionary<TableKey, DateTime> _tableUpdatedUtc = new();
+
+    public OnlineSpectatorRegistry(TimeProvider? timeProvider = null)
+    {
+        _timeProvider = timeProvider ?? TimeProvider.System;
+    }
 
     public OnlineSpectatorRegistration Register(
         string roomId,
@@ -24,7 +30,7 @@ public sealed class OnlineSpectatorRegistry
 
         lock (_gate)
         {
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             var key = SpectatorKey.Create(roomId, tableId, viewerPlayerId);
 
             if (_byConnection.TryGetValue(connectionId, out var priorKey) && priorKey != key)
@@ -88,7 +94,7 @@ public sealed class OnlineSpectatorRegistry
             }
 
             _byViewer.Remove(key);
-            TouchLocked(key.RoomId, key.TableId, DateTime.UtcNow);
+            TouchLocked(key.RoomId, key.TableId, _timeProvider.GetUtcNow().UtcDateTime);
             return new OnlineSpectatorDisconnectResult(
                 true,
                 membership.RoomId,
@@ -113,6 +119,35 @@ public sealed class OnlineSpectatorRegistry
             {
                 return _byViewer.Count;
             }
+        }
+    }
+
+    public int PruneOrphans(
+        Func<string, string, bool> tableExists,
+        TimeSpan grace,
+        DateTime nowUtc,
+        int maxRemovals)
+    {
+        ArgumentNullException.ThrowIfNull(tableExists);
+        if (maxRemovals <= 0)
+        {
+            return 0;
+        }
+
+        lock (_gate)
+        {
+            var candidates = _byViewer
+                .Where(pair => !tableExists(pair.Value.RoomId, pair.Value.TableId) &&
+                    nowUtc - pair.Value.LastSeenUtc >= grace)
+                .Take(maxRemovals)
+                .ToArray();
+            foreach (var candidate in candidates)
+            {
+                _byViewer.Remove(candidate.Key);
+                _byConnection.Remove(candidate.Value.ConnectionId);
+                TouchLocked(candidate.Key.RoomId, candidate.Key.TableId, nowUtc);
+            }
+            return candidates.Length;
         }
     }
 

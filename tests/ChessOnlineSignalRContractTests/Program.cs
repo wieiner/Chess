@@ -37,6 +37,7 @@ try
 
     await ServerStartupTests(test, url, hubUrl);
     SpectatorRegistryTests(test, profileRoot);
+    RoomCleanupTests(test, profileRoot);
     await ProtocolTests(test, hubUrl);
     await RoomTableAuthorityTests(test, hubUrl, profileRoot);
     await ProfileActionTests(test, hubUrl, profileRoot);
@@ -79,6 +80,18 @@ static async Task ServerStartupTests(ContractTest test, string url, string hubUr
     var diagnostics = await http.GetStringAsync($"{url}/chess3d/diagnostics");
     test.Check(diagnostics.Contains(OnlineProtocolVersion.ProtocolId, StringComparison.Ordinal), "SignalR diagnostics are parseable");
     test.Check(!diagnostics.Contains("sessionToken", StringComparison.OrdinalIgnoreCase), "SignalR diagnostics do not expose session tokens");
+    using (var diagnosticsJson = JsonDocument.Parse(diagnostics))
+    {
+        var root = diagnosticsJson.RootElement;
+        test.Check(root.TryGetProperty("activeTableCount", out _) &&
+            root.TryGetProperty("resumableTableCount", out _) &&
+            root.TryGetProperty("completedTableCount", out _) &&
+            root.TryGetProperty("expiredTableCount", out _) &&
+            root.TryGetProperty("spectatorCount", out _) &&
+            root.TryGetProperty("cleanupRunCount", out _) &&
+            root.TryGetProperty("lastCleanupRemovedCount", out _),
+            "SignalR diagnostics expose aggregate lifecycle cleanup counters");
+    }
 
     await using var client = NewClient(hubUrl);
     await client.StartAsync();
@@ -662,6 +675,99 @@ static void SpectatorRegistryTests(ContractTest test, string profileRoot)
         "spectator lobby projection does not serialize connection identifiers");
 }
 
+static void RoomCleanupTests(ContractTest test, string profileRoot)
+{
+    var clock = new ManualTimeProvider(new DateTimeOffset(2026, 7, 13, 0, 0, 0, TimeSpan.Zero));
+    var registry = new OnlineRoomRegistry(profileRoot, timeProvider: clock);
+    var spectators = new OnlineSpectatorRegistry(clock);
+    var options = new HostedOnlineOptions
+    {
+        Cleanup = new HostedCleanupOptions
+        {
+            Enabled = true,
+            MaxRemovalsPerRun = 2,
+            WaitingIdleMinutes = 360,
+            AbandonedRetentionHours = 168,
+            CompletedRetentionHours = 168,
+            MalformedOrphanMinutes = 60,
+            SpectatorOrphanMinutes = 5
+        }
+    };
+    options.Normalize();
+    var coordinator = new OnlineRoomCleanupCoordinator(registry, spectators, options, clock);
+
+    registry.CreateRoom(Envelope(OnlineMessageTypes.CreateRoom, "cleanup-waiting", "", "cleanup", "owner"),
+        new OnlineRoomCommand { RoomId = "cleanup-waiting", MaxTables = 4 });
+    foreach (var tableId in new[] { "waiting-a", "waiting-b", "waiting-c" })
+    {
+        registry.CreateTable(Envelope(OnlineMessageTypes.CreateTable, "cleanup-waiting", "", "cleanup", "owner"),
+            new OnlineTableCommand { TableId = tableId, RulesetId = "classic-six-side-3d-8x8x8-v0.1" });
+    }
+
+    CreateStartedCleanupTable(registry, "cleanup-active", "active", "active-player", connected: true);
+    CreateStartedCleanupTable(registry, "cleanup-resumable", "resumable", "resume-player", connected: false);
+    var activeHash = registry.RequestSnapshot(Envelope(OnlineMessageTypes.RequestSnapshot, "cleanup-active", "active", "cleanup", "active-player")).Snapshot?.StateHash ?? "";
+    var resumableHash = registry.RequestSnapshot(Envelope(OnlineMessageTypes.RequestSnapshot, "cleanup-resumable", "resumable", "cleanup", "resume-player")).Snapshot?.StateHash ?? "";
+
+    clock.Advance(TimeSpan.FromHours(6) + TimeSpan.FromSeconds(1));
+    var classified = coordinator.RunOnce();
+    test.Check(classified.Rooms.ClassifiedAbandonedCount == 3 && classified.Rooms.RemovedTableCount == 0,
+        "room cleanup classifies idle waiting tables without same-run deletion");
+
+    clock.Advance(TimeSpan.FromDays(7) + TimeSpan.FromSeconds(1));
+    var firstRemoval = coordinator.RunOnce();
+    var secondRemoval = coordinator.RunOnce();
+    test.Check(firstRemoval.Rooms.RemovedTableCount == 2 && secondRemoval.Rooms.RemovedTableCount == 1,
+        "room cleanup enforces bounded table removals per run");
+    test.Check(!registry.ContainsTable("cleanup-waiting", "waiting-a") &&
+        !registry.ContainsTable("cleanup-waiting", "waiting-b") &&
+        !registry.ContainsTable("cleanup-waiting", "waiting-c"),
+        "room cleanup removes only expired abandoned tables");
+
+    clock.Advance(TimeSpan.FromDays(365));
+    coordinator.RunOnce();
+    var activeHashAfter = registry.RequestSnapshot(Envelope(OnlineMessageTypes.RequestSnapshot, "cleanup-active", "active", "cleanup", "active-player")).Snapshot?.StateHash ?? "";
+    var resumableHashAfter = registry.RequestSnapshot(Envelope(OnlineMessageTypes.RequestSnapshot, "cleanup-resumable", "resumable", "cleanup", "resume-player")).Snapshot?.StateHash ?? "";
+    test.Check(registry.ContainsTable("cleanup-active", "active") && activeHashAfter == activeHash,
+        "room cleanup never removes or mutates active table");
+    test.Check(registry.ContainsTable("cleanup-resumable", "resumable") && resumableHashAfter == resumableHash,
+        "room cleanup never removes or mutates disconnected-resumable table");
+
+    spectators.Register("missing-room", "missing-table", "orphan-viewer", "orphan-connection");
+    var beforeGrace = coordinator.RunOnce();
+    clock.Advance(TimeSpan.FromMinutes(5) + TimeSpan.FromSeconds(1));
+    var afterGrace = coordinator.RunOnce();
+    test.Check(beforeGrace.RemovedSpectatorCount == 0 && afterGrace.RemovedSpectatorCount == 1 && spectators.TotalCount == 0,
+        "room cleanup prunes only stale spectator records for missing tables");
+
+    var diagnostics = registry.GetDiagnostics();
+    test.Check(diagnostics.ActiveTableCount == 1 && diagnostics.ResumableTableCount == 1 &&
+        diagnostics.ExpiredTableCount == 3 && diagnostics.CleanupRunCount >= 6 &&
+        !string.IsNullOrWhiteSpace(diagnostics.LastCleanupUtc),
+        "room cleanup exposes aggregate lifecycle diagnostics");
+}
+
+static void CreateStartedCleanupTable(
+    OnlineRoomRegistry registry,
+    string roomId,
+    string tableId,
+    string playerId,
+    bool connected)
+{
+    var envelope = (string type) => Envelope(type, roomId, tableId, $"client-{playerId}", playerId);
+    registry.CreateRoom(envelope(OnlineMessageTypes.CreateRoom), new OnlineRoomCommand { RoomId = roomId });
+    registry.JoinRoom(envelope(OnlineMessageTypes.JoinRoom));
+    registry.CreateTable(envelope(OnlineMessageTypes.CreateTable),
+        new OnlineTableCommand { TableId = tableId, RulesetId = "classic-six-side-3d-8x8x8-v0.1" });
+    registry.JoinTableSeat(envelope(OnlineMessageTypes.JoinTableSeat), new OnlineTableCommand { SeatIndex = 1 });
+    registry.Ready(envelope(OnlineMessageTypes.Ready), new OnlineTableCommand { Ready = true });
+    registry.StartGame(envelope(OnlineMessageTypes.StartGame));
+    if (!connected)
+    {
+        registry.SetPlayerConnectionState(roomId, tableId, playerId, false);
+    }
+}
+
 static async Task PersistenceRestartSequenceTests(ContractTest test, string root)
 {
     var storePath = Path.Combine(root, ".tmp", "chess3d-p4g2-restart-store", Guid.NewGuid().ToString("N"), "store.json");
@@ -867,6 +973,23 @@ static string JsonString(JsonElement element, string propertyName)
 }
 
 internal sealed record StartedHubClient(HubConnection Client, string SessionToken);
+
+internal sealed class ManualTimeProvider : TimeProvider
+{
+    private DateTimeOffset _utcNow;
+
+    public ManualTimeProvider(DateTimeOffset utcNow)
+    {
+        _utcNow = utcNow;
+    }
+
+    public override DateTimeOffset GetUtcNow() => _utcNow;
+
+    public void Advance(TimeSpan duration)
+    {
+        _utcNow += duration;
+    }
+}
 
 internal sealed class ContractTest
 {

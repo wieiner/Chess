@@ -63,10 +63,15 @@ public static class ChessOnlineServerHost
             RefreshTokenDays = options.Auth.RefreshTokenDays
         });
         builder.Services.AddSingleton<OnlineTokenService>();
-        builder.Services.AddSingleton(new OnlineRoomRegistry(options.ProfileRoot));
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(sp => new OnlineRoomRegistry(
+            options.ProfileRoot,
+            timeProvider: sp.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<OnlineHubConnectionRegistry>();
-        builder.Services.AddSingleton<OnlineSpectatorRegistry>();
+        builder.Services.AddSingleton(sp => new OnlineSpectatorRegistry(sp.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton<OnlineMatchmakingService>();
+        builder.Services.AddSingleton<OnlineRoomCleanupCoordinator>();
+        builder.Services.AddHostedService<OnlineRoomCleanupService>();
         if (options.Auth.EnableAuthentication)
         {
             builder.Services
@@ -129,7 +134,11 @@ public static class ChessOnlineServerHost
                 : Results.Json(new { status = "notReady", reason = "missingProfile" }, statusCode: 503);
         });
         MapAuthEndpoints(app, options);
-        app.MapGet("/chess3d/diagnostics", (OnlineRoomRegistry registry, OnlineHubConnectionRegistry connections, OnlineMatchmakingService matchmaking) =>
+        app.MapGet("/chess3d/diagnostics", (
+            OnlineRoomRegistry registry,
+            OnlineHubConnectionRegistry connections,
+            OnlineMatchmakingService matchmaking,
+            OnlineSpectatorRegistry spectators) =>
         {
             var diagnostics = registry.GetDiagnostics();
             var authority = registry.GetAuthorityDiagnostics();
@@ -160,6 +169,14 @@ public static class ChessOnlineServerHost
                 diagnostics.ActionLogLength,
                 diagnostics.ProtocolErrorCount,
                 diagnostics.LastRejectReason,
+                diagnostics.ActiveTableCount,
+                diagnostics.ResumableTableCount,
+                diagnostics.CompletedTableCount,
+                diagnostics.ExpiredTableCount,
+                spectatorCount = spectators.TotalCount,
+                diagnostics.CleanupRunCount,
+                diagnostics.LastCleanupUtc,
+                diagnostics.LastCleanupRemovedCount,
                 authorityRuntimeKind = authority.RuntimeKindName,
                 authorityIsPortableRuntime = authority.IsPortableRuntime,
                 authorityIsSupported = authority.IsSupported,

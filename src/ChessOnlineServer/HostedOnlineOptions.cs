@@ -25,6 +25,7 @@ public sealed class HostedOnlineOptions
     public HostedPersistenceOptions Persistence { get; set; } = new();
     public HostedDataProtectionOptions DataProtection { get; set; } = new();
     public HostedSecurityOptions Security { get; set; } = new();
+    public HostedCleanupOptions Cleanup { get; set; } = new();
 
     public void Normalize()
     {
@@ -49,6 +50,30 @@ public sealed class HostedOnlineOptions
         Persistence.Normalize();
         DataProtection.Normalize();
         Security.Normalize();
+        Cleanup.Normalize();
+    }
+}
+
+public sealed class HostedCleanupOptions
+{
+    public bool Enabled { get; set; } = true;
+    public int IntervalSeconds { get; set; } = 300;
+    public int MaxRemovalsPerRun { get; set; } = 32;
+    public int WaitingIdleMinutes { get; set; } = 360;
+    public int CompletedRetentionHours { get; set; } = 168;
+    public int AbandonedRetentionHours { get; set; } = 168;
+    public int MalformedOrphanMinutes { get; set; } = 60;
+    public int SpectatorOrphanMinutes { get; set; } = 5;
+
+    public void Normalize()
+    {
+        IntervalSeconds = Math.Clamp(IntervalSeconds <= 0 ? 300 : IntervalSeconds, 30, 86400);
+        MaxRemovalsPerRun = Math.Clamp(MaxRemovalsPerRun <= 0 ? 32 : MaxRemovalsPerRun, 1, 256);
+        WaitingIdleMinutes = Math.Clamp(WaitingIdleMinutes <= 0 ? 360 : WaitingIdleMinutes, 30, 43200);
+        CompletedRetentionHours = Math.Clamp(CompletedRetentionHours <= 0 ? 168 : CompletedRetentionHours, 1, 8760);
+        AbandonedRetentionHours = Math.Clamp(AbandonedRetentionHours <= 0 ? 168 : AbandonedRetentionHours, 1, 8760);
+        MalformedOrphanMinutes = Math.Clamp(MalformedOrphanMinutes <= 0 ? 60 : MalformedOrphanMinutes, 10, 10080);
+        SpectatorOrphanMinutes = Math.Clamp(SpectatorOrphanMinutes <= 0 ? 5 : SpectatorOrphanMinutes, 1, 1440);
     }
 }
 

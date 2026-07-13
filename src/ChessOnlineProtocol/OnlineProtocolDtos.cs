@@ -506,6 +506,13 @@ public sealed class OnlineDiagnostics
     public int AcceptedActionCount { get; set; }
     public int RejectedActionCount { get; set; }
     public int ResyncCount { get; set; }
+    public int ActiveTableCount { get; set; }
+    public int ResumableTableCount { get; set; }
+    public int CompletedTableCount { get; set; }
+    public int ExpiredTableCount { get; set; }
+    public long CleanupRunCount { get; set; }
+    public string LastCleanupUtc { get; set; } = "";
+    public int LastCleanupRemovedCount { get; set; }
 }
 
 public sealed class OnlineServerBuildIdentity
