@@ -65,6 +65,7 @@ public static class ChessOnlineServerHost
         builder.Services.AddSingleton<OnlineTokenService>();
         builder.Services.AddSingleton(new OnlineRoomRegistry(options.ProfileRoot));
         builder.Services.AddSingleton<OnlineHubConnectionRegistry>();
+        builder.Services.AddSingleton<OnlineSpectatorRegistry>();
         builder.Services.AddSingleton<OnlineMatchmakingService>();
         if (options.Auth.EnableAuthentication)
         {

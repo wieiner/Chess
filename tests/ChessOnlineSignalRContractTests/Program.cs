@@ -36,6 +36,7 @@ try
     await app.StartAsync();
 
     await ServerStartupTests(test, url, hubUrl);
+    SpectatorRegistryTests(test, profileRoot);
     await ProtocolTests(test, hubUrl);
     await RoomTableAuthorityTests(test, hubUrl, profileRoot);
     await ProfileActionTests(test, hubUrl, profileRoot);
@@ -166,6 +167,67 @@ static async Task RoomTableAuthorityTests(ContractTest test, string hubUrl, stri
     test.Check(snapshot.Envelope.MessageType == OnlineMessageTypes.AuthoritativeSnapshot, "SignalR snapshot returned to requester");
     var actionLog = await client1.InvokeAsync<OnlineProtocolMessage>("RequestActionLog", Message(OnlineMessageTypes.RequestActionLog, "c1", "p1", "room-signalr", "classic"));
     test.Check(actionLog.ActionLog?.Events.Count >= 1, "SignalR action log chunk returned");
+
+    var hashBeforeSpectators = snapshot.Snapshot?.StateHash ?? "";
+    await using var spectator1 = NewClient(hubUrl);
+    await spectator1.StartAsync();
+    var spectator1Hello = await Hello(spectator1, "spectator-c1", "spectator-p1");
+    var joinSpectator1 = Message(OnlineMessageTypes.JoinSpectator, "spectator-c1", "spectator-p1", "room-signalr", "classic");
+    joinSpectator1.SpectatorRequest = new OnlineJoinSpectatorRequest
+    {
+        PlayerId = "spectator-p1",
+        RoomId = "room-signalr",
+        TableId = "classic",
+        ExpectedRulesetId = "classic-six-side-3d-8x8x8-v0.1"
+    };
+    test.Check((await spectator1.InvokeAsync<OnlineProtocolMessage>("JoinSpectator", joinSpectator1)).SpectatorResult?.Success == true,
+        "SignalR first spectator joins active table");
+    await spectator1.InvokeAsync<OnlineProtocolMessage>("JoinSpectator", joinSpectator1);
+
+    await using var spectator2 = NewClient(hubUrl);
+    await spectator2.StartAsync();
+    await Hello(spectator2, "spectator-c2", "spectator-p2");
+    var joinSpectator2 = Message(OnlineMessageTypes.JoinSpectator, "spectator-c2", "spectator-p2", "room-signalr", "classic");
+    joinSpectator2.SpectatorRequest = new OnlineJoinSpectatorRequest
+    {
+        PlayerId = "spectator-p2",
+        RoomId = "room-signalr",
+        TableId = "classic",
+        ExpectedRulesetId = "classic-six-side-3d-8x8x8-v0.1"
+    };
+    await spectator2.InvokeAsync<OnlineProtocolMessage>("JoinSpectator", joinSpectator2);
+
+    await using var spectator1Reconnect = NewClient(hubUrl);
+    await spectator1Reconnect.StartAsync();
+    var reconnectHello = Message(OnlineMessageTypes.Hello, "spectator-c1-reconnect", "spectator-p1");
+    reconnectHello.Envelope.SessionToken = spectator1Hello.Envelope.SessionToken;
+    await spectator1Reconnect.InvokeAsync<OnlineProtocolMessage>("Hello", reconnectHello);
+    var reconnectJoin = Message(OnlineMessageTypes.JoinSpectator, "spectator-c1-reconnect", "spectator-p1", "room-signalr", "classic");
+    reconnectJoin.SpectatorRequest = joinSpectator1.SpectatorRequest;
+    await spectator1Reconnect.InvokeAsync<OnlineProtocolMessage>("JoinSpectator", reconnectJoin);
+
+    var lobbyRequest = Message(OnlineMessageTypes.RequestLobbySnapshot, "spectator-c2", "spectator-p2");
+    lobbyRequest.LobbyRequest = new OnlineLobbySnapshotRequest
+    {
+        RulesetIdFilter = "classic-six-side-3d-8x8x8-v0.1",
+        IncludeInGameTables = true
+    };
+    var spectatorLobby = await spectator2.InvokeAsync<OnlineProtocolMessage>("RequestLobbySnapshot", lobbyRequest);
+    var spectatorRow = spectatorLobby.LobbySnapshot?.Tables.SingleOrDefault(row => row.RoomId == "room-signalr" && row.TableId == "classic");
+    var spectatorLobbyJson = OnlineProtocolJson.Serialize(spectatorLobby);
+    var hashAfterSpectators = (await client1.InvokeAsync<OnlineProtocolMessage>("RequestSnapshot", Message(
+        OnlineMessageTypes.RequestSnapshot,
+        "c1",
+        "p1",
+        "room-signalr",
+        "classic"))).Snapshot?.StateHash ?? "";
+    test.Check(spectatorRow?.SpectatorCount == 2 && spectatorRow.SeatsOccupied == 2,
+        "SignalR lobby counts two distinct spectators after duplicate join and reconnect");
+    test.Check(hashBeforeSpectators == hashAfterSpectators,
+        "SignalR spectator membership does not mutate authoritative state hash");
+    test.Check(!spectatorLobbyJson.Contains("ConnectionId", StringComparison.OrdinalIgnoreCase) &&
+        !(spectator1.ConnectionId is { Length: > 0 } connectionId && spectatorLobbyJson.Contains(connectionId, StringComparison.Ordinal)),
+        "SignalR lobby spectator count does not expose transport connection identifiers");
 }
 
 static async Task ProfileActionTests(ContractTest test, string hubUrl, string profileRoot)
@@ -483,6 +545,54 @@ static async Task<(string RoomId, string TableId)> AssertMatchmakingProfile(
         !string.IsNullOrWhiteSpace(found.MatchmakingStatus.RoomId) &&
         !string.IsNullOrWhiteSpace(found.MatchmakingStatus.TableId), $"P4C {label} matchmaking creates match-found room/table");
     return (found.MatchmakingStatus?.RoomId ?? "", found.MatchmakingStatus?.TableId ?? "");
+}
+
+static void SpectatorRegistryTests(ContractTest test, string profileRoot)
+{
+    var game = StartedRegistry(profileRoot, "spectator-registry-room", "spectator-registry-table", "classic-six-side-3d-8x8x8-v0.1", 1);
+    var beforeHash = game.RequestSnapshot(Envelope(
+        OnlineMessageTypes.RequestSnapshot,
+        "spectator-registry-room",
+        "spectator-registry-table",
+        "client-player",
+        "player-1")).Snapshot?.StateHash ?? "";
+    var spectators = new OnlineSpectatorRegistry();
+
+    var first = spectators.Register("spectator-registry-room", "spectator-registry-table", "viewer-1", "connection-1");
+    var duplicate = spectators.Register("spectator-registry-room", "spectator-registry-table", "viewer-1", "connection-1");
+    var second = spectators.Register("spectator-registry-room", "spectator-registry-table", "viewer-2", "connection-2");
+    var reconnect = spectators.Register("spectator-registry-room", "spectator-registry-table", "viewer-1", "connection-3");
+
+    var lobby = game.RequestLobbySnapshot(
+        Envelope(OnlineMessageTypes.RequestLobbySnapshot, "", "", "client-lobby", "viewer-1"),
+        new OnlineLobbySnapshotRequest { IncludeInGameTables = true });
+    spectators.ApplyCounts(lobby.LobbySnapshot);
+    var row = lobby.LobbySnapshot?.Tables.SingleOrDefault(t => t.TableId == "spectator-registry-table");
+    var lobbyJson = OnlineProtocolJson.Serialize(lobby);
+    var afterHash = game.RequestSnapshot(Envelope(
+        OnlineMessageTypes.RequestSnapshot,
+        "spectator-registry-room",
+        "spectator-registry-table",
+        "client-player",
+        "player-1")).Snapshot?.StateHash ?? "";
+
+    test.Check(first.TableSpectatorCount == 1 && !first.IsDuplicate && !first.ReplacedConnection,
+        "spectator registry first viewer count is one");
+    test.Check(duplicate.TableSpectatorCount == 1 && duplicate.IsDuplicate && !duplicate.ReplacedConnection,
+        "spectator registry duplicate join is idempotent");
+    test.Check(second.TableSpectatorCount == 2 && spectators.TotalCount == 2,
+        "spectator registry counts distinct viewers");
+    test.Check(reconnect.TableSpectatorCount == 2 && reconnect.ReplacedConnection && reconnect.ReplacedConnectionId == "connection-1",
+        "spectator registry reconnect replaces transport without inflating count");
+    test.Check(!JsonSerializer.Serialize(reconnect).Contains("connection-1", StringComparison.Ordinal),
+        "spectator registry replacement result does not serialize transport identifier");
+    test.Check(row?.SpectatorCount == 2 && row.SeatsOccupied == 1,
+        "spectator registry projects count without changing player seats");
+    test.Check(beforeHash == afterHash,
+        "spectator registry operations do not mutate authoritative game state hash");
+    test.Check(!lobbyJson.Contains("connection-", StringComparison.OrdinalIgnoreCase) &&
+        !lobbyJson.Contains("ConnectionId", StringComparison.OrdinalIgnoreCase),
+        "spectator lobby projection does not serialize connection identifiers");
 }
 
 static async Task PersistenceRestartSequenceTests(ContractTest test, string root)

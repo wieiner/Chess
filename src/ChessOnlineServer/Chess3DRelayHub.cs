@@ -12,6 +12,7 @@ public sealed class Chess3DRelayHub : Hub
 {
     private readonly OnlineRoomRegistry _registry;
     private readonly OnlineHubConnectionRegistry _connections;
+    private readonly OnlineSpectatorRegistry _spectators;
     private readonly OnlineMatchmakingService _matchmaking;
     private readonly IOnlineRoomPersistenceStore _roomStore;
     private readonly IOnlineSessionStore _sessionStore;
@@ -21,6 +22,7 @@ public sealed class Chess3DRelayHub : Hub
     public Chess3DRelayHub(
         OnlineRoomRegistry registry,
         OnlineHubConnectionRegistry connections,
+        OnlineSpectatorRegistry spectators,
         OnlineMatchmakingService matchmaking,
         IOnlineRoomPersistenceStore roomStore,
         IOnlineSessionStore sessionStore,
@@ -29,6 +31,7 @@ public sealed class Chess3DRelayHub : Hub
     {
         _registry = registry;
         _connections = connections;
+        _spectators = spectators;
         _matchmaking = matchmaking;
         _roomStore = roomStore;
         _sessionStore = sessionStore;
@@ -274,6 +277,16 @@ public sealed class Chess3DRelayHub : Hub
         var result = InvokeRegistry(message, OnlineMessageTypes.JoinSpectator, env => _registry.JoinSpectator(env, message.SpectatorRequest ?? new OnlineJoinSpectatorRequest()));
         if (result.SpectatorResult?.Success == true)
         {
+            var registration = _spectators.Register(
+                result.SpectatorResult.RoomId,
+                result.SpectatorResult.TableId,
+                result.SpectatorResult.State.ViewerPlayerId,
+                Context.ConnectionId);
+            if (registration.ReplacedConnection && !string.IsNullOrWhiteSpace(registration.ReplacedConnectionId))
+            {
+                await Groups.RemoveFromGroupAsync(registration.ReplacedConnectionId, RoomGroup(result.SpectatorResult.RoomId));
+                await Groups.RemoveFromGroupAsync(registration.ReplacedConnectionId, TableGroup(result.SpectatorResult.TableId));
+            }
             _connections.SetMembership(Context.ConnectionId, result.SpectatorResult.RoomId, result.SpectatorResult.TableId);
             await Groups.AddToGroupAsync(Context.ConnectionId, RoomGroup(result.SpectatorResult.RoomId));
             await Groups.AddToGroupAsync(Context.ConnectionId, TableGroup(result.SpectatorResult.TableId));
@@ -317,6 +330,7 @@ public sealed class Chess3DRelayHub : Hub
             message,
             OnlineMessageTypes.RequestLobbySnapshot,
             env => _registry.RequestLobbySnapshot(env, message.LobbyRequest ?? new OnlineLobbySnapshotRequest()));
+        _spectators.ApplyCounts(result.LobbySnapshot);
         await SendCaller(result.Envelope.MessageType == OnlineMessageTypes.LobbySnapshot ? "ReceiveLobbySnapshot" : "ReceiveError", result);
         return result;
     }
