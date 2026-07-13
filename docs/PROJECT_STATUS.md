@@ -514,7 +514,7 @@ Chess.com remains read-only through the public Published Data API unless an appr
 
 ## Next Era Stalled Areas Audit
 
-The stalled-area audit found no hidden branch/tag line to recover: `main` is the source of truth. The main open areas are TLS/domain hardening, public HTTPS SignalR smoke, deployment rollback/backups/log rotation, documentation reconciliation for older `draft`/`blocked` notes, Chess2D PGN/UCI portal foundations, visual QA automation, and future AI/search quality work.
+The stalled-area audit found no hidden branch/tag line to recover: `main` is the source of truth. P4K has since proved guarded deployment, backup, and rollback dry-run. The main open areas are TLS/domain hardening, public HTTPS SignalR smoke, log rotation, exact restart rehydration, documentation reconciliation for older `draft`/`blocked` notes, Chess2D PGN/UCI portal foundations, visual QA automation, and future AI/search quality work.
 
 ## Next Era Mode Incubator
 
@@ -530,4 +530,28 @@ P4J completes the repository/local UX layer for online match play:
 - `ChessOnlineApp` has spectator read-only mode, lobby table list, and sanitized network bug reports;
 - full local `run-tests -SkipBenchmark -MSBuildMaxCpuCount 1` and `scripts/verify.ps1` passed.
 
-The current public Hetzner HTTP 80 deployment still exposes legal preview, matchmaking, snapshot, action log, and action submit, but does not yet expose `RequestResumeMatch`, `JoinSpectator`, or `RequestLobbySnapshot`. Remote resume/spectator/lobby PASS requires a later server package deployment; P4J did not touch TLS/443, x-ui/Xray, nginx, systemd, UFW, Outline, Albatronix, or Unreal.
+The P4J paragraph above is historical repository state. P4K subsequently
+deployed and remotely verified those contracts.
+
+## P4K Remote Online UX And Hardening
+
+P4K is verified locally and against the public Hetzner HTTP 80 diagnostic
+deployment:
+
+- authoritative play, legal preview, resume, spectator, lobby, action log, and
+  realtime resync pass bounded remote scenarios;
+- WPF resume, spectator, lobby, and three-client player/player/spectator flows pass;
+- all five and only five RuleProfiles start, snapshot, preview, and retain their
+  profile-specific action boundaries;
+- disconnected/spectator presence cleanup and conservative bounded room cleanup
+  are deployed;
+- active and disconnected-resumable games are retained;
+- readiness checks native authority, exact profile set, registry, persistence,
+  keyring, and configuration without exposing internal paths;
+- fixed HTTP limits and stable-player hub limits are deployed;
+- full local tests and `scripts/verify.ps1` pass.
+
+Deployed source is `810f8ff9a917191f420bb6eaa8ae36191ea607ba`, package
+`chessonline-linux-x64-810f8ff9a917`. Exact restart-resume is audited and
+designed but not implemented. HTTP 80 remains development-only; TLS/domain/443
+and production account policy remain deferred.

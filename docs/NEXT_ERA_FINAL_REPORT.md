@@ -320,3 +320,28 @@ The full verify built Release x64 outputs, checked assets/profiles/scenarios/mod
    - UCI process adapter.
    - Lichess token-safe client.
    - Chess.com read-only import path.
+
+## P4K Remote UX Closeout (2026-07-13)
+
+P4K supersedes the earlier deployment-pending statements in this report. The
+current Hetzner payload is source commit
+`810f8ff9a917191f420bb6eaa8ae36191ea607ba`, package
+`chessonline-linux-x64-810f8ff9a917`. Public HTTP 80 remote scenarios pass for
+play, resume, spectator, lobby, and their combined flow. WPF UI Automation also
+passed resume, spectator, lobby, and an independent three-client flow.
+
+All five RuleProfiles pass remote start/snapshot/legal-preview coverage. Normal
+actions pass for all five in the final regression, while Rubik layer turns,
+Hodge projection composites, and Asgard special actions remain distinct UI
+work rather than fabricated normal moves.
+
+The deployed server includes bounded disconnected/spectator cleanup,
+conservative room lifecycle cleanup, dependency-aware readiness, query-token
+logging protection, and fixed-window request limits. Active and resumable games
+are retained. Exact match recovery across a server process restart remains
+audit/design only and is not claimed.
+
+Full local contract tests and `scripts/verify.ps1` passed. The deploy retained a
+protected backup and previous server directory; rollback dry-run passed and
+actual rollback was unnecessary. See `P4K_REMOTE_UX_FINAL_REPORT.md`,
+`P4K_HETZNER_OPERATOR_GUIDE.md`, and `P4K_REMOTE_UX_USER_GUIDE.md`.

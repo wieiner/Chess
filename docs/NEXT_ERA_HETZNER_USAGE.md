@@ -16,6 +16,8 @@ This is the short operator note for the current single-server ChessOnlineServer 
 - External HTTP health works.
 - Linux native authority works with `/opt/chessonline/server/libChess3DEngine.so`.
 - Exactly five Chess3D RuleProfiles are loaded.
+- P4K play, resume, spectator, lobby, realtime resync, and legal preview are deployed and remotely verified.
+- Dependency-aware readiness and conservative request limits are active.
 - 443/TLS is deferred and must not be changed in this smoke phase.
 
 ## Health checks
@@ -76,11 +78,17 @@ In the app:
 7. Click `Ready Both`.
 8. Click `Start Game`.
 9. Click `Request Snapshot`.
-10. Click `Submit Safe Asgard Test Action`.
-11. Click `Request Action Log`.
-12. Click `Save Session Report`.
+10. Click an occupied current-side source and one highlighted legal target.
+11. Confirm the authoritative action log/sequence/hash update.
+12. Click `Save Session Report` only for an ignored local diagnostic report.
 
-See `docs/P4F_PLAYABLE_ONLINE_USER_GUIDE.md` for the full operator flow.
+For explicit resume use `Disconnect Primary Relay`, `Reconnect Primary Relay`,
+then `Resume Current Match`. Spectators use `Spectator`, `Join as Spectator`,
+and `Follow Last Move`. Lobby discovery uses `Refresh Lobby`,
+`Use Selected For Spectator`, and `Spectate Selected`.
+
+See `docs/P4K_REMOTE_UX_USER_GUIDE.md` for the complete user flow and
+`docs/P4K_HETZNER_OPERATOR_GUIDE.md` for deploy/rollback operations.
 
 ## Dry run
 

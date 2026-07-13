@@ -214,6 +214,15 @@ The online hub owns the C# `LichessClient` foundation under `src\ChessOnlineApp\
 
 The online hub exposes the token/profile/connection UI separately from `ChessApp.exe`, so the normal chess UI stays a chess board and engine advisor surface.
 
+The current P4K Windows client also provides hands-on Chess3D play against the
+single-server Hetzner diagnostic deployment: server health/diagnostics,
+temporary users, five-profile matchmaking, authoritative legal targets,
+one-click moves, explicit reconnect/resume, a read-only spectator mode, lobby
+discovery, and sanitized network reports. Public HTTP 80 is for development
+only; do not use real credentials. Start with
+`docs\P4K_REMOTE_UX_USER_GUIDE.md`; operators should use
+`docs\P4K_HETZNER_OPERATOR_GUIDE.md`.
+
 3D chess has a separate `Chess3DInternetRelayClient` WebSocket client. Lichess cannot host custom 8x8x8 six-sided rules, so the 3D internet path is a relay-room protocol for `Chess3DNetworkMessage` payloads (`move3d`, `rotate3d`, sync messages) rather than a Lichess integration.
 
 See `docs\ONLINE_INTEGRATION_ARCHITECTURE.md` for the full 3D relay protocol and ordinary chess portal capability matrix.

@@ -404,16 +404,17 @@ Deferred:
 
 ## Next Era - Stalled Areas Priority
 
-Current priority order after the stalled-area audit:
+The first two priorities from the stalled-area audit are complete in P4K:
+the updated server is deployed and remote resume/spectator/lobby smoke passes.
+The remaining order is:
 
-1. Deploy the updated ChessOnlineServer package that exposes `RequestResumeMatch`, `JoinSpectator`, and `RequestLobbySnapshot` on the existing HTTP 80 diagnostic deployment.
-2. Re-run remote resume/spectator/lobby smoke without touching 443/TLS/x-ui/Xray.
-3. TLS/domain + HTTPS auth enforcement on a dedicated plan/server after the x-ui/443 decision.
-4. Deployment rollback, backup, and log rotation.
-5. Documentation consistency pass for stale `draft`/`blocked` notes.
-6. Chess2D PGN/SAN and UCI adapter.
-7. Visual QA automation and screenshot checklist execution.
-8. AI/search quality work and anti-cheat policy.
+1. exact versioned restart rehydration and persistent lifecycle deletion;
+2. TLS/domain + HTTPS auth enforcement on a dedicated plan/server after the x-ui/443 decision;
+3. log rotation and production account/session policy;
+4. documentation consistency pass for stale `draft`/`blocked` notes;
+5. Chess2D PGN/SAN and UCI adapter;
+6. visual QA automation and screenshot checklist execution;
+7. AI/search quality work and anti-cheat policy.
 
 ## P4J Online Match UX
 
@@ -426,8 +427,29 @@ Completed locally:
 - sanitized network bug reports;
 - full local verify.
 
-Remote public Hetzner still needs a server package deploy before resume/spectator/lobby can pass against HTTP 80. Current public play with legal preview remains available.
+P4K subsequently deployed this contract set. Remote public HTTP 80 play,
+resume, spectator, and lobby now pass bounded operator and WPF smoke.
 
 ## Next Era - Mode Incubator
 
 Future concepts such as Timefold, Portal/Gate, Gravity Well, Orbit, Team Cathedral, and Shadow Mirror are documented only in `docs/NEXT_ERA_MODE_INCUBATOR.md`. They are not runtime modes, not JSON profiles, and not test-counted profiles. The next implementation work should remain deployment hardening and Chess2D/online foundations, not a sixth Chess3D mode.
+
+## P4K Remote Online UX And Operational Hardening
+
+Completed:
+
+- deployed resume, spectator, lobby, legal preview, lifecycle cleanup,
+  readiness, logging filters, and conservative request limits;
+- bounded remote play/resume/spectator/lobby/combined scenarios;
+- WPF resume/spectator/lobby and three-client remote UX proof;
+- all-five-profile remote regression without flattening special actions;
+- guarded package swap, retained previous payload, backup, and rollback dry-run;
+- full local test/verify gate.
+
+Next recommended fronts:
+
+1. versioned atomic match checkpoints and quarantine before restart-resume;
+2. Rubik/Hodge/Asgard special-action online UX;
+3. lobby recent-first paging and production account/session policy;
+4. dedicated TLS/domain/HTTPS deployment after the 443 ownership decision;
+5. Chess2D PGN/SAN, UCI, and token-safe portal integration.

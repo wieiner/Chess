@@ -76,15 +76,19 @@ Still not production-complete:
 - no TLS certificate;
 - no HTTPS-only auth/token policy;
 - no public authenticated SignalR smoke over HTTPS;
-- public Hetzner has not yet been redeployed with the latest resume/spectator/lobby hub methods;
-- no rate limiting, log rotation, backup/restore rehearsal, or rollback package flow.
+- no exact active-match resume across a server process restart;
+- no log rotation or production account policy.
 
 P4J repository/local state:
 
 - `ChessOnlineApp` now has reconnect/resync, resume, spectator, lobby, and network bug-report UX.
 - Server/protocol/client code contains `RequestResumeMatch`, `JoinSpectator`, and `RequestLobbySnapshot` contracts.
 - Local tests and `scripts/verify.ps1` pass.
-- Current public HTTP 80 deployment still supports legal-preview play, but resume/spectator/lobby remote PASS is deployment-pending.
+- P4K deployed and remotely verified legal-preview play, resume, spectator,
+  lobby, realtime resync, bounded lifecycle cleanup, dependency-aware readiness,
+  and conservative request limits.
+- P4K retained a previous payload and protected backup; rollback dry-run passed
+  and actual rollback was not needed.
 
 ## Game Modes
 
