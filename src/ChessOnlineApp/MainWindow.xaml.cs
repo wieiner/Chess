@@ -970,6 +970,7 @@ public partial class MainWindow : Window
             P4JReconnectStatusText.Text = "Reconnect: primary relay manually disconnected; match context retained.";
             P4JReconnectStatusText.Foreground = Brush("#F4D58D");
             ClearP4GLegalPreview("Legal preview: cleared while primary relay is disconnected.");
+            UpdateP4JSpectatorUiState();
             UpdateP4FRealtimeStatus();
             UpdateP4FCompactStatus();
             Log("P4J primary relay manually disconnected; room/table/session context retained for reconnect smoke.");
@@ -2152,13 +2153,17 @@ public partial class MainWindow : Window
         }
 
         var spectator = IsP4FSpectatorMode();
+        var submitEnabled = !spectator &&
+            CanUseP4FPrimaryRelay(out _) &&
+            _p4fSeatTurnState.CanPrimaryAct &&
+            !_p4gSubmitPending;
         P4FReadyBothButton.IsEnabled = !spectator;
         P4FReadyThisWindowButton.IsEnabled = !spectator;
         P4FStartGameButton.IsEnabled = !spectator;
         P4FStartThisWindowButton.IsEnabled = !spectator;
-        P4FSubmitSafeAsgardActionButton.IsEnabled = !spectator;
-        P4GSubmitNormalMoveButton.IsEnabled = !spectator;
-        P4GSubmitSelectedPreviewActionButton.IsEnabled = !spectator;
+        P4FSubmitSafeAsgardActionButton.IsEnabled = submitEnabled;
+        P4GSubmitNormalMoveButton.IsEnabled = submitEnabled;
+        P4GSubmitSelectedPreviewActionButton.IsEnabled = submitEnabled;
         if (P4JSpectatorStatusText != null && spectator && !P4JSpectatorStatusText.Text.StartsWith("SPECTATOR", StringComparison.OrdinalIgnoreCase))
         {
             P4JSpectatorStatusText.Text = "SPECTATOR: read-only mode. Ready/Start/Submit are disabled; snapshot, action log and board navigation remain enabled.";
@@ -2244,6 +2249,7 @@ public partial class MainWindow : Window
             _ => Brush("#AFC0D0")
         };
         _p4fRealtimeSync.MarkConnectionState($"relay {summary.State}");
+        UpdateP4JSpectatorUiState();
         UpdateP4FRealtimeStatus();
         UpdateP4FCompactStatus();
 
