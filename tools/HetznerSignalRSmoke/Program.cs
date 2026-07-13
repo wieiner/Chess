@@ -530,6 +530,11 @@ static async Task RunSpectatorScenarioAsync(
     CancellationToken cancellationToken)
 {
     Console.WriteLine("STEP START spectator");
+    var lobbyBefore = await RequestLobbySnapshotAsync(activePlayer, activePlayerToken, options, "spectator-before", cancellationToken);
+    var rowBefore = lobbyBefore.Tables.FirstOrDefault(row =>
+        string.Equals(row.RoomId, roomId, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(row.TableId, tableId, StringComparison.OrdinalIgnoreCase))
+        ?? throw new InvalidOperationException("spectator pre-join lobby row missing");
     var suffix = Guid.NewGuid().ToString("N")[..10];
     var user = $"smoke-s-{suffix}";
     var password = $"Smoke-{suffix}-S!2026";
@@ -565,6 +570,13 @@ static async Task RunSpectatorScenarioAsync(
     Require(result.Snapshot?.StateHash == latestSnapshot.StateHash, "spectator snapshot hash matches latest");
     var spectatorSnapshot = result.Snapshot ?? throw new InvalidOperationException("spectator snapshot missing");
     Require((result.ActionLog?.Events.Count ?? 0) <= latestActionLog.Events.Count, "spectator action log tail did not grow unexpectedly");
+    var lobbyAfter = await RequestLobbySnapshotAsync(activePlayer, activePlayerToken, options, "spectator-after", cancellationToken);
+    var rowAfter = lobbyAfter.Tables.FirstOrDefault(row =>
+        string.Equals(row.RoomId, roomId, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(row.TableId, tableId, StringComparison.OrdinalIgnoreCase))
+        ?? throw new InvalidOperationException("spectator post-join lobby row missing");
+    Require(rowAfter.SeatsOccupied == rowBefore.SeatsOccupied, "spectator join allocates no seat");
+    Require(rowAfter.MaxSeats == rowBefore.MaxSeats, "spectator join does not change table capacity");
     Console.WriteLine($"STEP PASS spectator joined spectatorId={Short(result.SpectatorId)} hash={spectatorSnapshot.StateHash} readonly={result.State.SubmitDisabledReason}");
 
     Console.WriteLine("STEP START spectator read-only authority");
