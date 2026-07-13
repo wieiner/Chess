@@ -199,7 +199,7 @@ static async Task RunAsync(SmokeOptions options, CancellationToken cancellationT
 
     if (options.ShouldRun(OnlineUxSmokeScenarios.Lobby))
     {
-        await RunLobbyScenarioAsync(client1, token1, roomId, tableId, options, cancellationToken);
+        await RunLobbyScenarioAsync(http, hubUrl, client1, token1, roomId, tableId, latestSnapshot, options, cancellationToken);
     }
 
     if (options.ShouldRun(OnlineUxSmokeScenarios.Spectator))
@@ -253,10 +253,13 @@ static async Task<OnlineLobbySnapshot> RequestLobbySnapshotAsync(
 }
 
 static async Task RunLobbyScenarioAsync(
+    HttpClient http,
+    string hubUrl,
     HubConnection client,
     AuthTokenResponse token,
     string roomId,
     string tableId,
+    OnlineSnapshot authoritativeSnapshot,
     SmokeOptions options,
     CancellationToken cancellationToken)
 {
@@ -269,8 +272,69 @@ static async Task RunLobbyScenarioAsync(
         throw new InvalidOperationException("lobby contains current table");
     }
     Require(row.RulesetId == options.ProfileId, "lobby row ruleset matches");
+    Require(!string.IsNullOrWhiteSpace(row.RoomId) && !string.IsNullOrWhiteSpace(row.TableId), "lobby row has room/table identity");
+    Require(!string.IsNullOrWhiteSpace(row.TableState), "lobby row has lifecycle state");
+    Require(row.SeatsOccupied > 0 && row.MaxSeats >= row.SeatsOccupied, "lobby row seat counts are valid");
+    Require(row.SpectatorCount >= 0, "lobby row spectator count is non-negative");
     Require(row.Started, "lobby row reports started table");
-    Console.WriteLine($"STEP PASS lobby current table state={row.TableState} seq={row.LastServerSeq}");
+    Require(row.LastServerSeq == authoritativeSnapshot.ServerSeq, "lobby row server sequence matches authoritative snapshot");
+    Require(DateTimeOffset.TryParse(row.UpdatedUtc, out _), "lobby row updatedUtc parses");
+
+    var serializedRow = JsonSerializer.Serialize(row);
+    var forbiddenNames = new[]
+    {
+        "accessToken", "refreshToken", "Authorization", "connectionId", "password",
+        "email", "privateKey", "runtimeStore", "sessionToken"
+    };
+    Require(forbiddenNames.All(name => !serializedRow.Contains(name, StringComparison.OrdinalIgnoreCase)),
+        "lobby row contains no forbidden secret/runtime fields");
+    Require(row.SeatSummaries.All(seat => seat.PlayerLabel.Length <= 8), "lobby row player labels are shortened");
+
+    var playerSeat = row.SeatSummaries.FirstOrDefault(seat =>
+        string.Equals(seat.PlayerLabel, Short(token.PlayerId), StringComparison.OrdinalIgnoreCase))
+        ?? throw new InvalidOperationException("lobby row does not contain the current player's shortened seat label");
+    var resume = await InvokeResumeProbeAsync(
+        client,
+        token.PlayerId,
+        row.RoomId,
+        row.TableId,
+        playerSeat.SeatIndex,
+        row.RulesetId,
+        authoritativeSnapshot.StateHash,
+        authoritativeSnapshot.ServerSeq,
+        cancellationToken);
+    Require(resume.ResumeResult?.Success == true, "lobby row resumes matching seated player");
+    var lobbyResume = resume.ResumeResult ?? throw new InvalidOperationException("lobby-row resume result missing");
+    Require(lobbyResume.Snapshot?.StateHash == authoritativeSnapshot.StateHash, "lobby-row resume preserves state hash");
+
+    var suffix = Guid.NewGuid().ToString("N")[..10];
+    var spectatorUser = $"smoke-l-{suffix}";
+    var spectatorPassword = $"Smoke-{suffix}-L!2026";
+    await RegisterAsync(http, spectatorUser, "Smoke Lobby Spectator", spectatorPassword, cancellationToken);
+    var spectatorToken = await LoginAsync(http, spectatorUser, spectatorPassword, cancellationToken);
+    await using var spectator = NewAuthenticatedClient(hubUrl, spectatorToken.AccessToken);
+    await spectator.StartAsync(cancellationToken);
+    var hello = await InvokeAsync(spectator, "Hello", Message(OnlineMessageTypes.Hello, "smoke-lobby-spectator", spectatorToken.PlayerId), cancellationToken);
+    Require(hello.Envelope.MessageType == OnlineMessageTypes.Welcome, "lobby spectator welcomed");
+    var join = Message(OnlineMessageTypes.JoinSpectator, "smoke-lobby-spectator", spectatorToken.PlayerId, row.RoomId, row.TableId);
+    join.SpectatorRequest = new OnlineJoinSpectatorRequest
+    {
+        PlayerId = spectatorToken.PlayerId,
+        RoomId = row.RoomId,
+        TableId = row.TableId,
+        ExpectedRulesetId = row.RulesetId,
+        LastKnownServerSeq = row.LastServerSeq
+    };
+    var joined = await InvokeAsync(spectator, "JoinSpectator", join, cancellationToken);
+    Require(joined.SpectatorResult?.Success == true, "lobby row supports spectator join");
+    var lobbySpectator = joined.SpectatorResult ?? throw new InvalidOperationException("lobby spectator result missing");
+    Require(lobbySpectator.State.IsSpectator, "lobby-selected viewer is read-only spectator");
+    Require(lobbySpectator.Snapshot?.StateHash == authoritativeSnapshot.StateHash, "lobby-row spectator receives authoritative state");
+
+    var finalSnapshot = await InvokeAsync(client, "RequestSnapshot", Message(OnlineMessageTypes.RequestSnapshot, "smoke-client-a-lobby", token.PlayerId, roomId, tableId), cancellationToken);
+    Require(finalSnapshot.Snapshot?.StateHash == authoritativeSnapshot.StateHash, "lobby discovery operations do not mutate state");
+    Require(finalSnapshot.Snapshot?.ActionCount == authoritativeSnapshot.ActionCount, "lobby discovery operations do not change action count");
+    Console.WriteLine($"STEP PASS lobby current table state={row.TableState} seats={row.SeatsOccupied}/{row.MaxSeats} spectators={row.SpectatorCount} seq={row.LastServerSeq}");
 }
 
 static async Task RunResumeScenarioAsync(
