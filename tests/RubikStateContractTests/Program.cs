@@ -20,6 +20,7 @@ try
     CheckStructuredValidationDiagnostics(checks);
     CheckFaceletDecomposition(checks);
     CheckSolvabilityValidation(checks);
+    CheckPhysicalElevenByElevenWorkflow(checks);
 }
 catch (Exception exception)
 {
@@ -450,6 +451,81 @@ static void CheckSolvabilityValidation(ContractChecks checks)
     checks.Check(evenResult.CubieInventoryValid && evenResult.OrientationValid && evenResult.ParityValid &&
                  !evenResult.ParityProven && !evenResult.SolverReady,
         "legal even-cube state is accepted without a false full parity proof");
+}
+
+static void CheckPhysicalElevenByElevenWorkflow(ContractChecks checks)
+{
+    const int size = 11;
+    var directory = Path.Combine(Path.GetTempPath(), "Chess-RubikPhysical11Workflow", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var service = new RubikStateFileService();
+        var draft = new RubikFaceEditorDraft(size);
+        for (var face = 0; face < 6; face++) draft.FillFace(face, face + 1);
+
+        var diagnostic = RubikPhysicalStateDiagnostics.ValidateDraft(draft);
+        checks.Check(diagnostic.BasicCountsValid && diagnostic.ErrorCount == 0,
+            "physical N=11 solved draft passes structured validation");
+        var document = draft.ToStateDocument("physical-11x11-workflow");
+        var solvability = RubikSolvabilityValidator.Validate(document);
+        checks.Check(solvability is
+            {
+                BasicCountsValid: true,
+                CubieInventoryValid: true,
+                SolverReady: false,
+                OrientationProven: false,
+                ParityProven: false,
+                ValidationLevel: RubikValidationLevel.CubieInventory
+            }, "physical N=11 solved input reports honest inventory-only solver readiness");
+
+        using var applied = NativeCube.Create(size);
+        checks.Check(applied.SetFacelets(document.Faces.Flatten()), "physical N=11 solved document applies to native cube");
+        var rendered = ShellSignature(size, applied.Facelets);
+        checks.Check(rendered is { StickerCount: 726, InvalidCount: 0, Fallback: true },
+            "physical N=11 solved document renders a complete facelet shell");
+
+        var path = Path.Combine(directory, "physical-solved-11x11.rubik.json");
+        var originalHash = RubikStateHasher.Calculate(document);
+        checks.Check(service.Save(path, document).Success, "physical N=11 solved document saves atomically");
+
+        using var reset = NativeCube.Create(size);
+        var loaded = service.Read(path);
+        checks.Check(loaded.Success && loaded.LoadPlan is not null, "physical N=11 saved document reloads after reset");
+        checks.Check(loaded.LoadPlan?.StateHash == originalHash, "physical N=11 load preserves canonical hash");
+        checks.Check(loaded.LoadPlan is not null && reset.SetFacelets(loaded.LoadPlan.Facelets),
+            "physical N=11 reloaded plan applies to reset cube");
+        checks.Check(reset.Facelets.SequenceEqual(document.Faces.Flatten()),
+            "physical N=11 reset/load preserves every facelet");
+
+        using var scramble = NativeCube.Create(size);
+        checks.Check(scramble.Scramble(20260720, 20), "legal N=11 physical workflow scramble fixture is generated");
+        var scrambleDocument = RubikStateDocument.Create(size, scramble.Facelets, "legal-native-11x11-fixture") with
+        {
+            CreatedUtc = "2026-07-20T00:00:00Z"
+        };
+        var scrambleSolvability = RubikSolvabilityValidator.Validate(scrambleDocument);
+        checks.Check(scrambleSolvability.CubieInventoryValid && !scrambleSolvability.SolverReady,
+            "legal N=11 scramble validates at the honest inventory-only level");
+        var scrambleVisual = ShellSignature(size, scrambleDocument.Faces.Flatten());
+        checks.Check(scrambleVisual is { StickerCount: 726, InvalidCount: 0 },
+            "legal N=11 scramble renders all physical stickers");
+
+        var fixturePath = Path.Combine(directory, "legal-scramble-fixture.rubik.json");
+        var copyPath = Path.Combine(directory, "legal-scramble-copy.rubik.json");
+        checks.Check(service.Save(fixturePath, scrambleDocument).Success, "legal N=11 scramble fixture saves atomically");
+        var fixture = service.Read(fixturePath);
+        checks.Check(fixture.LoadPlan is not null && service.Save(copyPath, fixture.LoadPlan.Document).Success,
+            "loaded legal N=11 scramble saves as an independent copy");
+        var copy = service.Read(copyPath);
+        checks.Check(copy.LoadPlan?.StateHash == fixture.LoadPlan?.StateHash &&
+                     copy.LoadPlan?.Facelets.SequenceEqual(scrambleDocument.Faces.Flatten()) == true,
+            "legal N=11 scramble copy preserves hash and exact facelets");
+    }
+    finally
+    {
+        try { Directory.Delete(directory, recursive: true); } catch { }
+    }
 }
 
 static RubikStateDocument SolvedDocument(int size)

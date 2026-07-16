@@ -1575,3 +1575,12 @@ Date: 2026-07-16
 | --- | --- | --- | --- | --- | --- |
 | Small-cube invariants | Standard cubie orientation/permutation invariants and repository legal turn generator | 3x3 requires corner twist sum, edge flip sum, and equal corner/edge permutation parity; 2x2 has corner orientation constraints but no independent edge parity match. | Implement a full declared small-cube validation kernel for N=2/3 and test impossible single-twist/flip/swap fixtures. | RubikState/tests | Legal scrambles pass; twisted corner, flipped edge, and swapped corners fail the expected invariant. |
 | NxN proof boundary | Phase 18 duplicate wing/center observations | Facelets identify pair/orbit inventory but do not label interchangeable wings/centers strongly enough to prove full arbitrary-N permutation parity. | Report known-valid inventory/orientation separately from `parityProven`; keep `solverReady=false` and validation level partial for N>3. | RubikState/docs/UI status | Legal 4/5/8/11 states remain accepted as partial, never advertised fully solver-ready. |
+
+## P4L Phase 20 - Physical 11x11 Workflow
+
+Date: 2026-07-16
+
+| Topic | Sources checked | Key finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| End-to-end physical input | Existing editor draft, structured diagnostics, portable state, native import, visual descriptors, and atomic file APIs | Every boundary needed for physical 11x11 input already exists, but no single contract proves the complete user journey. | Add one headless workflow covering draft fill through save/reset/load/hash and an independently native-generated legal scramble copy. | RubikState contract tests/docs | Assert exact 726 stickers, exact facelets/hash after reload, and clean atomic copies. |
+| Honest solver status | Phase 19 NxN validation boundary | Inventory-valid 11x11 input is not equivalent to a full arbitrary-state solvability proof. | Surface `CubieInventory`, `orientationProven=false`, `parityProven=false`, and `solverReady=false` as the expected successful input status. | Tests/docs | Both solved and legal-scramble workflows must report the same honest proof boundary. |
