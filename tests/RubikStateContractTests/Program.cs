@@ -25,6 +25,7 @@ try
     CheckSolutionVerification(checks);
     CheckBoundedTwoByTwoSolver(checks);
     CheckNxnReductionFramework(checks);
+    CheckElevenByElevenReductionMilestone(checks);
 }
 catch (Exception exception)
 {
@@ -724,6 +725,56 @@ static void CheckNxnReductionFramework(ContractChecks checks)
     var cancelledPlan = RubikNxnReductionFramework.CreatePlan(SolvedDocument(4), cancelled.Token);
     checks.Check(!cancelledPlan.Success && cancelledPlan.Status == RubikReductionStatus.Cancelled,
         "NxN reduction planning honors cancellation");
+}
+
+static void CheckElevenByElevenReductionMilestone(ContractChecks checks)
+{
+    var directory = Path.Combine(Path.GetTempPath(), "Chess-Rubik11Reduction", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(directory);
+    try
+    {
+        using var native = NativeCube.Create(11);
+        checks.Check(native.Scramble(2611, 8), "Level A N=11 legal generated scramble succeeds");
+        var generated = RubikStateDocument.Create(11, native.Facelets, "level-a-generated");
+        var importedParse = RubikStateSerializer.Parse(RubikStateSerializer.Serialize(generated));
+        checks.Check(importedParse.Success && importedParse.Plan is not null,
+            "Level A N=11 state survives portable export/import boundary");
+        var imported = importedParse.Plan!.Document;
+        var decomposition = RubikCubieDecomposer.Decompose(imported);
+        var validation = RubikSolvabilityValidator.Validate(imported);
+        var plan = RubikNxnReductionFramework.CreatePlan(imported);
+        checks.Check(decomposition.Complete && validation.CubieInventoryValid && plan.Success &&
+                     plan.Status == RubikReductionStatus.Incomplete,
+            "N=11 reaches Level A load, validation, decomposition, and guided planning");
+        checks.Check(plan.Phases.Any(phase => phase.Phase == RubikReductionPhase.SolveCenters) &&
+                     plan.Phases.Any(phase => phase.Phase == RubikReductionPhase.PairWings) &&
+                     plan.Checkpoint?.EmittedMoves.Count == 0,
+            "N=11 Level A produces center/wing guidance without invented moves");
+
+        var checkpointPath = Path.Combine(directory, "level-a.solve-checkpoint.json");
+        RubikNxnReductionFramework.SaveCheckpointAtomic(checkpointPath, plan.Checkpoint!);
+        var resumed = RubikNxnReductionFramework.LoadCheckpoint(checkpointPath, imported);
+        checks.Check(resumed.InputHash == plan.Checkpoint!.InputHash && resumed.Status == RubikReductionStatus.Incomplete,
+            "N=11 Level A checkpoint saves atomically and resumes against imported state");
+
+        var movePath = Path.Combine(directory, "level-a.solution.rubikmoves");
+        var partialMoves = RubikMoveSequenceFile.Create(11, resumed.InputHash, RubikNxnReductionFramework.SolverId,
+            resumed.EmittedMoves, complete: false, verified: false);
+        RubikMoveSequenceFile.SaveAtomic(movePath, partialMoves);
+        var loadedMoves = RubikMoveSequenceFile.Load(movePath);
+        checks.Check(!loadedMoves.Complete && !loadedMoves.Verified && loadedMoves.Moves.Count == 0 &&
+                     loadedMoves.InputHash == RubikStateHasher.Calculate(imported),
+            "N=11 Level A move artifact preserves explicit incomplete/unverified status");
+
+        var invalidStatusRejected = false;
+        try { RubikMoveSequenceFile.Create(11, resumed.InputHash, RubikNxnReductionFramework.SolverId, [], false, true); }
+        catch (InvalidDataException) { invalidStatusRejected = true; }
+        checks.Check(invalidStatusRejected, "move artifact rejects a false verified-but-incomplete claim");
+    }
+    finally
+    {
+        try { Directory.Delete(directory, recursive: true); } catch { }
+    }
 }
 
 static RubikStateDocument SolvedDocument(int size)

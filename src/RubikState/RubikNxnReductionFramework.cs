@@ -130,6 +130,18 @@ public static class RubikNxnReductionFramework
         .TakeLast(MaximumLogEntries)
         .ToArray();
 
+    public static void SaveCheckpointAtomic(string path, RubikReductionCheckpoint checkpoint)
+    {
+        var json = SerializeCheckpoint(checkpoint);
+        AtomicTextFile.Write(path, json);
+    }
+
+    public static RubikReductionCheckpoint LoadCheckpoint(string path, RubikStateDocument expectedState)
+    {
+        var json = AtomicTextFile.ReadBounded(path, MaximumCheckpointBytes);
+        return ParseCheckpoint(json, expectedState);
+    }
+
     private static RubikReductionCheckpoint ValidateCheckpointShape(RubikReductionCheckpoint checkpoint)
     {
         if (checkpoint.Format != Format || checkpoint.Version != Version || checkpoint.SolverId != SolverId)

@@ -1634,3 +1634,13 @@ Date: 2026-07-16
 | Reduction state machine | Phase 21 architecture and Phase 18 corner/wing/center decomposition | Center solving, wing pairing, reduced-3x3 construction, parity, and final verification have distinct invariants and cannot be represented as one opaque search. | Add explicit ordered phase descriptors and a state/checkpoint model; generate guidance only, not fabricated moves. | RubikState/tests/docs | 4x4/5x5/7x7 produce deterministic phase plans with zero emitted moves and `Incomplete` status. |
 | Checkpoint safety | Existing state hash/checkpoint contract | Resume is safe only when solver id, schema version, size, and input hash all match. | Add strict bounded JSON checkpoint parsing and mismatch validation before resume. | RubikState/tests | Deterministic roundtrip, wrong hash, wrong size, malformed JSON, and cancellation tests. |
 | Progress/log bounds | Existing solver request resource contract | A long NxN phase can produce unbounded diagnostic output even before move algorithms exist. | Cap checkpoint log entries and messages; progress names the exact phase and never reports false completion. | RubikState | Tests verify bounded log and terminal `Incomplete` guidance status. |
+
+## P4L Phase 26 - 11x11 Reduction Milestone
+
+Date: 2026-07-16
+
+| Topic | Sources checked | Key finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Milestone level | Requested Level A/B/C acceptance criteria and Phase 25 framework | Current code can prove load, inventory/decomposition, phase guidance, and checkpointing, but cannot solve centers or pair wings. | Declare Level A only; do not use reverse history or a short generated scramble as arbitrary-solve evidence. | RubikState/tests/docs | Generated and imported N=11 states reach the same Level A plan with zero emitted moves. |
+| Move artifact honesty | Existing portable state format and independent verifier | A partial reduction artifact must be distinguishable from a complete, replay-verified solution. | Add versioned `.rubikmoves` JSON with explicit `complete`, `verified`, and nullable final hash; enforce verified implies complete+final hash. | RubikState/tests | Atomic save/load preserves input hash and empty Level A move list; invalid status combinations fail. |
+| Resume artifact | Phase 25 checkpoint schema | In-memory checkpoint support is insufficient for a user workflow. | Add atomic checkpoint file save/load with bounded reads and input hash validation. | RubikState/tests | Saved N=11 checkpoint resumes only against its exact imported state. |
