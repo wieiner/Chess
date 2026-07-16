@@ -21,6 +21,7 @@ try
     CheckFaceletDecomposition(checks);
     CheckSolvabilityValidation(checks);
     CheckPhysicalElevenByElevenWorkflow(checks);
+    CheckSolverContracts(checks);
 }
 catch (Exception exception)
 {
@@ -526,6 +527,36 @@ static void CheckPhysicalElevenByElevenWorkflow(ContractChecks checks)
     {
         try { Directory.Delete(directory, recursive: true); } catch { }
     }
+}
+
+static void CheckSolverContracts(ContractChecks checks)
+{
+    var solver = new ReverseHistorySolver();
+    checks.Check(!solver.Capabilities.SupportsArbitraryState && solver.Capabilities.RequiresTrustedHistory &&
+                 solver.Capabilities is { MinimumSize: 2, MaximumSize: 32 },
+        "reverse-history solver advertises trusted-history capability honestly");
+
+    var state = SolvedDocument(3);
+    var history = new[] { new RubikMove(2, 2, 1), new RubikMove(0, 0, 2), new RubikMove(1, 2, 3) };
+    var request = new RubikSolveRequest(state, TimeSpan.FromSeconds(5), 16 * 1024 * 1024, 20,
+        TrustedHistory: history);
+    var result = solver.SolveAsync(request).GetAwaiter().GetResult();
+    checks.Check(result.Success && result.Moves.SequenceEqual(new[]
+        {
+            new RubikMove(1, 2, 1), new RubikMove(0, 0, 2), new RubikMove(2, 2, 3)
+        }), "reverse-history solver returns the exact inverse sequence");
+    checks.Check(result is { FinalHash: null, Verification.Status: RubikSolutionVerificationStatus.NotRun },
+        "solver result does not claim verification before independent replay");
+
+    var imported = solver.SolveAsync(request with { TrustedHistory = null }).GetAwaiter().GetResult();
+    checks.Check(!imported.Success && imported.Failure?.Kind == RubikSolveFailureKind.UnsupportedState,
+        "reverse-history solver rejects arbitrary imported state without trusted history");
+
+    using var cancelled = new CancellationTokenSource();
+    cancelled.Cancel();
+    var cancelledResult = solver.SolveAsync(request with { CancellationToken = cancelled.Token }).GetAwaiter().GetResult();
+    checks.Check(!cancelledResult.Success && cancelledResult.Failure?.Kind == RubikSolveFailureKind.Cancelled,
+        "solver contract reports pre-cancelled request without work");
 }
 
 static RubikStateDocument SolvedDocument(int size)
