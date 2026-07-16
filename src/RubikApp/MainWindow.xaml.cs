@@ -15,6 +15,9 @@ namespace RubikApp;
 
 public partial class MainWindow : Window
 {
+    private static readonly MeshGeometry3D SharedCubieBodyMesh = CreateUnitCubieMesh();
+    private static readonly MeshGeometry3D[] SharedStickerMeshes = Enumerable.Range(0, 6).Select(CreateUnitStickerMesh).ToArray();
+    private static readonly Dictionary<MaterialCacheKey, Material> SharedMaterialCache = new();
     private readonly NativeRubikEngine _engine;
     private readonly Model3DGroup _scene = new();
     private readonly List<CubeVisual> _cubeVisuals = new();
@@ -39,6 +42,8 @@ public partial class MainWindow : Window
     private bool _faceletsSynchronized;
     private bool _orientationAvailable;
     private bool _fallbackRendererActive;
+    private double _lastSceneBuildMilliseconds;
+    private long _lastSceneAllocatedBytes;
     private double _yaw = 42;
     private double _pitch = 26;
     private double _distance = 18;
@@ -50,10 +55,16 @@ public partial class MainWindow : Window
         _engine = new NativeRubikEngine();
         SetupViewport();
         RefreshScene();
-        if (Environment.GetCommandLineArgs().Any(argument =>
+        var arguments = Environment.GetCommandLineArgs();
+        if (arguments.Any(argument =>
             string.Equals(argument, "--save-visual-evidence", StringComparison.OrdinalIgnoreCase)))
         {
             Loaded += SaveVisualEvidenceOnStartup;
+        }
+        else if (arguments.Any(argument =>
+            string.Equals(argument, "--measure-render-performance", StringComparison.OrdinalIgnoreCase)))
+        {
+            Loaded += MeasureRenderPerformanceOnStartup;
         }
     }
 
@@ -76,6 +87,8 @@ public partial class MainWindow : Window
 
     private void RefreshScene()
     {
+        var stopwatch = Stopwatch.StartNew();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         _scene.Children.Clear();
         _cubeVisuals.Clear();
         _cubeHitMap.Clear();
@@ -141,6 +154,9 @@ public partial class MainWindow : Window
             }
         }
 
+        stopwatch.Stop();
+        _lastSceneBuildMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
+        _lastSceneAllocatedBytes = Math.Max(0, GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
         UpdateStatus();
     }
 
@@ -154,7 +170,9 @@ public partial class MainWindow : Window
                           $"(bodies {_renderedCubieCount}, corners {_renderedCornerCount}, edges {_renderedEdgeCount}, " +
                           $"centers {_renderedCenterCount}, internal {_renderedInternalCount}, invalid {_invalidStickerCount}); " +
                           $"facelets: {(_faceletsSynchronized ? "sync" : "unavailable")}, orientation: {(_orientationAvailable ? "available" : "unavailable")}, " +
-                          $"fallback: {(_fallbackRendererActive ? "active" : "off")}";
+                          $"fallback: {(_fallbackRendererActive ? "active" : "off")}; " +
+                          $"build {_lastSceneBuildMilliseconds:0.0} ms / {_lastSceneAllocatedBytes / 1024.0:0} KiB, " +
+                          $"shared meshes {SharedStickerMeshes.Length + 1}, materials {SharedMaterialCache.Count}";
         var info = _engine.GetLastInfo();
         if (!string.IsNullOrWhiteSpace(info) && string.IsNullOrWhiteSpace(OutputBox.Text))
         {
@@ -523,6 +541,202 @@ public partial class MainWindow : Window
             }
         }
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chess", "RubikApp");
+    }
+
+    private async void MeasureRenderPerformance_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var reportPath = await MeasureRenderPerformanceAsync();
+            OutputBox.Text = $"Render performance report saved:\r\n{reportPath}";
+        }
+        catch (Exception exception)
+        {
+            OutputBox.Text = $"Render performance probe failed: {exception.Message}";
+        }
+    }
+
+    private async void MeasureRenderPerformanceOnStartup(object sender, RoutedEventArgs e)
+    {
+        Loaded -= MeasureRenderPerformanceOnStartup;
+        try
+        {
+            var reportPath = await MeasureRenderPerformanceAsync();
+            Console.WriteLine($"Rubik render performance PASS: {reportPath}");
+            Application.Current.Shutdown(0);
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine($"Rubik render performance FAIL: {exception}");
+            Application.Current.Shutdown(1);
+        }
+    }
+
+    internal async Task<string> MeasureRenderPerformanceAsync()
+    {
+        if (_isAnimating)
+        {
+            throw new InvalidOperationException("Wait for the current animation to finish before measuring rendering.");
+        }
+
+        var originalState = _engine.GetState();
+        if (originalState.ManualState != 0)
+        {
+            throw new InvalidOperationException("Performance measurement is unavailable for a manual state that cannot restore cubie orientation.");
+        }
+
+        var originalHistory = _engine.GetHistory();
+        var originalFacelets = _engine.GetFacelets();
+        var originalSurfaceOnly = SurfaceOnlyBox.IsChecked;
+        var originalSelection = (_selectedAxis, _selectedLayer);
+        var originalCamera = (_yaw, _pitch, _distance, _pan);
+        var originalSpeed = AnimationSpeedSlider.Value;
+        var outputDirectory = Path.Combine(FindRepositoryRoot(), ".tmp", "rubik-render-performance");
+        Directory.CreateDirectory(outputDirectory);
+        var reportPath = Path.Combine(outputDirectory, "result.json");
+
+        try
+        {
+            _engine.SetSize(11);
+            _engine.Scramble(20260716, 12);
+            _selectedAxis = -1;
+            _selectedLayer = -1;
+            SurfaceOnlyBox.IsChecked = true;
+            ResetCameraToDimension(11);
+
+            var firstRenderStopwatch = Stopwatch.StartNew();
+            RefreshScene();
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            firstRenderStopwatch.Stop();
+            var firstSurfaceBuildMs = _lastSceneBuildMilliseconds;
+            var firstSurfaceRenderWallMs = firstRenderStopwatch.Elapsed.TotalMilliseconds;
+            var surfaceCubies = _renderedCubieCount;
+            var surfaceStickers = _renderedStickerCount;
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            var managedBefore = GC.GetTotalMemory(forceFullCollection: false);
+            var privateBefore = Process.GetCurrentProcess().PrivateMemorySize64;
+            var rebuildTimes = new List<double>();
+            var rebuildAllocations = new List<long>();
+            for (var iteration = 0; iteration < 8; iteration++)
+            {
+                RefreshScene();
+                rebuildTimes.Add(_lastSceneBuildMilliseconds);
+                rebuildAllocations.Add(_lastSceneAllocatedBytes);
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            }
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            var managedAfter = GC.GetTotalMemory(forceFullCollection: false);
+            var privateAfter = Process.GetCurrentProcess().PrivateMemorySize64;
+
+            SurfaceOnlyBox.IsChecked = false;
+            var fullRenderStopwatch = Stopwatch.StartNew();
+            RefreshScene();
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            fullRenderStopwatch.Stop();
+            var fullBuildMs = _lastSceneBuildMilliseconds;
+            var fullRenderWallMs = fullRenderStopwatch.Elapsed.TotalMilliseconds;
+            var fullCubies = _renderedCubieCount;
+            var fullStickers = _renderedStickerCount;
+
+            SurfaceOnlyBox.IsChecked = true;
+            RefreshScene();
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            AnimationSpeedSlider.Value = 2;
+            var renderedFrames = 0;
+            EventHandler frameCounter = (_, _) => renderedFrames++;
+            CompositionTarget.Rendering += frameCounter;
+            var animationStopwatch = Stopwatch.StartNew();
+            try
+            {
+                await AnimateAndCommitMoveAsync(new NativeRubikEngine.RubikMoveDto
+                {
+                    Axis = 2,
+                    Layer = 10,
+                    QuarterTurns = 1
+                });
+            }
+            finally
+            {
+                animationStopwatch.Stop();
+                CompositionTarget.Rendering -= frameCounter;
+            }
+
+            var report = new
+            {
+                format = "rubik.render-performance",
+                version = 1,
+                generatedUtc = DateTimeOffset.UtcNow,
+                size = 11,
+                runtime = new
+                {
+                    framework = Environment.Version.ToString(),
+                    os = Environment.OSVersion.VersionString,
+                    processorCount = Environment.ProcessorCount
+                },
+                resources = new
+                {
+                    sharedMeshes = SharedStickerMeshes.Length + 1,
+                    cachedMaterials = SharedMaterialCache.Count
+                },
+                surface = new
+                {
+                    cubies = surfaceCubies,
+                    stickers = surfaceStickers,
+                    firstBuildMilliseconds = firstSurfaceBuildMs,
+                    firstRenderWallMilliseconds = firstSurfaceRenderWallMs,
+                    repeatedBuildMilliseconds = rebuildTimes,
+                    repeatedAllocatedBytes = rebuildAllocations,
+                    averageBuildMilliseconds = rebuildTimes.Average(),
+                    averageAllocatedBytes = rebuildAllocations.Average(),
+                    managedLiveBytesBefore = managedBefore,
+                    managedLiveBytesAfter = managedAfter,
+                    privateBytesBefore = privateBefore,
+                    privateBytesAfter = privateAfter
+                },
+                fullCube = new
+                {
+                    cubies = fullCubies,
+                    stickers = fullStickers,
+                    buildMilliseconds = fullBuildMs,
+                    renderWallMilliseconds = fullRenderWallMs
+                },
+                animation = new
+                {
+                    axis = 2,
+                    layer = 10,
+                    requestedMilliseconds = 260,
+                    wallMilliseconds = animationStopwatch.Elapsed.TotalMilliseconds,
+                    renderingCallbacks = renderedFrames,
+                    actionCommittedOnce = true
+                }
+            };
+            await File.WriteAllTextAsync(reportPath, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        finally
+        {
+            AnimationSpeedSlider.Value = originalSpeed;
+            _engine.SetSize(originalState.Size);
+            if (originalHistory.Length > 0 && !_engine.ApplyMoves(originalHistory))
+            {
+                throw new InvalidOperationException("Could not restore trusted history after performance measurement.");
+            }
+            SurfaceOnlyBox.IsChecked = originalSurfaceOnly;
+            (_selectedAxis, _selectedLayer) = originalSelection;
+            (_yaw, _pitch, _distance, _pan) = originalCamera;
+            UpdateCamera();
+            RefreshScene();
+            if (!_engine.GetFacelets().SequenceEqual(originalFacelets))
+            {
+                throw new InvalidOperationException("Performance measurement restoration did not reproduce original facelets.");
+            }
+        }
+
+        return reportPath;
     }
 
     private int SelectedQuarterTurns()
@@ -995,42 +1209,80 @@ public partial class MainWindow : Window
     {
         var group = new Model3DGroup();
         var bodyColor = selected ? Color.FromRgb(72, 74, 62) : Color.FromRgb(30, 34, 41);
-        group.Children.Add(CreateCube(center, size, bodyColor, opacity));
+        var modelTransform = CreateCubieModelTransform(center, size);
+        var bodyMaterial = CreateMaterial(bodyColor, opacity, 34);
+        group.Children.Add(new GeometryModel3D(SharedCubieBodyMesh, bodyMaterial)
+        {
+            Material = bodyMaterial,
+            Transform = modelTransform
+        });
         foreach (var sticker in stickers)
         {
             var color = selected
                 ? Blend(sticker.Color, Color.FromRgb(255, 244, 156), 0.18)
                 : sticker.Color;
-            group.Children.Add(CreateSticker(center, size, sticker.Face, color, opacity));
+            var stickerMaterial = CreateMaterial(color, opacity, 24);
+            group.Children.Add(new GeometryModel3D(SharedStickerMeshes[sticker.Face], stickerMaterial)
+            {
+                BackMaterial = stickerMaterial,
+                Transform = modelTransform
+            });
         }
         return group;
     }
 
-    private static GeometryModel3D CreateCube(Point3D center, double size, Color color, double opacity)
+    private static Transform3D CreateCubieModelTransform(Point3D center, double size)
     {
-        return CreateBox(center, size, size, size, color, opacity);
+        var transform = new Transform3DGroup();
+        transform.Children.Add(new ScaleTransform3D(size, size, size));
+        transform.Children.Add(new TranslateTransform3D(center.X, center.Y, center.Z));
+        transform.Freeze();
+        return transform;
     }
 
-    private static GeometryModel3D CreateSticker(Point3D center, double bodySize, int face, Color color, double opacity)
+    private static MeshGeometry3D CreateUnitCubieMesh()
     {
-        var radius = bodySize * 0.37;
-        var offset = bodySize * 0.5 + Math.Max(0.006, bodySize * 0.012);
+        var mesh = new MeshGeometry3D
+        {
+            Positions = new Point3DCollection
+            {
+                new(-0.5, -0.5, -0.5), new(0.5, -0.5, -0.5), new(0.5, 0.5, -0.5), new(-0.5, 0.5, -0.5),
+                new(-0.5, -0.5, 0.5), new(0.5, -0.5, 0.5), new(0.5, 0.5, 0.5), new(-0.5, 0.5, 0.5)
+            },
+            TriangleIndices = new Int32Collection
+            {
+                4, 5, 6, 4, 6, 7,
+                0, 2, 1, 0, 3, 2,
+                0, 4, 7, 0, 7, 3,
+                1, 2, 6, 1, 6, 5,
+                3, 7, 6, 3, 6, 2,
+                0, 1, 5, 0, 5, 4
+            }
+        };
+        mesh.Freeze();
+        return mesh;
+    }
+
+    private static MeshGeometry3D CreateUnitStickerMesh(int face)
+    {
+        const double radius = 0.37;
+        const double offset = 0.512;
         Point3DCollection positions = face switch
         {
-            0 => new() { new(center.X - radius, center.Y + offset, center.Z - radius), new(center.X + radius, center.Y + offset, center.Z - radius), new(center.X + radius, center.Y + offset, center.Z + radius), new(center.X - radius, center.Y + offset, center.Z + radius) },
-            1 => new() { new(center.X + offset, center.Y - radius, center.Z + radius), new(center.X + offset, center.Y - radius, center.Z - radius), new(center.X + offset, center.Y + radius, center.Z - radius), new(center.X + offset, center.Y + radius, center.Z + radius) },
-            2 => new() { new(center.X - radius, center.Y - radius, center.Z + offset), new(center.X + radius, center.Y - radius, center.Z + offset), new(center.X + radius, center.Y + radius, center.Z + offset), new(center.X - radius, center.Y + radius, center.Z + offset) },
-            3 => new() { new(center.X - radius, center.Y - offset, center.Z + radius), new(center.X + radius, center.Y - offset, center.Z + radius), new(center.X + radius, center.Y - offset, center.Z - radius), new(center.X - radius, center.Y - offset, center.Z - radius) },
-            4 => new() { new(center.X - offset, center.Y - radius, center.Z - radius), new(center.X - offset, center.Y - radius, center.Z + radius), new(center.X - offset, center.Y + radius, center.Z + radius), new(center.X - offset, center.Y + radius, center.Z - radius) },
-            _ => new() { new(center.X + radius, center.Y - radius, center.Z - offset), new(center.X - radius, center.Y - radius, center.Z - offset), new(center.X - radius, center.Y + radius, center.Z - offset), new(center.X + radius, center.Y + radius, center.Z - offset) }
+            0 => new() { new(-radius, offset, -radius), new(radius, offset, -radius), new(radius, offset, radius), new(-radius, offset, radius) },
+            1 => new() { new(offset, -radius, radius), new(offset, -radius, -radius), new(offset, radius, -radius), new(offset, radius, radius) },
+            2 => new() { new(-radius, -radius, offset), new(radius, -radius, offset), new(radius, radius, offset), new(-radius, radius, offset) },
+            3 => new() { new(-radius, -offset, radius), new(radius, -offset, radius), new(radius, -offset, -radius), new(-radius, -offset, -radius) },
+            4 => new() { new(-offset, -radius, -radius), new(-offset, -radius, radius), new(-offset, radius, radius), new(-offset, radius, -radius) },
+            _ => new() { new(radius, -radius, -offset), new(-radius, -radius, -offset), new(-radius, radius, -offset), new(radius, radius, -offset) }
         };
         var mesh = new MeshGeometry3D
         {
             Positions = positions,
             TriangleIndices = new Int32Collection { 0, 1, 2, 0, 2, 3 }
         };
-        var material = CreateMaterial(color, opacity, 24);
-        return new GeometryModel3D(mesh, material) { BackMaterial = material };
+        mesh.Freeze();
+        return mesh;
     }
 
     private static GeometryModel3D CreateBox(Point3D center, double width, double height, double depth, Color color, double opacity)
@@ -1073,7 +1325,14 @@ public partial class MainWindow : Window
 
     private static Material CreateMaterial(Color color, double opacity, double specularPower)
     {
-        var brush = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(opacity * 255, 20, 255), color.R, color.G, color.B));
+        var alpha = (byte)Math.Clamp(opacity * 255, 20, 255);
+        var key = new MaterialCacheKey(alpha, color.R, color.G, color.B, (byte)Math.Clamp(specularPower, 0, 255));
+        if (SharedMaterialCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var brush = new SolidColorBrush(Color.FromArgb(alpha, color.R, color.G, color.B));
         brush.Freeze();
         var specularBrush = new SolidColorBrush(Color.FromArgb(105, 255, 255, 255));
         specularBrush.Freeze();
@@ -1081,6 +1340,7 @@ public partial class MainWindow : Window
         material.Children.Add(new DiffuseMaterial(brush));
         material.Children.Add(new SpecularMaterial(specularBrush, specularPower));
         material.Freeze();
+        SharedMaterialCache[key] = material;
         return material;
     }
 
@@ -1153,5 +1413,6 @@ public partial class MainWindow : Window
 
     private sealed record CubeVisual(int X, int Y, int Z, Point3D Center, Model3DGroup Model);
     private readonly record struct StickerVisual(int Face, Color Color);
+    private readonly record struct MaterialCacheKey(byte Alpha, byte Red, byte Green, byte Blue, byte SpecularPower);
     private readonly record struct MouseLayerCandidate(CubeVisual Visual, int Axis, int Layer, Point3D HitPoint);
 }

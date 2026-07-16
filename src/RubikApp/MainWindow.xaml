@@ -142,6 +142,7 @@
                             <CheckBox x:Name="SurfaceOnlyBox" Content="только оболочка" IsChecked="True" Checked="SurfaceMode_Changed" Unchecked="SurfaceMode_Changed" />
                             <Button Content="Вид" Click="ResetCamera_Click" />
                             <Button Content="Save Visual Evidence" Click="SaveVisualEvidence_Click" />
+                            <Button Content="Measure Render" Click="MeasureRenderPerformance_Click" />
                         </StackPanel>
                     </Border>
                 </WrapPanel>
