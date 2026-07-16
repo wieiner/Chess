@@ -24,6 +24,16 @@ public partial class MainWindow : Window
     private MouseLayerCandidate? _mouseLayerCandidate;
     private int _selectedAxis = -1;
     private int _selectedLayer = -1;
+    private int _renderedCubieCount;
+    private int _renderedStickerCount;
+    private int _renderedCornerCount;
+    private int _renderedEdgeCount;
+    private int _renderedCenterCount;
+    private int _renderedInternalCount;
+    private int _invalidStickerCount;
+    private bool _faceletsSynchronized;
+    private bool _orientationAvailable;
+    private bool _fallbackRendererActive;
     private double _yaw = 42;
     private double _pitch = 26;
     private double _distance = 18;
@@ -65,7 +75,16 @@ public partial class MainWindow : Window
 
         var state = _engine.GetState();
         var size = Math.Max(2, state.Size);
-        var cells = _engine.GetCells();
+        int[]? facelets = null;
+        try
+        {
+            facelets = _engine.GetFacelets();
+        }
+        catch (InvalidOperationException)
+        {
+            // Legacy integer-only edits cannot provide physical sticker orientation.
+        }
+        _faceletsSynchronized = facelets != null;
         var surfaceOnly = SurfaceOnlyBox.IsChecked == true;
         var spacing = SpacingForSize(size);
         var cubeSize = CubeSizeForDimension(size);
@@ -73,6 +92,15 @@ public partial class MainWindow : Window
 
         _scene.Children.Add(CreateBasePlate(half, spacing, size));
         AddAxesAndCoordinates(size, half, spacing);
+        _renderedCubieCount = 0;
+        _renderedStickerCount = 0;
+        _renderedCornerCount = 0;
+        _renderedEdgeCount = 0;
+        _renderedCenterCount = 0;
+        _renderedInternalCount = 0;
+        _invalidStickerCount = 0;
+        _orientationAvailable = true;
+        _fallbackRendererActive = false;
 
         for (var z = 0; z < size; z++)
         {
@@ -86,19 +114,32 @@ public partial class MainWindow : Window
                         continue;
                     }
 
-                    var cell = cells[IndexOf(size, x, y, z)];
                     var opacity = isSurface ? 0.96 : 0.18;
                     var selected = _selectedAxis >= 0 &&
                         ((_selectedAxis == 0 && z == _selectedLayer) ||
                          (_selectedAxis == 1 && y == _selectedLayer) ||
                          (_selectedAxis == 2 && x == _selectedLayer));
-                    var color = selected ? Blend(ColorForCell(cell, size), Color.FromRgb(255, 244, 156), 0.32) : ColorForCell(cell, size);
                     var center = new Point3D(x * spacing - half, y * spacing - half, z * spacing - half);
-                    var model = CreateCube(center, cubeSize, color, selected ? 1.0 : opacity);
+                    var stickers = BuildStickerVisuals(facelets, size, x, y, z, ref _invalidStickerCount);
+                    var model = CreateRubikCubie(center, cubeSize, stickers, selected, selected ? 1.0 : opacity);
                     _scene.Children.Add(model);
                     var visual = new CubeVisual(x, y, z, center, model);
                     _cubeVisuals.Add(visual);
-                    _cubeHitMap[model] = visual;
+                    foreach (var child in model.Children.OfType<GeometryModel3D>())
+                    {
+                        _cubeHitMap[child] = visual;
+                    }
+
+                    _renderedCubieCount++;
+                    _renderedStickerCount += stickers.Count;
+                    var stickerMask = _engine.GetCubieStickerMask(x, y, z);
+                    var physicalStickerCount = stickerMask >= 0
+                        ? CountMaskBits(stickerMask)
+                        : ExposedFaceCount(size, x, y, z);
+                    if (physicalStickerCount == 3) _renderedCornerCount++;
+                    else if (physicalStickerCount == 2) _renderedEdgeCount++;
+                    else if (physicalStickerCount == 1) _renderedCenterCount++;
+                    else if (physicalStickerCount == 0) _renderedInternalCount++;
                 }
             }
         }
@@ -111,7 +152,12 @@ public partial class MainWindow : Window
         var state = _engine.GetState();
         SizeBox.Text = state.Size.ToString(CultureInfo.InvariantCulture);
         StatusText.Text = $"{state.Size}x{state.Size}x{state.Size}, ячеек {state.CellCount}, история {state.HistoryCount}, " +
-                          $"собран: {(state.IsSolved != 0 ? "да" : "нет")}, ручной режим: {(state.ManualState != 0 ? "да" : "нет")}";
+                          $"собран: {(state.IsSolved != 0 ? "да" : "нет")}, ручной режим: {(state.ManualState != 0 ? "да" : "нет")}; " +
+                          $"визуализация: {_renderedCubieCount} cubies / {_renderedStickerCount} stickers " +
+                          $"(bodies {_renderedCubieCount}, corners {_renderedCornerCount}, edges {_renderedEdgeCount}, " +
+                          $"centers {_renderedCenterCount}, internal {_renderedInternalCount}, invalid {_invalidStickerCount}); " +
+                          $"facelets: {(_faceletsSynchronized ? "sync" : "unavailable")}, orientation: {(_orientationAvailable ? "available" : "unavailable")}, " +
+                          $"fallback: {(_fallbackRendererActive ? "active" : "off")}";
         var info = _engine.GetLastInfo();
         if (!string.IsNullOrWhiteSpace(info) && string.IsNullOrWhiteSpace(OutputBox.Text))
         {
@@ -738,9 +784,237 @@ public partial class MainWindow : Window
         return Math.Clamp(spacing * 0.82, 0.48, 0.92);
     }
 
+    private static int ExposedFaceCount(int size, int x, int y, int z)
+    {
+        var maximum = size - 1;
+        return (x == 0 || x == maximum ? 1 : 0) +
+               (y == 0 || y == maximum ? 1 : 0) +
+               (z == 0 || z == maximum ? 1 : 0);
+    }
+
+    private List<StickerVisual> BuildStickerVisuals(
+        int[]? facelets,
+        int size,
+        int x,
+        int y,
+        int z,
+        ref int invalidCount)
+    {
+        if (facelets != null &&
+            _engine.TryGetCubieOrientation(x, y, z, out var orientation))
+        {
+            var stickerMask = _engine.GetCubieStickerMask(x, y, z);
+            if (stickerMask >= 0)
+            {
+                return BuildOrientedStickerVisuals(
+                    facelets,
+                    size,
+                    x,
+                    y,
+                    z,
+                    stickerMask,
+                    orientation,
+                    ref invalidCount);
+            }
+        }
+
+        _orientationAvailable = false;
+        _fallbackRendererActive = true;
+        return BuildFaceletShellStickerVisuals(facelets, size, x, y, z, ref invalidCount);
+    }
+
+    private static List<StickerVisual> BuildOrientedStickerVisuals(
+        int[] facelets,
+        int size,
+        int x,
+        int y,
+        int z,
+        int stickerMask,
+        NativeRubikEngine.RubikCubieOrientationDto orientation,
+        ref int invalidCount)
+    {
+        var result = new List<StickerVisual>(3);
+        for (var localFace = 0; localFace < 6; localFace++)
+        {
+            if ((stickerMask & (1 << localFace)) == 0)
+            {
+                continue;
+            }
+
+            var worldFace = WorldFaceForLocalFace(localFace, orientation);
+            if (worldFace < 0 || !IsOnWorldFace(size, x, y, z, worldFace))
+            {
+                invalidCount++;
+                continue;
+            }
+
+            AddWorldSticker(result, facelets, size, worldFace, x, y, z, ref invalidCount);
+        }
+        return result;
+    }
+
+    private static List<StickerVisual> BuildFaceletShellStickerVisuals(
+        int[]? facelets,
+        int size,
+        int x,
+        int y,
+        int z,
+        ref int invalidCount)
+    {
+        var result = new List<StickerVisual>(3);
+        var maximum = size - 1;
+        if (y == maximum) AddWorldSticker(result, facelets, size, 0, x, y, z, ref invalidCount);
+        if (x == maximum) AddWorldSticker(result, facelets, size, 1, x, y, z, ref invalidCount);
+        if (z == maximum) AddWorldSticker(result, facelets, size, 2, x, y, z, ref invalidCount);
+        if (y == 0) AddWorldSticker(result, facelets, size, 3, x, y, z, ref invalidCount);
+        if (x == 0) AddWorldSticker(result, facelets, size, 4, x, y, z, ref invalidCount);
+        if (z == 0) AddWorldSticker(result, facelets, size, 5, x, y, z, ref invalidCount);
+        return result;
+    }
+
+    private static void AddWorldSticker(
+        ICollection<StickerVisual> result,
+        int[]? facelets,
+        int size,
+        int worldFace,
+        int x,
+        int y,
+        int z,
+        ref int invalidCount)
+    {
+        var maximum = size - 1;
+        var (row, column) = worldFace switch
+        {
+            0 => (z, x),
+            1 => (maximum - y, maximum - z),
+            2 => (maximum - y, x),
+            3 => (maximum - z, x),
+            4 => (maximum - y, z),
+            5 => (maximum - y, maximum - x),
+            _ => (-1, -1)
+        };
+        var index = worldFace * size * size + row * size + column;
+        if (facelets == null || index < 0 || index >= facelets.Length || facelets[index] is < 1 or > 6)
+        {
+            invalidCount++;
+            return;
+        }
+        result.Add(new StickerVisual(worldFace, ColorForFacelet(facelets[index])));
+    }
+
+    private static int WorldFaceForLocalFace(
+        int localFace,
+        NativeRubikEngine.RubikCubieOrientationDto orientation)
+    {
+        var (x, y, z) = localFace switch
+        {
+            0 => (orientation.LocalYWorldX, orientation.LocalYWorldY, orientation.LocalYWorldZ),
+            1 => (orientation.LocalXWorldX, orientation.LocalXWorldY, orientation.LocalXWorldZ),
+            2 => (orientation.LocalZWorldX, orientation.LocalZWorldY, orientation.LocalZWorldZ),
+            3 => (-orientation.LocalYWorldX, -orientation.LocalYWorldY, -orientation.LocalYWorldZ),
+            4 => (-orientation.LocalXWorldX, -orientation.LocalXWorldY, -orientation.LocalXWorldZ),
+            5 => (-orientation.LocalZWorldX, -orientation.LocalZWorldY, -orientation.LocalZWorldZ),
+            _ => (0, 0, 0)
+        };
+        return (x, y, z) switch
+        {
+            (0, 1, 0) => 0,
+            (1, 0, 0) => 1,
+            (0, 0, 1) => 2,
+            (0, -1, 0) => 3,
+            (-1, 0, 0) => 4,
+            (0, 0, -1) => 5,
+            _ => -1
+        };
+    }
+
+    private static bool IsOnWorldFace(int size, int x, int y, int z, int face)
+    {
+        var maximum = size - 1;
+        return face switch
+        {
+            0 => y == maximum,
+            1 => x == maximum,
+            2 => z == maximum,
+            3 => y == 0,
+            4 => x == 0,
+            5 => z == 0,
+            _ => false
+        };
+    }
+
+    private static int CountMaskBits(int mask)
+    {
+        var count = 0;
+        for (var bit = 0; bit < 6; bit++)
+        {
+            if ((mask & (1 << bit)) != 0)
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static Color ColorForFacelet(int colorId)
+    {
+        return colorId switch
+        {
+            1 => Color.FromRgb(244, 240, 222), // white / ivory
+            2 => Color.FromRgb(211, 57, 66),   // red
+            3 => Color.FromRgb(47, 166, 91),   // green
+            4 => Color.FromRgb(244, 205, 54),  // yellow
+            5 => Color.FromRgb(238, 119, 37),  // orange
+            6 => Color.FromRgb(50, 112, 214),  // blue
+            _ => Color.FromRgb(180, 184, 190)
+        };
+    }
+
+    private static Model3DGroup CreateRubikCubie(
+        Point3D center,
+        double size,
+        IReadOnlyList<StickerVisual> stickers,
+        bool selected,
+        double opacity)
+    {
+        var group = new Model3DGroup();
+        var bodyColor = selected ? Color.FromRgb(72, 74, 62) : Color.FromRgb(30, 34, 41);
+        group.Children.Add(CreateCube(center, size, bodyColor, opacity));
+        foreach (var sticker in stickers)
+        {
+            var color = selected
+                ? Blend(sticker.Color, Color.FromRgb(255, 244, 156), 0.18)
+                : sticker.Color;
+            group.Children.Add(CreateSticker(center, size, sticker.Face, color, opacity));
+        }
+        return group;
+    }
+
     private static GeometryModel3D CreateCube(Point3D center, double size, Color color, double opacity)
     {
         return CreateBox(center, size, size, size, color, opacity);
+    }
+
+    private static GeometryModel3D CreateSticker(Point3D center, double bodySize, int face, Color color, double opacity)
+    {
+        var radius = bodySize * 0.37;
+        var offset = bodySize * 0.5 + Math.Max(0.006, bodySize * 0.012);
+        Point3DCollection positions = face switch
+        {
+            0 => new() { new(center.X - radius, center.Y + offset, center.Z - radius), new(center.X + radius, center.Y + offset, center.Z - radius), new(center.X + radius, center.Y + offset, center.Z + radius), new(center.X - radius, center.Y + offset, center.Z + radius) },
+            1 => new() { new(center.X + offset, center.Y - radius, center.Z + radius), new(center.X + offset, center.Y - radius, center.Z - radius), new(center.X + offset, center.Y + radius, center.Z - radius), new(center.X + offset, center.Y + radius, center.Z + radius) },
+            2 => new() { new(center.X - radius, center.Y - radius, center.Z + offset), new(center.X + radius, center.Y - radius, center.Z + offset), new(center.X + radius, center.Y + radius, center.Z + offset), new(center.X - radius, center.Y + radius, center.Z + offset) },
+            3 => new() { new(center.X - radius, center.Y - offset, center.Z + radius), new(center.X + radius, center.Y - offset, center.Z + radius), new(center.X + radius, center.Y - offset, center.Z - radius), new(center.X - radius, center.Y - offset, center.Z - radius) },
+            4 => new() { new(center.X - offset, center.Y - radius, center.Z - radius), new(center.X - offset, center.Y - radius, center.Z + radius), new(center.X - offset, center.Y + radius, center.Z + radius), new(center.X - offset, center.Y + radius, center.Z - radius) },
+            _ => new() { new(center.X + radius, center.Y - radius, center.Z - offset), new(center.X - radius, center.Y - radius, center.Z - offset), new(center.X - radius, center.Y + radius, center.Z - offset), new(center.X + radius, center.Y + radius, center.Z - offset) }
+        };
+        var mesh = new MeshGeometry3D
+        {
+            Positions = positions,
+            TriangleIndices = new Int32Collection { 0, 1, 2, 0, 2, 3 }
+        };
+        var material = CreateMaterial(color, opacity, 24);
+        return new GeometryModel3D(mesh, material) { BackMaterial = material };
     }
 
     private static GeometryModel3D CreateBox(Point3D center, double width, double height, double depth, Color color, double opacity)
@@ -773,17 +1047,25 @@ public partial class MainWindow : Window
             }
         };
 
-        var brush = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(opacity * 255, 20, 255), color.R, color.G, color.B));
-        brush.Freeze();
-        var material = new MaterialGroup();
-        material.Children.Add(new DiffuseMaterial(brush));
-        material.Children.Add(new SpecularMaterial(new SolidColorBrush(Color.FromArgb(95, 255, 255, 255)), 34));
-        material.Freeze();
+        var material = CreateMaterial(color, opacity, 34);
         var model = new GeometryModel3D(mesh, material)
         {
             BackMaterial = material
         };
         return model;
+    }
+
+    private static Material CreateMaterial(Color color, double opacity, double specularPower)
+    {
+        var brush = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(opacity * 255, 20, 255), color.R, color.G, color.B));
+        brush.Freeze();
+        var specularBrush = new SolidColorBrush(Color.FromArgb(105, 255, 255, 255));
+        specularBrush.Freeze();
+        var material = new MaterialGroup();
+        material.Children.Add(new DiffuseMaterial(brush));
+        material.Children.Add(new SpecularMaterial(specularBrush, specularPower));
+        material.Freeze();
+        return material;
     }
 
     private static GeometryModel3D CreateTextLabel(string text, Point3D center, double width, double height, Color color)
@@ -829,27 +1111,6 @@ public partial class MainWindow : Window
         return new GeometryModel3D(mesh, material) { BackMaterial = material };
     }
 
-    private static Color ColorForCell(int value, int size)
-    {
-        var count = Math.Max(1, size * size * size);
-        var source = Math.Abs(value) % count;
-        var x = source % size;
-        var y = (source / size) % size;
-        var z = source / (size * size);
-
-        if (x == 0) return Color.FromRgb(210, 58, 70);
-        if (x == size - 1) return Color.FromRgb(245, 139, 48);
-        if (y == 0) return Color.FromRgb(62, 126, 232);
-        if (y == size - 1) return Color.FromRgb(70, 176, 96);
-        if (z == 0) return Color.FromRgb(245, 214, 78);
-        if (z == size - 1) return Color.FromRgb(238, 241, 246);
-
-        return Color.FromRgb(
-            (byte)(70 + source * 29 % 90),
-            (byte)(76 + source * 47 % 100),
-            (byte)(88 + source * 61 % 100));
-    }
-
     private static Color Blend(Color baseColor, Color overlay, double amount)
     {
         amount = Math.Clamp(amount, 0, 1);
@@ -874,6 +1135,7 @@ public partial class MainWindow : Window
         };
     }
 
-    private sealed record CubeVisual(int X, int Y, int Z, Point3D Center, GeometryModel3D Model);
+    private sealed record CubeVisual(int X, int Y, int Z, Point3D Center, Model3DGroup Model);
+    private readonly record struct StickerVisual(int Face, Color Color);
     private readonly record struct MouseLayerCandidate(CubeVisual Visual, int Axis, int Layer, Point3D HitPoint);
 }
