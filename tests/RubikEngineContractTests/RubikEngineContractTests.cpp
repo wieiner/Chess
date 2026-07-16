@@ -25,6 +25,26 @@ std::vector<int> SolvedFacelets(int size)
     return result;
 }
 
+std::vector<int> FaceletsOf(void* cube)
+{
+    const int count = Rubik_GetFaceletCount(cube);
+    std::vector<int> result(static_cast<size_t>(count), 0);
+    Rubik_GetFacelets(cube, result.data(), count);
+    return result;
+}
+
+std::vector<int> CellsOf(void* cube, int size)
+{
+    std::vector<int> result(static_cast<size_t>(size * size * size), 0);
+    Rubik_GetCells(cube, result.data());
+    return result;
+}
+
+int FaceletAt(const std::vector<int>& facelets, int size, int face, int row, int column)
+{
+    return facelets[static_cast<size_t>(face * size * size + row * size + column)];
+}
+
 void CheckSolvedFacelets(ContractTestRunner& test, int size)
 {
     void* cube = Rubik_CreateSized(size);
@@ -43,6 +63,112 @@ void CheckSolvedFacelets(ContractTestRunner& test, int size)
     test.Check(facelets == SolvedFacelets(size), "Solved face order and colors are canonical for N=" + std::to_string(size));
     test.Check(Rubik_ValidateFacelets(cube, facelets.data(), expectedCount) == 1,
         "Solved facelets validate for N=" + std::to_string(size));
+    Rubik_Destroy(cube);
+}
+
+void CheckRotationInvariants(ContractTestRunner& test, int size)
+{
+    void* cube = Rubik_CreateSized(size);
+    test.Check(cube != nullptr, "Create rotation invariant cube N=" + std::to_string(size));
+    if (cube == nullptr)
+    {
+        return;
+    }
+
+    const std::vector<int> solvedFacelets = FaceletsOf(cube);
+    const std::vector<int> solvedCells = CellsOf(cube, size);
+    const int maximum = size - 1;
+
+    test.Check(Rubik_RotateLayer(cube, 0, maximum, 1) == 1, "Outer quarter turn succeeds N=" + std::to_string(size));
+    std::vector<int> turnedFacelets = FaceletsOf(cube);
+    test.Check(turnedFacelets != solvedFacelets, "Outer quarter turn changes facelets N=" + std::to_string(size));
+    test.Check(Rubik_ValidateFacelets(cube, turnedFacelets.data(), static_cast<int>(turnedFacelets.size())) == 1,
+        "Outer turn preserves color counts N=" + std::to_string(size));
+    std::vector<int> turnedCells = CellsOf(cube, size);
+    std::sort(turnedCells.begin(), turnedCells.end());
+    test.Check(turnedCells == solvedCells, "Outer turn preserves cubie ID permutation N=" + std::to_string(size));
+    test.Check(Rubik_RotateLayer(cube, 0, maximum, 3) == 1, "Outer inverse turn succeeds N=" + std::to_string(size));
+    test.Check(FaceletsOf(cube) == solvedFacelets && CellsOf(cube, size) == solvedCells,
+        "Turn plus inverse restores facelets and cubies N=" + std::to_string(size));
+
+    for (int turn = 0; turn < 4; ++turn)
+    {
+        Rubik_RotateLayer(cube, 2, 0, 1);
+    }
+    test.Check(FaceletsOf(cube) == solvedFacelets && CellsOf(cube, size) == solvedCells,
+        "Four quarter turns restore state N=" + std::to_string(size));
+
+    Rubik_RotateLayer(cube, 1, maximum, 2);
+    Rubik_RotateLayer(cube, 1, maximum, 2);
+    test.Check(FaceletsOf(cube) == solvedFacelets && CellsOf(cube, size) == solvedCells,
+        "Two half turns restore state N=" + std::to_string(size));
+
+    if (size > 2)
+    {
+        Rubik_RotateLayer(cube, 0, 1, 1);
+        Rubik_RotateLayer(cube, 0, 1, 3);
+        test.Check(FaceletsOf(cube) == solvedFacelets && CellsOf(cube, size) == solvedCells,
+            "Inner slice turn and inverse restore state N=" + std::to_string(size));
+    }
+
+    RubikMoveDto wideRoundTrip[] = {
+        { 2, maximum, 1 },
+        { 2, maximum - 1, 1 },
+        { 2, maximum - 1, 3 },
+        { 2, maximum, 3 }
+    };
+    test.Check(Rubik_ApplyMoves(cube, wideRoundTrip, 4) == 1, "Wide-turn sequence applies N=" + std::to_string(size));
+    test.Check(FaceletsOf(cube) == solvedFacelets && CellsOf(cube, size) == solvedCells,
+        "Wide turn and inverse restore state N=" + std::to_string(size));
+
+    for (int layer = 0; layer < size; ++layer)
+    {
+        Rubik_RotateLayer(cube, 1, layer, 1);
+    }
+    for (int layer = size - 1; layer >= 0; --layer)
+    {
+        Rubik_RotateLayer(cube, 1, layer, 3);
+    }
+    test.Check(FaceletsOf(cube) == solvedFacelets && CellsOf(cube, size) == solvedCells,
+        "Whole-cube rotation and inverse restore state N=" + std::to_string(size));
+
+    Rubik_Destroy(cube);
+}
+
+void CheckAxisStripDirections(ContractTestRunner& test)
+{
+    constexpr int size = 3;
+    constexpr int maximum = size - 1;
+    void* cube = Rubik_CreateSized(size);
+    if (cube == nullptr)
+    {
+        test.Check(false, "Create axis strip direction cube");
+        return;
+    }
+
+    Rubik_RotateLayer(cube, 0, maximum, 1);
+    std::vector<int> facelets = FaceletsOf(cube);
+    test.Check(FaceletAt(facelets, size, 0, maximum, 1) == 2, "Z+ front turn maps R left strip to U bottom");
+    test.Check(FaceletAt(facelets, size, 1, 1, 0) == 4, "Z+ front turn maps D top strip to R left");
+    test.Check(FaceletAt(facelets, size, 3, 0, 1) == 5, "Z+ front turn maps L right strip to D top");
+    test.Check(FaceletAt(facelets, size, 4, 1, maximum) == 1, "Z+ front turn maps U bottom strip to L right");
+
+    Rubik_Reset(cube);
+    Rubik_RotateLayer(cube, 2, maximum, 1);
+    facelets = FaceletsOf(cube);
+    test.Check(FaceletAt(facelets, size, 0, 1, maximum) == 6, "X+ right turn maps B left strip to U right");
+    test.Check(FaceletAt(facelets, size, 2, 1, maximum) == 1, "X+ right turn maps U right strip to F right");
+    test.Check(FaceletAt(facelets, size, 3, 1, maximum) == 3, "X+ right turn maps F right strip to D right");
+    test.Check(FaceletAt(facelets, size, 5, 1, 0) == 4, "X+ right turn maps D right strip to B left");
+
+    Rubik_Reset(cube);
+    Rubik_RotateLayer(cube, 1, maximum, 1);
+    facelets = FaceletsOf(cube);
+    test.Check(FaceletAt(facelets, size, 2, 0, 1) == 2, "Y+ top turn maps R top strip to F top");
+    test.Check(FaceletAt(facelets, size, 1, 0, 1) == 6, "Y+ top turn maps B top strip to R top");
+    test.Check(FaceletAt(facelets, size, 5, 0, 1) == 5, "Y+ top turn maps L top strip to B top");
+    test.Check(FaceletAt(facelets, size, 4, 0, 1) == 3, "Y+ top turn maps F top strip to L top");
+
     Rubik_Destroy(cube);
 }
 }
@@ -66,6 +192,12 @@ int main()
     {
         CheckSolvedFacelets(test, size);
     }
+
+    for (const int size : { 2, 3, 4, 5, 8, 11 })
+    {
+        CheckRotationInvariants(test, size);
+    }
+    CheckAxisStripDirections(test);
 
     std::vector<int> importedFacelets = SolvedFacelets(8);
     std::swap(importedFacelets[0], importedFacelets[64]);
@@ -96,9 +228,9 @@ int main()
     Rubik_Reset(cube);
 
     test.Check(Rubik_RotateLayer(cube, 0, 0, 1) == 1, "Rubik_RotateLayer accepts one quarter turn");
-    std::vector<int> staleFacelets(384, 0);
-    test.Check(Rubik_GetFacelets(cube, staleFacelets.data(), static_cast<int>(staleFacelets.size())) == -1,
-        "Phase 04 rejects stale facelets after legacy cubie-only rotation");
+    std::vector<int> rotatedFacelets(384, 0);
+    test.Check(Rubik_GetFacelets(cube, rotatedFacelets.data(), static_cast<int>(rotatedFacelets.size())) == 384,
+        "Layer rotation keeps facelets synchronized");
     state = StateOf(cube);
     test.Check(state.isSolved == 0, "One quarter turn changes solved state");
     test.Check(Rubik_RotateLayer(cube, 0, 0, 1) == 1, "Second quarter turn succeeds");
@@ -119,6 +251,7 @@ int main()
         test.Check(Rubik_GetCells(cubeA, cellsA.data()) == 1, "Read scrambled cells A");
         test.Check(Rubik_GetCells(cubeB, cellsB.data()) == 1, "Read scrambled cells B");
         test.Check(cellsA == cellsB, "Scramble is reproducible for the same seed and length");
+        test.Check(FaceletsOf(cubeA) == FaceletsOf(cubeB), "Scramble facelets are reproducible for the same seed and length");
 
         RubikMoveDto solution[64]{};
         const int solutionCount = Rubik_SolveByReverseHistory(cubeA, solution, 64);
@@ -128,12 +261,16 @@ int main()
         test.Check(std::string(commandText).size() > 0, "Rubik_GetCommandText returns non-empty text");
         test.Check(Rubik_ApplyMoves(cubeA, solution, solutionCount) == 1, "Applying reverse-history solution succeeds");
         test.Check(StateOf(cubeA).isSolved == 1, "Applying reverse-history solution returns cube to solved state");
+        test.Check(FaceletsOf(cubeA) == SolvedFacelets(8), "Reverse-history solution restores solved facelets");
     }
 
     Rubik_Reset(cube);
     test.Check(Rubik_SetCell(cube, 0, 0, 0, 999) == 1, "Rubik_SetCell accepts manual edit");
     state = StateOf(cube);
     test.Check(state.manualState == 1, "Manual SetCell marks cube as manual state");
+    std::vector<int> unavailableFacelets(384, 0);
+    test.Check(Rubik_GetFacelets(cube, unavailableFacelets.data(), static_cast<int>(unavailableFacelets.size())) == -1,
+        "Legacy integer edit keeps unknown sticker orientation explicit");
     RubikMoveDto manualSolution[8]{};
     test.Check(Rubik_SolveByReverseHistory(cube, manualSolution, 8) == -1, "Manual state rejects trusted reverse-history solving");
 

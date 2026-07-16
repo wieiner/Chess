@@ -50,11 +50,10 @@ Reset creates synchronized solved facelets for every supported N. A facelet
 import makes facelets authoritative, clears trusted history, and marks the
 state manual.
 
-The Phase 04 engine does not yet permute facelets during a layer turn. To avoid
-inventing sticker orientation, a legacy cell edit/import or layer rotation
-marks facelets unsynchronized; `Rubik_GetFacelets` then returns `-1` and
-`Rubik_GetLastInfo` explains the boundary. Phase 05 replaces that temporary
-guard with the real facelet permutation.
+Phase 05 now permutes synchronized facelets during every layer turn. A legacy
+cell edit/import still marks facelets unsynchronized because the integer-only
+payload has no sticker orientation; `Rubik_GetFacelets` then returns `-1` and
+`Rubik_GetLastInfo` explains the boundary.
 
 This behavior does not alter `Rubik_GetCells`, `Rubik_SetCells`, rendering, or
 reverse-history solving. It makes the new API honest while preserving all old
@@ -71,4 +70,6 @@ Contract tests cover solved sizes 2, 3, 8, 11, and 32, including:
 - invalid-color rejection without mutation;
 - single facelet access;
 - versioned color-scheme metadata;
-- explicit rejection of stale facelets after a legacy-only turn.
+- explicit rejection after a legacy integer edit/import with unknown
+  orientation;
+- synchronized facelet reads after normal layer turns (Phase 05).

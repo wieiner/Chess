@@ -316,6 +316,151 @@ Vec3 rotateLayerSquare(const Engine& engine, int axis, int layer, int turns, int
     }
 }
 
+struct Sticker
+{
+    Vec3 position;
+    Vec3 normal;
+};
+
+Sticker faceletToSticker(const Engine& engine, int face, int row, int column)
+{
+    const int maximum = engine.size - 1;
+    switch (face)
+    {
+    case 0: // U
+        return { { column, maximum, row }, { 0, 1, 0 } };
+    case 1: // R
+        return { { maximum, maximum - row, maximum - column }, { 1, 0, 0 } };
+    case 2: // F
+        return { { column, maximum - row, maximum }, { 0, 0, 1 } };
+    case 3: // D
+        return { { column, 0, maximum - row }, { 0, -1, 0 } };
+    case 4: // L
+        return { { 0, maximum - row, column }, { -1, 0, 0 } };
+    default: // B
+        return { { maximum - column, maximum - row, 0 }, { 0, 0, -1 } };
+    }
+}
+
+Vec3 rotateNormal(int axis, int turns, Vec3 normal)
+{
+    for (int turn = 0; turn < turns; ++turn)
+    {
+        switch (axis)
+        {
+        case 0:
+            normal = { -normal.y, normal.x, normal.z };
+            break;
+        case 1:
+            normal = { -normal.z, normal.y, normal.x };
+            break;
+        default:
+            normal = { normal.x, -normal.z, normal.y };
+            break;
+        }
+    }
+    return normal;
+}
+
+bool stickerToFacelet(const Engine& engine, const Sticker& sticker, int& face, int& row, int& column)
+{
+    const int maximum = engine.size - 1;
+    if (sticker.normal.y == 1)
+    {
+        face = 0;
+        row = sticker.position.z;
+        column = sticker.position.x;
+    }
+    else if (sticker.normal.x == 1)
+    {
+        face = 1;
+        row = maximum - sticker.position.y;
+        column = maximum - sticker.position.z;
+    }
+    else if (sticker.normal.z == 1)
+    {
+        face = 2;
+        row = maximum - sticker.position.y;
+        column = sticker.position.x;
+    }
+    else if (sticker.normal.y == -1)
+    {
+        face = 3;
+        row = maximum - sticker.position.z;
+        column = sticker.position.x;
+    }
+    else if (sticker.normal.x == -1)
+    {
+        face = 4;
+        row = maximum - sticker.position.y;
+        column = sticker.position.z;
+    }
+    else if (sticker.normal.z == -1)
+    {
+        face = 5;
+        row = maximum - sticker.position.y;
+        column = maximum - sticker.position.x;
+    }
+    else
+    {
+        return false;
+    }
+    return validFaceletCoordinate(engine, face, row, column);
+}
+
+bool buildRotatedFacelets(const Engine& engine, int axis, int layer, int turns, std::vector<int>& result)
+{
+    if (!engine.faceletsSynchronized)
+    {
+        result.clear();
+        return true;
+    }
+    if (static_cast<int>(engine.facelets.size()) != faceletCount(engine.size))
+    {
+        return false;
+    }
+
+    result = engine.facelets;
+    for (int face = 0; face < FaceCount; ++face)
+    {
+        for (int row = 0; row < engine.size; ++row)
+        {
+            for (int column = 0; column < engine.size; ++column)
+            {
+                Sticker sticker = faceletToSticker(engine, face, row, column);
+                const int coordinate = axis == 0
+                    ? sticker.position.z
+                    : axis == 1 ? sticker.position.y : sticker.position.x;
+                if (coordinate != layer)
+                {
+                    continue;
+                }
+
+                sticker.position = rotateLayerSquare(
+                    engine,
+                    axis,
+                    layer,
+                    turns,
+                    sticker.position.x,
+                    sticker.position.y,
+                    sticker.position.z);
+                sticker.normal = rotateNormal(axis, turns, sticker.normal);
+
+                int toFace = -1;
+                int toRow = -1;
+                int toColumn = -1;
+                if (!stickerToFacelet(engine, sticker, toFace, toRow, toColumn))
+                {
+                    return false;
+                }
+                result[static_cast<size_t>(faceletIndex(engine, toFace, toRow, toColumn))] =
+                    engine.facelets[static_cast<size_t>(faceletIndex(engine, face, row, column))];
+            }
+        }
+    }
+    return true;
+}
+
 void rememberMove(Engine& engine, Move move)
 {
     if (!engine.history.empty())
@@ -349,6 +494,13 @@ bool rotateLayer(Engine& engine, int axis, int layer, int quarterTurns, bool rec
         return true;
     }
 
+    std::vector<int> rotatedFacelets;
+    if (!buildRotatedFacelets(engine, axis, layer, turns, rotatedFacelets))
+    {
+        engine.lastInfo = "Rotation rejected: synchronized facelet state is invalid.";
+        return false;
+    }
+
     const std::vector<int> before = engine.cells;
     for (int z = 0; z < engine.size; ++z)
     {
@@ -366,10 +518,10 @@ bool rotateLayer(Engine& engine, int axis, int layer, int quarterTurns, bool rec
             }
         }
     }
-
-    // Phase 05 adds the facelet permutation. Until then, never expose stale
-    // facelets after a legacy cubie-only rotation.
-    engine.faceletsSynchronized = false;
+    if (engine.faceletsSynchronized)
+    {
+        engine.facelets.swap(rotatedFacelets);
+    }
 
     const Move move{ axis, layer, turns };
     engine.lastMove = move;
