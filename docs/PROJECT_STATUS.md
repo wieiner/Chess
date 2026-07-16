@@ -1,8 +1,10 @@
 # Project Status
 
-Last audited locally for P4G2 actual online play.
+Last audited locally for P4L Rubik physical workflow completion.
 
 Current summary: the repository now contains Windows desktop products, a Linux-capable ChessOnlineServer authority, a proven Hetzner systemd + Nginx public HTTP dry-run, a playable `ChessOnlineApp` diagnostic client path over HTTP 80, and exactly five real Chess3D RuleProfiles. P4G2 adds server-backed legal preview, one-click normal actions, one-app/two-window UI play proof, five-profile startup/snapshot coverage, and explicit Rubik/Hodge special-action boundaries. TLS/domain hardening, HTTPS auth enforcement, reconnect/resume/spectator UX, deployment rollback/backups/log rotation, Chess2D PGN/UCI portal foundations, and older documentation reconciliation remain open. Historical sections below keep phase context; `docs/NEXT_ERA_PROJECT_MAP.md` and `docs/P4G2_ACTUAL_ONLINE_PLAY_USER_GUIDE.md` are the concise current-state entry points.
+
+P4L closes the local Rubik visual/physical-state foundation: exact cubie orientation and multi-color sticker rendering, tested N=11 rendering, versioned atomic `.rubik.json`, transactional load, six-face physical editor, structured solvability diagnostics, independent solution replay verification, bounded arbitrary 2x2 solving, and an honest checkpointed NxN reduction Level A. Arbitrary 3x3 and complete arbitrary 11x11 solving remain deferred. The original integer ABI, facelet ABI, turns/notation/scramble, and trusted reverse-history flow are preserved.
 
 P4A added a local production-oriented identity/session/persistence layer around the P3E/P3F online authority contract: persistent player accounts, password hashing, protected access/refresh tokens, authenticated SignalR player identity, durable session records, JSON persistence baseline, identity/persistence fixtures, tests, and packaging checks. It did not add a sixth Chess3D RuleProfile and did not make online play a public production service.
 

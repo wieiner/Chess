@@ -1,10 +1,10 @@
 # Next Era Project Map
 
-Date: 2026-06-21
+Date: 2026-07-16
 
 Reachability refresh: 2026-06-28
 
-This is the current operator-facing map after the Next Era Linux dry-run, P4F diagnostic client, and P4G2 actual online play pass. Historical phase documents remain useful, but this page is the concise current-state entry point.
+This is the current operator-facing map after the Next Era Linux/online work and P4L Rubik physical workflow. Historical phase documents remain useful, but this page is the concise current-state entry point.
 
 ## Products
 
@@ -12,7 +12,7 @@ This is the current operator-facing map after the Next Era Linux dry-run, P4F di
 | --- | --- | --- |
 | Chess2D / Chess Advisor | Playable Windows WPF app | Ordinary 8x8 chess engine with legal moves, FEN, draw status, search, and 3D model view. Portal integration is audited but not implemented. |
 | Chess3DApp | Playable experimental Windows WPF app | Exactly five Chess3D RuleProfiles: Classic, Single-Side, Asgard, Rubik, Hodge. No sixth runtime mode exists. |
-| RubikApp | Playable Windows WPF app | Separate Rubik state/rotation product; not a Chess3D RuleProfile. |
+| RubikApp | Playable Windows WPF physical-state workspace | Separate NxN Rubik product with multi-color cubies, `.rubik.json`, physical input/validation, verified arbitrary 2x2 solving, and Level A NxN reduction. It is not a Chess3D RuleProfile. |
 | ChessOnlineApp | Playable Windows WPF online client MVP | Account/portal/relay UI shell plus P4G2 server-backed legal preview, one-app/two-window play, action log, session reports, and special-action boundaries over diagnostic HTTP 80. |
 | ChessOnlineServer | Linux-capable ASP.NET Core authority | `net8.0` server package can run with Linux `libChess3DEngine.so`; Hetzner systemd + Nginx external HTTP health and SignalR Asgard smoke work. TLS/domain hardening is still missing. |
 | Chess2DBenchmark | Native benchmark executable | Measures ordinary 2D legal move/search/evaluation hot paths. |
@@ -54,6 +54,16 @@ This is the current operator-facing map after the Next Era Linux dry-run, P4F di
 | Full verify | `scripts/verify.ps1` | Windows Build gate used by CI. |
 
 The decomposed runner uses controlled `/m:N`, bounded test executable timeouts, and logs under `.tmp/test-logs`.
+
+## Rubik Product State
+
+- Supported portable state/UI size range: N=2..32; N=11 rendering, turns, physical state roundtrip, validation, and reduction checkpoint are tested.
+- Corners render three stickers, edges/wings two, centers one. Exact native orientation is retained for trusted native states; imported facelets use an explicit shell fallback without invented identity.
+- Portable state is `.rubik.json`; verified complete solver output is `.rubikmoves`.
+- Arbitrary imported 2x2 is solved by the owned bounded backend and independently replay-verified.
+- Arbitrary 3x3 search is not implemented.
+- N=11 is Level A only: validation/decomposition/guidance/checkpoint, no center/wing solution moves and no arbitrary-solve claim.
+- User entry point: `P4L_RUBIK_USER_GUIDE.md`.
 
 ## Server Deploy State
 

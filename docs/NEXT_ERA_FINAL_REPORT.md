@@ -345,3 +345,23 @@ Full local contract tests and `scripts/verify.ps1` passed. The deploy retained a
 protected backup and previous server directory; rollback dry-run passed and
 actual rollback was unnecessary. See `P4K_REMOTE_UX_FINAL_REPORT.md`,
 `P4K_HETZNER_OPERATOR_GUIDE.md`, and `P4K_REMOTE_UX_USER_GUIDE.md`.
+
+## P4L Rubik Physical Workflow Closeout (2026-07-16)
+
+P4L is a local Windows Rubik product pass and did not modify or deploy the
+ChessOnlineServer. It fixes the old one-material cubie renderer with exact
+physical stickers, preserves cubie orientation through layer/inner/wide/cube
+turns, and verifies N=11 rendering and portable state roundtrips.
+
+Rubik Studio now has strict atomic `.rubik.json` save/load, a six-face physical
+editor, structured validation, cubie decomposition, and explicit proof levels.
+The Solver tab runs bounded arbitrary 2x2 search off the UI thread, verifies
+every candidate through fresh-native replay, and enables versioned solution
+save/playback only after solved-state/final-hash proof. Arbitrary 3x3 remains
+deferred. The NxN framework reaches declared Level A only: validated state,
+decomposition, phase guidance, and resumable checkpoint with no fabricated
+center/wing moves or arbitrary 11x11 solve claim.
+
+The dedicated Rubik suite, full repository suite, production packaging, quick
+benchmark, and `scripts/verify.ps1` passed. CUDA remained optional. See
+`P4L_RUBIK_FINAL_REPORT.md` and `P4L_RUBIK_USER_GUIDE.md`.

@@ -1,6 +1,6 @@
 # Chess Advisor
 
-Current map: see `docs/NEXT_ERA_PROJECT_MAP.md` for the latest product/deploy status. In short, the repository contains Chess2D, Chess3D, Rubik, online integration apps, a portable `net8.0` ChessOnlineServer, and exactly five real Chess3D RuleProfiles. Linux server smoke has passed through Hetzner systemd + Nginx public HTTP, and `ChessOnlineApp` now has a P4G2 actual online play path with one-app/two-window UI flows documented in `docs/P4G2_ACTUAL_ONLINE_PLAY_USER_GUIDE.md`; TLS/domain and production hardening are still open.
+Current map: see `docs/NEXT_ERA_PROJECT_MAP.md` for the latest product/deploy status. In short, the repository contains Chess2D, Chess3D, a physical-state-aware NxN Rubik Studio, online integration apps, a portable `net8.0` ChessOnlineServer, and exactly five real Chess3D RuleProfiles. P4L adds multi-color Rubik cubies, portable state files, physical input/validation, verified arbitrary 2x2 solving, and an honest Level A NxN reduction boundary. Linux server smoke has passed through Hetzner systemd + Nginx public HTTP; TLS/domain and production hardening remain separate open work.
 
 ## Structure
 
@@ -8,10 +8,10 @@ Current map: see `docs/NEXT_ERA_PROJECT_MAP.md` for the latest product/deploy st
 - `src/ChessGpuBackend` - stable native GPU ABI with CUDA, Direct3D 11, and CPU fallback routing.
 - `src/ChessCudaBackend` - optional native CUDA DLL compiled from `.cu` kernels and loaded dynamically by `ChessGpuBackend.dll`.
 - `src/Chess3DEngine` - separate native DLL for experimental cube chess on an 8x8x8 board.
-- `src/RubikEngine` - separate native DLL for 8x8x8 Rubik-layer state, rotations and reverse-history solving.
+- `src/RubikEngine` - separate native DLL for NxNxN Rubik facelets, cubie orientation, rotations and trusted reverse-history solving.
 - `src/ChessApp` - ordinary 8x8 chess C# WPF frontend. It uses P/Invoke and keeps chess logic inside the DLL.
 - `src/Chess3DApp` - separate cube-chess WPF frontend. It starts directly into the 8x8x8 game and runs independently from `ChessApp.exe`.
-- `src/RubikApp` - separate WPF 3D frontend for the 8x8x8 Rubik assembly project.
+- `src/RubikApp` - separate WPF 3D frontend for NxN rendering, physical state files/input, validation and capability-aware solving.
 - `src/ChessOnlineApp` - separate WPF hub for internet integrations, online portal accounts, read-only platform APIs, ICS text servers and the future 3D chess web relay.
 - `src/ChessOnlineServer` - portable ASP.NET Core/SignalR authority for Chess3D online play.
 - `src/Chess2DBenchmark` - separate native console benchmark executable for ordinary 2D chess engine and CPU/Direct3D/CUDA batch evaluation.
@@ -178,7 +178,7 @@ src\Chess3DApp\bin\x64\Release\net8.0-windows\Chess3DApp.exe
 
 The current 3D rules are intentionally marked as draft. The module already supports setup, JSON rule loading, move generation, direct moves, position text, 3D preview, and a small generic AI search. Exact law decisions such as six-player starts, king safety, check/mate semantics, castling, en passant, and final pawn rules can evolve inside this module without touching `ChessEngine.dll`.
 
-## Rubik 8x8x8
+## Rubik NxNxN
 
 The Rubik assembly project is a third separate executable:
 
@@ -187,15 +187,20 @@ src\RubikApp\bin\x64\Release\net8.0-windows\RubikApp.exe
 ```
 
 - Native module: `RubikEngine.dll`.
-- State: 512 integer cells with the same `x/y/z` indexing as cube chess.
+- State: physical U/R/F/D/L/B facelets plus legacy integer cells, with supported dimensions 2 through 32.
 - Operations: rotate any `Z`, `Y`, or `X` layer by `+90`, `180`, or `-90`.
 - Scramble: reproducible by seed and length.
-- Solver v1: reverse-engineers positions produced by trusted rotations or scramble history and emits the inverse command sequence.
-- Manual cell editing is supported, but it clears the trusted history; arbitrary-state solving is explicitly left for the next deeper solver core.
-- The frontend renders the 8x8x8 cube in WPF `Viewport3D`, with surface-only/full rendering, orbit, pan and zoom.
+- Trusted-history solver: preserves the original inverse-history path for positions produced in the current session.
+- Arbitrary solver: bounded owned 2x2 IDDFS with independent replay verification; arbitrary 3x3 is deferred.
+- NxN reduction: Level A validation/decomposition/guidance/checkpoint only. It does not solve arbitrary 11x11 states.
+- Portable state: atomic `.rubik.json` save/load with strict validation and canonical hash; complete verified solutions use `.rubikmoves`.
+- Physical input: six-face draft editor with structured diagnostics and explicit transactional apply.
+- The frontend renders multi-color physical stickers in WPF `Viewport3D`, with three-color corners, two-color edges/wings, surface-only/full rendering, orbit, pan and zoom. N=11 rendering and state roundtrip are tested.
 - Moves can be animated at selectable speed. Manual layer turns, solution playback, and notation playback all use smooth layer rotation before committing the native state.
 - The notation parser accepts compact and spaced formulas such as `RUR'U'`, `R U R' U'`, inner-slice forms from 4x4 tutorials such as `r`, `Uu`, `Rr`, wide forms such as `Rw`, `3Rw`, cube rotations `x/y/z`, parentheses such as `(Uu)2`, and the internal coordinate notation `Z5x2`.
 - `History` exports the current trusted move history as coordinate notation; `Notation` applies formulas from the text area; `Play` applies the same formula with animation.
+
+Start with `docs/P4L_RUBIK_USER_GUIDE.md`; format and physical-entry details are in `docs/P4L_RUBIK_STATE_FILE_GUIDE.md` and `docs/P4L_PHYSICAL_CUBE_INPUT_GUIDE.md`.
 
 ## Internet Integrations
 

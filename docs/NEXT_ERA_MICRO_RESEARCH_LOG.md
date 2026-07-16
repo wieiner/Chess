@@ -1675,3 +1675,13 @@ Date: 2026-07-16
 | Cross-product gate | Decomposed test registry, `scripts/verify.ps1`, and current Windows Build workflow | The Rubik project shares solution, packaging, native build, and test infrastructure with Chess2D, Chess3D, GPU, and Online products. | Run the full contract registry without benchmark under controlled `/m:1`, then run the unchanged full verify/package gate. | Regression report | All selected tests and verify steps exit 0; no watchdog timeout. |
 | Profile isolation | Existing Chess3D contract tests and packaged rules assets | Rubik work must not alter the five-profile Chess3D contract or server deployment state. | Treat exactly-five profile checks and absence of deployment edits as explicit acceptance criteria. | Regression report | Verify profile assets/tests and inspect tracked diff/status. |
 | Generated artifact hygiene | Repository `.gitignore`, `.tmp` test logs, and production build scripts | Local logs/build/package outputs are evidence but must not become tracked source. | Keep `.tmp`, `bin`, `obj`, `ProductionOutput`, and server runtime material out of the phase commit. | Regression report | `git status --short`, tracked-artifact scan, and diff scope review. |
+
+## P4L Phase 30 - Final Rubik Product Documentation
+
+Date: 2026-07-16
+
+| Topic | Sources checked | Key finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| User workflow | Current Rubik Studio UI, portable state/editor/solver contracts, and Phase 28-29 evidence | Users need one route from physical stickers to validated state and a separate, capability-aware solve route. | Publish concise state-file, physical-input, solver, and launch instructions without presenting deferred backends as available. | User guides/final report | Cross-check every control name and file extension against current XAML/code. |
+| Product status language | Existing project map/status/roadmap and Level A acceptance boundary | Summary documents can easily turn partial NxN reduction into an accidental arbitrary-solve claim. | State arbitrary 2x2 as implemented, arbitrary 3x3 as deferred, and 11x11 as rendering/state/validation/reduction Level A only. | README and summary docs | Search final diff for unsupported `11x11 solved` or general-solver claims. |
+| Release evidence | Phase 28 local Rubik gate, Phase 29 repository gate, and successful phase CI runs | Final claims should link to reproducible commands/results rather than raw generated logs. | Reference tracked result documents and keep `.tmp` evidence untracked. | Final report | `git diff --check`, targeted Rubik suite, final CI, clean tree. |

@@ -2,15 +2,14 @@
 
 ## Current Next Era Priorities
 
-Current source of truth after P4G2:
+Current source of truth after P4L:
 
-1. P4I: improve the online board readability, action-history UI, and reduce manual click steps.
-2. P4H: add reconnect/resume/spectator UX and operator diagnostics.
+1. Rubik next: approve an arbitrary 3x3 backend, then implement NxN center/wing/parity phases without weakening replay verification.
+2. Online next: exact restart rehydration, special-action UX, and production account/session policy.
 3. P4E later: confirm domain/DNS and configure TLS/HTTPS for ChessOnlineServer on a dedicated server or after the x-ui/443 decision.
 4. Enforce HTTPS-safe auth/token behavior before real public accounts.
-5. Add deployment rollback, backup/restore, and log rotation runbooks.
-6. Build Chess2D PGN/SAN and UCI adapter foundations before live portal play.
-7. Add visual QA automation and later AI/search strength work.
+5. Build Chess2D PGN/SAN and UCI adapter foundations before live portal play.
+6. Add visual QA automation and later AI/search strength work.
 
 Historical phase sections below are retained for context. When an older "Next" line conflicts with this section or `docs/NEXT_ERA_PROJECT_MAP.md`, the Next Era map wins.
 
@@ -453,3 +452,24 @@ Next recommended fronts:
 3. lobby recent-first paging and production account/session policy;
 4. dedicated TLS/domain/HTTPS deployment after the 443 ownership decision;
 5. Chess2D PGN/SAN, UCI, and token-safe portal integration.
+
+## P4L Rubik Visual And Physical Workflow
+
+Completed:
+
+- exact facelet coordinates, rotations, cubie orientation basis, and physical sticker masks;
+- multi-color WPF cubies with three-color corners and two-color edges/wings;
+- N=11 render/performance evidence and state roundtrip;
+- versioned `.rubik.json`, strict parsing, canonical hash, atomic save, and transactional load;
+- six-face physical editor and structured validation diagnostics;
+- cubie decomposition and full declared 2x2/3x3 small-cube invariants;
+- solver contracts, fresh-native replay verification, bounded arbitrary 2x2 IDDFS;
+- NxN reduction framework/checkpoints and declared N=11 Level A;
+- capability-aware Solver UI with save/load/play/step/previous/cancel.
+
+Deferred:
+
+- arbitrary 3x3 search backend;
+- NxN center solving, wing pairing, reduced-3x3 solving, and parity correction;
+- arbitrary 11x11 solve claim until imported state -> generated moves -> independent solved replay -> final hash is proven;
+- dedicated checkpoint file controls and broader visual/accessibility automation.
