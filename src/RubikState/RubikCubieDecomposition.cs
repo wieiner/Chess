@@ -54,9 +54,7 @@ public static class RubikCubieDecomposer
             if (stickers.Length == 3)
             {
                 var ud = stickers.FirstOrDefault(sticker => sticker.ColorId is 1 or 4);
-                var orientation = ud is null ? -1 : ud.Face is "U" or "D" ? 0 :
-                    ud.ColorId == 1 ? (ud.Face is "R" or "L" ? 1 : 2) :
-                    (ud.Face is "R" or "L" ? 2 : 1);
+                var orientation = ud is null ? -1 : Array.IndexOf(CornerFaceOrder(coordinate, maximum), ud.Face);
                 corners.Add(new(coordinate, stickers, Signature(stickers.Select(sticker => sticker.ColorId)), orientation));
             }
             else if (stickers.Length == 2)
@@ -156,6 +154,17 @@ public static class RubikCubieDecomposer
     }
 
     private static string Signature(IEnumerable<int> colors) => string.Join('-', colors.OrderBy(color => color));
+
+    private static string[] CornerFaceOrder(RubikSurfaceCoordinate coordinate, int maximum)
+    {
+        if (coordinate.Y == maximum)
+        {
+            if (coordinate.Z == maximum) return coordinate.X == maximum ? ["U", "R", "F"] : ["U", "F", "L"];
+            return coordinate.X == 0 ? ["U", "L", "B"] : ["U", "B", "R"];
+        }
+        if (coordinate.Z == maximum) return coordinate.X == maximum ? ["D", "F", "R"] : ["D", "L", "F"];
+        return coordinate.X == 0 ? ["D", "B", "L"] : ["D", "R", "B"];
+    }
 
     private static int ReadFacelet(IReadOnlyList<int> facelets, int size, int face, RubikSurfaceCoordinate coordinate)
     {

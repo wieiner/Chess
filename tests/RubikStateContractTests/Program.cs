@@ -23,6 +23,7 @@ try
     CheckPhysicalElevenByElevenWorkflow(checks);
     CheckSolverContracts(checks);
     CheckSolutionVerification(checks);
+    CheckBoundedTwoByTwoSolver(checks);
 }
 catch (Exception exception)
 {
@@ -606,6 +607,80 @@ static void CheckSolutionVerification(ContractChecks checks)
     checks.Check(cancelledResult.Status == RubikSolutionVerificationStatus.Failed &&
                  cancelledResult.Message.Contains("cancelled", StringComparison.OrdinalIgnoreCase),
         "cancelled verification returns promptly with an explicit result");
+}
+
+static void CheckBoundedTwoByTwoSolver(ContractChecks checks)
+{
+    foreach (var size in new[] { 2, 3 })
+    foreach (var axis in Enumerable.Range(0, 3))
+    foreach (var layer in new[] { 0, size - 1 })
+    foreach (var turns in Enumerable.Range(1, 3))
+    {
+        using var native = NativeCube.Create(size);
+        var move = new RubikMove(axis, layer, turns);
+        var managed = RubikFaceletMoveSimulator.Apply(size, native.Facelets, move);
+        checks.Check(native.RotateLayer(axis, layer, turns) && native.Facelets.SequenceEqual(managed),
+            $"managed move simulator matches native N={size} axis={axis} layer={layer} turns={turns}");
+    }
+
+    var solver = new BoundedTwoByTwoSolver();
+    checks.Check(solver.Capabilities is { MinimumSize: 2, MaximumSize: 2, SupportsArbitraryState: true },
+        "bounded solver advertises arbitrary 2x2 only");
+    var factory = new NativeMoveExecutorFactory();
+    var fixtures = new[]
+    {
+        new[] { new RubikMove(2, 1, 1) },
+        new[] { new RubikMove(2, 1, 1), new RubikMove(0, 0, 2), new RubikMove(1, 1, 3) },
+        new[] { new RubikMove(0, 1, 1), new RubikMove(2, 0, 3), new RubikMove(1, 0, 2), new RubikMove(0, 0, 1) }
+    };
+    foreach (var (fixture, index) in fixtures.Select((value, index) => (value, index)))
+    {
+        var facelets = SolvedDocument(2).Faces.Flatten();
+        foreach (var move in fixture) facelets = RubikFaceletMoveSimulator.Apply(2, facelets, move);
+        var input = RubikStateDocument.Create(2, facelets, $"arbitrary-2x2-{index}");
+        var result = solver.SolveAsync(new(input, TimeSpan.FromSeconds(10), 64 * 1024 * 1024, 8))
+            .GetAwaiter().GetResult();
+        checks.Check(result.Success,
+            $"bounded arbitrary 2x2 fixture {index} finds a solution ({result.Failure?.Kind}: {result.Failure?.Message})");
+        var verification = RubikSolutionVerifier.Verify(input, result.Moves, factory);
+        checks.Check(verification.Status == RubikSolutionVerificationStatus.Verified,
+            $"bounded arbitrary 2x2 fixture {index} solution native replay-verifies");
+    }
+
+    foreach (var seed in new[] { 2401, 2402, 2403 })
+    {
+        using var randomNative = NativeCube.Create(2);
+        checks.Check(randomNative.Scramble(seed, 4), $"seeded legal 2x2 scramble {seed} is generated");
+        var imported = RubikStateDocument.Create(2, randomNative.Facelets, $"imported-seeded-{seed}");
+        var result = solver.SolveAsync(new(imported, TimeSpan.FromSeconds(10), 64 * 1024 * 1024, 8))
+            .GetAwaiter().GetResult();
+        checks.Check(result.Success, $"imported seeded 2x2 state {seed} solves without trusted history");
+        checks.Check(RubikSolutionVerifier.Verify(imported, result.Moves, factory).Status ==
+                     RubikSolutionVerificationStatus.Verified,
+            $"imported seeded 2x2 state {seed} native replay-verifies");
+    }
+
+    var unsupported = solver.SolveAsync(new(SolvedDocument(3), TimeSpan.FromSeconds(1), 16 * 1024 * 1024, 4))
+        .GetAwaiter().GetResult();
+    checks.Check(!unsupported.Success && unsupported.Failure?.Kind == RubikSolveFailureKind.UnsupportedSize,
+        "bounded 2x2 backend rejects 3x3 without a false arbitrary claim");
+
+    var impossible = SolvedDocument(2).Faces.Flatten();
+    var d = 3 * 4 + 2;
+    var l = 4 * 4 + 2;
+    var b = 5 * 4 + 3;
+    (impossible[d], impossible[l], impossible[b]) = (impossible[l], impossible[b], impossible[d]);
+    var impossibleResult = solver.SolveAsync(new(RubikStateDocument.Create(2, impossible, "impossible-twist"),
+        TimeSpan.FromSeconds(1), 16 * 1024 * 1024, 4)).GetAwaiter().GetResult();
+    checks.Check(!impossibleResult.Success && impossibleResult.Failure?.Kind == RubikSolveFailureKind.InvalidState,
+        "impossible single-twist 2x2 is rejected before search");
+
+    using var cancelled = new CancellationTokenSource();
+    cancelled.Cancel();
+    var cancelledResult = solver.SolveAsync(new(SolvedDocument(2), TimeSpan.FromSeconds(1), 16 * 1024 * 1024, 4,
+        cancelled.Token)).GetAwaiter().GetResult();
+    checks.Check(!cancelledResult.Success && cancelledResult.Failure?.Kind == RubikSolveFailureKind.Cancelled,
+        "bounded arbitrary 2x2 honors pre-cancellation");
 }
 
 static RubikStateDocument SolvedDocument(int size)
