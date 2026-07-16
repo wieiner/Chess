@@ -24,6 +24,7 @@ try
     CheckSolverContracts(checks);
     CheckSolutionVerification(checks);
     CheckBoundedTwoByTwoSolver(checks);
+    CheckNxnReductionFramework(checks);
 }
 catch (Exception exception)
 {
@@ -681,6 +682,48 @@ static void CheckBoundedTwoByTwoSolver(ContractChecks checks)
         cancelled.Token)).GetAwaiter().GetResult();
     checks.Check(!cancelledResult.Success && cancelledResult.Failure?.Kind == RubikSolveFailureKind.Cancelled,
         "bounded arbitrary 2x2 honors pre-cancellation");
+}
+
+static void CheckNxnReductionFramework(ContractChecks checks)
+{
+    var expectedPhases = Enum.GetValues<RubikReductionPhase>();
+    foreach (var size in new[] { 4, 5, 7 })
+    {
+        using var native = NativeCube.Create(size);
+        checks.Check(native.Scramble(2500 + size, 6), $"N={size} reduction fixture scramble succeeds");
+        var state = RubikStateDocument.Create(size, native.Facelets, $"reduction-{size}");
+        var plan = RubikNxnReductionFramework.CreatePlan(state);
+        checks.Check(plan.Success && plan.Status == RubikReductionStatus.Incomplete &&
+                     plan.Phases.Select(phase => phase.Phase).SequenceEqual(expectedPhases),
+            $"N={size} reduction plan exposes every ordered phase and honest incomplete status");
+        checks.Check(plan.Checkpoint is { EmittedMoves.Count: 0, CurrentPhase: RubikReductionPhase.NormalizeOrientation },
+            $"N={size} reduction checkpoint emits no invented moves");
+
+        var jsonA = RubikNxnReductionFramework.SerializeCheckpoint(plan.Checkpoint!);
+        var jsonB = RubikNxnReductionFramework.SerializeCheckpoint(plan.Checkpoint!);
+        var resumed = RubikNxnReductionFramework.ParseCheckpoint(jsonA, state);
+        checks.Check(jsonA == jsonB && resumed.Format == plan.Checkpoint!.Format &&
+                     resumed.Version == plan.Checkpoint.Version && resumed.SolverId == plan.Checkpoint.SolverId &&
+                     resumed.Size == plan.Checkpoint.Size && resumed.InputHash == plan.Checkpoint.InputHash &&
+                     resumed.CurrentPhase == plan.Checkpoint.CurrentPhase && resumed.Status == plan.Checkpoint.Status &&
+                     resumed.EmittedMoves.SequenceEqual(plan.Checkpoint.EmittedMoves) &&
+                     resumed.Log.SequenceEqual(plan.Checkpoint.Log),
+            $"N={size} reduction checkpoint is deterministic and resumes against matching state");
+        var changed = RubikFaceletMoveSimulator.Apply(size, state.Faces.Flatten(), new RubikMove(0, 0, 1));
+        var mismatchRejected = false;
+        try { RubikNxnReductionFramework.ParseCheckpoint(jsonA, RubikStateDocument.Create(size, changed, "changed")); }
+        catch (InvalidDataException) { mismatchRejected = true; }
+        checks.Check(mismatchRejected, $"N={size} reduction checkpoint rejects changed input hash");
+    }
+
+    var bounded = RubikNxnReductionFramework.BoundedLog(Enumerable.Range(0, 200).Select(index => new string('x', 600) + index));
+    checks.Check(bounded.Count == RubikNxnReductionFramework.MaximumLogEntries && bounded.All(entry => entry.Length == 512),
+        "reduction checkpoint log is bounded by entry count and message length");
+    using var cancelled = new CancellationTokenSource();
+    cancelled.Cancel();
+    var cancelledPlan = RubikNxnReductionFramework.CreatePlan(SolvedDocument(4), cancelled.Token);
+    checks.Check(!cancelledPlan.Success && cancelledPlan.Status == RubikReductionStatus.Cancelled,
+        "NxN reduction planning honors cancellation");
 }
 
 static RubikStateDocument SolvedDocument(int size)

@@ -1624,3 +1624,13 @@ Date: 2026-07-16
 | Managed move model | Native `faceletToSticker`, layer-square rotation, normal rotation, and `stickerToFacelet` implementation | The native move semantics can be reproduced from geometry without copying solver logic or changing ABI. | Add a pure managed facelet simulator and prove all 18 outer moves against fresh native 2x2 and 3x3 handles. | RubikState/tests | Exact facelet equality for every axis/layer/quarter-turn combination. |
 | Bounded 2x2 search | Phase 21 architecture and full N=2 solvability validation | Iterative deepening can solve arbitrary validated 2x2 states within explicit depth/time/node bounds without large precomputed tables. | Implement deterministic IDDFS with inverse/commuting move pruning; derive node cap conservatively from memory limit. | RubikState/tests | Known and seeded legal short scrambles solve and native replay-verify; impossible state fails validation; cancellation is typed. |
 | 3x3 boundary | Kociemba two-phase research and Phase 21 licensing/table audit | A credible arbitrary 3x3 backend requires coordinate/pruning tables and an explicit implementation/license decision. | Return `UnsupportedSize` for 3x3 from this backend; do not label bounded 2x2 support as general small-cube completion. | RubikState/docs | Capability maximum remains 2 and a 3x3 request clean-fails. |
+
+## P4L Phase 25 - NxN Reduction Framework
+
+Date: 2026-07-16
+
+| Topic | Sources checked | Key finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Reduction state machine | Phase 21 architecture and Phase 18 corner/wing/center decomposition | Center solving, wing pairing, reduced-3x3 construction, parity, and final verification have distinct invariants and cannot be represented as one opaque search. | Add explicit ordered phase descriptors and a state/checkpoint model; generate guidance only, not fabricated moves. | RubikState/tests/docs | 4x4/5x5/7x7 produce deterministic phase plans with zero emitted moves and `Incomplete` status. |
+| Checkpoint safety | Existing state hash/checkpoint contract | Resume is safe only when solver id, schema version, size, and input hash all match. | Add strict bounded JSON checkpoint parsing and mismatch validation before resume. | RubikState/tests | Deterministic roundtrip, wrong hash, wrong size, malformed JSON, and cancellation tests. |
+| Progress/log bounds | Existing solver request resource contract | A long NxN phase can produce unbounded diagnostic output even before move algorithms exist. | Cap checkpoint log entries and messages; progress names the exact phase and never reports false completion. | RubikState | Tests verify bounded log and terminal `Incomplete` guidance status. |
