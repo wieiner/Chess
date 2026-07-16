@@ -1604,3 +1604,13 @@ Date: 2026-07-16
 | Portable solver boundary | Existing `RubikStateDocument`, state hash, native move DTO, and reverse-history ABI | A solver request must carry a validated immutable state plus explicit resource/cancellation bounds; native DTO layout must not leak into managed backends. | Add pure `net8.0` solver/move/progress/result contracts in RubikState with no native or WPF dependency. | RubikState/tests | Build on all current targets and test validation, cancellation, and capability fields. |
 | Reverse history naming | Existing `Rubik_SolveByReverseHistory` behavior | Inverting trusted history is deterministic and useful, but cannot solve imported/manual arbitrary states. | Implement `ReverseHistorySolver` with `SupportsArbitraryState=false` and `RequiresTrustedHistory=true`; reject a missing trusted history. | RubikState/tests/docs | Assert exact inverse order and typed unsupported-state failure. |
 | Verification hand-off | Phase 21 independent replay decision | A returned move list is not proof; Phase 22 has no independent move executor yet. | Result carries an explicit `NotRun` verification status and nullable final hash. Phase 23 supplies replay authority. | RubikState | Tests ensure reverse-history output never reports itself verified. |
+
+## P4L Phase 23 - Solution Verification Authority
+
+Date: 2026-07-16
+
+| Topic | Sources checked | Key finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Independent execution | Existing native create/set-facelets/rotate/get-facelets APIs and portable state validator | A fresh cube handle can replay solver output without sharing mutable solver state or trusted history. | Define a small executor factory boundary; verifier clones canonical facelets, validates each structured move and each intermediate state, then checks canonical solved facelets. | RubikState/tests | Native-backed tests cover valid, malformed, illegal, truncated, incorrect, and cancelled sequences. |
+| Proof result | Existing canonical state hash contract | Applying all moves successfully is insufficient; solved state and final hash must both be computed from replay output. | Return `Verified` only for canonical solved output; return `Failed` with applied count/final hash for a legal but incomplete sequence. | RubikState/tests/docs | Reverse solution reaches solved hash; truncated/incorrect solutions fail. |
+| Input isolation | Portable document arrays are mutable references | A verifier could accidentally alter caller-owned facelets while cloning or adapting. | Snapshot input before execution and test byte-for-byte facelet equality after every verification path. | Tests | Input mutation assertion runs after successful replay. |

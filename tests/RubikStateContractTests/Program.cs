@@ -22,6 +22,7 @@ try
     CheckSolvabilityValidation(checks);
     CheckPhysicalElevenByElevenWorkflow(checks);
     CheckSolverContracts(checks);
+    CheckSolutionVerification(checks);
 }
 catch (Exception exception)
 {
@@ -559,6 +560,54 @@ static void CheckSolverContracts(ContractChecks checks)
         "solver contract reports pre-cancelled request without work");
 }
 
+static void CheckSolutionVerification(ContractChecks checks)
+{
+    var history = new[]
+    {
+        new RubikMove(2, 2, 1), new RubikMove(0, 0, 2), new RubikMove(1, 2, 3), new RubikMove(2, 0, 1)
+    };
+    using var source = NativeCube.Create(3);
+    foreach (var move in history)
+        checks.Check(source.RotateLayer(move.Axis, move.Layer, move.QuarterTurns), "verification fixture move applies");
+    var inputFacelets = source.Facelets;
+    var input = RubikStateDocument.Create(3, inputFacelets, "verification-fixture");
+    var solver = new ReverseHistorySolver();
+    var request = new RubikSolveRequest(input, TimeSpan.FromSeconds(5), 16 * 1024 * 1024, 20,
+        TrustedHistory: history);
+    var solution = solver.SolveAsync(request).GetAwaiter().GetResult();
+    var factory = new NativeMoveExecutorFactory();
+
+    var verified = RubikSolutionVerifier.Verify(input, solution.Moves, factory);
+    var solvedHash = RubikStateHasher.Calculate(SolvedDocument(3));
+    checks.Check(verified is { Status: RubikSolutionVerificationStatus.Verified, Solved: true, AppliedMoveCount: 4 } &&
+                 verified.FinalHash == solvedHash, "valid reverse solution replays independently to solved hash");
+    checks.Check(input.Faces.Flatten().SequenceEqual(inputFacelets), "solution verification does not mutate input facelets");
+
+    var malformed = RubikSolutionVerifier.Verify(input, [new RubikMove(9, 0, 1)], factory);
+    checks.Check(malformed.Status == RubikSolutionVerificationStatus.Failed && malformed.AppliedMoveCount == 0,
+        "malformed move fails before replay mutation");
+    var illegalLayer = RubikSolutionVerifier.Verify(input, [new RubikMove(0, 3, 1)], factory);
+    checks.Check(illegalLayer.Status == RubikSolutionVerificationStatus.Failed && illegalLayer.AppliedMoveCount == 0,
+        "out-of-range layer fails before replay mutation");
+
+    var truncated = RubikSolutionVerifier.Verify(input, solution.Moves.Take(solution.Moves.Count - 1).ToArray(), factory);
+    checks.Check(truncated.Status == RubikSolutionVerificationStatus.Failed && !truncated.Solved &&
+                 truncated.AppliedMoveCount == solution.Moves.Count - 1,
+        "truncated solution applies cleanly but fails solved-state proof");
+    var incorrect = solution.Moves.ToArray();
+    incorrect[0] = incorrect[0] with { QuarterTurns = 2 };
+    var incorrectResult = RubikSolutionVerifier.Verify(input, incorrect, factory);
+    checks.Check(incorrectResult.Status == RubikSolutionVerificationStatus.Failed && !incorrectResult.Solved,
+        "syntactically valid incorrect sequence fails solved-state proof");
+
+    using var cancelled = new CancellationTokenSource();
+    cancelled.Cancel();
+    var cancelledResult = RubikSolutionVerifier.Verify(input, solution.Moves, factory, cancelled.Token);
+    checks.Check(cancelledResult.Status == RubikSolutionVerificationStatus.Failed &&
+                 cancelledResult.Message.Contains("cancelled", StringComparison.OrdinalIgnoreCase),
+        "cancelled verification returns promptly with an explicit result");
+}
+
 static RubikStateDocument SolvedDocument(int size)
 {
     var area = size * size;
@@ -627,6 +676,36 @@ internal sealed class NativeCube : IDisposable
     {
         public int Xx, Xy, Xz, Yx, Yy, Yz, Zx, Zy, Zz;
     }
+}
+
+internal sealed class NativeMoveExecutorFactory : IRubikMoveExecutorFactory
+{
+    public IRubikMoveExecutor Create(RubikStateDocument state) => new NativeMoveExecutor(state);
+}
+
+internal sealed class NativeMoveExecutor : IRubikMoveExecutor
+{
+    private readonly NativeCube _cube;
+
+    public NativeMoveExecutor(RubikStateDocument state)
+    {
+        _cube = NativeCube.Create(state.Size);
+        if (!_cube.SetFacelets(state.Faces.Flatten()))
+        {
+            _cube.Dispose();
+            throw new InvalidOperationException("Native verifier could not import facelets.");
+        }
+    }
+
+    public int Size => _cube.Size;
+    public int[] GetFacelets() => _cube.Facelets;
+    public bool TryApply(RubikMove move, out string error)
+    {
+        var success = _cube.RotateLayer(move.Axis, move.Layer, move.QuarterTurns);
+        error = success ? string.Empty : "native layer rotation failed";
+        return success;
+    }
+    public void Dispose() => _cube.Dispose();
 }
 
 internal sealed class ThrowAtStage(RubikFileWriteStage target) : IRubikFileFailureInjector

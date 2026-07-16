@@ -115,9 +115,95 @@ public interface IRubikSolver
     Task<RubikSolveResult> SolveAsync(RubikSolveRequest request);
 }
 
+public interface IRubikMoveExecutor : IDisposable
+{
+    int Size { get; }
+    int[] GetFacelets();
+    bool TryApply(RubikMove move, out string error);
+}
+
+public interface IRubikMoveExecutorFactory
+{
+    IRubikMoveExecutor Create(RubikStateDocument state);
+}
+
 public static class RubikSolutionVerifier
 {
     public static RubikSolutionVerification NotRun() => RubikSolutionVerification.NotRun;
+
+    public static RubikSolutionVerification Verify(
+        RubikStateDocument input,
+        IReadOnlyList<RubikMove> moves,
+        IRubikMoveExecutorFactory executorFactory,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(moves);
+        ArgumentNullException.ThrowIfNull(executorFactory);
+        var inputFacelets = input.Faces.Flatten();
+        var validation = RubikStateValidator.Validate(input);
+        if (!validation.IsValid)
+            return Failed(null, 0, "Input state is invalid: " + string.Join("; ", validation.Issues.Select(issue => issue.Message)));
+        if (cancellationToken.IsCancellationRequested)
+            return Failed(null, 0, "Verification was cancelled before replay.");
+
+        var clone = RubikStateDocument.Create(input.Size, inputFacelets.ToArray(), "solution-verifier");
+        try
+        {
+            using var executor = executorFactory.Create(clone);
+            if (executor.Size != input.Size)
+                return Failed(null, 0, "Move executor size does not match the input state.");
+
+            for (var index = 0; index < moves.Count; index++)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    return Failed(HashOf(executor), index, $"Verification was cancelled before move {index + 1}.");
+                var move = moves[index];
+                if (!move.IsValidFor(input.Size))
+                    return Failed(HashOf(executor), index,
+                        $"Move {index + 1} has an invalid axis, layer, or quarter-turn value.");
+                if (!executor.TryApply(move, out var error))
+                    return Failed(HashOf(executor), index, $"Move {index + 1} was rejected: {error}");
+
+                var intermediate = RubikStateDocument.Create(input.Size, executor.GetFacelets(), "solution-verifier-intermediate");
+                var intermediateValidation = RubikStateValidator.Validate(intermediate, verifyHash: false);
+                if (!intermediateValidation.IsValid)
+                    return Failed(RubikStateHasher.Calculate(intermediate), index + 1,
+                        $"Move {index + 1} produced an invalid physical state.");
+            }
+
+            var finalFacelets = executor.GetFacelets();
+            var finalDocument = RubikStateDocument.Create(input.Size, finalFacelets, "solution-verifier-final");
+            var finalHash = RubikStateHasher.Calculate(finalDocument);
+            var solved = IsCanonicalSolved(input.Size, finalFacelets);
+            return solved
+                ? new(RubikSolutionVerificationStatus.Verified, true, finalHash, moves.Count,
+                    "Move sequence independently replays to the canonical solved state.")
+                : Failed(finalHash, moves.Count, "Move sequence is valid but does not reach the canonical solved state.");
+        }
+        catch (Exception exception)
+        {
+            return Failed(null, 0, $"Verification executor failed: {exception.Message}");
+        }
+        finally
+        {
+            if (!input.Faces.Flatten().SequenceEqual(inputFacelets))
+                throw new InvalidOperationException("Solution verifier mutated its input document.");
+        }
+    }
+
+    private static RubikSolutionVerification Failed(string? finalHash, int applied, string message) =>
+        new(RubikSolutionVerificationStatus.Failed, false, finalHash, applied, message);
+
+    private static string HashOf(IRubikMoveExecutor executor) =>
+        RubikStateHasher.Calculate(RubikStateDocument.Create(executor.Size, executor.GetFacelets(), "solution-verifier-partial"));
+
+    private static bool IsCanonicalSolved(int size, IReadOnlyList<int> facelets)
+    {
+        var area = size * size;
+        return facelets.Count == 6 * area && Enumerable.Range(0, 6)
+            .All(face => facelets.Skip(face * area).Take(area).All(color => color == face + 1));
+    }
 }
 
 public sealed class ReverseHistorySolver : IRubikSolver
