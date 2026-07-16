@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using RubikState;
+using RubikVisuals;
 
 var checks = new ContractChecks();
 
@@ -14,6 +15,7 @@ try
     CheckExamples(checks);
     CheckTransactionalNativeApply(checks);
     CheckAtomicFileService(checks);
+    CheckElevenByElevenFileRoundtrips(checks);
 }
 catch (Exception exception)
 {
@@ -172,6 +174,95 @@ static void CheckAtomicFileService(ContractChecks checks)
     }
 }
 
+static void CheckElevenByElevenFileRoundtrips(ContractChecks checks)
+{
+    var scenarios = new (string Name, Action<NativeCube> Mutate)[]
+    {
+        ("solved", _ => { }),
+        ("short-scramble", cube => checks.Check(cube.Scramble(20260716, 12), "N=11 short scramble succeeds")),
+        ("inner-slice", cube => checks.Check(cube.RotateLayer(0, 1, 1), "N=11 inner slice succeeds")),
+        ("wide-move", cube =>
+        {
+            checks.Check(cube.RotateLayer(2, 10, 1) && cube.RotateLayer(2, 9, 1), "N=11 two-layer wide move succeeds");
+        }),
+        ("whole-cube", cube =>
+        {
+            var success = true;
+            for (var layer = 0; layer < 11; layer++) success &= cube.RotateLayer(1, layer, 1);
+            checks.Check(success, "N=11 whole-cube layer sequence succeeds");
+        })
+    };
+
+    var directory = Path.Combine(Path.GetTempPath(), "Chess-Rubik11Roundtrips", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var service = new RubikStateFileService();
+        foreach (var scenario in scenarios)
+        {
+            using var source = NativeCube.Create(11);
+            scenario.Mutate(source);
+            var sourceFacelets = source.Facelets;
+            var document = RubikStateDocument.Create(11, sourceFacelets, $"regression-{scenario.Name}") with
+            {
+                CreatedUtc = "2026-07-16T00:00:00Z"
+            };
+            var sourceHash = RubikStateHasher.Calculate(document);
+            var sourceVisual = ShellSignature(11, sourceFacelets);
+            var path = Path.Combine(directory, $"{scenario.Name}.rubik.json");
+
+            checks.Check(service.Save(path, document).Success, $"{scenario.Name} atomic save succeeds");
+            var read = service.Read(path);
+            checks.Check(read.Success && read.LoadPlan is not null, $"{scenario.Name} bounded read succeeds");
+            checks.Check(read.LoadPlan?.StateHash == sourceHash, $"{scenario.Name} hash survives file roundtrip");
+
+            using var loaded = NativeCube.Create(11);
+            checks.Check(read.LoadPlan is not null && loaded.SetFacelets(read.LoadPlan.Facelets), $"{scenario.Name} validated file applies to fresh native cube");
+            checks.Check(loaded.Facelets.SequenceEqual(sourceFacelets), $"{scenario.Name} exact facelets survive reset/load");
+            checks.Check(RubikStateHasher.Calculate(RubikStateDocument.Create(11, loaded.Facelets)) == sourceHash,
+                $"{scenario.Name} exported loaded hash equals saved hash");
+            var loadedState = loaded.State;
+            checks.Check(loadedState.ManualState == 1 && loadedState.HistoryCount == 0,
+                $"{scenario.Name} physical import does not manufacture trusted history");
+            checks.Check(!loaded.HasOrientationAt(0, 0, 0), $"{scenario.Name} physical import reports decomposition unavailable");
+            var loadedVisual = ShellSignature(11, loaded.Facelets);
+            checks.Check(loadedVisual.StickerCount == 726 && loadedVisual.InvalidCount == 0 && loadedVisual.Fallback,
+                $"{scenario.Name} loaded renderer uses complete honest facelet shell");
+            checks.Check(loadedVisual.Signature.SequenceEqual(sourceVisual.Signature),
+                $"{scenario.Name} world-face/color visual descriptors survive file roundtrip");
+        }
+    }
+    finally
+    {
+        try { Directory.Delete(directory, recursive: true); } catch { }
+    }
+}
+
+static (int StickerCount, int InvalidCount, bool Fallback, string[] Signature) ShellSignature(int size, int[] facelets)
+{
+    var cubies = new List<RubikCubieVisualInput>(size * size * size);
+    var maximum = size - 1;
+    for (var z = 0; z < size; z++)
+    for (var y = 0; y < size; y++)
+    for (var x = 0; x < size; x++)
+    {
+        var mask = 0;
+        if (y == maximum) mask |= 1 << (int)RubikFace.U;
+        if (x == maximum) mask |= 1 << (int)RubikFace.R;
+        if (z == maximum) mask |= 1 << (int)RubikFace.F;
+        if (y == 0) mask |= 1 << (int)RubikFace.D;
+        if (x == 0) mask |= 1 << (int)RubikFace.L;
+        if (z == 0) mask |= 1 << (int)RubikFace.B;
+        cubies.Add(new RubikCubieVisualInput(new RubikCoordinate(x, y, z), z * size * size + y * size + x, mask, null));
+    }
+    var summary = RubikVisualDescriptorBuilder.BuildScene(size, facelets, cubies, surfaceOnly: true);
+    var signature = summary.Cubies.SelectMany(cubie => cubie.Stickers.Select(sticker =>
+            $"{cubie.Coordinate.X},{cubie.Coordinate.Y},{cubie.Coordinate.Z}:{sticker.WorldFace}:{sticker.ColorId}"))
+        .OrderBy(value => value, StringComparer.Ordinal)
+        .ToArray();
+    return (summary.StickersRendered, summary.InvalidStickers, summary.FallbackRendererActive, signature);
+}
+
 static RubikStateDocument SolvedDocument(int size)
 {
     var area = size * size;
@@ -214,12 +305,32 @@ internal sealed class NativeCube : IDisposable
         }
     }
     public bool SetFacelets(int[] values) => Rubik_SetFacelets(_handle, values, values.Length) != 0;
+    public NativeState State { get { if (Rubik_GetState(_handle, out var state) == 0) throw new InvalidOperationException("State read failed."); return state; } }
+    public bool RotateLayer(int axis, int layer, int turns) => Rubik_RotateLayer(_handle, axis, layer, turns) != 0;
+    public bool Scramble(int seed, int length) => Rubik_Scramble(_handle, seed, length) != 0;
+    public bool HasOrientationAt(int x, int y, int z) => Rubik_GetCubieOrientation(_handle, x, y, z, out _) != 0;
     public void Dispose() { if (_handle != IntPtr.Zero) { Rubik_Destroy(_handle); _handle = IntPtr.Zero; } }
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)] private static extern IntPtr Rubik_CreateSized(int size);
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)] private static extern void Rubik_Destroy(IntPtr handle);
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)] private static extern int Rubik_GetFacelets(IntPtr handle, [Out] int[] facelets, int capacity);
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)] private static extern int Rubik_SetFacelets(IntPtr handle, [In] int[] facelets, int count);
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)] private static extern int Rubik_GetState(IntPtr handle, out NativeState state);
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)] private static extern int Rubik_RotateLayer(IntPtr handle, int axis, int layer, int turns);
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)] private static extern int Rubik_Scramble(IntPtr handle, int seed, int length);
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)] private static extern int Rubik_GetCubieOrientation(IntPtr handle, int x, int y, int z, out NativeOrientation orientation);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct NativeState
+    {
+        public int Size, CellCount, HistoryCount, IsSolved, ManualState, LastAxis, LastLayer, LastQuarterTurns;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeOrientation
+    {
+        public int Xx, Xy, Xz, Yx, Yy, Yz, Zx, Zy, Zz;
+    }
 }
 
 internal sealed class ThrowAtStage(RubikFileWriteStage target) : IRubikFileFailureInjector

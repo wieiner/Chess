@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\RubikState\RubikState.csproj" />
+    <ProjectReference Include="..\..\src\RubikVisuals\RubikVisuals.csproj" />
     <ProjectReference Include="..\..\src\RubikEngine\RubikEngine.vcxproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
