@@ -102,6 +102,24 @@
                     </Border>
 
                     <Border Style="{StaticResource CommandGroupStyle}">
+                        <StackPanel>
+                            <WrapPanel>
+                                <Button Content="Save State" Click="SaveStateFile_Click" />
+                                <Button Content="Save As" Click="SaveStateAsFile_Click" />
+                                <Button Content="Load State" Click="LoadStateFile_Click" />
+                                <Button Content="Export Moves" Click="ExportMovesFile_Click" />
+                                <Button Content="Import Moves" Click="ImportMovesFile_Click" />
+                            </WrapPanel>
+                            <WrapPanel>
+                                <ComboBox x:Name="RecentFilesBox" Width="260" ToolTip="Recent files in this process only" />
+                                <Button Content="Open Recent" Click="OpenRecentFile_Click" />
+                            </WrapPanel>
+                            <TextBlock x:Name="CurrentFileText" Text="Untitled" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="430" />
+                            <TextBlock x:Name="FileStateText" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" MaxWidth="430" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CommandGroupStyle}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Поворот" Style="{StaticResource LabelStyle}" />
                             <ComboBox x:Name="AxisBox" SelectedIndex="0">
@@ -205,7 +223,7 @@
                     <TabItem Header="Позиция">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
                             <StackPanel>
-                                <TextBlock Text="Ручная позиция" Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="Legacy integer position (debug)" Style="{StaticResource SectionTitleStyle}" />
                                 <WrapPanel>
                                     <TextBlock Text="x" Style="{StaticResource LabelStyle}" />
                                     <TextBox x:Name="XBox" Text="1" Width="42" />
@@ -220,10 +238,10 @@
                                     <Button Content="Задать" Click="SetCell_Click" />
                                 </WrapPanel>
                                 <WrapPanel Margin="0,10,0,0">
-                                    <Button Content="Экспорт" Click="ExportState_Click" />
-                                    <Button Content="Загрузить текст" MinWidth="122" Click="LoadState_Click" />
+                                    <Button Content="Export integer cells" Click="ExportState_Click" />
+                                    <Button Content="Load integer text" MinWidth="138" Click="LoadState_Click" />
                                 </WrapPanel>
-                                <TextBlock Text="Формат состояния использует текущую размерность. При N=8 это 512 значений, при N=4 — 64." Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,12,0,0" />
+                                <TextBlock Text="Compatibility path only: integer cubie IDs do not preserve physical sticker orientation. Use Save/Load State for portable files." Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,12,0,0" />
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>

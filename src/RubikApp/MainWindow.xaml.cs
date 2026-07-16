@@ -9,6 +9,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
+using Microsoft.Win32;
+using RubikState;
 using RubikVisuals;
 
 namespace RubikApp;
@@ -18,7 +20,9 @@ public partial class MainWindow : Window
     private static readonly MeshGeometry3D SharedCubieBodyMesh = CreateUnitCubieMesh();
     private static readonly MeshGeometry3D[] SharedStickerMeshes = Enumerable.Range(0, 6).Select(CreateUnitStickerMesh).ToArray();
     private static readonly Dictionary<MaterialCacheKey, Material> SharedMaterialCache = new();
-    private readonly NativeRubikEngine _engine;
+    private NativeRubikEngine _engine;
+    private readonly RubikStateFileService _stateFileService = new();
+    private readonly List<string> _recentStateFiles = new();
     private readonly Model3DGroup _scene = new();
     private readonly List<CubeVisual> _cubeVisuals = new();
     private readonly Dictionary<Model3D, CubeVisual> _cubeHitMap = new();
@@ -48,11 +52,15 @@ public partial class MainWindow : Window
     private double _pitch = 26;
     private double _distance = 18;
     private Vector3D _pan = new(0, 0, 0);
+    private string? _currentStateFile;
+    private string? _savedStateHash;
+    private string? _currentStateHash;
 
     public MainWindow()
     {
         InitializeComponent();
         _engine = new NativeRubikEngine();
+        InitializeFileTracking();
         SetupViewport();
         RefreshScene();
         var arguments = Environment.GetCommandLineArgs();
@@ -173,6 +181,7 @@ public partial class MainWindow : Window
                           $"fallback: {(_fallbackRendererActive ? "active" : "off")}; " +
                           $"build {_lastSceneBuildMilliseconds:0.0} ms / {_lastSceneAllocatedBytes / 1024.0:0} KiB, " +
                           $"shared meshes {SharedStickerMeshes.Length + 1}, materials {SharedMaterialCache.Count}";
+        UpdateFileStatus();
         var info = _engine.GetLastInfo();
         if (!string.IsNullOrWhiteSpace(info) && string.IsNullOrWhiteSpace(OutputBox.Text))
         {
@@ -325,6 +334,234 @@ public partial class MainWindow : Window
             OutputBox.Text = _engine.GetLastInfo();
             RefreshScene();
         }
+    }
+
+    private async void SaveStateFile_Click(object sender, RoutedEventArgs e)
+    {
+        await SaveStateFileAsync(forceDialog: false);
+    }
+
+    private async void SaveStateAsFile_Click(object sender, RoutedEventArgs e)
+    {
+        await SaveStateFileAsync(forceDialog: true);
+    }
+
+    private async Task SaveStateFileAsync(bool forceDialog)
+    {
+        if (_isAnimating)
+        {
+            OutputBox.Text = "Finish or stop the current animation before saving.";
+            return;
+        }
+        if (!TryBuildPortableDocument(out var document, out var error))
+        {
+            OutputBox.Text = error;
+            return;
+        }
+
+        var path = _currentStateFile;
+        if (forceDialog || string.IsNullOrWhiteSpace(path))
+        {
+            var dialog = new SaveFileDialog
+            {
+                Title = "Save Rubik physical state",
+                Filter = "Rubik state (*.rubik.json)|*.rubik.json|JSON (*.json)|*.json",
+                DefaultExt = ".rubik.json",
+                AddExtension = true,
+                OverwritePrompt = true,
+                FileName = path is null ? $"rubik-{document.Size}x{document.Size}.rubik.json" : Path.GetFileName(path)
+            };
+            if (dialog.ShowDialog(this) != true)
+                return;
+            path = dialog.FileName;
+        }
+
+        var result = await Task.Run(() => _stateFileService.Save(path!, document, retainBackup: File.Exists(path)));
+        if (!result.Success)
+        {
+            OutputBox.Text = $"Save failed [{result.ErrorCode}]: {result.Message}";
+            return;
+        }
+
+        _currentStateFile = result.Path;
+        _savedStateHash = result.LoadPlan?.StateHash ?? RubikStateHasher.Calculate(document);
+        AddRecentFile(result.Path);
+        UpdateFileStatus();
+        OutputBox.Text = $"State saved atomically: {result.Path}\r\nHash: {_savedStateHash}" +
+                         (result.BackupPath is null ? string.Empty : $"\r\nBackup: {result.BackupPath}");
+    }
+
+    private async void LoadStateFile_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Load Rubik physical state",
+            Filter = "Rubik state (*.rubik.json)|*.rubik.json|JSON (*.json)|*.json",
+            DefaultExt = ".rubik.json",
+            Multiselect = false,
+            CheckFileExists = true
+        };
+        if (dialog.ShowDialog(this) == true)
+            await LoadStateFileAsync(dialog.FileName);
+    }
+
+    private async void OpenRecentFile_Click(object sender, RoutedEventArgs e)
+    {
+        if (RecentFilesBox.SelectedItem is string path)
+            await LoadStateFileAsync(path);
+    }
+
+    private async Task LoadStateFileAsync(string path)
+    {
+        if (_isAnimating)
+        {
+            OutputBox.Text = "Finish or stop the current animation before loading.";
+            return;
+        }
+
+        var result = await Task.Run(() => _stateFileService.Read(path));
+        if (!result.Success || result.LoadPlan is null)
+        {
+            OutputBox.Text = $"Load failed [{result.ErrorCode}]: {result.Message}";
+            return;
+        }
+
+        NativeRubikEngine? candidate = null;
+        try
+        {
+            candidate = new NativeRubikEngine();
+            if (!candidate.SetSize(result.LoadPlan.Document.Size) || !candidate.SetFacelets(result.LoadPlan.Facelets))
+            {
+                OutputBox.Text = $"Native load rejected the validated document: {candidate.GetLastInfo()}";
+                return;
+            }
+
+            var previous = _engine;
+            _engine = candidate;
+            candidate = null;
+            previous.Dispose();
+
+            _currentStateFile = result.Path;
+            _savedStateHash = result.LoadPlan.StateHash;
+            _currentStateHash = result.LoadPlan.StateHash;
+            _lastSolution = Array.Empty<NativeRubikEngine.RubikMoveDto>();
+            _selectedAxis = -1;
+            _selectedLayer = -1;
+            AddRecentFile(result.Path);
+            ResetCameraToDimension(result.LoadPlan.Document.Size);
+            RefreshScene();
+            OutputBox.Text = $"State loaded transactionally: {result.Path}\r\nHash: {result.LoadPlan.StateHash}\r\n" +
+                             "Move history is intentionally untrusted after physical facelet import.";
+        }
+        catch (Exception exception)
+        {
+            OutputBox.Text = $"Native load failed without replacing the current cube: {exception.Message}";
+        }
+        finally
+        {
+            candidate?.Dispose();
+        }
+    }
+
+    private async void ExportMovesFile_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export Rubik moves",
+            Filter = "Rubik moves (*.rubikmoves)|*.rubikmoves|Text (*.txt)|*.txt",
+            DefaultExt = ".rubikmoves",
+            AddExtension = true,
+            OverwritePrompt = true,
+            FileName = "rubik-history.rubikmoves"
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+        var history = _engine.GetHistory();
+        var text = history.Length == 0 ? "# History is empty." : RubikNotation.FormatEngineMoves(history);
+        await File.WriteAllTextAsync(dialog.FileName, text, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        OutputBox.Text = $"Exported {history.Length} moves to {dialog.FileName}";
+    }
+
+    private async void ImportMovesFile_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import Rubik moves",
+            Filter = "Rubik moves (*.rubikmoves)|*.rubikmoves|Text (*.txt)|*.txt",
+            DefaultExt = ".rubikmoves",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+        var info = new FileInfo(dialog.FileName);
+        if (info.Length > RubikStateSerializer.DefaultMaximumBytes)
+        {
+            OutputBox.Text = $"Move file exceeds {RubikStateSerializer.DefaultMaximumBytes} bytes.";
+            return;
+        }
+        var text = await File.ReadAllTextAsync(dialog.FileName);
+        try
+        {
+            var moves = RubikNotation.Parse(text, CurrentSize());
+            OutputBox.Text = text;
+            OutputBox.Text += $"\r\n\r\n# Imported and validated {moves.Length} moves. Use Apply or Play in the Notation tab.";
+        }
+        catch (Exception exception)
+        {
+            OutputBox.Text = $"Move import rejected: {exception.Message}";
+        }
+    }
+
+    private void InitializeFileTracking()
+    {
+        if (TryBuildPortableDocument(out var document, out _))
+        {
+            _currentStateHash = RubikStateHasher.Calculate(document);
+            _savedStateHash = _currentStateHash;
+        }
+    }
+
+    private bool TryBuildPortableDocument(out RubikStateDocument document, out string error)
+    {
+        try
+        {
+            var state = _engine.GetState();
+            var facelets = _engine.GetFacelets();
+            document = RubikStateDocument.Create(state.Size, facelets, "RubikApp");
+            error = string.Empty;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            document = null!;
+            error = $"Portable state is unavailable: {exception.Message}. Legacy integer edits cannot invent sticker orientation.";
+            return false;
+        }
+    }
+
+    private void UpdateFileStatus()
+    {
+        var valid = TryBuildPortableDocument(out var document, out _);
+        _currentStateHash = valid ? RubikStateHasher.Calculate(document) : null;
+        var dirty = !valid || !string.Equals(_currentStateHash, _savedStateHash, StringComparison.Ordinal);
+        CurrentFileText.Text = $"{(dirty ? "* " : string.Empty)}{(_currentStateFile is null ? "Untitled" : Path.GetFileName(_currentStateFile))}";
+        CurrentFileText.ToolTip = _currentStateFile ?? "No file path. Recent paths are memory-only.";
+        FileStateText.Text = valid
+            ? $"{(dirty ? "Modified" : "Saved")} | valid | hash {_currentStateHash}"
+            : "Modified | physical facelets/orientation unavailable | portable save disabled";
+    }
+
+    private void AddRecentFile(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        _recentStateFiles.RemoveAll(item => string.Equals(item, fullPath, StringComparison.OrdinalIgnoreCase));
+        _recentStateFiles.Insert(0, fullPath);
+        if (_recentStateFiles.Count > 6)
+            _recentStateFiles.RemoveRange(6, _recentStateFiles.Count - 6);
+        RecentFilesBox.Items.Clear();
+        foreach (var item in _recentStateFiles) RecentFilesBox.Items.Add(item);
+        RecentFilesBox.SelectedIndex = 0;
     }
 
     private void ExportNotation_Click(object sender, RoutedEventArgs e)
