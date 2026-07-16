@@ -1566,3 +1566,12 @@ Date: 2026-07-16
 | Observable physical pieces | Repository U/R/F/D/L/B coordinate mapping and NxN topology | A surface coordinate exposes three, two, or one world faces and therefore describes a corner, wing, or center observation directly from facelets. | Enumerate boundary coordinates and read colors with the renderer's canonical mapping; classify without native cubie IDs. | RubikState/tests/docs | Solved N=2/3/4/5/8/11 and legal native scrambles match exact topology. |
 | Duplicate NxN wings | [Demaine et al., On the nxnxn Rubik's Cube](https://arxiv.org/abs/1708.05598) | Multiple wings share a color pair; pair alone is not a stable physical identity. | Store current coordinate, free-axis index, and reflection-invariant orbit; compare inventory as pair+orbit multisets without inventing identity. | RubikState | Assert wing counts/orbits and reject missing/impossible pair inventory. |
 | Center orbits | NxN legal slice geometry | Center stickers of one color occupy multiple rotation-invariant distance orbits on larger cubes. | Classify centers by sorted distances to face edges and compare color+orbit inventory against solved topology. | RubikState | Detect a count-preserving cross-orbit center corruption. |
+
+## P4L Phase 19 - Solvability and Parity Validation
+
+Date: 2026-07-16
+
+| Topic | Sources checked | Key finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Small-cube invariants | Standard cubie orientation/permutation invariants and repository legal turn generator | 3x3 requires corner twist sum, edge flip sum, and equal corner/edge permutation parity; 2x2 has corner orientation constraints but no independent edge parity match. | Implement a full declared small-cube validation kernel for N=2/3 and test impossible single-twist/flip/swap fixtures. | RubikState/tests | Legal scrambles pass; twisted corner, flipped edge, and swapped corners fail the expected invariant. |
+| NxN proof boundary | Phase 18 duplicate wing/center observations | Facelets identify pair/orbit inventory but do not label interchangeable wings/centers strongly enough to prove full arbitrary-N permutation parity. | Report known-valid inventory/orientation separately from `parityProven`; keep `solverReady=false` and validation level partial for N>3. | RubikState/docs/UI status | Legal 4/5/8/11 states remain accepted as partial, never advertised fully solver-ready. |

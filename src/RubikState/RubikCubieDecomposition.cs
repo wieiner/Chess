@@ -54,7 +54,9 @@ public static class RubikCubieDecomposer
             if (stickers.Length == 3)
             {
                 var ud = stickers.FirstOrDefault(sticker => sticker.ColorId is 1 or 4);
-                var orientation = ud is null ? -1 : ud.Face is "U" or "D" ? 0 : ud.Face is "R" or "L" ? 1 : 2;
+                var orientation = ud is null ? -1 : ud.Face is "U" or "D" ? 0 :
+                    ud.ColorId == 1 ? (ud.Face is "R" or "L" ? 1 : 2) :
+                    (ud.Face is "R" or "L" ? 2 : 1);
                 corners.Add(new(coordinate, stickers, Signature(stickers.Select(sticker => sticker.ColorId)), orientation));
             }
             else if (stickers.Length == 2)

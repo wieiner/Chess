@@ -19,6 +19,7 @@ try
     CheckPhysicalEditorDraft(checks);
     CheckStructuredValidationDiagnostics(checks);
     CheckFaceletDecomposition(checks);
+    CheckSolvabilityValidation(checks);
 }
 catch (Exception exception)
 {
@@ -382,6 +383,73 @@ static void CheckFaceletDecomposition(ContractChecks checks)
     var badCenterResult = RubikCubieDecomposer.Decompose(5, badCenterOrbit);
     checks.Check(!badCenterResult.Complete && badCenterResult.Issues.Any(issue => issue.CubieClass == "center"),
         "count-preserving center orbit corruption is detected");
+}
+
+static void CheckSolvabilityValidation(ContractChecks checks)
+{
+    foreach (var size in new[] { 2, 3, 4, 5, 8, 11 })
+    {
+        var solved = RubikSolvabilityValidator.Validate(SolvedDocument(size));
+        checks.Check(solved.BasicCountsValid && solved.CubieInventoryValid && solved.OrientationValid,
+            $"solved N={size} passes counts, inventory, and orientation invariants");
+        checks.Check(size <= 3
+                ? solved is { SolverReady: true, OrientationProven: true, ParityProven: true, ValidationLevel: RubikValidationLevel.FullSmallCube }
+                : solved is { SolverReady: false, OrientationProven: false, ParityProven: false, ValidationLevel: RubikValidationLevel.CubieInventory },
+            $"N={size} reports honest small/full versus NxN/partial proof level");
+
+        using var cube = NativeCube.Create(size);
+        checks.Check(cube.Scramble(1900 + size, Math.Min(14, size + 5)), $"N={size} solvability scramble succeeds");
+        var legal = RubikSolvabilityValidator.Validate(RubikStateDocument.Create(size, cube.Facelets));
+        checks.Check(legal.CubieInventoryValid && legal.OrientationValid && legal.ParityValid,
+            $"legal scramble N={size} has no known solvability violation " +
+            $"(inventory={legal.CubieInventoryValid}, orientation={legal.OrientationValid}, parity={legal.ParityValid}, " +
+            $"issues={string.Join(',', legal.Issues.Select(issue => issue.Code))})");
+    }
+
+
+    using (var canonicalThree = NativeCube.Create(3))
+    {
+        checks.Check(canonicalThree.RotateLayer(2, 2, 1) && canonicalThree.RotateLayer(1, 2, 1) &&
+                     canonicalThree.RotateLayer(0, 2, 3) && canonicalThree.RotateLayer(2, 0, 1),
+            "canonical 3x3 outer-face scramble succeeds");
+        var canonicalResult = RubikSolvabilityValidator.Validate(RubikStateDocument.Create(3, canonicalThree.Facelets));
+        checks.Check(canonicalResult is { SolverReady: true, OrientationProven: true, ParityProven: true },
+            "canonical 3x3 outer-face scramble receives full small-cube proof");
+    }
+
+    var twistedCorner = SolvedDocument(3).Faces.Flatten();
+    var d = 3 * 9 + 6;
+    var l = 4 * 9 + 6;
+    var b = 5 * 9 + 8;
+    (twistedCorner[d], twistedCorner[l], twistedCorner[b]) = (twistedCorner[l], twistedCorner[b], twistedCorner[d]);
+    var twistedResult = RubikSolvabilityValidator.Validate(RubikStateDocument.Create(3, twistedCorner));
+    checks.Check(!twistedResult.OrientationValid && !twistedResult.SolverReady &&
+                 twistedResult.Issues.Any(issue => issue.Code == "cornerOrientation"),
+        "single twisted corner is rejected by orientation sum");
+
+    var flippedEdge = SolvedDocument(3).Faces.Flatten();
+    var uFrontEdge = 7;
+    var fTopEdge = 2 * 9 + 1;
+    (flippedEdge[uFrontEdge], flippedEdge[fTopEdge]) = (flippedEdge[fTopEdge], flippedEdge[uFrontEdge]);
+    var flippedResult = RubikSolvabilityValidator.Validate(RubikStateDocument.Create(3, flippedEdge));
+    checks.Check(!flippedResult.OrientationValid && flippedResult.Issues.Any(issue => issue.Code == "edgeOrientation"),
+        "single flipped 3x3 edge is rejected");
+
+    var swappedCorners = SolvedDocument(3).Faces.Flatten();
+    var rTopFront = 9;
+    var lTopFront = 4 * 9 + 2;
+    (swappedCorners[rTopFront], swappedCorners[lTopFront]) = (swappedCorners[lTopFront], swappedCorners[rTopFront]);
+    var swappedResult = RubikSolvabilityValidator.Validate(RubikStateDocument.Create(3, swappedCorners));
+    checks.Check(!swappedResult.ParityValid && !swappedResult.SolverReady &&
+                 swappedResult.Issues.Any(issue => issue.Code == "permutationParity"),
+        "two-corner swap is rejected by 3x3 parity equality");
+
+    using var evenCube = NativeCube.Create(4);
+    checks.Check(evenCube.RotateLayer(0, 1, 1), "legal 4x4 inner turn creates an even-cube parity-boundary fixture");
+    var evenResult = RubikSolvabilityValidator.Validate(RubikStateDocument.Create(4, evenCube.Facelets));
+    checks.Check(evenResult.CubieInventoryValid && evenResult.OrientationValid && evenResult.ParityValid &&
+                 !evenResult.ParityProven && !evenResult.SolverReady,
+        "legal even-cube state is accepted without a false full parity proof");
 }
 
 static RubikStateDocument SolvedDocument(int size)
