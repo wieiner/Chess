@@ -13,6 +13,7 @@ try
     CheckNegativeInputs(checks);
     CheckExamples(checks);
     CheckTransactionalNativeApply(checks);
+    CheckAtomicFileService(checks);
 }
 catch (Exception exception)
 {
@@ -120,6 +121,57 @@ static void CheckTransactionalNativeApply(ContractChecks checks)
     checks.Check(valid.Plan is not null && cube.SetFacelets(valid.Plan.Facelets), "fully validated load plan reaches native commit");
 }
 
+static void CheckAtomicFileService(ContractChecks checks)
+{
+    var directory = Path.Combine(Path.GetTempPath(), "Chess-RubikStateContracts", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var service = new RubikStateFileService();
+        var path = Path.Combine(directory, "cube.rubik.json");
+        var original = SolvedDocument(3) with { Source = "atomic-original" };
+        var initialSave = service.Save(path, original);
+        checks.Check(initialSave.Success && File.Exists(path), "atomic service creates first destination");
+        var originalBytes = File.ReadAllBytes(path);
+
+        var changedFacelets = original.Faces.Flatten();
+        (changedFacelets[0], changedFacelets[9]) = (changedFacelets[9], changedFacelets[0]);
+        var changed = RubikStateDocument.Create(3, changedFacelets, "atomic-replacement") with { CreatedUtc = "2026-07-16T00:00:00Z" };
+
+        foreach (var stage in Enum.GetValues<RubikFileWriteStage>())
+        {
+            var result = service.Save(path, changed, failureInjector: new ThrowAtStage(stage));
+            checks.Check(!result.Success, $"injected {stage} failure is reported");
+            checks.Check(File.ReadAllBytes(path).SequenceEqual(originalBytes), $"injected {stage} preserves destination bytes");
+            checks.Check(service.Read(path).Success, $"destination remains readable after injected {stage}");
+            checks.Check(!Directory.EnumerateFiles(directory, ".*.tmp").Any(), $"injected {stage} leaves no sibling temp");
+        }
+
+        var replacement = service.Save(path, changed, retainBackup: true);
+        checks.Check(replacement.Success && replacement.BackupPath is not null && File.Exists(replacement.BackupPath),
+            "successful replacement optionally retains backup");
+        checks.Check(service.Read(path).LoadPlan?.Facelets.SequenceEqual(changedFacelets) == true,
+            "replacement destination contains new validated state");
+        checks.Check(replacement.BackupPath is not null && File.ReadAllBytes(replacement.BackupPath).SequenceEqual(originalBytes),
+            "backup contains previous destination bytes");
+
+        File.WriteAllBytes(Path.Combine(directory, "oversized.rubik.json"), new byte[128]);
+        var oversized = service.Read(Path.Combine(directory, "oversized.rubik.json"), maximumBytes: 64);
+        checks.Check(!oversized.Success && oversized.ErrorCode == RubikFileErrorCode.InputTooLarge,
+            "bounded file read rejects oversized input before allocation/parsing");
+
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        var cancelledResult = service.Save(Path.Combine(directory, "cancelled.rubik.json"), original, cancellationToken: cancelled.Token);
+        checks.Check(!cancelledResult.Success && cancelledResult.ErrorCode == RubikFileErrorCode.Cancelled,
+            "cancelled write reports a stable error and creates no destination");
+    }
+    finally
+    {
+        try { Directory.Delete(directory, recursive: true); } catch { }
+    }
+}
+
 static RubikStateDocument SolvedDocument(int size)
 {
     var area = size * size;
@@ -168,6 +220,14 @@ internal sealed class NativeCube : IDisposable
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)] private static extern void Rubik_Destroy(IntPtr handle);
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)] private static extern int Rubik_GetFacelets(IntPtr handle, [Out] int[] facelets, int capacity);
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)] private static extern int Rubik_SetFacelets(IntPtr handle, [In] int[] facelets, int count);
+}
+
+internal sealed class ThrowAtStage(RubikFileWriteStage target) : IRubikFileFailureInjector
+{
+    public void AtStage(RubikFileWriteStage stage)
+    {
+        if (stage == target) throw new IOException($"Injected failure at {stage}.");
+    }
 }
 
 internal sealed class ContractChecks
