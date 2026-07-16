@@ -1665,3 +1665,13 @@ Date: 2026-07-16
 | Test selection authority | Decomposed `tests/run-tests.ps1 -List` registry and [GitHub Actions workflow syntax](https://docs.github.com/actions/writing-workflows/workflow-syntax-for-github-actions) | The repository runner, not a hand-maintained executable list, is the current source of suite membership and timeout policy. | Enumerate first, run the exact `Rubik` suite with controlled `/m:1`, and record every selected executable and watchdog outcome. | Test/result docs | `-List`, `-Suite Rubik`, no timeout, exit 0. |
 | Mixed native/WPF build | Visual Studio MSBuild project graph and existing RubikEngine/RubikApp project files | `dotnet build` cannot provide C++ `VCTargetsPath`; product verification must use Visual Studio MSBuild for the mixed graph. | Build RubikEngine and RubikApp separately with `/restore /m:1 /nr:false`, preserving the existing Visual Studio path. | Result docs | Both project builds exit 0 with x64 Release output. |
 | Regression evidence | Phase 08-27 contracts and artifacts | Rendering, state files, physical input, decomposition, validation, replay verification, bounded 2x2, and Level A 11x11 are distributed across three contract executables. | Record evidence by capability and retain the explicit arbitrary-3x3/NxN limitations. | `P4L_RUBIK_FULL_VERIFY_RESULT.md` | Cross-check suite output against the Phase 28 checklist. |
+
+## P4L Phase 29 - Repository Regression
+
+Date: 2026-07-16
+
+| Topic | Sources checked | Key finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Cross-product gate | Decomposed test registry, `scripts/verify.ps1`, and current Windows Build workflow | The Rubik project shares solution, packaging, native build, and test infrastructure with Chess2D, Chess3D, GPU, and Online products. | Run the full contract registry without benchmark under controlled `/m:1`, then run the unchanged full verify/package gate. | Regression report | All selected tests and verify steps exit 0; no watchdog timeout. |
+| Profile isolation | Existing Chess3D contract tests and packaged rules assets | Rubik work must not alter the five-profile Chess3D contract or server deployment state. | Treat exactly-five profile checks and absence of deployment edits as explicit acceptance criteria. | Regression report | Verify profile assets/tests and inspect tracked diff/status. |
+| Generated artifact hygiene | Repository `.gitignore`, `.tmp` test logs, and production build scripts | Local logs/build/package outputs are evidence but must not become tracked source. | Keep `.tmp`, `bin`, `obj`, `ProductionOutput`, and server runtime material out of the phase commit. | Regression report | `git status --short`, tracked-artifact scan, and diff scope review. |
