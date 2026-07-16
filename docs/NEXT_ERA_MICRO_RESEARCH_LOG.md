@@ -1546,3 +1546,13 @@ Date: 2026-07-16
 | Draft isolation | [Microsoft Learn: WPF input overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/input-overview) and repository transactional load boundary | Mouse painting can generate many intermediate states; none should reach the native cube before explicit acceptance. | Keep six `N*N` managed matrices with bounded undo/redo; paint/drag/fill/rotate/clear/copy/paste operate only on the draft. | RubikState, RubikApp | Headless model contracts plus x64 WPF build/startup probe. |
 | Odd/even orientation | WCA color-scheme conventions and physical cube topology | Odd cubes expose one center per face; even cubes have no fixed single center and cannot infer orientation the same way. | Offer odd-center scheme guidance only when six centers are complete/distinct; require explicit U/R/F/D/L/B labels for even N and never silently reorient. | editor UI/docs | N=11 center inference and N=4 explicit-orientation guidance tests. |
 | Draft persistence | Phase 13 same-volume temp/replace policy | Incomplete drafts cannot satisfy `.rubik.json` physical-state counts but still need safe local persistence. | Define a separate bounded `rubik.editor-draft` JSON with IDs `0..6`; atomically replace only after the temp draft parses. | RubikState/editor/tests | Save/load an incomplete N=11 draft and compare every cell. |
+
+## P4L Phase 17 - Structured Validation Diagnostics
+
+Date: 2026-07-16
+
+| Topic | Sources checked | Key finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Actionable validation | Repository editor requirements and Phase 12 parser error paths | Aggregate count text cannot identify a cell, while emitting every empty cell on N=32 would overwhelm the UI. | Add severity/code/face/row/column/cubie-class/message/action issues, bounded cell detail, and complete aggregate underflow/overflow summaries. | RubikState/editor/tests | Assert exact first missing-cell location, stable reason codes, and valid solved report. |
+| WPF issue navigation | [Microsoft Learn: ListBox](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/listbox) and WPF focus/input model | A selected validation item can drive the existing tab/grid controls without mutating the draft. | Bind a compact issue list; selection switches face tab and focuses the addressed cell. | RubikApp | Build/start UI and headless-test diagnostic coordinates. |
+| Sanitized report | OWASP logging guidance and repository no-secret policy | Validation support data needs reason/location, not full facelet payload or local path. | Export only size, summary counts, and structured issues as UTF-8 JSON. | RubikApp/docs | Search report model for payload/path fields and parse test JSON. |

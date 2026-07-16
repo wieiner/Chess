@@ -67,6 +67,11 @@
                         </WrapPanel>
                         <TextBlock x:Name="CountText" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,10,0,0" />
                         <TextBlock x:Name="GuidanceText" Foreground="#B8C7D8" TextWrapping="Wrap" Margin="0,12,0,0" />
+                        <TextBlock Text="Validation issues" FontWeight="SemiBold" Margin="0,14,0,6" />
+                        <ListBox x:Name="ValidationIssueList" Height="190" DisplayMemberPath="DisplayText"
+                                 SelectionChanged="ValidationIssueList_SelectionChanged"
+                                 Background="#0E131A" Foreground="#EEF3F8" BorderBrush="#334052" />
+                        <Button Content="Export validation report" Margin="0,8,0,0" Click="ExportValidationReport_Click" />
                         <TextBlock x:Name="EditorErrorText" Foreground="#FF9B8D" TextWrapping="Wrap" Margin="0,12,0,0" />
                     </StackPanel>
                 </ScrollViewer>

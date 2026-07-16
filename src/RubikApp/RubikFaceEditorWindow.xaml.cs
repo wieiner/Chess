@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -147,6 +148,45 @@ public partial class RubikFaceEditorWindow : Window
         catch (Exception exception) { EditorErrorText.Text = $"Apply blocked: {exception.Message}"; }
     }
 
+    private void ValidationIssueList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ValidationIssueList.SelectedItem is not RubikValidationIssue { Face: not null, Row: not null, Column: not null } issue)
+            return;
+        var face = Array.IndexOf(FaceNames, issue.Face);
+        if (face < 0) return;
+        FaceTabs.SelectedIndex = face;
+        if (FaceTabs.Items[face] is TabItem { Content: ScrollViewer { Content: UniformGrid grid } })
+        {
+            var index = issue.Row.Value * _draft.Size + issue.Column.Value;
+            if (index >= 0 && index < grid.Children.Count && grid.Children[index] is Button button)
+            {
+                button.BringIntoView();
+                button.Focus();
+            }
+        }
+    }
+
+    private void ExportValidationReport_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Rubik validation report (*.rubik-validation.json)|*.rubik-validation.json|JSON (*.json)|*.json",
+            DefaultExt = ".rubik-validation.json", AddExtension = true, OverwritePrompt = true,
+            FileName = $"rubik-{_draft.Size}x{_draft.Size}.rubik-validation.json"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var report = RubikPhysicalStateDiagnostics.ValidateDraft(_draft);
+            File.WriteAllText(dialog.FileName, report.ToSanitizedJson(), new System.Text.UTF8Encoding(false));
+            EditorErrorText.Text = $"Sanitized validation report saved: {dialog.FileName}";
+        }
+        catch (Exception exception)
+        {
+            EditorErrorText.Text = $"Validation report save failed: {exception.Message}";
+        }
+    }
+
     private void Cancel_Click(object sender, RoutedEventArgs e) => DialogResult = false;
     private void FaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e) => RefreshEditor();
     private int CurrentFace => Math.Clamp(FaceTabs.SelectedIndex, 0, 5);
@@ -165,12 +205,14 @@ public partial class RubikFaceEditorWindow : Window
             }
         }
         var summary = _draft.Summarize();
+        var report = RubikPhysicalStateDiagnostics.ValidateDraft(_draft);
         SelectedColorText.Text = $"Selected color: {_selectedColor}";
         CountText.Text = string.Join(Environment.NewLine, Enumerable.Range(1, 6).Select(color =>
             $"{color}: {summary.ColorCounts[color],4} / {_draft.Size * _draft.Size}")) + $"\nempty: {summary.EmptyCells}";
         GuidanceText.Text = summary.OrientationGuidance;
         SummaryText.Text = $"N={_draft.Size}; {(summary.BasicCountsValid ? "basic counts valid" : "draft incomplete/imbalanced")}";
-        ApplyButton.IsEnabled = summary.BasicCountsValid;
+        ValidationIssueList.ItemsSource = report.Issues;
+        ApplyButton.IsEnabled = report.BasicCountsValid;
         UndoButton.IsEnabled = _draft.CanUndo;
         RedoButton.IsEnabled = _draft.CanRedo;
     }

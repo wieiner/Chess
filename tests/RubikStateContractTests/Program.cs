@@ -17,6 +17,7 @@ try
     CheckAtomicFileService(checks);
     CheckElevenByElevenFileRoundtrips(checks);
     CheckPhysicalEditorDraft(checks);
+    CheckStructuredValidationDiagnostics(checks);
 }
 catch (Exception exception)
 {
@@ -310,6 +311,38 @@ static void CheckPhysicalEditorDraft(ContractChecks checks)
     {
         try { Directory.Delete(directory, recursive: true); } catch { }
     }
+}
+
+static void CheckStructuredValidationDiagnostics(ContractChecks checks)
+{
+    var empty = new RubikFaceEditorDraft(11);
+    var emptyReport = RubikPhysicalStateDiagnostics.ValidateDraft(empty, maximumCellIssues: 4);
+    var first = emptyReport.Issues.FirstOrDefault(issue => issue.Code == RubikValidationCodes.MissingSticker);
+    checks.Check(first is { Face: "U", Row: 0, Column: 0, Severity: RubikValidationSeverity.Error },
+        "structured missing-sticker issue identifies exact U cell");
+    checks.Check(emptyReport.Issues.Count(issue => issue.Code == RubikValidationCodes.MissingSticker) == 4 &&
+                 emptyReport.Issues.Count(issue => issue.Code == RubikValidationCodes.ColorUnderflow) == 6,
+        "cell diagnostics are bounded while all color underflow summaries remain present");
+
+    var imbalanced = new RubikFaceEditorDraft(3);
+    for (var face = 0; face < 6; face++) imbalanced.FillFace(face, 1);
+    var imbalanceReport = RubikPhysicalStateDiagnostics.ValidateDraft(imbalanced);
+    checks.Check(imbalanceReport.Issues.Any(issue => issue.Code == RubikValidationCodes.ColorOverflow) &&
+                 imbalanceReport.Issues.Any(issue => issue.Code == RubikValidationCodes.ColorUnderflow),
+        "structured diagnostics distinguish color overflow and underflow");
+    checks.Check(imbalanceReport.Issues.Any(issue => issue.Code == RubikValidationCodes.InvalidCenterScheme),
+        "odd-N duplicate centers produce invalidCenterScheme");
+
+    var solved = new RubikFaceEditorDraft(3);
+    for (var face = 0; face < 6; face++) solved.FillFace(face, face + 1);
+    var solvedReport = RubikPhysicalStateDiagnostics.ValidateDraft(solved);
+    checks.Check(solvedReport.BasicCountsValid && solvedReport.ErrorCount == 0 && solvedReport.Issues.Count == 0,
+        "solved editor draft has a clean structured report");
+    using var json = JsonDocument.Parse(emptyReport.ToSanitizedJson());
+    checks.Check(json.RootElement.GetProperty("format").GetString() == "rubik.validation-report" &&
+                 !emptyReport.ToSanitizedJson().Contains("facelets", StringComparison.OrdinalIgnoreCase) &&
+                 !emptyReport.ToSanitizedJson().Contains("path", StringComparison.OrdinalIgnoreCase),
+        "sanitized validation report contains diagnostics but no payload or local path");
 }
 
 static RubikStateDocument SolvedDocument(int size)
