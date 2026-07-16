@@ -55,6 +55,13 @@ public partial class MainWindow : Window
     private string? _currentStateFile;
     private string? _savedStateHash;
     private string? _currentStateHash;
+    private CancellationTokenSource? _solverCancellation;
+    private Stopwatch? _solverTimer;
+    private RubikMoveSequenceDocument? _solverSequence;
+    private RubikReductionCheckpoint? _solverCheckpoint;
+    private int _solverCursor;
+    private string? _solverExpectedHash;
+    private bool _solverWorkflowBusy;
 
     public MainWindow()
     {
@@ -78,6 +85,8 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _solverCancellation?.Cancel();
+        _solverCancellation?.Dispose();
         _engine.Dispose();
         base.OnClosed(e);
     }
@@ -253,6 +262,400 @@ public partial class MainWindow : Window
             : $"{info}\r\n\r\nSolution:\r\n{commands}";
         UpdateStatus();
     }
+
+    private void SolverValidate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryBuildPortableDocument(out var document, out var error))
+        {
+            SolverValidationText.Text = "Unavailable";
+            SolverFailureText.Text = error;
+            return;
+        }
+
+        ShowSolverValidation(document);
+        SolverPhaseText.Text = "Validate";
+        SolverProgressBar.Value = 0;
+        SolverProgressText.Text = "Validation complete";
+        SolverFailureText.Text = "None";
+    }
+
+    private async void SolverSolve_Click(object sender, RoutedEventArgs e)
+    {
+        if (_solverWorkflowBusy || _isAnimating)
+        {
+            SolverFailureText.Text = "Wait for the current solver or animation operation to finish.";
+            return;
+        }
+        if (!TryBuildPortableDocument(out var document, out var error))
+        {
+            SolverFailureText.Text = error;
+            return;
+        }
+
+        var validation = ShowSolverValidation(document);
+        ClearSolverArtifacts();
+        SolverHashText.Text = RubikStateHasher.Calculate(document);
+        SolverVerificationText.Text = "Not run";
+        SolverFailureText.Text = "None";
+        SolverProgressBar.Value = 0;
+        SolverProgressText.Text = "Starting";
+        _solverTimer = Stopwatch.StartNew();
+        _solverCancellation = new CancellationTokenSource();
+        SetSolverBusy(true);
+
+        try
+        {
+            if (document.Size == 2)
+            {
+                if (!validation.SolverReady)
+                {
+                    SolverFailureText.Text = "The 2x2 state did not pass full physical solvability validation.";
+                    return;
+                }
+
+                var solver = new BoundedTwoByTwoSolver();
+                ShowSolverCapabilities(solver.Capabilities);
+                var lastProgressUpdate = TimeSpan.MinValue;
+                var progress = new Progress<RubikSolveProgress>(update =>
+                {
+                    if (_solverTimer is null ||
+                        update.Fraction < 1 && lastProgressUpdate != TimeSpan.MinValue &&
+                        update.Elapsed - lastProgressUpdate < TimeSpan.FromMilliseconds(125))
+                    {
+                        return;
+                    }
+                    lastProgressUpdate = update.Elapsed;
+                    SolverPhaseText.Text = update.Phase.ToString();
+                    SolverProgressBar.Value = Math.Clamp(update.Fraction, 0, 1);
+                    SolverProgressText.Text = $"{update.Fraction:P0} | nodes {update.NodesVisited:N0} | {update.Message}";
+                    SolverElapsedText.Text = update.Elapsed.ToString(@"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture);
+                    SolverMoveCountText.Text = update.MovesFound.ToString(CultureInfo.InvariantCulture);
+                });
+                var request = new RubikSolveRequest(
+                    document,
+                    TimeSpan.FromSeconds(30),
+                    128L * 1024 * 1024,
+                    14,
+                    _solverCancellation.Token,
+                    Progress: progress);
+                var result = await solver.SolveAsync(request);
+                SolverElapsedText.Text = result.Elapsed.ToString(@"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture);
+                SolverMoveCountText.Text = result.MoveCount.ToString(CultureInfo.InvariantCulture);
+                if (!result.Success)
+                {
+                    SolverPhaseText.Text = result.Failure?.Kind.ToString() ?? "Failed";
+                    SolverFailureText.Text = result.Failure?.Message ?? "The solver failed without a diagnostic.";
+                    return;
+                }
+
+                SolverPhaseText.Text = "Verify";
+                SolverProgressText.Text = "Independent native replay";
+                var verification = await Task.Run(() => RubikSolutionVerifier.Verify(
+                    document, result.Moves, new RubikNativeMoveExecutorFactory(), _solverCancellation.Token));
+                SolverVerificationText.Text = $"{verification.Status}: {verification.Message}";
+                if (verification.Status != RubikSolutionVerificationStatus.Verified || verification.FinalHash is null)
+                {
+                    SolverFailureText.Text = "Candidate moves were not accepted as a verified solution.";
+                    return;
+                }
+
+                _solverSequence = RubikMoveSequenceFile.Create(document.Size, result.InputHash,
+                    solver.Capabilities.SolverId, result.Moves, complete: true, verified: true,
+                    finalHash: verification.FinalHash);
+                _solverCursor = 0;
+                _solverExpectedHash = result.InputHash;
+                SolverPhaseText.Text = "Complete";
+                SolverProgressBar.Value = 1;
+                SolverProgressText.Text = "100% | independently replay-verified";
+                SolverFailureText.Text = "None";
+                OutputBox.Text = $"Verified bounded 2x2 solution: {result.MoveCount} moves.\r\n" +
+                                 FormatSolverMoves(result.Moves);
+                return;
+            }
+
+            if (document.Size == 3)
+            {
+                SolverImplementationText.Text = "No approved arbitrary 3x3 backend";
+                SolverCapabilityText.Text = "Validation is available; arbitrary 3x3 search is deferred.";
+                SolverPhaseText.Text = "UnsupportedSize";
+                SolverFailureText.Text = "Arbitrary 3x3 solving requires a separately approved two-phase backend.";
+                return;
+            }
+
+            SolverImplementationText.Text = RubikNxnReductionFramework.SolverId;
+            SolverCapabilityText.Text = "NxN reduction guidance/checkpoint only; center and wing move generation are not implemented.";
+            SolverPhaseText.Text = "Plan reduction";
+            var plan = await Task.Run(() => RubikNxnReductionFramework.CreatePlan(document, _solverCancellation.Token));
+            _solverCheckpoint = plan.Checkpoint;
+            SolverCheckpointText.Text = plan.Checkpoint is null
+                ? "None"
+                : $"{plan.Checkpoint.Status} | {plan.Checkpoint.CurrentPhase} | hash {plan.Checkpoint.InputHash}";
+            SolverPhaseText.Text = plan.Status.ToString();
+            SolverProgressText.Text = plan.Success
+                ? "Level A: validated/decomposed with guided reduction checkpoint; no solution moves emitted."
+                : "Reduction planning failed.";
+            SolverFailureText.Text = plan.Failure?.Message ?? "None";
+            OutputBox.Text = string.Join("\r\n", plan.Checkpoint?.Log ?? []);
+        }
+        catch (OperationCanceledException)
+        {
+            SolverPhaseText.Text = "Cancelled";
+            SolverFailureText.Text = "Solver operation was cancelled.";
+        }
+        catch (Exception exception)
+        {
+            SolverPhaseText.Text = "Failed";
+            SolverFailureText.Text = exception.Message;
+        }
+        finally
+        {
+            _solverTimer?.Stop();
+            if (_solverTimer is not null)
+                SolverElapsedText.Text = _solverTimer.Elapsed.ToString(@"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture);
+            _solverCancellation?.Dispose();
+            _solverCancellation = null;
+            SetSolverBusy(false);
+            UpdateSolverButtons();
+        }
+    }
+
+    private void SolverPause_Click(object sender, RoutedEventArgs e) =>
+        SolverFailureText.Text = "Pause/resume is not supported by the current solver implementation.";
+
+    private void SolverResume_Click(object sender, RoutedEventArgs e) =>
+        SolverFailureText.Text = "Pause/resume is not supported by the current solver implementation.";
+
+    private void SolverCancel_Click(object sender, RoutedEventArgs e)
+    {
+        _solverCancellation?.Cancel();
+        SolverPhaseText.Text = "Cancelling";
+        SolverProgressText.Text = "Cooperative cancellation requested.";
+    }
+
+    private async void SolverSave_Click(object sender, RoutedEventArgs e)
+    {
+        if (_solverSequence is null)
+        {
+            SolverFailureText.Text = "There is no verified solution to save.";
+            return;
+        }
+        var dialog = new SaveFileDialog
+        {
+            Title = "Save verified Rubik solution",
+            Filter = "Rubik move sequence (*.rubikmoves)|*.rubikmoves",
+            DefaultExt = ".rubikmoves",
+            AddExtension = true,
+            OverwritePrompt = true,
+            FileName = $"rubik-{_solverSequence.Size}x{_solverSequence.Size}-solution.rubikmoves"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            await Task.Run(() => RubikMoveSequenceFile.SaveAtomic(dialog.FileName, _solverSequence));
+            OutputBox.Text = $"Verified solution saved atomically: {dialog.FileName}";
+            SolverFailureText.Text = "None";
+        }
+        catch (Exception exception)
+        {
+            SolverFailureText.Text = $"Solution save failed: {exception.Message}";
+        }
+    }
+
+    private async void SolverLoad_Click(object sender, RoutedEventArgs e)
+    {
+        if (_solverWorkflowBusy || _isAnimating) return;
+        var dialog = new OpenFileDialog
+        {
+            Title = "Load Rubik solution",
+            Filter = "Rubik move sequence (*.rubikmoves)|*.rubikmoves",
+            DefaultExt = ".rubikmoves",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var sequence = await Task.Run(() => RubikMoveSequenceFile.Load(dialog.FileName));
+            if (!TryBuildPortableDocument(out var current, out var error))
+                throw new InvalidOperationException(error);
+            var currentHash = RubikStateHasher.Calculate(current);
+            if (sequence.Size != current.Size || !StringComparer.Ordinal.Equals(sequence.InputHash, currentHash))
+                throw new InvalidDataException("Solution size/input hash does not match the current cube.");
+            _solverSequence = sequence;
+            _solverCursor = 0;
+            _solverExpectedHash = currentHash;
+            SolverImplementationText.Text = sequence.SolverId;
+            SolverMoveCountText.Text = sequence.Moves.Count.ToString(CultureInfo.InvariantCulture);
+            SolverHashText.Text = currentHash;
+            SolverVerificationText.Text = sequence.Verified
+                ? $"Verified artifact | final hash {sequence.FinalHash}"
+                : "Artifact is not independently verified; playback disabled.";
+            SolverFailureText.Text = "None";
+            SolverPhaseText.Text = "Loaded";
+            OutputBox.Text = $"Loaded {sequence.Moves.Count} moves from {dialog.FileName}";
+        }
+        catch (Exception exception)
+        {
+            SolverFailureText.Text = $"Solution load rejected: {exception.Message}";
+        }
+        UpdateSolverButtons();
+    }
+
+    private async void SolverPlay_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanPlaySolverSequence() || _solverWorkflowBusy) return;
+        SetSolverBusy(true);
+        _stopPlaybackRequested = false;
+        try
+        {
+            while (_solverSequence is not null && _solverCursor < _solverSequence.Moves.Count && !_stopPlaybackRequested)
+            {
+                if (!await ApplySolverStepAsync(forward: true)) break;
+                await Task.Delay(45);
+            }
+            SolverPhaseText.Text = _solverCursor == _solverSequence?.Moves.Count ? "Playback complete" : "Playback stopped";
+        }
+        finally
+        {
+            SetSolverBusy(false);
+            UpdateSolverButtons();
+        }
+    }
+
+    private async void SolverStep_Click(object sender, RoutedEventArgs e)
+    {
+        if (_solverWorkflowBusy) return;
+        await ApplySolverStepAsync(forward: true);
+    }
+
+    private async void SolverPrevious_Click(object sender, RoutedEventArgs e)
+    {
+        if (_solverWorkflowBusy) return;
+        await ApplySolverStepAsync(forward: false);
+    }
+
+    private async Task<bool> ApplySolverStepAsync(bool forward)
+    {
+        if (_solverSequence is null || !_solverSequence.Verified || !_solverSequence.Complete)
+        {
+            SolverFailureText.Text = "Playback requires a complete, verified solution artifact.";
+            return false;
+        }
+        if (forward ? _solverCursor >= _solverSequence.Moves.Count : _solverCursor <= 0) return false;
+        if (!TryBuildPortableDocument(out var current, out var error))
+        {
+            SolverFailureText.Text = error;
+            return false;
+        }
+        var currentHash = RubikStateHasher.Calculate(current);
+        if (!StringComparer.Ordinal.Equals(currentHash, _solverExpectedHash))
+        {
+            SolverFailureText.Text = "Current cube hash no longer matches the solution playback cursor.";
+            return false;
+        }
+
+        var move = forward ? _solverSequence.Moves[_solverCursor] : _solverSequence.Moves[_solverCursor - 1].Inverse();
+        await AnimateAndCommitMoveAsync(ToNativeMove(move));
+        if (!TryBuildPortableDocument(out var updated, out error))
+        {
+            SolverFailureText.Text = error;
+            return false;
+        }
+        _solverCursor += forward ? 1 : -1;
+        _solverExpectedHash = RubikStateHasher.Calculate(updated);
+        SolverHashText.Text = _solverExpectedHash;
+        SolverMoveCountText.Text = $"{_solverCursor}/{_solverSequence.Moves.Count}";
+        SolverProgressBar.Value = _solverSequence.Moves.Count == 0 ? 1 : (double)_solverCursor / _solverSequence.Moves.Count;
+        SolverProgressText.Text = $"Playback {_solverCursor}/{_solverSequence.Moves.Count}: {FormatSolverMove(move)}";
+        SolverFailureText.Text = "None";
+        UpdateSolverButtons();
+        return true;
+    }
+
+    private RubikSolvabilityResult ShowSolverValidation(RubikStateDocument document)
+    {
+        var validation = RubikSolvabilityValidator.Validate(document);
+        var issueSummary = validation.Issues.Count == 0
+            ? "no issues"
+            : string.Join("; ", validation.Issues.Take(3).Select(issue => $"{issue.Code}: {issue.Message}"));
+        SolverValidationText.Text = $"{validation.ValidationLevel} | counts {validation.BasicCountsValid} | " +
+                                    $"inventory {validation.CubieInventoryValid} | orientation " +
+                                    $"{(validation.OrientationProven ? validation.OrientationValid.ToString() : "unproven")} | " +
+                                    $"parity {(validation.ParityProven ? validation.ParityValid.ToString() : "unproven")} | {issueSummary}";
+        SolverHashText.Text = RubikStateHasher.Calculate(document);
+        if (document.Size == 2) ShowSolverCapabilities(new BoundedTwoByTwoSolver().Capabilities);
+        else if (document.Size == 3)
+        {
+            SolverImplementationText.Text = "No approved arbitrary 3x3 backend";
+            SolverCapabilityText.Text = "Physical validation only; search deferred.";
+        }
+        else
+        {
+            SolverImplementationText.Text = RubikNxnReductionFramework.SolverId;
+            SolverCapabilityText.Text = "Level A reduction planning/checkpoint only.";
+        }
+        return validation;
+    }
+
+    private void ShowSolverCapabilities(RubikSolverCapabilities capabilities)
+    {
+        SolverImplementationText.Text = $"{capabilities.DisplayName} ({capabilities.SolverId})";
+        SolverCapabilityText.Text = $"N={capabilities.MinimumSize}..{capabilities.MaximumSize}; arbitrary={capabilities.SupportsArbitraryState}; " +
+                                    $"checkpoint={capabilities.SupportsCheckpoints}; pause/resume={capabilities.SupportsPauseResume}";
+        SolverPauseButton.IsEnabled = !_solverWorkflowBusy && capabilities.SupportsPauseResume;
+        SolverResumeButton.IsEnabled = false;
+    }
+
+    private void SetSolverBusy(bool busy)
+    {
+        _solverWorkflowBusy = busy;
+        SolverSolveButton.IsEnabled = !busy;
+        SolverCancelButton.IsEnabled = busy && _solverCancellation is not null;
+        SolverPauseButton.IsEnabled = false;
+        SolverResumeButton.IsEnabled = false;
+        if (busy)
+        {
+            SolverSaveButton.IsEnabled = false;
+            SolverPlayButton.IsEnabled = false;
+            SolverStepButton.IsEnabled = false;
+            SolverPreviousButton.IsEnabled = false;
+        }
+    }
+
+    private void ClearSolverArtifacts()
+    {
+        _solverSequence = null;
+        _solverCheckpoint = null;
+        _solverCursor = 0;
+        _solverExpectedHash = null;
+        SolverCheckpointText.Text = "None";
+        UpdateSolverButtons();
+    }
+
+    private void UpdateSolverButtons()
+    {
+        var verified = _solverSequence is { Complete: true, Verified: true };
+        SolverSaveButton.IsEnabled = !_solverWorkflowBusy && verified;
+        SolverPlayButton.IsEnabled = !_solverWorkflowBusy && verified && _solverCursor < _solverSequence!.Moves.Count;
+        SolverStepButton.IsEnabled = SolverPlayButton.IsEnabled;
+        SolverPreviousButton.IsEnabled = !_solverWorkflowBusy && verified && _solverCursor > 0;
+    }
+
+    private bool CanPlaySolverSequence() =>
+        _solverSequence is { Complete: true, Verified: true } && _solverCursor < _solverSequence.Moves.Count;
+
+    private static NativeRubikEngine.RubikMoveDto ToNativeMove(RubikMove move) => new()
+    {
+        Axis = move.Axis,
+        Layer = move.Layer,
+        QuarterTurns = move.QuarterTurns
+    };
+
+    private static string FormatSolverMove(RubikMove move) =>
+        $"{AxisName(move.Axis)}{move.Layer + 1}x{RubikMove.NormalizeQuarterTurns(move.QuarterTurns)}";
+
+    private static string FormatSolverMoves(IEnumerable<RubikMove> moves) =>
+        string.Join(' ', moves.Select(FormatSolverMove));
 
     private void ApplySolution_Click(object sender, RoutedEventArgs e)
     {

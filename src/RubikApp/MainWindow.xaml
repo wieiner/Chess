@@ -221,6 +221,73 @@
                         </ScrollViewer>
                     </TabItem>
 
+                    <TabItem Header="Solver">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
+                            <StackPanel>
+                                <TextBlock Text="Validated solver workflow" Style="{StaticResource SectionTitleStyle}" />
+                                <WrapPanel>
+                                    <Button Content="Validate" Click="SolverValidate_Click" />
+                                    <Button x:Name="SolverSolveButton" Content="Solve" Click="SolverSolve_Click" />
+                                    <Button x:Name="SolverPauseButton" Content="Pause" Click="SolverPause_Click" IsEnabled="False" />
+                                    <Button x:Name="SolverResumeButton" Content="Resume" Click="SolverResume_Click" IsEnabled="False" />
+                                    <Button x:Name="SolverCancelButton" Content="Cancel" Click="SolverCancel_Click" IsEnabled="False" />
+                                </WrapPanel>
+                                <WrapPanel>
+                                    <Button x:Name="SolverSaveButton" Content="Save Solution" Click="SolverSave_Click" IsEnabled="False" />
+                                    <Button Content="Load Solution" Click="SolverLoad_Click" />
+                                </WrapPanel>
+                                <WrapPanel>
+                                    <Button x:Name="SolverPlayButton" Content="Play Solution" Click="SolverPlay_Click" IsEnabled="False" />
+                                    <Button x:Name="SolverStepButton" Content="Step" Click="SolverStep_Click" IsEnabled="False" />
+                                    <Button x:Name="SolverPreviousButton" Content="Previous Step" Click="SolverPrevious_Click" IsEnabled="False" />
+                                </WrapPanel>
+                                <ProgressBar x:Name="SolverProgressBar" Height="10" Minimum="0" Maximum="1" Margin="0,4,8,10" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Text="Implementation" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock x:Name="SolverImplementationText" Grid.Row="0" Grid.Column="1" Text="Not selected" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="1" Text="Capability" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock x:Name="SolverCapabilityText" Grid.Row="1" Grid.Column="1" Text="Validate the current state" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="2" Text="Phase" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock x:Name="SolverPhaseText" Grid.Row="2" Grid.Column="1" Text="Idle" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="3" Text="Progress" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock x:Name="SolverProgressText" Grid.Row="3" Grid.Column="1" Text="0%" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="4" Text="Elapsed" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock x:Name="SolverElapsedText" Grid.Row="4" Grid.Column="1" Text="00:00:00" />
+                                    <TextBlock Grid.Row="5" Text="Moves" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock x:Name="SolverMoveCountText" Grid.Row="5" Grid.Column="1" Text="0" />
+                                    <TextBlock Grid.Row="6" Text="Current hash" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock x:Name="SolverHashText" Grid.Row="6" Grid.Column="1" Text="-" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="7" Text="Checkpoint" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock x:Name="SolverCheckpointText" Grid.Row="7" Grid.Column="1" Text="None" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="8" Text="Validation" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock x:Name="SolverValidationText" Grid.Row="8" Grid.Column="1" Text="Not run" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="9" Text="Verification" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock x:Name="SolverVerificationText" Grid.Row="9" Grid.Column="1" Text="Not run" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="10" Text="Failure" Style="{StaticResource LabelStyle}" />
+                                    <TextBlock x:Name="SolverFailureText" Grid.Row="10" Grid.Column="1" Text="None" TextWrapping="Wrap" Foreground="#FFB9A8" />
+                                </Grid>
+                                <TextBlock Text="Arbitrary solving is implemented for bounded 2x2 only. N≥4 currently creates an incomplete reduction checkpoint; arbitrary 3x3 is deferred." Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,12,0,0" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
                     <TabItem Header="Позиция">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
                             <StackPanel>
