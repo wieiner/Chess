@@ -1,24 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <UseWPF>true</UseWPF>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
-    <AssemblyName>RubikApp</AssemblyName>
-    <RootNamespace>RubikApp</RootNamespace>
+    <AssemblyName>RubikVisualContractTests</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RubikEngine\RubikEngine.vcxproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\RubikVisuals\RubikVisuals.csproj" />
+    <ProjectReference Include="..\..\src\RubikVisuals\RubikVisuals.csproj" />
+    <ProjectReference Include="..\..\src\RubikEngine\RubikEngine.vcxproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="fixtures\solved-3x3.visual.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <Target Name="CopyNativeRubikEngine" AfterTargets="Build">
     <PropertyGroup>
-      <RubikEnginePath>$(MSBuildThisFileDirectory)..\RubikEngine\bin\$(Platform)\$(Configuration)\RubikEngine.dll</RubikEnginePath>
+      <RubikEnginePath>$(MSBuildThisFileDirectory)..\..\src\RubikEngine\bin\$(Platform)\$(Configuration)\RubikEngine.dll</RubikEnginePath>
       <LegacyRubikEnginePath>$(MSBuildThisFileDirectory)..\..\bin\$(Platform)\$(Configuration)\RubikEngine.dll</LegacyRubikEnginePath>
     </PropertyGroup>
     <Copy SourceFiles="$(RubikEnginePath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('$(RubikEnginePath)')" />

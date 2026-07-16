@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using RubikVisuals;
 
 namespace RubikApp;
 
@@ -85,6 +86,7 @@ public partial class MainWindow : Window
             // Legacy integer-only edits cannot provide physical sticker orientation.
         }
         _faceletsSynchronized = facelets != null;
+        var cells = _engine.GetCells();
         var surfaceOnly = SurfaceOnlyBox.IsChecked == true;
         var spacing = SpacingForSize(size);
         var cubeSize = CubeSizeForDimension(size);
@@ -92,55 +94,41 @@ public partial class MainWindow : Window
 
         _scene.Children.Add(CreateBasePlate(half, spacing, size));
         AddAxesAndCoordinates(size, half, spacing);
-        _renderedCubieCount = 0;
-        _renderedStickerCount = 0;
-        _renderedCornerCount = 0;
-        _renderedEdgeCount = 0;
-        _renderedCenterCount = 0;
-        _renderedInternalCount = 0;
-        _invalidStickerCount = 0;
-        _orientationAvailable = true;
-        _fallbackRendererActive = false;
+        var summary = RubikVisualDescriptorBuilder.BuildScene(
+            size,
+            facelets,
+            BuildVisualInputs(size, cells),
+            surfaceOnly,
+            _selectedAxis,
+            _selectedLayer);
+        _renderedCubieCount = summary.CubiesRendered;
+        _renderedStickerCount = summary.StickersRendered;
+        _renderedCornerCount = summary.CornersRendered;
+        _renderedEdgeCount = summary.EdgesRendered;
+        _renderedCenterCount = summary.CentersRendered;
+        _renderedInternalCount = summary.InternalsRendered;
+        _invalidStickerCount = summary.InvalidStickers;
+        _orientationAvailable = summary.OrientationAvailable;
+        _fallbackRendererActive = summary.FallbackRendererActive;
 
-        for (var z = 0; z < size; z++)
+        foreach (var cubie in summary.Cubies)
         {
-            for (var y = 0; y < size; y++)
+            var x = cubie.Coordinate.X;
+            var y = cubie.Coordinate.Y;
+            var z = cubie.Coordinate.Z;
+            var isSurface = cubie.PhysicalStickerCount > 0;
+            var opacity = isSurface ? 0.96 : 0.18;
+            var center = new Point3D(x * spacing - half, y * spacing - half, z * spacing - half);
+            var stickers = cubie.Stickers
+                .Select(sticker => new StickerVisual(sticker.WorldFace, ColorForFacelet(sticker.ColorId)))
+                .ToArray();
+            var model = CreateRubikCubie(center, cubeSize, stickers, cubie.IsSelected, cubie.IsSelected ? 1.0 : opacity);
+            _scene.Children.Add(model);
+            var visual = new CubeVisual(x, y, z, center, model);
+            _cubeVisuals.Add(visual);
+            foreach (var child in model.Children.OfType<GeometryModel3D>())
             {
-                for (var x = 0; x < size; x++)
-                {
-                    var isSurface = x == 0 || x == size - 1 || y == 0 || y == size - 1 || z == 0 || z == size - 1;
-                    if (surfaceOnly && !isSurface)
-                    {
-                        continue;
-                    }
-
-                    var opacity = isSurface ? 0.96 : 0.18;
-                    var selected = _selectedAxis >= 0 &&
-                        ((_selectedAxis == 0 && z == _selectedLayer) ||
-                         (_selectedAxis == 1 && y == _selectedLayer) ||
-                         (_selectedAxis == 2 && x == _selectedLayer));
-                    var center = new Point3D(x * spacing - half, y * spacing - half, z * spacing - half);
-                    var stickers = BuildStickerVisuals(facelets, size, x, y, z, ref _invalidStickerCount);
-                    var model = CreateRubikCubie(center, cubeSize, stickers, selected, selected ? 1.0 : opacity);
-                    _scene.Children.Add(model);
-                    var visual = new CubeVisual(x, y, z, center, model);
-                    _cubeVisuals.Add(visual);
-                    foreach (var child in model.Children.OfType<GeometryModel3D>())
-                    {
-                        _cubeHitMap[child] = visual;
-                    }
-
-                    _renderedCubieCount++;
-                    _renderedStickerCount += stickers.Count;
-                    var stickerMask = _engine.GetCubieStickerMask(x, y, z);
-                    var physicalStickerCount = stickerMask >= 0
-                        ? CountMaskBits(stickerMask)
-                        : ExposedFaceCount(size, x, y, z);
-                    if (physicalStickerCount == 3) _renderedCornerCount++;
-                    else if (physicalStickerCount == 2) _renderedEdgeCount++;
-                    else if (physicalStickerCount == 1) _renderedCenterCount++;
-                    else if (physicalStickerCount == 0) _renderedInternalCount++;
-                }
+                _cubeHitMap[child] = visual;
             }
         }
 
@@ -784,176 +772,28 @@ public partial class MainWindow : Window
         return Math.Clamp(spacing * 0.82, 0.48, 0.92);
     }
 
-    private static int ExposedFaceCount(int size, int x, int y, int z)
+    private IReadOnlyList<RubikCubieVisualInput> BuildVisualInputs(int size, IReadOnlyList<int> cells)
     {
-        var maximum = size - 1;
-        return (x == 0 || x == maximum ? 1 : 0) +
-               (y == 0 || y == maximum ? 1 : 0) +
-               (z == 0 || z == maximum ? 1 : 0);
-    }
-
-    private List<StickerVisual> BuildStickerVisuals(
-        int[]? facelets,
-        int size,
-        int x,
-        int y,
-        int z,
-        ref int invalidCount)
-    {
-        if (facelets != null &&
-            _engine.TryGetCubieOrientation(x, y, z, out var orientation))
+        var result = new List<RubikCubieVisualInput>(size * size * size);
+        for (var z = 0; z < size; z++)
+        for (var y = 0; y < size; y++)
+        for (var x = 0; x < size; x++)
         {
-            var stickerMask = _engine.GetCubieStickerMask(x, y, z);
-            if (stickerMask >= 0)
+            RubikCubieOrientation? orientation = null;
+            if (_engine.TryGetCubieOrientation(x, y, z, out var nativeOrientation))
             {
-                return BuildOrientedStickerVisuals(
-                    facelets,
-                    size,
-                    x,
-                    y,
-                    z,
-                    stickerMask,
-                    orientation,
-                    ref invalidCount);
+                orientation = new RubikCubieOrientation(
+                    new RubikAxisVector(nativeOrientation.LocalXWorldX, nativeOrientation.LocalXWorldY, nativeOrientation.LocalXWorldZ),
+                    new RubikAxisVector(nativeOrientation.LocalYWorldX, nativeOrientation.LocalYWorldY, nativeOrientation.LocalYWorldZ),
+                    new RubikAxisVector(nativeOrientation.LocalZWorldX, nativeOrientation.LocalZWorldY, nativeOrientation.LocalZWorldZ));
             }
-        }
-
-        _orientationAvailable = false;
-        _fallbackRendererActive = true;
-        return BuildFaceletShellStickerVisuals(facelets, size, x, y, z, ref invalidCount);
-    }
-
-    private static List<StickerVisual> BuildOrientedStickerVisuals(
-        int[] facelets,
-        int size,
-        int x,
-        int y,
-        int z,
-        int stickerMask,
-        NativeRubikEngine.RubikCubieOrientationDto orientation,
-        ref int invalidCount)
-    {
-        var result = new List<StickerVisual>(3);
-        for (var localFace = 0; localFace < 6; localFace++)
-        {
-            if ((stickerMask & (1 << localFace)) == 0)
-            {
-                continue;
-            }
-
-            var worldFace = WorldFaceForLocalFace(localFace, orientation);
-            if (worldFace < 0 || !IsOnWorldFace(size, x, y, z, worldFace))
-            {
-                invalidCount++;
-                continue;
-            }
-
-            AddWorldSticker(result, facelets, size, worldFace, x, y, z, ref invalidCount);
+            result.Add(new RubikCubieVisualInput(
+                new RubikCoordinate(x, y, z),
+                cells[IndexOf(size, x, y, z)],
+                _engine.GetCubieStickerMask(x, y, z),
+                orientation));
         }
         return result;
-    }
-
-    private static List<StickerVisual> BuildFaceletShellStickerVisuals(
-        int[]? facelets,
-        int size,
-        int x,
-        int y,
-        int z,
-        ref int invalidCount)
-    {
-        var result = new List<StickerVisual>(3);
-        var maximum = size - 1;
-        if (y == maximum) AddWorldSticker(result, facelets, size, 0, x, y, z, ref invalidCount);
-        if (x == maximum) AddWorldSticker(result, facelets, size, 1, x, y, z, ref invalidCount);
-        if (z == maximum) AddWorldSticker(result, facelets, size, 2, x, y, z, ref invalidCount);
-        if (y == 0) AddWorldSticker(result, facelets, size, 3, x, y, z, ref invalidCount);
-        if (x == 0) AddWorldSticker(result, facelets, size, 4, x, y, z, ref invalidCount);
-        if (z == 0) AddWorldSticker(result, facelets, size, 5, x, y, z, ref invalidCount);
-        return result;
-    }
-
-    private static void AddWorldSticker(
-        ICollection<StickerVisual> result,
-        int[]? facelets,
-        int size,
-        int worldFace,
-        int x,
-        int y,
-        int z,
-        ref int invalidCount)
-    {
-        var maximum = size - 1;
-        var (row, column) = worldFace switch
-        {
-            0 => (z, x),
-            1 => (maximum - y, maximum - z),
-            2 => (maximum - y, x),
-            3 => (maximum - z, x),
-            4 => (maximum - y, z),
-            5 => (maximum - y, maximum - x),
-            _ => (-1, -1)
-        };
-        var index = worldFace * size * size + row * size + column;
-        if (facelets == null || index < 0 || index >= facelets.Length || facelets[index] is < 1 or > 6)
-        {
-            invalidCount++;
-            return;
-        }
-        result.Add(new StickerVisual(worldFace, ColorForFacelet(facelets[index])));
-    }
-
-    private static int WorldFaceForLocalFace(
-        int localFace,
-        NativeRubikEngine.RubikCubieOrientationDto orientation)
-    {
-        var (x, y, z) = localFace switch
-        {
-            0 => (orientation.LocalYWorldX, orientation.LocalYWorldY, orientation.LocalYWorldZ),
-            1 => (orientation.LocalXWorldX, orientation.LocalXWorldY, orientation.LocalXWorldZ),
-            2 => (orientation.LocalZWorldX, orientation.LocalZWorldY, orientation.LocalZWorldZ),
-            3 => (-orientation.LocalYWorldX, -orientation.LocalYWorldY, -orientation.LocalYWorldZ),
-            4 => (-orientation.LocalXWorldX, -orientation.LocalXWorldY, -orientation.LocalXWorldZ),
-            5 => (-orientation.LocalZWorldX, -orientation.LocalZWorldY, -orientation.LocalZWorldZ),
-            _ => (0, 0, 0)
-        };
-        return (x, y, z) switch
-        {
-            (0, 1, 0) => 0,
-            (1, 0, 0) => 1,
-            (0, 0, 1) => 2,
-            (0, -1, 0) => 3,
-            (-1, 0, 0) => 4,
-            (0, 0, -1) => 5,
-            _ => -1
-        };
-    }
-
-    private static bool IsOnWorldFace(int size, int x, int y, int z, int face)
-    {
-        var maximum = size - 1;
-        return face switch
-        {
-            0 => y == maximum,
-            1 => x == maximum,
-            2 => z == maximum,
-            3 => y == 0,
-            4 => x == 0,
-            5 => z == 0,
-            _ => false
-        };
-    }
-
-    private static int CountMaskBits(int mask)
-    {
-        var count = 0;
-        for (var bit = 0; bit < 6; bit++)
-        {
-            if ((mask & (1 << bit)) != 0)
-            {
-                count++;
-            }
-        }
-        return count;
     }
 
     private static Color ColorForFacelet(int colorId)

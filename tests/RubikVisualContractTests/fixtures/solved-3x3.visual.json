@@ -1,0 +1,10 @@
+{
+  "size": 3,
+  "stickers": 54,
+  "colorsPerId": 9,
+  "representatives": [
+    { "coordinate": [0, 0, 0], "kind": "corner", "localFaces": [3, 4, 5], "colorIds": [4, 5, 6] },
+    { "coordinate": [1, 0, 0], "kind": "edge", "localFaces": [3, 5], "colorIds": [4, 6] },
+    { "coordinate": [1, 1, 0], "kind": "center", "localFaces": [5], "colorIds": [6] }
+  ]
+}
