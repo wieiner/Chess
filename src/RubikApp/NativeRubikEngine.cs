@@ -93,6 +93,16 @@ internal sealed class NativeRubikEngine : IDisposable
         return Rubik_ValidateFacelets(_handle, facelets, facelets.Length) != 0;
     }
 
+    public bool TryGetCubieOrientation(int x, int y, int z, out RubikCubieOrientationDto orientation)
+    {
+        return Rubik_GetCubieOrientation(_handle, x, y, z, out orientation) != 0;
+    }
+
+    public int GetCubieStickerMask(int x, int y, int z)
+    {
+        return Rubik_GetCubieStickerMask(_handle, x, y, z);
+    }
+
     public bool SetSize(int size)
     {
         return Rubik_SetSize(_handle, size) != 0;
@@ -247,6 +257,17 @@ internal sealed class NativeRubikEngine : IDisposable
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Rubik_ValidateFacelets(IntPtr handle, [In] int[] facelets, int count);
 
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Rubik_GetCubieOrientation(
+        IntPtr handle,
+        int x,
+        int y,
+        int z,
+        out RubikCubieOrientationDto orientation);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Rubik_GetCubieStickerMask(IntPtr handle, int x, int y, int z);
+
     [StructLayout(LayoutKind.Sequential)]
     public struct RubikMoveDto
     {
@@ -276,5 +297,19 @@ internal sealed class NativeRubikEngine : IDisposable
         D = 3,
         L = 4,
         B = 5
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RubikCubieOrientationDto
+    {
+        public int LocalXWorldX;
+        public int LocalXWorldY;
+        public int LocalXWorldZ;
+        public int LocalYWorldX;
+        public int LocalYWorldY;
+        public int LocalYWorldZ;
+        public int LocalZWorldX;
+        public int LocalZWorldY;
+        public int LocalZWorldZ;
     }
 }

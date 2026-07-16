@@ -29,6 +29,13 @@ struct Vec3
     int z;
 };
 
+struct Basis
+{
+    Vec3 localX;
+    Vec3 localY;
+    Vec3 localZ;
+};
+
 struct Move
 {
     int axis;
@@ -42,6 +49,8 @@ struct Engine
     std::vector<int> cells;
     std::vector<int> facelets;
     bool faceletsSynchronized = true;
+    std::vector<Basis> orientations;
+    bool orientationsSynchronized = true;
     std::vector<Move> history;
     std::string lastInfo;
     std::string lastCommandText;
@@ -67,6 +76,11 @@ int faceletCount(int size)
 int faceletIndex(const Engine& engine, int face, int row, int column)
 {
     return face * engine.size * engine.size + row * engine.size + column;
+}
+
+Basis identityBasis()
+{
+    return { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
 }
 
 bool validFaceletCoordinate(const Engine& engine, int face, int row, int column)
@@ -240,6 +254,8 @@ void reset(Engine& engine)
             face + FirstColorId);
     }
     engine.faceletsSynchronized = true;
+    engine.orientations.assign(static_cast<size_t>(cellCount(engine.size)), identityBasis());
+    engine.orientationsSynchronized = true;
     engine.history.clear();
     engine.lastMove = { -1, -1, 0 };
     engine.manualState = false;
@@ -360,6 +376,49 @@ Vec3 rotateNormal(int axis, int turns, Vec3 normal)
         }
     }
     return normal;
+}
+
+Basis rotateBasis(int axis, int turns, Basis basis)
+{
+    basis.localX = rotateNormal(axis, turns, basis.localX);
+    basis.localY = rotateNormal(axis, turns, basis.localY);
+    basis.localZ = rotateNormal(axis, turns, basis.localZ);
+    return basis;
+}
+
+bool buildRotatedOrientations(const Engine& engine, int axis, int layer, int turns, std::vector<Basis>& result)
+{
+    if (!engine.orientationsSynchronized)
+    {
+        result.clear();
+        return true;
+    }
+    if (static_cast<int>(engine.orientations.size()) != cellCount(engine.size))
+    {
+        return false;
+    }
+
+    result = engine.orientations;
+    for (int z = 0; z < engine.size; ++z)
+    {
+        for (int y = 0; y < engine.size; ++y)
+        {
+            for (int x = 0; x < engine.size; ++x)
+            {
+                const bool inLayer = (axis == 0 && z == layer) || (axis == 1 && y == layer) || (axis == 2 && x == layer);
+                if (!inLayer)
+                {
+                    continue;
+                }
+                const Vec3 to = rotateLayerSquare(engine, axis, layer, turns, x, y, z);
+                result[static_cast<size_t>(indexOf(engine, to.x, to.y, to.z))] = rotateBasis(
+                    axis,
+                    turns,
+                    engine.orientations[static_cast<size_t>(indexOf(engine, x, y, z))]);
+            }
+        }
+    }
+    return true;
 }
 
 bool stickerToFacelet(const Engine& engine, const Sticker& sticker, int& face, int& row, int& column)
@@ -500,6 +559,12 @@ bool rotateLayer(Engine& engine, int axis, int layer, int quarterTurns, bool rec
         engine.lastInfo = "Rotation rejected: synchronized facelet state is invalid.";
         return false;
     }
+    std::vector<Basis> rotatedOrientations;
+    if (!buildRotatedOrientations(engine, axis, layer, turns, rotatedOrientations))
+    {
+        engine.lastInfo = "Rotation rejected: synchronized cubie orientation state is invalid.";
+        return false;
+    }
 
     const std::vector<int> before = engine.cells;
     for (int z = 0; z < engine.size; ++z)
@@ -521,6 +586,10 @@ bool rotateLayer(Engine& engine, int axis, int layer, int quarterTurns, bool rec
     if (engine.faceletsSynchronized)
     {
         engine.facelets.swap(rotatedFacelets);
+    }
+    if (engine.orientationsSynchronized)
+    {
+        engine.orientations.swap(rotatedOrientations);
     }
 
     const Move move{ axis, layer, turns };
@@ -629,6 +698,7 @@ RUBIK_API int Rubik_SetCells(void* handle, const int* cells)
     }
     std::copy(cells, cells + engine->cells.size(), engine->cells.begin());
     engine->faceletsSynchronized = false;
+    engine->orientationsSynchronized = false;
     engine->history.clear();
     engine->manualState = true;
     engine->lastCommandText.clear();
@@ -645,6 +715,7 @@ RUBIK_API int Rubik_SetCell(void* handle, int x, int y, int z, int value)
     }
     engine->cells[indexOf(*engine, x, y, z)] = value;
     engine->faceletsSynchronized = false;
+    engine->orientationsSynchronized = false;
     engine->history.clear();
     engine->manualState = true;
     engine->lastCommandText.clear();
@@ -824,6 +895,7 @@ RUBIK_API int Rubik_SetFacelets(void* handle, const int* facelets, int count)
     std::vector<int> next(facelets, facelets + count);
     engine->facelets.swap(next);
     engine->faceletsSynchronized = true;
+    engine->orientationsSynchronized = false;
     engine->history.clear();
     engine->manualState = true;
     engine->lastMove = { -1, -1, 0 };
@@ -881,4 +953,60 @@ RUBIK_API int Rubik_ValidateFacelets(void* handle, const int* facelets, int coun
         ? "Facelet validation passed: size, color ids, and color counts are valid."
         : error;
     return valid ? 1 : 0;
+}
+
+RUBIK_API int Rubik_GetCubieOrientation(
+    void* handle,
+    int x,
+    int y,
+    int z,
+    RubikCubieOrientationDto* orientation)
+{
+    auto* engine = asEngine(handle);
+    if (engine == nullptr || orientation == nullptr || !inside(*engine, x, y, z))
+    {
+        return 0;
+    }
+    if (!engine->orientationsSynchronized)
+    {
+        engine->lastInfo = "Cubie orientation unavailable: the current imported state has no cubie decomposition.";
+        return 0;
+    }
+
+    const Basis& basis = engine->orientations[static_cast<size_t>(indexOf(*engine, x, y, z))];
+    *orientation = {
+        basis.localX.x, basis.localX.y, basis.localX.z,
+        basis.localY.x, basis.localY.y, basis.localY.z,
+        basis.localZ.x, basis.localZ.y, basis.localZ.z
+    };
+    return 1;
+}
+
+RUBIK_API int Rubik_GetCubieStickerMask(void* handle, int x, int y, int z)
+{
+    auto* engine = asEngine(handle);
+    if (engine == nullptr || !inside(*engine, x, y, z))
+    {
+        return -1;
+    }
+
+    const int cubieId = engine->cells[static_cast<size_t>(indexOf(*engine, x, y, z))];
+    if (cubieId < 0 || cubieId >= cellCount(engine->size))
+    {
+        engine->lastInfo = "Cubie sticker mask unavailable: cubie id is outside the solved cube range.";
+        return -1;
+    }
+
+    const int solvedX = cubieId % engine->size;
+    const int solvedY = (cubieId / engine->size) % engine->size;
+    const int solvedZ = cubieId / (engine->size * engine->size);
+    const int maximum = engine->size - 1;
+    int mask = 0;
+    if (solvedY == maximum) mask |= 1 << 0; // U
+    if (solvedX == maximum) mask |= 1 << 1; // R
+    if (solvedZ == maximum) mask |= 1 << 2; // F
+    if (solvedY == 0) mask |= 1 << 3; // D
+    if (solvedX == 0) mask |= 1 << 4; // L
+    if (solvedZ == 0) mask |= 1 << 5; // B
+    return mask;
 }

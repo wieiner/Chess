@@ -28,6 +28,19 @@ struct RubikStateDto
     int lastLayer;
     int lastQuarterTurns;
 };
+
+struct RubikCubieOrientationDto
+{
+    int localXWorldX;
+    int localXWorldY;
+    int localXWorldZ;
+    int localYWorldX;
+    int localYWorldY;
+    int localYWorldZ;
+    int localZWorldX;
+    int localZWorldY;
+    int localZWorldZ;
+};
 #pragma pack(pop)
 
 RUBIK_API void* Rubik_Create();
@@ -54,3 +67,5 @@ RUBIK_API int Rubik_GetFacelet(void* handle, int face, int row, int column);
 RUBIK_API int Rubik_SetFacelet(void* handle, int face, int row, int column, int colorId);
 RUBIK_API int Rubik_GetColorScheme(void* handle, char* buffer, int capacity);
 RUBIK_API int Rubik_ValidateFacelets(void* handle, const int* facelets, int count);
+RUBIK_API int Rubik_GetCubieOrientation(void* handle, int x, int y, int z, RubikCubieOrientationDto* orientation);
+RUBIK_API int Rubik_GetCubieStickerMask(void* handle, int x, int y, int z);

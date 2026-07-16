@@ -45,6 +45,13 @@ int FaceletAt(const std::vector<int>& facelets, int size, int face, int row, int
     return facelets[static_cast<size_t>(face * size * size + row * size + column)];
 }
 
+bool IsIdentity(const RubikCubieOrientationDto& orientation)
+{
+    return orientation.localXWorldX == 1 && orientation.localXWorldY == 0 && orientation.localXWorldZ == 0 &&
+        orientation.localYWorldX == 0 && orientation.localYWorldY == 1 && orientation.localYWorldZ == 0 &&
+        orientation.localZWorldX == 0 && orientation.localZWorldY == 0 && orientation.localZWorldZ == 1;
+}
+
 void CheckSolvedFacelets(ContractTestRunner& test, int size)
 {
     void* cube = Rubik_CreateSized(size);
@@ -171,6 +178,59 @@ void CheckAxisStripDirections(ContractTestRunner& test)
 
     Rubik_Destroy(cube);
 }
+
+void CheckCubieOrientation(ContractTestRunner& test)
+{
+    void* cube = Rubik_CreateSized(3);
+    if (cube == nullptr)
+    {
+        test.Check(false, "Create cubie orientation cube");
+        return;
+    }
+
+    test.Check(Rubik_GetCubieStickerMask(cube, 0, 0, 0) == ((1 << 3) | (1 << 4) | (1 << 5)),
+        "Corner cubie has three solved local sticker faces");
+    test.Check(Rubik_GetCubieStickerMask(cube, 1, 0, 0) == ((1 << 3) | (1 << 5)),
+        "Edge cubie has two solved local sticker faces");
+    test.Check(Rubik_GetCubieStickerMask(cube, 1, 1, 0) == (1 << 5),
+        "Center cubie has one solved local sticker face");
+    test.Check(Rubik_GetCubieStickerMask(cube, 1, 1, 1) == 0,
+        "Internal cubie has no sticker faces");
+
+    RubikCubieOrientationDto orientation{};
+    test.Check(Rubik_GetCubieOrientation(cube, 0, 0, 0, &orientation) == 1 && IsIdentity(orientation),
+        "Solved cubie orientation is the identity basis");
+
+    Rubik_RotateLayer(cube, 0, 0, 1);
+    test.Check(Rubik_GetCubieStickerMask(cube, 2, 0, 0) == ((1 << 3) | (1 << 4) | (1 << 5)),
+        "Sticker mask follows physical cubie identity after movement");
+    test.Check(Rubik_GetCubieOrientation(cube, 2, 0, 0, &orientation) == 1 &&
+        orientation.localXWorldX == 0 && orientation.localXWorldY == 1 && orientation.localXWorldZ == 0 &&
+        orientation.localYWorldX == -1 && orientation.localYWorldY == 0 && orientation.localYWorldZ == 0 &&
+        orientation.localZWorldX == 0 && orientation.localZWorldY == 0 && orientation.localZWorldZ == 1,
+        "Z quarter turn rotates the cubie basis exactly");
+    Rubik_RotateLayer(cube, 0, 0, 3);
+    test.Check(Rubik_GetCubieOrientation(cube, 0, 0, 0, &orientation) == 1 && IsIdentity(orientation),
+        "Cubie orientation returns after inverse turn");
+
+    for (const int axis : { 0, 1, 2 })
+    {
+        for (int turn = 0; turn < 4; ++turn)
+        {
+            Rubik_RotateLayer(cube, axis, 0, 1);
+        }
+        test.Check(Rubik_GetCubieOrientation(cube, 0, 0, 0, &orientation) == 1 && IsIdentity(orientation),
+            "Four turns restore exact orientation for axis " + std::to_string(axis));
+    }
+
+    std::vector<int> manualFacelets = SolvedFacelets(3);
+    test.Check(Rubik_SetFacelets(cube, manualFacelets.data(), static_cast<int>(manualFacelets.size())) == 1,
+        "Manual facelet import succeeds before orientation boundary check");
+    test.Check(Rubik_GetCubieOrientation(cube, 0, 0, 0, &orientation) == 0,
+        "Manual facelets do not invent a cubie decomposition");
+
+    Rubik_Destroy(cube);
+}
 }
 
 int main()
@@ -198,6 +258,7 @@ int main()
         CheckRotationInvariants(test, size);
     }
     CheckAxisStripDirections(test);
+    CheckCubieOrientation(test);
 
     std::vector<int> importedFacelets = SolvedFacelets(8);
     std::swap(importedFacelets[0], importedFacelets[64]);
