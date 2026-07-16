@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>RubikStateContractTests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\RubikState\RubikState.csproj" />
+    <ProjectReference Include="..\..\src\RubikEngine\RubikEngine.vcxproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\assets\rules\rubik\examples\**\*.rubik.json"
+          Link="examples\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="CopyNativeRubikEngine" AfterTargets="Build">
+    <PropertyGroup>
+      <RubikEnginePath>$(MSBuildThisFileDirectory)..\..\src\RubikEngine\bin\$(Platform)\$(Configuration)\RubikEngine.dll</RubikEnginePath>
+      <LegacyRubikEnginePath>$(MSBuildThisFileDirectory)..\..\bin\$(Platform)\$(Configuration)\RubikEngine.dll</LegacyRubikEnginePath>
+    </PropertyGroup>
+    <Copy SourceFiles="$(RubikEnginePath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('$(RubikEnginePath)')" />
+    <Copy SourceFiles="$(LegacyRubikEnginePath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="!Exists('$(RubikEnginePath)') And Exists('$(LegacyRubikEnginePath)')" />
+  </Target>
+</Project>
