@@ -134,13 +134,13 @@ function Invoke-BuildProject([object]$Item, [string]$MSBuildPath, [int]$MaxCpuCo
     }
     Write-Step "Build $($Item.Name)"
     $buildLog = Join-Path $script:TestLogRoot "$($Item.Name).build.log"
-    & $MSBuildPath $projectPath "/m:$MaxCpuCount" "/nr:false" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal" *> $buildLog
+    & $MSBuildPath $projectPath "/restore" "/m:$MaxCpuCount" "/nr:false" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal" *> $buildLog
     $exitCode = $LASTEXITCODE
     $buildResult = if ($exitCode -eq 0) { "PASS" } else { "FAIL" }
     if ($exitCode -ne 0 -and $MaxCpuCount -gt 1) {
         $retryLog = Join-Path $script:TestLogRoot "$($Item.Name).build.retry-m1.log"
         Write-Warning "MSBuild failed for $($Item.Name) under /m:$MaxCpuCount; retrying /m:1."
-        & $MSBuildPath $projectPath "/m:1" "/nr:false" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal" *> $retryLog
+        & $MSBuildPath $projectPath "/restore" "/m:1" "/nr:false" "/p:Configuration=$Configuration" "/p:Platform=$Platform" "/v:minimal" *> $retryLog
         $exitCode = $LASTEXITCODE
         $buildLog = $retryLog
         $buildResult = if ($exitCode -eq 0) { "PASS_RETRY" } else { "FAIL" }
