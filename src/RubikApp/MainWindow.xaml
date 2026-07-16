@@ -141,6 +141,7 @@
                         <StackPanel Orientation="Horizontal">
                             <CheckBox x:Name="SurfaceOnlyBox" Content="только оболочка" IsChecked="True" Checked="SurfaceMode_Changed" Unchecked="SurfaceMode_Changed" />
                             <Button Content="Вид" Click="ResetCamera_Click" />
+                            <Button Content="Save Visual Evidence" Click="SaveVisualEvidence_Click" />
                         </StackPanel>
                     </Border>
                 </WrapPanel>
@@ -153,7 +154,7 @@
                 <ColumnDefinition Width="390" />
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="#10151D" BorderBrush="#273141" BorderThickness="0,0,1,0">
+            <Border x:Name="ViewportCaptureHost" Grid.Column="0" Background="#10151D" BorderBrush="#273141" BorderThickness="0,0,1,0">
                 <Grid>
                     <Viewport3D x:Name="RubikViewport"
                                 ClipToBounds="True"

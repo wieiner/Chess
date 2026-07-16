@@ -1,10 +1,14 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
+using System.Windows.Threading;
 using RubikVisuals;
 
 namespace RubikApp;
@@ -46,6 +50,11 @@ public partial class MainWindow : Window
         _engine = new NativeRubikEngine();
         SetupViewport();
         RefreshScene();
+        if (Environment.GetCommandLineArgs().Any(argument =>
+            string.Equals(argument, "--save-visual-evidence", StringComparison.OrdinalIgnoreCase)))
+        {
+            Loaded += SaveVisualEvidenceOnStartup;
+        }
     }
 
     protected override void OnClosed(EventArgs e)
@@ -347,6 +356,173 @@ public partial class MainWindow : Window
     private void ResetCamera_Click(object sender, RoutedEventArgs e)
     {
         ResetCameraToDimension(CurrentSize());
+    }
+
+    private async void SaveVisualEvidence_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var files = await SaveVisualEvidenceAsync();
+            OutputBox.Text = $"Visual evidence saved ({files.Count} scenes):\r\n" + string.Join("\r\n", files);
+        }
+        catch (Exception exception)
+        {
+            OutputBox.Text = $"Visual evidence failed: {exception.Message}";
+        }
+    }
+
+    private async void SaveVisualEvidenceOnStartup(object sender, RoutedEventArgs e)
+    {
+        Loaded -= SaveVisualEvidenceOnStartup;
+        try
+        {
+            var files = await SaveVisualEvidenceAsync();
+            Console.WriteLine($"Rubik visual evidence PASS: {files.Count} scenes.");
+            Application.Current.Shutdown(0);
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine($"Rubik visual evidence FAIL: {exception}");
+            Application.Current.Shutdown(1);
+        }
+    }
+
+    internal async Task<IReadOnlyList<string>> SaveVisualEvidenceAsync()
+    {
+        if (_isAnimating)
+        {
+            throw new InvalidOperationException("Wait for the current animation to finish before capturing evidence.");
+        }
+
+        var originalState = _engine.GetState();
+        if (originalState.ManualState != 0)
+        {
+            throw new InvalidOperationException("Evidence capture is unavailable for a manual state because cubie orientation cannot be restored safely.");
+        }
+
+        var originalHistory = _engine.GetHistory();
+        var originalSurfaceOnly = SurfaceOnlyBox.IsChecked;
+        var originalSelection = (_selectedAxis, _selectedLayer);
+        var originalCamera = (_yaw, _pitch, _distance, _pan);
+        var originalFacelets = _engine.GetFacelets();
+        var outputDirectory = Path.Combine(FindRepositoryRoot(), ".tmp", "rubik-visual-evidence");
+        Directory.CreateDirectory(outputDirectory);
+        var files = new List<string>();
+        var manifestScenes = new List<object>();
+
+        try
+        {
+            SurfaceOnlyBox.IsChecked = true;
+            await PrepareAndCaptureEvidenceSceneAsync(outputDirectory, files, manifestScenes, "solved-3x3", 3);
+            await PrepareAndCaptureEvidenceSceneAsync(outputDirectory, files, manifestScenes, "turn-r-3x3", 3,
+                () => _engine.RotateLayer(2, 2, 1));
+            await PrepareAndCaptureEvidenceSceneAsync(outputDirectory, files, manifestScenes, "solved-11x11", 11);
+            await PrepareAndCaptureEvidenceSceneAsync(outputDirectory, files, manifestScenes, "inner-slice-11x11", 11,
+                () => _engine.RotateLayer(2, 1, 1));
+            await PrepareAndCaptureEvidenceSceneAsync(outputDirectory, files, manifestScenes, "scramble-11x11", 11,
+                () => _engine.Scramble(20260716, 12));
+
+            var manifestPath = Path.Combine(outputDirectory, "manifest.json");
+            var manifest = new
+            {
+                format = "rubik.visual-evidence",
+                version = 1,
+                generatedUtc = DateTimeOffset.UtcNow,
+                scenes = manifestScenes
+            };
+            await File.WriteAllTextAsync(manifestPath, JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        finally
+        {
+            _engine.SetSize(originalState.Size);
+            if (originalHistory.Length > 0 && !_engine.ApplyMoves(originalHistory))
+            {
+                throw new InvalidOperationException("Could not restore the trusted pre-capture history.");
+            }
+            SurfaceOnlyBox.IsChecked = originalSurfaceOnly;
+            (_selectedAxis, _selectedLayer) = originalSelection;
+            (_yaw, _pitch, _distance, _pan) = originalCamera;
+            UpdateCamera();
+            RefreshScene();
+            if (!_engine.GetFacelets().SequenceEqual(originalFacelets))
+            {
+                throw new InvalidOperationException("Evidence capture restoration did not reproduce the original facelets.");
+            }
+        }
+
+        return files;
+    }
+
+    private async Task PrepareAndCaptureEvidenceSceneAsync(
+        string outputDirectory,
+        ICollection<string> files,
+        ICollection<object> manifestScenes,
+        string name,
+        int size,
+        Func<bool>? mutate = null)
+    {
+        if (!_engine.SetSize(size) || (mutate != null && !mutate()))
+        {
+            throw new InvalidOperationException($"Could not prepare visual evidence scene '{name}'.");
+        }
+        _selectedAxis = -1;
+        _selectedLayer = -1;
+        ResetCameraToDimension(size);
+        RefreshScene();
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        await Task.Delay(80);
+
+        var filePath = Path.Combine(outputDirectory, $"{name}.png");
+        var (width, height) = SaveVisualToPng(ViewportCaptureHost, filePath);
+        files.Add(filePath);
+        manifestScenes.Add(new
+        {
+            name,
+            size,
+            file = Path.GetFileName(filePath),
+            width,
+            height,
+            stickers = _renderedStickerCount,
+            cubies = _renderedCubieCount,
+            invalidStickers = _invalidStickerCount,
+            fallbackRenderer = _fallbackRendererActive
+        });
+    }
+
+    private static (int Width, int Height) SaveVisualToPng(FrameworkElement visual, string filePath)
+    {
+        visual.UpdateLayout();
+        var width = Math.Max(1, (int)Math.Ceiling(visual.ActualWidth));
+        var height = Math.Max(1, (int)Math.Ceiling(visual.ActualHeight));
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+        encoder.Save(stream);
+        stream.Flush(flushToDisk: true);
+        if (stream.Length == 0)
+        {
+            throw new IOException($"Rendered PNG is empty: {filePath}");
+        }
+        return (width, height);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        foreach (var start in new[] { Environment.CurrentDirectory, AppContext.BaseDirectory })
+        {
+            var directory = new DirectoryInfo(Path.GetFullPath(start));
+            while (directory != null)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "Chess.sln")))
+                {
+                    return directory.FullName;
+                }
+                directory = directory.Parent;
+            }
+        }
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chess", "RubikApp");
     }
 
     private int SelectedQuarterTurns()
