@@ -1536,3 +1536,13 @@ Date: 2026-07-16
 | --- | --- | --- | --- | --- | --- |
 | Physical roundtrip authority | Repository facelet ABI, state hash, atomic service, and visual descriptor fallback | A portable load can preserve visible physical facelets without claiming recovery of native cubie identity/orientation or trusted move history. | Compare authoritative facelets/hash and a world-face/color shell signature; require imported state to report manual/untrusted history and unavailable decomposition. | RubikState contract tests/docs | N=11 solved, scramble, inner, wide, and whole-cube scenarios save/read/apply and compare exactly. |
 | Renderer continuity | Phase 08 descriptor builder fallback contract | Facelet-only imports intentionally render from world shell coordinates when cubie orientation is unavailable. | Assert 726 stickers, no invalid descriptors, fallback active, and equal world-face/color signatures before/after file roundtrip. | RubikState + RubikVisuals tests | Run managed Rubik suite alongside existing oriented visual contracts. |
+
+## P4L Phase 16 - Physical Face Editor
+
+Date: 2026-07-16
+
+| Topic | Sources checked | Key finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Draft isolation | [Microsoft Learn: WPF input overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/input-overview) and repository transactional load boundary | Mouse painting can generate many intermediate states; none should reach the native cube before explicit acceptance. | Keep six `N*N` managed matrices with bounded undo/redo; paint/drag/fill/rotate/clear/copy/paste operate only on the draft. | RubikState, RubikApp | Headless model contracts plus x64 WPF build/startup probe. |
+| Odd/even orientation | WCA color-scheme conventions and physical cube topology | Odd cubes expose one center per face; even cubes have no fixed single center and cannot infer orientation the same way. | Offer odd-center scheme guidance only when six centers are complete/distinct; require explicit U/R/F/D/L/B labels for even N and never silently reorient. | editor UI/docs | N=11 center inference and N=4 explicit-orientation guidance tests. |
+| Draft persistence | Phase 13 same-volume temp/replace policy | Incomplete drafts cannot satisfy `.rubik.json` physical-state counts but still need safe local persistence. | Define a separate bounded `rubik.editor-draft` JSON with IDs `0..6`; atomically replace only after the temp draft parses. | RubikState/editor/tests | Save/load an incomplete N=11 draft and compare every cell. |

@@ -16,6 +16,7 @@ try
     CheckTransactionalNativeApply(checks);
     CheckAtomicFileService(checks);
     CheckElevenByElevenFileRoundtrips(checks);
+    CheckPhysicalEditorDraft(checks);
 }
 catch (Exception exception)
 {
@@ -261,6 +262,54 @@ static (int StickerCount, int InvalidCount, bool Fallback, string[] Signature) S
         .OrderBy(value => value, StringComparer.Ordinal)
         .ToArray();
     return (summary.StickersRendered, summary.InvalidStickers, summary.FallbackRendererActive, signature);
+}
+
+static void CheckPhysicalEditorDraft(ContractChecks checks)
+{
+    var draft = new RubikFaceEditorDraft(11);
+    checks.Check(draft.Summarize().EmptyCells == 6 * 121 && !draft.Summarize().BasicCountsValid,
+        "empty N=11 editor draft is isolated and incomplete");
+    draft.Paint(0, 0, 0, 1);
+    checks.Check(draft.GetCell(0, 0, 0) == 1 && draft.CanUndo, "paint updates only managed draft and records undo");
+    checks.Check(draft.Undo() && draft.GetCell(0, 0, 0) == 0, "editor undo restores prior cell");
+    checks.Check(draft.Redo() && draft.GetCell(0, 0, 0) == 1, "editor redo restores paint");
+    draft.ClearAll();
+    for (var face = 0; face < 6; face++) draft.FillFace(face, face + 1);
+    var summary = draft.Summarize();
+    checks.Check(summary.BasicCountsValid && summary.EmptyCells == 0, "six solved N=11 faces satisfy basic color counts");
+    checks.Check(summary.OrientationGuidance.Contains("U=1", StringComparison.Ordinal), "odd N reports explicit center orientation suggestion");
+    checks.Check(draft.ToStateDocument().Faces.Flatten().SequenceEqual(draft.Flatten()), "valid draft converts to portable physical document");
+
+    var copied = draft.CopyFaceText(0);
+    draft.ClearFace(1);
+    draft.PasteFaceText(1, copied);
+    checks.Check(draft.GetFace(1).All(value => value == 1), "copy/paste face uses exactly N*N bounded color IDs");
+
+    var rotation = new RubikFaceEditorDraft(3);
+    rotation.PasteFaceText(0, "1 2 3 4 5 6 1 2 3");
+    rotation.RotateFaceClockwise(0);
+    checks.Check(rotation.GetFace(0).SequenceEqual(new[] { 1, 4, 1, 2, 5, 2, 3, 6, 3 }), "face view rotation maps matrix clockwise");
+
+    var even = new RubikFaceEditorDraft(4);
+    checks.Check(even.Summarize().OrientationGuidance.Contains("no single fixed center", StringComparison.Ordinal),
+        "even N requires explicit orientation and is never silently inferred");
+
+    var directory = Path.Combine(Path.GetTempPath(), "Chess-RubikDraftContracts", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var path = Path.Combine(directory, "incomplete.rubikdraft.json");
+        var incomplete = new RubikFaceEditorDraft(11);
+        incomplete.Paint(2, 4, 7, 3);
+        RubikFaceEditorDraftSerializer.SaveAtomic(path, incomplete);
+        var loaded = RubikFaceEditorDraftSerializer.Load(path);
+        checks.Check(loaded.Size == 11 && loaded.Flatten().SequenceEqual(incomplete.Flatten()),
+            "incomplete N=11 draft saves and loads without touching portable state rules");
+    }
+    finally
+    {
+        try { Directory.Delete(directory, recursive: true); } catch { }
+    }
 }
 
 static RubikStateDocument SolvedDocument(int size)

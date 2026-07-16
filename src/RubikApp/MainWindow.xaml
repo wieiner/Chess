@@ -107,6 +107,7 @@
                                 <Button Content="Save State" Click="SaveStateFile_Click" />
                                 <Button Content="Save As" Click="SaveStateAsFile_Click" />
                                 <Button Content="Load State" Click="LoadStateFile_Click" />
+                                <Button Content="Physical Editor" Click="OpenPhysicalEditor_Click" />
                                 <Button Content="Export Moves" Click="ExportMovesFile_Click" />
                                 <Button Content="Import Moves" Click="ImportMovesFile_Click" />
                             </WrapPanel>

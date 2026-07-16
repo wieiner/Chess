@@ -405,6 +405,57 @@ public partial class MainWindow : Window
             await LoadStateFileAsync(dialog.FileName);
     }
 
+    private void OpenPhysicalEditor_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isAnimating)
+        {
+            OutputBox.Text = "Finish or stop the current animation before opening the physical editor.";
+            return;
+        }
+
+        RubikFaceEditorDraft draft;
+        try { draft = new RubikFaceEditorDraft(CurrentSize(), _engine.GetFacelets()); }
+        catch { draft = new RubikFaceEditorDraft(CurrentSize()); }
+        var editor = new RubikFaceEditorWindow(draft) { Owner = this };
+        if (editor.ShowDialog() != true || editor.ResultDocument is null)
+            return;
+
+        var parsed = RubikStateSerializer.Parse(RubikStateSerializer.SerializeToUtf8(editor.ResultDocument));
+        if (!parsed.Success || parsed.Plan is null)
+        {
+            OutputBox.Text = "Editor state failed portable validation and was not applied.";
+            return;
+        }
+
+        NativeRubikEngine? candidate = null;
+        try
+        {
+            candidate = new NativeRubikEngine();
+            if (!candidate.SetSize(parsed.Plan.Document.Size) || !candidate.SetFacelets(parsed.Plan.Facelets))
+            {
+                OutputBox.Text = $"Native engine rejected editor state: {candidate.GetLastInfo()}";
+                return;
+            }
+            var previous = _engine;
+            _engine = candidate;
+            candidate = null;
+            previous.Dispose();
+            _currentStateFile = null;
+            _savedStateHash = null;
+            _lastSolution = Array.Empty<NativeRubikEngine.RubikMoveDto>();
+            _selectedAxis = -1;
+            _selectedLayer = -1;
+            ResetCameraToDimension(parsed.Plan.Document.Size);
+            RefreshScene();
+            OutputBox.Text = $"Physical editor state applied transactionally.\r\nHash: {parsed.Plan.StateHash}\r\n" +
+                             "Cubie decomposition/history remain intentionally untrusted.";
+        }
+        finally
+        {
+            candidate?.Dispose();
+        }
+    }
+
     private async void OpenRecentFile_Click(object sender, RoutedEventArgs e)
     {
         if (RecentFilesBox.SelectedItem is string path)
