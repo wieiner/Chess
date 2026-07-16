@@ -1,6 +1,7 @@
 #include "../../src/RubikEngine/RubikEngine.h"
 #include "../TestSupport/TestSupport.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -11,6 +12,38 @@ RubikStateDto StateOf(void* cube)
     RubikStateDto state{};
     Rubik_GetState(cube, &state);
     return state;
+}
+
+std::vector<int> SolvedFacelets(int size)
+{
+    std::vector<int> result(static_cast<size_t>(6 * size * size));
+    const int perFace = size * size;
+    for (int face = 0; face < 6; ++face)
+    {
+        std::fill_n(result.begin() + static_cast<size_t>(face * perFace), perFace, face + 1);
+    }
+    return result;
+}
+
+void CheckSolvedFacelets(ContractTestRunner& test, int size)
+{
+    void* cube = Rubik_CreateSized(size);
+    test.Check(cube != nullptr, "Create facelet test cube " + std::to_string(size) + "x" + std::to_string(size));
+    if (cube == nullptr)
+    {
+        return;
+    }
+
+    const int expectedCount = 6 * size * size;
+    test.Check(Rubik_GetFaceletSchemaVersion(cube) == 1, "Facelet schema version is 1 for N=" + std::to_string(size));
+    test.Check(Rubik_GetFaceletCount(cube) == expectedCount, "Facelet count is 6*N*N for N=" + std::to_string(size));
+    std::vector<int> facelets(static_cast<size_t>(expectedCount), 0);
+    test.Check(Rubik_GetFacelets(cube, facelets.data(), expectedCount) == expectedCount,
+        "Read solved facelets for N=" + std::to_string(size));
+    test.Check(facelets == SolvedFacelets(size), "Solved face order and colors are canonical for N=" + std::to_string(size));
+    test.Check(Rubik_ValidateFacelets(cube, facelets.data(), expectedCount) == 1,
+        "Solved facelets validate for N=" + std::to_string(size));
+    Rubik_Destroy(cube);
 }
 }
 
@@ -29,7 +62,43 @@ int main()
     test.Check(state.cellCount == 512, "Rubik cell count is 512");
     test.Check(state.isSolved == 1, "Rubik reset state is solved");
 
+    for (const int size : { 2, 3, 8, 11, 32 })
+    {
+        CheckSolvedFacelets(test, size);
+    }
+
+    std::vector<int> importedFacelets = SolvedFacelets(8);
+    std::swap(importedFacelets[0], importedFacelets[64]);
+    const std::vector<int> beforeInvalidImport = importedFacelets;
+    test.Check(Rubik_SetFacelets(cube, importedFacelets.data(), static_cast<int>(importedFacelets.size())) == 1,
+        "Rubik_SetFacelets accepts a count-valid manual facelet state");
+    std::vector<int> importedRoundTrip(importedFacelets.size(), 0);
+    test.Check(Rubik_GetFacelets(cube, importedRoundTrip.data(), static_cast<int>(importedRoundTrip.size())) ==
+        static_cast<int>(importedRoundTrip.size()), "Rubik_GetFacelets reads imported state");
+    test.Check(importedRoundTrip == importedFacelets, "Facelet import roundtrip is exact");
+    std::vector<int> invalidFacelets = importedFacelets;
+    invalidFacelets[0] = 99;
+    test.Check(Rubik_ValidateFacelets(cube, invalidFacelets.data(), static_cast<int>(invalidFacelets.size())) == 0,
+        "Unknown facelet color is rejected");
+    test.Check(Rubik_SetFacelets(cube, invalidFacelets.data(), static_cast<int>(invalidFacelets.size())) == 0,
+        "Invalid facelet import clean-fails");
+    std::vector<int> afterInvalidImport(importedFacelets.size(), 0);
+    Rubik_GetFacelets(cube, afterInvalidImport.data(), static_cast<int>(afterInvalidImport.size()));
+    test.Check(afterInvalidImport == beforeInvalidImport, "Failed facelet import does not mutate state");
+    test.Check(Rubik_GetFacelet(cube, 0, 0, 0) == 2, "Rubik_GetFacelet uses U/R/F/D/L/B row-major coordinates");
+    test.Check(Rubik_SetFacelet(cube, 0, 0, 0, 1) == 1, "Rubik_SetFacelet accepts a compact color id");
+    char colorScheme[512]{};
+    test.Check(Rubik_GetColorScheme(cube, colorScheme, static_cast<int>(sizeof(colorScheme))) > 0,
+        "Rubik_GetColorScheme returns versioned color metadata");
+    test.Check(std::string(colorScheme).find("\"schemaVersion\":1") != std::string::npos,
+        "Color scheme reports facelet schema version");
+
+    Rubik_Reset(cube);
+
     test.Check(Rubik_RotateLayer(cube, 0, 0, 1) == 1, "Rubik_RotateLayer accepts one quarter turn");
+    std::vector<int> staleFacelets(384, 0);
+    test.Check(Rubik_GetFacelets(cube, staleFacelets.data(), static_cast<int>(staleFacelets.size())) == -1,
+        "Phase 04 rejects stale facelets after legacy cubie-only rotation");
     state = StateOf(cube);
     test.Check(state.isSolved == 0, "One quarter turn changes solved state");
     test.Check(Rubik_RotateLayer(cube, 0, 0, 1) == 1, "Second quarter turn succeeds");
@@ -79,4 +148,3 @@ int main()
     Rubik_Destroy(cube);
     return test.Finish("RubikEngineContractTests");
 }
-

@@ -12,6 +12,15 @@ namespace
 constexpr int DefaultCubeSize = 8;
 constexpr int MinCubeSize = 2;
 constexpr int MaxCubeSize = 32;
+constexpr int FaceletSchemaVersion = 1;
+constexpr int FaceCount = 6;
+constexpr int FirstColorId = 1;
+constexpr int LastColorId = 6;
+constexpr const char* ColorSchemeJson =
+    "{\"schemaVersion\":1,\"U\":{\"id\":1,\"name\":\"white\"},"
+    "\"R\":{\"id\":2,\"name\":\"red\"},\"F\":{\"id\":3,\"name\":\"green\"},"
+    "\"D\":{\"id\":4,\"name\":\"yellow\"},\"L\":{\"id\":5,\"name\":\"orange\"},"
+    "\"B\":{\"id\":6,\"name\":\"blue\"}}";
 
 struct Vec3
 {
@@ -31,6 +40,8 @@ struct Engine
 {
     int size = DefaultCubeSize;
     std::vector<int> cells;
+    std::vector<int> facelets;
+    bool faceletsSynchronized = true;
     std::vector<Move> history;
     std::string lastInfo;
     std::string lastCommandText;
@@ -46,6 +57,22 @@ int safeSize(int size)
 int cellCount(int size)
 {
     return size * size * size;
+}
+
+int faceletCount(int size)
+{
+    return FaceCount * size * size;
+}
+
+int faceletIndex(const Engine& engine, int face, int row, int column)
+{
+    return face * engine.size * engine.size + row * engine.size + column;
+}
+
+bool validFaceletCoordinate(const Engine& engine, int face, int row, int column)
+{
+    return face >= 0 && face < FaceCount && row >= 0 && row < engine.size &&
+        column >= 0 && column < engine.size;
 }
 
 int indexOf(const Engine& engine, int x, int y, int z)
@@ -127,6 +154,75 @@ int copyText(const std::string& value, char* buffer, int capacity)
     return required;
 }
 
+bool validateFacelets(Engine& engine, const int* facelets, int count, std::string& error)
+{
+    const int expected = faceletCount(engine.size);
+    if (facelets == nullptr)
+    {
+        error = "Facelet validation failed: input buffer is null.";
+        return false;
+    }
+    if (count != expected)
+    {
+        std::ostringstream message;
+        message << "Facelet validation failed: expected " << expected << " values, received " << count << ".";
+        error = message.str();
+        return false;
+    }
+
+    std::vector<int> colorCounts(static_cast<size_t>(LastColorId + 1), 0);
+    for (int i = 0; i < count; ++i)
+    {
+        const int color = facelets[i];
+        if (color < FirstColorId || color > LastColorId)
+        {
+            std::ostringstream message;
+            message << "Facelet validation failed: unsupported color id " << color << " at index " << i << ".";
+            error = message.str();
+            return false;
+        }
+        ++colorCounts[static_cast<size_t>(color)];
+    }
+
+    const int expectedPerColor = engine.size * engine.size;
+    for (int color = FirstColorId; color <= LastColorId; ++color)
+    {
+        if (colorCounts[static_cast<size_t>(color)] != expectedPerColor)
+        {
+            std::ostringstream message;
+            message << "Facelet validation failed: color id " << color << " has "
+                << colorCounts[static_cast<size_t>(color)] << " values; expected " << expectedPerColor << ".";
+            error = message.str();
+            return false;
+        }
+    }
+
+    error.clear();
+    return true;
+}
+
+bool faceletsSolved(const Engine& engine)
+{
+    if (!engine.faceletsSynchronized || static_cast<int>(engine.facelets.size()) != faceletCount(engine.size))
+    {
+        return false;
+    }
+
+    const int perFace = engine.size * engine.size;
+    for (int face = 0; face < FaceCount; ++face)
+    {
+        const int solvedColor = face + FirstColorId;
+        for (int offset = 0; offset < perFace; ++offset)
+        {
+            if (engine.facelets[static_cast<size_t>(face * perFace + offset)] != solvedColor)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 void reset(Engine& engine)
 {
     engine.cells.resize(cellCount(engine.size));
@@ -134,6 +230,16 @@ void reset(Engine& engine)
     {
         engine.cells[i] = i;
     }
+    engine.facelets.resize(static_cast<size_t>(faceletCount(engine.size)));
+    const int perFace = engine.size * engine.size;
+    for (int face = 0; face < FaceCount; ++face)
+    {
+        std::fill_n(
+            engine.facelets.begin() + static_cast<size_t>(face * perFace),
+            perFace,
+            face + FirstColorId);
+    }
+    engine.faceletsSynchronized = true;
     engine.history.clear();
     engine.lastMove = { -1, -1, 0 };
     engine.manualState = false;
@@ -168,7 +274,7 @@ bool isSolved(const Engine& engine)
             return false;
         }
     }
-    return true;
+    return !engine.faceletsSynchronized || faceletsSolved(engine);
 }
 
 Vec3 rotateLayerSquare(const Engine& engine, int axis, int layer, int turns, int x, int y, int z)
@@ -260,6 +366,10 @@ bool rotateLayer(Engine& engine, int axis, int layer, int quarterTurns, bool rec
             }
         }
     }
+
+    // Phase 05 adds the facelet permutation. Until then, never expose stale
+    // facelets after a legacy cubie-only rotation.
+    engine.faceletsSynchronized = false;
 
     const Move move{ axis, layer, turns };
     engine.lastMove = move;
@@ -366,6 +476,7 @@ RUBIK_API int Rubik_SetCells(void* handle, const int* cells)
         return 0;
     }
     std::copy(cells, cells + engine->cells.size(), engine->cells.begin());
+    engine->faceletsSynchronized = false;
     engine->history.clear();
     engine->manualState = true;
     engine->lastCommandText.clear();
@@ -381,6 +492,7 @@ RUBIK_API int Rubik_SetCell(void* handle, int x, int y, int z, int value)
         return 0;
     }
     engine->cells[indexOf(*engine, x, y, z)] = value;
+    engine->faceletsSynchronized = false;
     engine->history.clear();
     engine->manualState = true;
     engine->lastCommandText.clear();
@@ -501,4 +613,120 @@ RUBIK_API int Rubik_GetLastInfo(void* handle, char* buffer, int capacity)
 {
     auto* engine = asEngine(handle);
     return engine == nullptr ? 0 : copyText(engine->lastInfo, buffer, capacity);
+}
+
+RUBIK_API int Rubik_GetFaceletSchemaVersion(void* handle)
+{
+    return asEngine(handle) != nullptr ? FaceletSchemaVersion : 0;
+}
+
+RUBIK_API int Rubik_GetFaceletCount(void* handle)
+{
+    const auto* engine = asEngine(handle);
+    return engine != nullptr ? faceletCount(engine->size) : 0;
+}
+
+RUBIK_API int Rubik_GetFacelets(void* handle, int* facelets, int capacity)
+{
+    auto* engine = asEngine(handle);
+    if (engine == nullptr)
+    {
+        return -1;
+    }
+
+    const int required = faceletCount(engine->size);
+    if (!engine->faceletsSynchronized)
+    {
+        engine->lastInfo = "Facelet read rejected: legacy cubie state has no synchronized sticker orientation.";
+        return -1;
+    }
+    if (facelets == nullptr || capacity <= 0)
+    {
+        return required;
+    }
+    if (capacity < required)
+    {
+        engine->lastInfo = "Facelet read rejected: output buffer is too small.";
+        return -1;
+    }
+
+    std::copy(engine->facelets.begin(), engine->facelets.end(), facelets);
+    return required;
+}
+
+RUBIK_API int Rubik_SetFacelets(void* handle, const int* facelets, int count)
+{
+    auto* engine = asEngine(handle);
+    if (engine == nullptr)
+    {
+        return 0;
+    }
+
+    std::string error;
+    if (!validateFacelets(*engine, facelets, count, error))
+    {
+        engine->lastInfo = error;
+        return 0;
+    }
+
+    std::vector<int> next(facelets, facelets + count);
+    engine->facelets.swap(next);
+    engine->faceletsSynchronized = true;
+    engine->history.clear();
+    engine->manualState = true;
+    engine->lastMove = { -1, -1, 0 };
+    engine->lastCommandText.clear();
+    engine->lastInfo = "Manual facelet state loaded and basic color counts validated.";
+    return 1;
+}
+
+RUBIK_API int Rubik_GetFacelet(void* handle, int face, int row, int column)
+{
+    auto* engine = asEngine(handle);
+    if (engine == nullptr || !engine->faceletsSynchronized ||
+        !validFaceletCoordinate(*engine, face, row, column))
+    {
+        return -1;
+    }
+    return engine->facelets[static_cast<size_t>(faceletIndex(*engine, face, row, column))];
+}
+
+RUBIK_API int Rubik_SetFacelet(void* handle, int face, int row, int column, int colorId)
+{
+    auto* engine = asEngine(handle);
+    if (engine == nullptr || !engine->faceletsSynchronized ||
+        !validFaceletCoordinate(*engine, face, row, column) ||
+        colorId < FirstColorId || colorId > LastColorId)
+    {
+        return 0;
+    }
+
+    engine->facelets[static_cast<size_t>(faceletIndex(*engine, face, row, column))] = colorId;
+    engine->history.clear();
+    engine->manualState = true;
+    engine->lastMove = { -1, -1, 0 };
+    engine->lastCommandText.clear();
+    engine->lastInfo = "Manual facelet edit applied. Validate the full state before solving.";
+    return 1;
+}
+
+RUBIK_API int Rubik_GetColorScheme(void* handle, char* buffer, int capacity)
+{
+    return asEngine(handle) != nullptr ? copyText(ColorSchemeJson, buffer, capacity) : 0;
+}
+
+RUBIK_API int Rubik_ValidateFacelets(void* handle, const int* facelets, int count)
+{
+    auto* engine = asEngine(handle);
+    if (engine == nullptr)
+    {
+        return 0;
+    }
+
+    std::string error;
+    const bool valid = validateFacelets(*engine, facelets, count, error);
+    engine->lastInfo = valid
+        ? "Facelet validation passed: size, color ids, and color counts are valid."
+        : error;
+    return valid ? 1 : 0;
 }

@@ -46,3 +46,11 @@ RUBIK_API int Rubik_SolveByReverseHistory(void* handle, RubikMoveDto* buffer, in
 RUBIK_API int Rubik_ApplyMoves(void* handle, const RubikMoveDto* moves, int count);
 RUBIK_API int Rubik_GetCommandText(void* handle, char* buffer, int capacity);
 RUBIK_API int Rubik_GetLastInfo(void* handle, char* buffer, int capacity);
+RUBIK_API int Rubik_GetFaceletSchemaVersion(void* handle);
+RUBIK_API int Rubik_GetFaceletCount(void* handle);
+RUBIK_API int Rubik_GetFacelets(void* handle, int* facelets, int capacity);
+RUBIK_API int Rubik_SetFacelets(void* handle, const int* facelets, int count);
+RUBIK_API int Rubik_GetFacelet(void* handle, int face, int row, int column);
+RUBIK_API int Rubik_SetFacelet(void* handle, int face, int row, int column, int colorId);
+RUBIK_API int Rubik_GetColorScheme(void* handle, char* buffer, int capacity);
+RUBIK_API int Rubik_ValidateFacelets(void* handle, const int* facelets, int count);

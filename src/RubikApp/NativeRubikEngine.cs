@@ -47,6 +47,52 @@ internal sealed class NativeRubikEngine : IDisposable
         return cells;
     }
 
+    public int FaceletSchemaVersion => Rubik_GetFaceletSchemaVersion(_handle);
+
+    public int FaceletCount => Rubik_GetFaceletCount(_handle);
+
+    public int[] GetFacelets()
+    {
+        var facelets = new int[Math.Max(0, FaceletCount)];
+        if (facelets.Length == 0)
+        {
+            return facelets;
+        }
+
+        if (Rubik_GetFacelets(_handle, facelets, facelets.Length) < 0)
+        {
+            throw new InvalidOperationException(GetLastInfo());
+        }
+        return facelets;
+    }
+
+    public bool SetFacelets(int[] facelets)
+    {
+        ArgumentNullException.ThrowIfNull(facelets);
+        return Rubik_SetFacelets(_handle, facelets, facelets.Length) != 0;
+    }
+
+    public int GetFacelet(RubikFace face, int row, int column)
+    {
+        return Rubik_GetFacelet(_handle, (int)face, row, column);
+    }
+
+    public bool SetFacelet(RubikFace face, int row, int column, int colorId)
+    {
+        return Rubik_SetFacelet(_handle, (int)face, row, column, colorId) != 0;
+    }
+
+    public string GetColorScheme()
+    {
+        return GetText(Rubik_GetColorScheme);
+    }
+
+    public bool ValidateFacelets(int[] facelets)
+    {
+        ArgumentNullException.ThrowIfNull(facelets);
+        return Rubik_ValidateFacelets(_handle, facelets, facelets.Length) != 0;
+    }
+
     public bool SetSize(int size)
     {
         return Rubik_SetSize(_handle, size) != 0;
@@ -177,6 +223,30 @@ internal sealed class NativeRubikEngine : IDisposable
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
     private static extern int Rubik_GetLastInfo(IntPtr handle, StringBuilder buffer, int capacity);
 
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Rubik_GetFaceletSchemaVersion(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Rubik_GetFaceletCount(IntPtr handle);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Rubik_GetFacelets(IntPtr handle, [Out] int[] facelets, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Rubik_SetFacelets(IntPtr handle, [In] int[] facelets, int count);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Rubik_GetFacelet(IntPtr handle, int face, int row, int column);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Rubik_SetFacelet(IntPtr handle, int face, int row, int column, int colorId);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern int Rubik_GetColorScheme(IntPtr handle, StringBuilder buffer, int capacity);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Rubik_ValidateFacelets(IntPtr handle, [In] int[] facelets, int count);
+
     [StructLayout(LayoutKind.Sequential)]
     public struct RubikMoveDto
     {
@@ -196,5 +266,15 @@ internal sealed class NativeRubikEngine : IDisposable
         public int LastAxis;
         public int LastLayer;
         public int LastQuarterTurns;
+    }
+
+    public enum RubikFace
+    {
+        U = 0,
+        R = 1,
+        F = 2,
+        D = 3,
+        L = 4,
+        B = 5
     }
 }
