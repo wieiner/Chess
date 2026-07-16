@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wieiner.github.io/Chess/schemas/rubik-state-v1.schema.json",
+  "title": "Portable Rubik State v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "version", "size", "faceOrder", "colorScheme", "faces", "source", "createdUtc"],
+  "properties": {
+    "format": { "const": "rubik.state" },
+    "version": { "const": 1 },
+    "size": { "type": "integer", "minimum": 2, "maximum": 32 },
+    "faceOrder": {
+      "type": "array",
+      "prefixItems": [
+        { "const": "U" }, { "const": "R" }, { "const": "F" },
+        { "const": "D" }, { "const": "L" }, { "const": "B" }
+      ],
+      "items": false,
+      "minItems": 6,
+      "maxItems": 6
+    },
+    "colorScheme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["U", "R", "F", "D", "L", "B"],
+      "properties": {
+        "U": { "const": "white" }, "R": { "const": "red" },
+        "F": { "const": "green" }, "D": { "const": "yellow" },
+        "L": { "const": "orange" }, "B": { "const": "blue" }
+      }
+    },
+    "faces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["U", "R", "F", "D", "L", "B"],
+      "properties": {
+        "U": { "$ref": "#/$defs/face" }, "R": { "$ref": "#/$defs/face" },
+        "F": { "$ref": "#/$defs/face" }, "D": { "$ref": "#/$defs/face" },
+        "L": { "$ref": "#/$defs/face" }, "B": { "$ref": "#/$defs/face" }
+      }
+    },
+    "stateHash": { "type": "string", "pattern": "^$|^[a-f0-9]{64}$" },
+    "source": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "createdUtc": { "type": "string", "format": "date-time" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "$defs": {
+    "face": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 1024,
+      "items": {
+        "oneOf": [
+          { "type": "integer", "minimum": 1, "maximum": 6 },
+          { "enum": ["white", "red", "green", "yellow", "orange", "blue"] }
+        ]
+      }
+    }
+  }
+}

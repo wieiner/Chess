@@ -1488,3 +1488,12 @@ Date: 2026-07-16
 | --- | --- | --- | --- | --- | --- |
 | WPF 3D resource reuse | [Microsoft Learn: Maximize 3D Performance](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/maximize-wpf-3d-performance), [Freezable Objects Overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/freezable-objects-overview) | Meshes, brushes, and materials are multiparentable `Freezable` resources; freezing and reusing them reduces change tracking and working set. | Use one frozen unit body mesh, six frozen unit sticker meshes, and a bounded cache of frozen materials. Keep per-cubie transforms lightweight and retain one logical animation group. | RubikApp renderer | Build/capture, verify hit-map ownership, run Rubik contracts, and compare measured N=11 rebuild/allocation counts. |
 | Performance evidence | Repository in-process capture and animation pipeline | Subjective interaction is insufficient; rebuild time, allocation, memory, model count, and rendered frame count can be recorded inside the UI process. | Add an opt-in `--measure-render-performance` probe that writes only an ignored JSON report and restores trusted state. | RubikApp/docs | Run through TestProcessWatchdog and record repeated N=11 surface/full refresh plus one animated layer turn. |
+
+## P4L Phase 11 - Portable Rubik State Contract
+
+Date: 2026-07-16
+
+| Topic | Sources checked | Key finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Versioned JSON schema | [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12), [Microsoft Learn: unmapped JSON members](https://learn.microsoft.com/en-gb/dotnet/standard/serialization/system-text-json/missing-members) | Draft 2020-12 can close the root object, while .NET 8 can reject unmapped POCO members. Dynamic `N*N` array length still requires runtime validation. | Define a strict v1 root, fixed U/R/F/D/L/B keys, bounded face arrays, and an explicit extensible `metadata` object. | assets/rules/rubik, docs | Parse schema/examples; runtime Phase 12 checks size-dependent lengths and counts. |
+| Canonical fingerprint | Repository facelet order and SHA-256 usage | A stable diagnostic hash must exclude formatting, timestamps, UI state, paths, and untrusted history. | Hash an ASCII v1 header containing size/color scheme followed by normalized numeric facelets in U/R/F/D/L/B row-major order. | docs, upcoming RubikStateHasher | Verify whitespace/metadata independence and state sensitivity. |
