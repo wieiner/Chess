@@ -1556,3 +1556,13 @@ Date: 2026-07-16
 | Actionable validation | Repository editor requirements and Phase 12 parser error paths | Aggregate count text cannot identify a cell, while emitting every empty cell on N=32 would overwhelm the UI. | Add severity/code/face/row/column/cubie-class/message/action issues, bounded cell detail, and complete aggregate underflow/overflow summaries. | RubikState/editor/tests | Assert exact first missing-cell location, stable reason codes, and valid solved report. |
 | WPF issue navigation | [Microsoft Learn: ListBox](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/controls/listbox) and WPF focus/input model | A selected validation item can drive the existing tab/grid controls without mutating the draft. | Bind a compact issue list; selection switches face tab and focuses the addressed cell. | RubikApp | Build/start UI and headless-test diagnostic coordinates. |
 | Sanitized report | OWASP logging guidance and repository no-secret policy | Validation support data needs reason/location, not full facelet payload or local path. | Export only size, summary counts, and structured issues as UTF-8 JSON. | RubikApp/docs | Search report model for payload/path fields and parse test JSON. |
+
+## P4L Phase 18 - Facelet-to-Cubie Decomposition
+
+Date: 2026-07-16
+
+| Topic | Sources checked | Key finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Observable physical pieces | Repository U/R/F/D/L/B coordinate mapping and NxN topology | A surface coordinate exposes three, two, or one world faces and therefore describes a corner, wing, or center observation directly from facelets. | Enumerate boundary coordinates and read colors with the renderer's canonical mapping; classify without native cubie IDs. | RubikState/tests/docs | Solved N=2/3/4/5/8/11 and legal native scrambles match exact topology. |
+| Duplicate NxN wings | [Demaine et al., On the nxnxn Rubik's Cube](https://arxiv.org/abs/1708.05598) | Multiple wings share a color pair; pair alone is not a stable physical identity. | Store current coordinate, free-axis index, and reflection-invariant orbit; compare inventory as pair+orbit multisets without inventing identity. | RubikState | Assert wing counts/orbits and reject missing/impossible pair inventory. |
+| Center orbits | NxN legal slice geometry | Center stickers of one color occupy multiple rotation-invariant distance orbits on larger cubes. | Classify centers by sorted distances to face edges and compare color+orbit inventory against solved topology. | RubikState | Detect a count-preserving cross-orbit center corruption. |

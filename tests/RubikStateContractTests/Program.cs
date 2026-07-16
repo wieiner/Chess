@@ -18,6 +18,7 @@ try
     CheckElevenByElevenFileRoundtrips(checks);
     CheckPhysicalEditorDraft(checks);
     CheckStructuredValidationDiagnostics(checks);
+    CheckFaceletDecomposition(checks);
 }
 catch (Exception exception)
 {
@@ -343,6 +344,44 @@ static void CheckStructuredValidationDiagnostics(ContractChecks checks)
                  !emptyReport.ToSanitizedJson().Contains("facelets", StringComparison.OrdinalIgnoreCase) &&
                  !emptyReport.ToSanitizedJson().Contains("path", StringComparison.OrdinalIgnoreCase),
         "sanitized validation report contains diagnostics but no payload or local path");
+}
+
+static void CheckFaceletDecomposition(ContractChecks checks)
+{
+    foreach (var size in new[] { 2, 3, 4, 5, 8, 11 })
+    {
+        var solved = SolvedDocument(size);
+        var decomposition = RubikCubieDecomposer.Decompose(solved);
+        var inner = Math.Max(0, size - 2);
+        checks.Check(decomposition.Complete, $"solved N={size} decomposes without invented inventory");
+        checks.Check(decomposition.Corners.Count == 8 && decomposition.Wings.Count == 12 * inner &&
+                     decomposition.Centers.Count == 6 * inner * inner,
+            $"N={size} corner/wing/center topology counts are exact");
+
+        using var cube = NativeCube.Create(size);
+        checks.Check(cube.Scramble(1800 + size, Math.Min(12, size + 4)), $"N={size} legal decomposition scramble succeeds");
+        var scrambled = RubikCubieDecomposer.Decompose(size, cube.Facelets);
+        checks.Check(scrambled.Complete, $"legal native scramble N={size} preserves decomposable inventory");
+        checks.Check(scrambled.Wings.Select(wing => wing.Coordinate).Distinct().Count() == scrambled.Wings.Count &&
+                     scrambled.Wings.All(wing => wing.OrbitIndex >= 1 && wing.WingIndex is > 0 && wing.WingIndex < size - 1),
+            $"N={size} duplicate color-pair wings retain distinct coordinates and bounded orbit/index observations");
+    }
+
+    var badCorner = SolvedDocument(3).Faces.Flatten();
+    var dCorner = 3 * 9 + 2 * 3;
+    var lCenter = 4 * 9 + 1 * 3 + 1;
+    (badCorner[dCorner], badCorner[lCenter]) = (badCorner[lCenter], badCorner[dCorner]);
+    var badCornerResult = RubikCubieDecomposer.Decompose(3, badCorner);
+    checks.Check(!badCornerResult.Complete && badCornerResult.Issues.Any(issue => issue.CubieClass == "corner"),
+        "duplicate/impossible corner colors fail decomposition without assigning cubie IDs");
+
+    var badCenterOrbit = SolvedDocument(5).Faces.Flatten();
+    var uOrbitOne = 1 * 5 + 1;
+    var rFixedCenter = 25 + 2 * 5 + 2;
+    (badCenterOrbit[uOrbitOne], badCenterOrbit[rFixedCenter]) = (badCenterOrbit[rFixedCenter], badCenterOrbit[uOrbitOne]);
+    var badCenterResult = RubikCubieDecomposer.Decompose(5, badCenterOrbit);
+    checks.Check(!badCenterResult.Complete && badCenterResult.Issues.Any(issue => issue.CubieClass == "center"),
+        "count-preserving center orbit corruption is detected");
 }
 
 static RubikStateDocument SolvedDocument(int size)
