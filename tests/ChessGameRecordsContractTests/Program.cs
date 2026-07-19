@@ -172,6 +172,43 @@ var invalidNagRejected = false;
 try { _ = new PgnNag(256); } catch (ArgumentOutOfRangeException) { invalidNagRejected = true; }
 checks.Check(invalidNagRejected, "PGN model rejects out-of-range NAG values");
 
+var exported = PgnExporter.Export(pgnGame);
+checks.Check(exported.Success, "PGN exporter accepts a complete strict game");
+checks.Check(exported.Text.StartsWith("[Event \"Model Contract\"]\n[Site \"?\"]", StringComparison.Ordinal),
+    "PGN exporter emits canonical Seven Tag Roster order");
+var normalizedExport = string.Join(' ', exported.Text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+checks.Check(exported.Text.Contains("[SetUp \"1\"]\n[FEN \"", StringComparison.Ordinal) &&
+    normalizedExport.Contains("1. e4 $1 {Main line} ( 1... c5 {Sicilian} ) {Symmetric reply} e5 1-0", StringComparison.Ordinal),
+    "PGN exporter emits SetUp/FEN, comments, NAG, RAV, move numbers, and result");
+checks.Check(PgnExporter.Export(pgnGame).Text == exported.Text, "PGN export is deterministic");
+
+var escapedTags = pgnGame.Tags.Select(tag => tag.Name == "Event" ? new PgnTagPair("Event", "A \\\"quoted\\\" path") : tag);
+var escapedExport = PgnExporter.Export(new PgnGame(escapedTags, pgnGame.MainLine, pgnGame.Result));
+checks.Check(escapedExport.Success && escapedExport.Text.Contains("[Event \"A \\\\\\\"quoted\\\\\\\" path\"]", StringComparison.Ordinal),
+    "PGN exporter escapes tag quotes and backslashes");
+
+var mismatchedTags = pgnGame.Tags.Select(tag => tag.Name == "Result" ? new PgnTagPair("Result", "0-1") : tag);
+checks.Check(!PgnExporter.Export(new PgnGame(mismatchedTags, pgnGame.MainLine, PgnResult.WhiteWin)).Success,
+    "PGN exporter rejects inconsistent result tag and marker");
+var missingRoster = new PgnGame(pgnGame.Tags.Where(tag => tag.Name != "Round"), pgnGame.MainLine, pgnGame.Result);
+checks.Check(!PgnExporter.Export(missingRoster).Success, "PGN exporter rejects an incomplete Seven Tag Roster");
+
+var recordExportHistory = new ChessGameHistory(ChessGameHistory.StandardInitialFen,
+    new ChessGameHeaders("Record Export", "Local", "2026.07.19", "1", "Alice", "Bob",
+        new Dictionary<string, string> { ["Zeta"] = "last", ["Alpha"] = "first" }));
+checks.Check(recordExportHistory.TryCommit(e4 with { Comment = "King pawn" }, ChessGameResult.Ongoing,
+    ChessTerminationReason.None, out _), "record exporter fixture commits");
+var recordExport = PgnExporter.Export(recordExportHistory.Snapshot());
+checks.Check(recordExport.Success && recordExport.Text.Contains("[Alpha \"first\"]\n[Zeta \"last\"]", StringComparison.Ordinal) &&
+    recordExport.Text.EndsWith("1. e4 {King pawn} *\n", StringComparison.Ordinal),
+    "structured game record exports deterministic custom tags and main line");
+
+var nonstandardHistory = new ChessGameHistory("7k/5Q2/6K1/8/8/8/8/8 b - - 0 23");
+var nonstandardExport = PgnExporter.Export(nonstandardHistory.Snapshot());
+checks.Check(nonstandardExport.Success && nonstandardExport.Text.Contains("[SetUp \"1\"]", StringComparison.Ordinal) &&
+    nonstandardExport.Text.Contains("[FEN \"7k/5Q2/6K1/8/8/8/8/8 b - - 0 23\"]", StringComparison.Ordinal),
+    "structured nonstandard start exports matching SetUp and FEN tags");
+
 return checks.Finish("ChessGameRecordsContractTests");
 
 static ChessSanMoveContext Context(

@@ -101,7 +101,9 @@ public sealed class PgnMoveNode
         IEnumerable<PgnComment>? leadingComments = null,
         IEnumerable<PgnNag>? nags = null,
         IEnumerable<PgnComment>? trailingComments = null,
-        IEnumerable<PgnVariation>? variations = null)
+        IEnumerable<PgnVariation>? variations = null,
+        int? fullmoveNumber = null,
+        bool? isBlackMove = null)
     {
         if (plyIndex < 0)
         {
@@ -110,6 +112,12 @@ public sealed class PgnMoveNode
         ArgumentException.ThrowIfNullOrWhiteSpace(san);
 
         PlyIndex = plyIndex;
+        FullmoveNumber = fullmoveNumber ?? (plyIndex / 2) + 1;
+        if (FullmoveNumber < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(fullmoveNumber));
+        }
+        IsBlackMove = isBlackMove ?? (plyIndex & 1) != 0;
         San = san;
         LeadingComments = Freeze(leadingComments);
         Nags = Freeze(nags);
@@ -118,8 +126,8 @@ public sealed class PgnMoveNode
     }
 
     public int PlyIndex { get; }
-    public int FullmoveNumber => (PlyIndex / 2) + 1;
-    public bool IsBlackMove => (PlyIndex & 1) != 0;
+    public int FullmoveNumber { get; }
+    public bool IsBlackMove { get; }
     public string San { get; }
     public IReadOnlyList<PgnComment> LeadingComments { get; }
     public IReadOnlyList<PgnNag> Nags { get; }

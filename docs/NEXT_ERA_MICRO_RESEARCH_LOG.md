@@ -1730,3 +1730,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | PGN document topology | [Portable Game Notation Specification and Implementation Guide](https://www.saremba.de/chessgml/standards/pgn/pgn-complete.htm), sections 8.1 and 8.2 | The structured game history can supply a main line, but it has no lossless representation for ordered tags, comments, NAGs, or recursive variations. | Add an immutable, WPF-independent PGN document tree. Keep duplicate/ordered tags representable so a later tolerant parser can diagnose them instead of losing input. | `ChessGameRecords`, managed contracts | Verify Seven Tag Roster order, result markers, defensive collection copies, SetUp/FEN and custom tag order, comments, NAG range, and nested RAV. |
 | Result authority | PGN sections 8.1.1 and 8.2.6 | PGN repeats the result in the `Result` tag and the final movetext marker; mismatches must be detectable later. | Keep typed `PgnResult` separate from raw ordered tag pairs. Export strictness and import diagnostics remain Phase 09/11 responsibilities. | PGN model | Roundtrip all four termination markers while preserving raw tags. |
+
+## P4M Phase 09 - Deterministic PGN Export
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Export format | [PGN Specification](https://www.saremba.de/chessgml/standards/pgn/pgn-complete.htm), sections 4.3, 8.1.1, 8.2, and 8.2.6 | Structured records contain canonical SAN and complete initial FEN, but no standards-compliant text writer exists. | Add a strict deterministic exporter with canonical roster order, escaped tag strings, move numbering, comments/NAG/RAV, result consistency, and bounded line width. | PGN exporter, contracts, export guide | Exact text assertions, deterministic repeat, escaping, result mismatch, missing roster, standard/nonstandard record adapters. |
+| Nonstandard start | PGN `SetUp` and `FEN` supplemental tag rules | A session can begin from any valid six-field FEN, including Black to move at an arbitrary fullmove number. | Carry explicit move side/fullmove in PGN nodes and emit paired `SetUp "1"`/`FEN` for nonstandard starts. | PGN model and exporter | Export a Black-to-move fullmove-23 fixture without deriving side from local ply index. |
