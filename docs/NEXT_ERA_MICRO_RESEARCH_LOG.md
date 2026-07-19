@@ -1844,3 +1844,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | Position replay | UCI `position` grammar and native FEN/move ABI | `Chess_TryMakeMove` validates coordinates but mutates its handle. | Parse startpos or exactly six FEN fields, replay all coordinate moves on a candidate handle, and commit only its final FEN. | UCI native adapter and position controller | External Phase 24 transcript checks startpos/FEN/promotion and illegal no-partial-commit behavior. |
 | Process resilience | UCI protocol error handling | A malformed GUI command must not terminate an engine process. | Route errors to stderr, retain authority FEN, and continue the input loop. | UCI entrypoint | Send malformed then valid `isready` in one subprocess. |
+
+## P4M Phase 22 - Cancellable UCI Search
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Cooperative stop | Current negamax stop checks and [UCI protocol](https://backscattering.de/chess/uci/) | Native search checks a local stop flag but exposed only elapsed-time cancellation. | Add append-only cancel/node-limit exports backed by an atomic flag and existing node checkpoints; retain all DTO layouts. | ChessEngine header/implementation and UCI adapter | Native tests plus subprocess `go infinite`/`stop` bounded completion. |
+| Search authority | Existing `MakeBestMoveEx` commits its selected move | Running it on the command-reader handle would mutate the UCI position and block input. | Search on a FEN clone in a worker task; generation IDs suppress stale results and emit at most one bestmove. | UCI search controller | Repeated and interrupted subprocess searches; position remains independently assignable. |

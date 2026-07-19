@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cctype>
 #include <cstdint>
@@ -147,6 +148,8 @@ struct SearchContext
     SearchOptions options{};
     std::vector<Move> rootResults;
     std::chrono::steady_clock::time_point started{};
+    const std::atomic<int>* cancelRequested = nullptr;
+    std::int64_t nodeLimit = 0;
 };
 
 struct ChessGame
@@ -158,6 +161,8 @@ struct ChessGame
     ChessSearchInfoDto lastSearchStats{};
     std::string lastSearchInfo = "Search has not been run yet.";
     std::mt19937 rng{ std::random_device{}() };
+    std::atomic<int> cancelSearch{ 0 };
+    std::int64_t searchNodeLimit = 0;
 };
 
 constexpr std::array<int, 7> Material = { 0, 100, 320, 330, 500, 900, 0 };
@@ -1366,9 +1371,15 @@ bool isDrawByRules(const Position& pos, const DrawRules& rules)
 
 bool shouldStop(SearchContext& context)
 {
-    if (context.stop || context.options.timeLimitMs <= 0)
+    if (context.stop || (context.cancelRequested != nullptr && context.cancelRequested->load(std::memory_order_relaxed) != 0) ||
+        (context.nodeLimit > 0 && context.nodes >= context.nodeLimit))
     {
-        return context.stop;
+        context.stop = true;
+        return true;
+    }
+    if (context.options.timeLimitMs <= 0)
+    {
+        return false;
     }
 
     if ((context.nodes & 2047) != 0)
@@ -2468,10 +2479,13 @@ CHESS_API int Chess_MakeBestMoveEx(void* handle, const ChessSearchOptionsDto* ra
         return 0;
     }
 
+    game->cancelSearch.store(0, std::memory_order_relaxed);
     SearchContext context;
     context.options = normalizeOptions(rawOptions);
     context.requestedDepth = context.options.depth;
     context.started = std::chrono::steady_clock::now();
+    context.cancelRequested = &game->cancelSearch;
+    context.nodeLimit = game->searchNodeLimit;
 
     Move best = legal.front();
     best.score = -Infinity;
@@ -2542,6 +2556,25 @@ CHESS_API int Chess_MakeBestMoveEx(void* handle, const ChessSearchOptionsDto* ra
         info << ", full depth reached";
     }
     game->lastSearchInfo = info.str();
+    return 1;
+}
+
+CHESS_API void Chess_CancelSearch(void* handle)
+{
+    if (auto* game = asGame(handle); game != nullptr)
+    {
+        game->cancelSearch.store(1, std::memory_order_relaxed);
+    }
+}
+
+CHESS_API int Chess_SetSearchNodeLimit(void* handle, long long nodeLimit)
+{
+    auto* game = asGame(handle);
+    if (game == nullptr || nodeLimit < 0)
+    {
+        return 0;
+    }
+    game->searchNodeLimit = nodeLimit;
     return 1;
 }
 

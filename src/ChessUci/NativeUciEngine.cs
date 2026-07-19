@@ -43,6 +43,7 @@ internal sealed class NativeUciEngine : IDisposable
         Chess_GetLastSearchStats(Handle, out var info) != 0 ? info : default;
 
     public void CancelSearch() => Chess_CancelSearch(Handle);
+    public bool SetSearchNodeLimit(long limit) => Chess_SetSearchNodeLimit(Handle, limit) != 0;
 
     public void Dispose()
     {
@@ -65,6 +66,7 @@ internal sealed class NativeUciEngine : IDisposable
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] private static extern int Chess_GetLastSearchStats(IntPtr handle,
         out NativeSearchInfo info);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] private static extern void Chess_CancelSearch(IntPtr handle);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] private static extern int Chess_SetSearchNodeLimit(IntPtr handle, long nodeLimit);
 }
 
 [StructLayout(LayoutKind.Sequential)]

@@ -4,6 +4,7 @@ var debug = false;
 var moveOverhead = 30;
 var ownBook = true;
 using var position = new UciPositionController();
+using var search = new UciSearchController(Console.Out);
 
 while (Console.ReadLine() is { } line)
 {
@@ -45,18 +46,26 @@ while (Console.ReadLine() is { } line)
             if (debug) Console.Error.WriteLine($"UCI debug: {command.Kind} is a compatibility no-op");
             break;
         case UciCommandKind.NewGame:
+            search.Cancel(suppressResult: true);
             position.Authority.Reset();
             break;
         case UciCommandKind.Position:
+            search.Cancel(suppressResult: true);
             if (!position.TryApply(command.Arguments, out var positionError))
                 Console.Error.WriteLine($"UCI error: {positionError}");
             break;
-        case UciCommandKind.Quit:
-            return 0;
         case UciCommandKind.Go:
-        case UciCommandKind.Stop:
-            Console.Error.WriteLine($"UCI error: {command.Kind} is recognized but not active in this build stage");
+            if (!UciGoParameters.TryParse(command.Arguments, out var go, out var goError) ||
+                !search.Start(position.Authority.GetFen(), go, moveOverhead, ownBook, out goError))
+                Console.Error.WriteLine($"UCI error: {goError}");
             break;
+        case UciCommandKind.Stop:
+            search.Stop();
+            break;
+        case UciCommandKind.Quit:
+            search.Cancel(suppressResult: true);
+            search.WaitForIdle(TimeSpan.FromSeconds(5));
+            return 0;
     }
 }
 

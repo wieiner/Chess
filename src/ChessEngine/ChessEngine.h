@@ -121,6 +121,8 @@ CHESS_API int Chess_GetMoveDescriptor(void* handle, int fromFile, int fromRank, 
 CHESS_API int Chess_TryMakeMove(void* handle, int fromFile, int fromRank, int toFile, int toRank, int promotion, ChessMoveDto* playedMove);
 CHESS_API int Chess_MakeBestMove(void* handle, int depth, ChessMoveDto* playedMove);
 CHESS_API int Chess_MakeBestMoveEx(void* handle, const ChessSearchOptionsDto* options, ChessMoveDto* playedMove);
+CHESS_API void Chess_CancelSearch(void* handle);
+CHESS_API int Chess_SetSearchNodeLimit(void* handle, long long nodeLimit);
 CHESS_API int Chess_GetLastSearchStats(void* handle, ChessSearchInfoDto* info);
 CHESS_API int Chess_Undo(void* handle);
 CHESS_API int Chess_GetLastSearchInfo(void* handle, char* buffer, int capacity);

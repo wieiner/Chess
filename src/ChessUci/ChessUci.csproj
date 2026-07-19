@@ -13,7 +13,7 @@
   </ItemGroup>
   <Target Name="CopyNativeEngine" AfterTargets="Build">
     <PropertyGroup>
-      <NativeEnginePath>$(MSBuildThisFileDirectory)..\..\bin\$(Platform)\$(Configuration)\ChessEngine.dll</NativeEnginePath>
+      <NativeEnginePath>$(MSBuildThisFileDirectory)..\ChessEngine\bin\$(Platform)\$(Configuration)\ChessEngine.dll</NativeEnginePath>
     </PropertyGroup>
     <Copy SourceFiles="$(NativeEnginePath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('$(NativeEnginePath)')" />
   </Target>

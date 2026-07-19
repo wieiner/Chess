@@ -182,6 +182,15 @@ int main()
     test.Check(searchInfo.completedDepth >= 1, "Search stats completedDepth is populated");
     test.Check(searchInfo.nodes > 0, "Search stats nodes is populated");
     test.Check(searchInfo.elapsedMs >= 0, "Search stats elapsedMs is populated");
+    test.Check(Chess_SetFen(game, startFen) == 1, "Node-limit search setup FEN loads");
+    test.Check(Chess_SetSearchNodeLimit(game, 1) == 1, "Append-only search node limit accepts a positive bound");
+    options.depth = 16;
+    options.automaticDepth = 1;
+    test.Check(Chess_MakeBestMoveEx(game, &options, &played) == 1, "Node-limited search returns a legal fallback move");
+    test.Check(Chess_GetLastSearchStats(game, &searchInfo) == 1 && searchInfo.nodes <= 1,
+        "Search stops at the configured node bound");
+    test.Check(Chess_SetSearchNodeLimit(game, -1) == 0 && Chess_SetSearchNodeLimit(game, 0) == 1,
+        "Search node limit rejects negative values and restores unlimited mode");
 
     ChessDrawRulesDto rules{};
     test.Check(Chess_GetDrawRules(game, &rules) == 1, "Chess_GetDrawRules succeeds");
