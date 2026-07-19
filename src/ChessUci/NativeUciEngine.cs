@@ -41,6 +41,7 @@ internal sealed class NativeUciEngine : IDisposable
 
     public NativeSearchInfo GetSearchInfo() =>
         Chess_GetLastSearchStats(Handle, out var info) != 0 ? info : default;
+    public NativeState GetState() => Chess_GetState(Handle, out var state) != 0 ? state : default;
 
     public void CancelSearch() => Chess_CancelSearch(Handle);
     public bool SetSearchNodeLimit(long limit) => Chess_SetSearchNodeLimit(Handle, limit) != 0;
@@ -65,6 +66,8 @@ internal sealed class NativeUciEngine : IDisposable
         ref NativeSearchOptions options, out NativeMove playedMove);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] private static extern int Chess_GetLastSearchStats(IntPtr handle,
         out NativeSearchInfo info);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] private static extern int Chess_GetState(IntPtr handle,
+        out NativeState state);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] private static extern void Chess_CancelSearch(IntPtr handle);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] private static extern int Chess_SetSearchNodeLimit(IntPtr handle, long nodeLimit);
 }
@@ -110,4 +113,24 @@ internal struct NativeSearchInfo
     public int ElapsedMs;
     public long Nodes;
     public int BestScore;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NativeState
+{
+    public int SideToMove;
+    public int Status;
+    public int IsCheck;
+    public int HalfmoveClock;
+    public int FullmoveNumber;
+    public int LegalMoveCount;
+    public int LastFromFile;
+    public int LastFromRank;
+    public int LastToFile;
+    public int LastToRank;
+    public int LastPromotion;
+    public int LastFlags;
+    public int RepetitionCount;
+    public int CanClaimRepetition;
+    public int CanClaimFiftyMove;
 }

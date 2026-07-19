@@ -1853,3 +1853,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | Cooperative stop | Current negamax stop checks and [UCI protocol](https://backscattering.de/chess/uci/) | Native search checks a local stop flag but exposed only elapsed-time cancellation. | Add append-only cancel/node-limit exports backed by an atomic flag and existing node checkpoints; retain all DTO layouts. | ChessEngine header/implementation and UCI adapter | Native tests plus subprocess `go infinite`/`stop` bounded completion. |
 | Search authority | Existing `MakeBestMoveEx` commits its selected move | Running it on the command-reader handle would mutate the UCI position and block input. | Search on a FEN clone in a worker task; generation IDs suppress stale results and emit at most one bestmove. | UCI search controller | Repeated and interrupted subprocess searches; position remains independently assignable. |
+
+## P4M Phase 23 - UCI Search Telemetry
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Info fields | UCI info grammar and native `ChessSearchInfoDto` | Engine exposes completed depth, nodes, elapsed time and best score, but not seldepth or a full PV. | Emit only real stats, derive NPS from nodes/time, and use the returned legal bestmove as a one-move PV. | UCI native/search adapter and guide | Subprocess parses numeric fields and verifies PV equals bestmove. |
+| Mate reporting | Native post-move game state | Score encoding alone does not expose a reliable mate distance. | Emit `score mate 1` only when the committed search-clone result is engine-backed checkmate; otherwise emit native centipawns. | UCI telemetry | Mate-in-one transcript fixture; no claims for longer mate distances. |

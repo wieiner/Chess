@@ -111,7 +111,23 @@ internal sealed class UciSearchController : IDisposable
             var success = engine.MakeBestMove(options, out var best);
             if (generation != Interlocked.Read(ref _generation)) return;
             var move = success ? ToUci(best) : "0000";
-            lock (_output) { _output.WriteLine($"bestmove {move}"); _output.Flush(); }
+            lock (_output)
+            {
+                if (success)
+                {
+                    var info = engine.GetSearchInfo();
+                    var state = engine.GetState();
+                    var score = state.Status == 1 ? "score mate 1" : $"score cp {info.BestScore}";
+                    var nps = info.Nodes <= 0 ? 0 : info.Nodes * 1000 / Math.Max(1, info.ElapsedMs);
+                    _output.WriteLine($"info depth {info.CompletedDepth} {score} nodes {info.Nodes} nps {nps} time {info.ElapsedMs} pv {move}");
+                }
+                else
+                {
+                    _output.WriteLine("info string no legal move");
+                }
+                _output.WriteLine($"bestmove {move}");
+                _output.Flush();
+            }
         }
         catch (Exception ex)
         {
