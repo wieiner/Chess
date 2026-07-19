@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/wieiner/Chess/assets/rules/chess2d/chess-session-v1.schema.json",
+  "title": "Chess2D session document v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "sessionId",
+    "createdUtc",
+    "modifiedUtc",
+    "startingFen",
+    "currentFen",
+    "game",
+    "presentation",
+    "engine",
+    "dirty"
+  ],
+  "properties": {
+    "format": { "const": "chess2d-session" },
+    "version": { "const": "1.0" },
+    "sessionId": { "type": "string", "format": "uuid" },
+    "createdUtc": { "type": "string", "format": "date-time" },
+    "modifiedUtc": { "type": "string", "format": "date-time" },
+    "startingFen": { "$ref": "#/$defs/fen" },
+    "currentFen": { "$ref": "#/$defs/fen" },
+    "game": { "$ref": "#/$defs/game" },
+    "presentation": { "$ref": "#/$defs/presentation" },
+    "engine": { "$ref": "#/$defs/engine" },
+    "dirty": { "type": "boolean" },
+    "autosave": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/autosave" }
+      ]
+    }
+  },
+  "$defs": {
+    "fen": {
+      "type": "string",
+      "minLength": 15,
+      "maxLength": 128
+    },
+    "square": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "rank"],
+      "properties": {
+        "file": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "rank": { "type": "integer", "minimum": 0, "maximum": 7 }
+      }
+    },
+    "clock": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "whiteRemainingMilliseconds": { "type": ["integer", "null"], "minimum": 0 },
+        "blackRemainingMilliseconds": { "type": ["integer", "null"], "minimum": 0 },
+        "moveElapsedMilliseconds": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "move": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plyIndex", "fullmoveNumber", "side", "from", "to", "movedPiece",
+        "capturedPiece", "promotionPiece", "castle", "isEnPassant", "isCapture",
+        "isCheck", "isCheckmate", "preMoveFen", "postMoveFen", "uci", "san"
+      ],
+      "properties": {
+        "plyIndex": { "type": "integer", "minimum": 0 },
+        "fullmoveNumber": { "type": "integer", "minimum": 1 },
+        "side": { "enum": [1, -1] },
+        "from": { "$ref": "#/$defs/square" },
+        "to": { "$ref": "#/$defs/square" },
+        "movedPiece": { "type": "integer" },
+        "capturedPiece": { "type": "integer" },
+        "promotionPiece": { "type": "integer" },
+        "castle": { "type": "string", "enum": ["None", "KingSide", "QueenSide"] },
+        "isEnPassant": { "type": "boolean" },
+        "isCapture": { "type": "boolean" },
+        "isCheck": { "type": "boolean" },
+        "isCheckmate": { "type": "boolean" },
+        "preMoveFen": { "$ref": "#/$defs/fen" },
+        "postMoveFen": { "$ref": "#/$defs/fen" },
+        "uci": { "type": "string", "pattern": "^[a-h][1-8][a-h][1-8][qrbn]?$" },
+        "san": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "clock": { "$ref": "#/$defs/clock" },
+        "comment": { "type": ["string", "null"], "maxLength": 4096 }
+      }
+    },
+    "headers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "site", "date", "round", "white", "black", "additionalTags"],
+      "properties": {
+        "event": { "type": "string", "maxLength": 255 },
+        "site": { "type": "string", "maxLength": 255 },
+        "date": { "type": "string", "maxLength": 32 },
+        "round": { "type": "string", "maxLength": 32 },
+        "white": { "type": "string", "maxLength": 255 },
+        "black": { "type": "string", "maxLength": 255 },
+        "additionalTags": {
+          "type": "object",
+          "maxProperties": 128,
+          "additionalProperties": { "type": "string", "maxLength": 4096 }
+        }
+      }
+    },
+    "game": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["headers", "moves", "result", "termination"],
+      "properties": {
+        "headers": { "$ref": "#/$defs/headers" },
+        "moves": { "type": "array", "maxItems": 8192, "items": { "$ref": "#/$defs/move" } },
+        "result": { "enum": ["Ongoing", "WhiteWin", "BlackWin", "Draw"] },
+        "termination": {
+          "enum": ["None", "Checkmate", "Stalemate", "Repetition", "FiftyMoveRule", "SeventyFiveMoveRule", "InsufficientMaterial", "Agreement", "Resignation", "TimeForfeit", "Abandoned", "Unknown"]
+        }
+      }
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boardOrientation", "pieceTheme", "modelSetId", "uiMode"],
+      "properties": {
+        "boardOrientation": { "enum": ["White", "Black"] },
+        "pieceTheme": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "modelSetId": { "type": ["string", "null"], "maxLength": 128 },
+        "uiMode": { "enum": ["Board2D", "Board3D"] }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "backend", "maxDepth", "timeLimitMilliseconds", "nodeLimit", "threads"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "backend": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "maxDepth": { "type": "integer", "minimum": 0, "maximum": 128 },
+        "timeLimitMilliseconds": { "type": "integer", "minimum": 0, "maximum": 3600000 },
+        "nodeLimit": { "type": "integer", "minimum": 0 },
+        "threads": { "type": "integer", "minimum": 1, "maximum": 256 }
+      }
+    },
+    "autosave": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["isAutosave", "sequence", "savedUtc"],
+      "properties": {
+        "isAutosave": { "const": true },
+        "sourceSessionId": { "type": ["string", "null"], "format": "uuid" },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "savedUtc": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

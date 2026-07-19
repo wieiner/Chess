@@ -1781,3 +1781,12 @@ Date: 2026-07-19
 | Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
 | --- | --- | --- | --- | --- | --- |
 | Interoperability corpus | PGN specification examples and repository legal-move contracts | External databases are unnecessary and introduce provenance risk. | Keep a compact authored fixture pack covering special legal moves, outcomes, setup FEN, annotations/RAV, and fail-closed malformed inputs. | `tests/fixtures/pgn`, workflow contracts, result doc | Copy fixtures to test output; run all legal files through native candidate replay and all invalid files through atomic rejection. |
+
+## P4M Phase 15 - Chess2D Session Contract
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Versioned JSON contract | [System.Text.Json overview](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/overview) and existing structured game records | PGN deliberately omits application presentation and search settings, while ad-hoc UI persistence would leak paths and lose deterministic move state. | Define a closed, versioned `chess2d-session` v1 schema containing structured game, semantic presentation IDs, engine limits, dirty state, and optional recovery metadata. | Session JSON Schema and format guide | Parse the schema in managed contracts in Phase 16 and roundtrip representative documents. |
+| Secret and path exclusion | [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html) | Session state does not need credentials or machine-specific absolute paths. | Exclude authentication material by design and permit only bounded semantic theme/model/backend identifiers. | Schema, format guide, validator | Reject rooted/path-shaped identifiers and scan tracked fixtures for credential fields. |
