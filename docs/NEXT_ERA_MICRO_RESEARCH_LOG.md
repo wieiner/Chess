@@ -1712,3 +1712,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | Record authority | Phase 02 record design, Phase 04 descriptor ABI, Phase 05 SAN generator, current `MainWindow` move flow | WPF currently appends long-coordinate strings after live moves and separately removes strings on undo. It cannot prove a pre/post position chain. | Add immutable records and a small history controller in `ChessGameRecords`; create records transactionally from a temporary native engine loaded with pre-move FEN. | Game-record library, ChessApp, contracts | Record-chain, undo/redo branch, reset, SAN/UCI/FEN projection, native build, WPF build, and Chess2D targeted suites. |
 | WPF history projection | [Microsoft WPF data binding overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/data/) and current code-behind architecture | A full MVVM rewrite is unnecessary, but the `ListBox` must stop being storage authority. | Render read-only full-move rows from record snapshots and expose selected-ply SAN/UCI/pre/post FEN controls. | `MainWindow.xaml(.cs)` | WPF compile validates bindings/handlers; managed contracts validate model behavior without UI automation. |
+
+## P4M Phase 07 - SAN Workflow Regression Gate
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| End-to-end SAN history | Existing C# native wrapper, Phase 04 descriptor, Phase 05 generator, and Phase 06 history controller | Native and managed contracts are individually green, but a stage gate must prove their composed FEN/SAN/history behavior. | Add a Windows console integration contract with friend access to the internal wrapper; do not widen production API visibility. | ChessApp assembly metadata, new workflow contracts, test registry | Real DLL tests cover legal preview no-mutation, illegal no-record, three-ply SAN chain, undo/recommit, reset replay, Fool's mate, stalemate, and draw claim. |
+| Search semantics | Current `Chess_MakeBestMoveEx` behavior | The current search ABI chooses and commits a best move; there is no separate non-committing search-preview API. | Require every successful AI move to create a record. Treat legal descriptor generation as the existing no-record preview path and document the distinction. | Verification report | Descriptor/GetLegalMoves preserve FEN and zero records; committed AI integration remains covered by WPF flow/build. |

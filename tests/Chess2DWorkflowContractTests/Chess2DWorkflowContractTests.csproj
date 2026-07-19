@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>Chess2DWorkflowContractTests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ChessApp\ChessApp.csproj" />
+    <ProjectReference Include="..\..\src\ChessGameRecords\ChessGameRecords.csproj" />
+  </ItemGroup>
+  <Target Name="CopyNativeChessEngine" AfterTargets="Build">
+    <PropertyGroup>
+      <ChessAppOutput>$(MSBuildThisFileDirectory)..\..\src\ChessApp\bin\$(Platform)\$(Configuration)\net8.0-windows</ChessAppOutput>
+    </PropertyGroup>
+    <Copy SourceFiles="$(ChessAppOutput)\ChessEngine.dll" DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" Condition="Exists('$(ChessAppOutput)\ChessEngine.dll')" />
+  </Target>
+</Project>
