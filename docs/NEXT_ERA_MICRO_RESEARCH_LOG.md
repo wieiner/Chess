@@ -1862,3 +1862,11 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | Info fields | UCI info grammar and native `ChessSearchInfoDto` | Engine exposes completed depth, nodes, elapsed time and best score, but not seldepth or a full PV. | Emit only real stats, derive NPS from nodes/time, and use the returned legal bestmove as a one-move PV. | UCI native/search adapter and guide | Subprocess parses numeric fields and verifies PV equals bestmove. |
 | Mate reporting | Native post-move game state | Score encoding alone does not expose a reliable mate distance. | Emit `score mate 1` only when the committed search-clone result is engine-backed checkmate; otherwise emit native centipawns. | UCI telemetry | Mate-in-one transcript fixture; no claims for longer mate distances. |
+
+## P4M Phase 24 - UCI Subprocess Interoperability
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Process-level evidence | [.NET Process redirected I/O](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.processstartinfo.redirectstandardoutput) and repository C# watchdog policy | Direct class tests cannot detect stdout contamination, input-loop blocking, leaked child processes, or DLL packaging errors. | Run a real redirected `ChessUci.exe` with bounded waits and unconditional process-tree cleanup. | New subprocess contract test and test registry | Handshake, positions, search modes, stop, malformed/illegal input, telemetry, quit, and stdout whitelist. |
