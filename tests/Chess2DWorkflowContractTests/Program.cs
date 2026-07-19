@@ -75,6 +75,17 @@ checks.Check(engine.ClaimDraw(), "fifty-move draw claim succeeds");
 history.UpdateOutcome(ChessGameResult.Draw, ChessTerminationReason.FiftyMoveRule);
 checks.Check(history.Result == ChessGameResult.Draw && history.Moves.Count == 0, "draw claim updates outcome without a move record");
 
+const string foolsMatePgn = "[Event \"Import\"]\n[Site \"Local\"]\n[Date \"2026.07.19\"]\n[Round \"1\"]\n[White \"A\"]\n[Black \"B\"]\n[Result \"0-1\"]\n\n1. f3 e5 2. g4 Qh4# 0-1\n";
+var importedMate = NativeChessPgnImporter.Import(foolsMatePgn);
+checks.Check(importedMate.Success && importedMate.Game is { Moves.Count: 4, Result: ChessGameResult.BlackWin },
+    "transactional PGN importer replays Fool's mate");
+checks.Check(importedMate.Game?.Moves[^1].San == "Qh4#" && importedMate.Game.Termination == ChessTerminationReason.Checkmate,
+    "PGN import preserves SAN and engine-backed checkmate outcome");
+var preservedFen = engine.GetFen();
+var invalidImport = NativeChessPgnImporter.Import(foolsMatePgn.Replace("Qh4#", "Qh5#", StringComparison.Ordinal));
+checks.Check(!invalidImport.Success && invalidImport.Game is null && engine.GetFen() == preservedFen,
+    "invalid PGN import does not mutate live engine state");
+
 return checks.Finish("Chess2DWorkflowContractTests");
 
 static ChessMoveRecord Commit(

@@ -209,6 +209,34 @@ public sealed class ChessGameHistory
         ModifiedUtc = DateTimeOffset.UtcNow;
     }
 
+    public bool TryLoad(ChessGameRecord record, out string error)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        var expectedFen = record.InitialPosition.Fen;
+        for (var index = 0; index < record.Moves.Count; index++)
+        {
+            var move = record.Moves[index];
+            if (move.PlyIndex != index || move.PreMoveFen != expectedFen || !move.From.IsValid || !move.To.IsValid)
+            {
+                error = $"Move record {index + 1} breaks the imported FEN chain.";
+                return false;
+            }
+            expectedFen = move.PostMoveFen;
+        }
+        Headers = record.Headers;
+        InitialPosition = record.InitialPosition;
+        _moves.Clear();
+        _moves.AddRange(record.Moves);
+        _redoMoves.Clear();
+        _redoMoves.AddRange(record.RedoMoves);
+        Result = record.Result;
+        Termination = record.Termination;
+        _createdUtc = record.CreatedUtc;
+        ModifiedUtc = record.ModifiedUtc;
+        error = string.Empty;
+        return true;
+    }
+
     public ChessGameRecord Snapshot() => new(
         Headers,
         InitialPosition,

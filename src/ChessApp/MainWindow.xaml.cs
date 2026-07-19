@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using ChessGameRecords;
+using Microsoft.Win32;
 
 namespace ChessApp;
 
@@ -28,6 +29,8 @@ public partial class MainWindow : Window
     private int[] _setupBoard = new int[64];
     private Square? _selected;
     private bool _busy;
+    private string? _currentPgnPath;
+    private int _replayPly;
     private PieceTheme _pieceTheme = PieceTheme.Transparent;
     private Point _dragStart;
     private bool _is3DDragging;
@@ -1723,7 +1726,8 @@ public partial class MainWindow : Window
         var selected = (MoveSelectionBox?.SelectedItem as MoveSelectionItem)?.Record;
         MoveHistoryStatusText.Text = selected is null
             ? $"Moves: {_gameHistory.Moves.Count}. Result: {_gameHistory.Result}."
-            : $"Ply {selected.PlyIndex + 1}/{_gameHistory.Moves.Count}: {selected.San} ({selected.Uci}).";
+            : $"Ply {selected.PlyIndex + 1}/{_gameHistory.Moves.Count}: {selected.San} ({selected.Uci})." +
+              (string.IsNullOrWhiteSpace(selected.Comment) ? string.Empty : $" Comment: {selected.Comment}");
         SelectedPreFenBox.Text = selected?.PreMoveFen ?? string.Empty;
         SelectedPostFenBox.Text = selected?.PostMoveFen ?? string.Empty;
     }
@@ -1741,6 +1745,66 @@ public partial class MainWindow : Window
         if ((MoveSelectionBox.SelectedItem as MoveSelectionItem)?.Record is { } record)
         {
             Clipboard.SetText(record.Uci);
+        }
+    }
+
+    private void OpenPgn_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog { Filter = "Portable Game Notation (*.pgn)|*.pgn|All files (*.*)|*.*" };
+        if (dialog.ShowDialog(this) != true) return;
+        var imported = NativeChessPgnImporter.Import(File.ReadAllText(dialog.FileName));
+        var historyError = "Imported game could not be loaded.";
+        if (!imported.Success || imported.Game is null || !_engine.SetFen(imported.FinalFen) ||
+            !_gameHistory.TryLoad(imported.Game, out historyError))
+        {
+            MessageBox.Show(this, imported.Success ? historyError : imported.Error, "PGN import", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+        _currentPgnPath = dialog.FileName;
+        _replayPly = _gameHistory.Moves.Count;
+        _selected = null;
+        RefreshAll();
+    }
+
+    private void SavePgn_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_currentPgnPath)) { SavePgnAs_Click(sender, e); return; }
+        SavePgnTo(_currentPgnPath);
+    }
+
+    private void SavePgnAs_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog { Filter = "Portable Game Notation (*.pgn)|*.pgn", DefaultExt = ".pgn", AddExtension = true };
+        if (dialog.ShowDialog(this) != true) return;
+        _currentPgnPath = dialog.FileName;
+        SavePgnTo(dialog.FileName);
+    }
+
+    private void SavePgnTo(string path)
+    {
+        var exported = PgnExporter.Export(_gameHistory.Snapshot());
+        if (!exported.Success) { MessageBox.Show(this, exported.Error, "PGN export", MessageBoxButton.OK, MessageBoxImage.Error); return; }
+        File.WriteAllText(path, exported.Text, new System.Text.UTF8Encoding(false));
+    }
+
+    private void ReplayFirst_Click(object sender, RoutedEventArgs e) => ReplayTo(0);
+    private void ReplayPrevious_Click(object sender, RoutedEventArgs e) => ReplayTo(_replayPly - 1);
+    private void ReplayNext_Click(object sender, RoutedEventArgs e) => ReplayTo(_replayPly + 1);
+    private void ReplayLast_Click(object sender, RoutedEventArgs e) => ReplayTo(_gameHistory.Moves.Count);
+
+    private void ReplayTo(int plyCount)
+    {
+        if (_busy) return;
+        plyCount = Math.Clamp(plyCount, 0, _gameHistory.Moves.Count);
+        var fen = plyCount == 0 ? _gameHistory.InitialPosition.Fen : _gameHistory.Moves[plyCount - 1].PostMoveFen;
+        if (!_engine.SetFen(fen)) return;
+        _replayPly = plyCount;
+        _selected = null;
+        RefreshAll();
+        if (plyCount > 0)
+        {
+            MoveSelectionBox.SelectedItem = MoveSelectionBox.Items.OfType<MoveSelectionItem>()
+                .FirstOrDefault(item => item.Record.PlyIndex == plyCount - 1);
         }
     }
 

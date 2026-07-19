@@ -1765,3 +1765,11 @@ Date: 2026-07-19
 | Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
 | --- | --- | --- | --- | --- | --- |
 | SAN resolution | PGN Specification section 8.2.3 and Phase 04 legal descriptor ABI | Current SAN parser tokens describe generated output, but import needs the inverse mapping against current legal moves. | Parse SAN constraints and filter only engine-supplied legal candidates by piece, destination, capture, disambiguation, promotion, castle, and check/mate. Never infer a coordinate move without exactly one legal match. | `ChessSanResolver`, managed and native workflow contracts | Normal/pawn/capture/en-passant/promotion/castle, ambiguity/disambiguation, mismatch categories, and no-mutation engine integration. |
+
+## P4M Phase 13 - Transactional PGN Import
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Transactional replay | PGN import rules, existing native FEN/legal-move APIs, WPF file dialogs | Parser and resolver are pure, but live UI state must not be used as the replay candidate. | Replay on an isolated `NativeChessEngine`, build a validated immutable history, then load final FEN/history into WPF only after success. | ChessApp importer/UI, history load API, workflow tests | Fool's mate import/result, illegal SAN no live mutation, WPF build, save/export path. |

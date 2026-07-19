@@ -238,6 +238,13 @@
                             <ComboBox x:Name="MoveSelectionBox" Grid.Row="1" Margin="0,8,0,8"
                                       SelectionChanged="MoveSelectionBox_SelectionChanged" />
                             <WrapPanel Grid.Row="2" Margin="0,0,0,8">
+                                <Button Content="Open PGN" Click="OpenPgn_Click" />
+                                <Button Content="Save PGN" Click="SavePgn_Click" />
+                                <Button Content="Save As" Click="SavePgnAs_Click" />
+                                <Button Content="|&lt;" Click="ReplayFirst_Click" ToolTip="First position" />
+                                <Button Content="&lt;" Click="ReplayPrevious_Click" ToolTip="Previous ply" />
+                                <Button Content="&gt;" Click="ReplayNext_Click" ToolTip="Next ply" />
+                                <Button Content="&gt;|" Click="ReplayLast_Click" ToolTip="Last position" />
                                 <Button Content="Копировать SAN" Click="CopySan_Click" />
                                 <Button Content="Копировать UCI" Click="CopyUci_Click" />
                             </WrapPanel>
