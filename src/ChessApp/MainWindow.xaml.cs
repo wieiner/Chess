@@ -4,12 +4,14 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
+using ChessGameRecords;
 
 namespace ChessApp;
 
 public partial class MainWindow : Window
 {
     private readonly NativeChessEngine _engine = new();
+    private readonly ChessGameHistory _gameHistory = new(ChessGameHistory.StandardInitialFen);
     private readonly ChessNetworkEndpoint _network = new();
     private readonly Button[,] _squares = new Button[8, 8];
     private readonly Brush _lightSquare = new SolidColorBrush(Color.FromRgb(238, 238, 210));
@@ -189,6 +191,7 @@ public partial class MainWindow : Window
         RefreshBoard();
         Refresh3DScene();
         RefreshStatus();
+        RefreshMoveHistory();
     }
 
     private void RefreshBoard()
@@ -276,6 +279,7 @@ public partial class MainWindow : Window
         }
 
         var before = _engine.GetState();
+        var preMoveFen = _engine.GetFen();
         var options = BuildSearchOptions();
         if (options.Depth > 8 && options.TimeLimitMs <= 0)
         {
@@ -299,8 +303,10 @@ public partial class MainWindow : Window
             var result = await Task.Run(() => _engine.MakeBestMove(options, out var move) ? move : (ChessMoveDto?)null);
             if (result is ChessMoveDto move)
             {
-                AddMoveToHistory(before, move);
-                await SendMoveOverNetworkAsync(move);
+                if (CommitMoveToHistory(preMoveFen, before, move))
+                {
+                    await SendMoveOverNetworkAsync(move);
+                }
             }
         }
         finally
@@ -321,7 +327,7 @@ public partial class MainWindow : Window
         _selected = null;
         SetupModeBox.IsChecked = false;
         SyncSetupBoardFromEngine();
-        MoveList.Items.Clear();
+        ResetGameHistory();
         RefreshAll();
         _ = SendFenOverNetworkAsync();
     }
@@ -334,9 +340,10 @@ public partial class MainWindow : Window
         }
 
         _selected = null;
-        if (MoveList.Items.Count > 0)
+        if (!_gameHistory.TryUndo(_engine.GetFen(), out _, out var historyError))
         {
-            MoveList.Items.RemoveAt(MoveList.Items.Count - 1);
+            _gameHistory.Reset(_engine.GetFen());
+            MessageBox.Show(this, historyError, "Chess history", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         RefreshAll();
         _ = SendFenOverNetworkAsync();
@@ -358,7 +365,7 @@ public partial class MainWindow : Window
         _selected = null;
         SetupModeBox.IsChecked = false;
         SyncSetupBoardFromEngine();
-        MoveList.Items.Clear();
+        ResetGameHistory();
         RefreshAll();
         _ = SendFenOverNetworkAsync();
     }
@@ -457,16 +464,17 @@ public partial class MainWindow : Window
                     {
                         SetupModeBox.IsChecked = false;
                         SyncSetupBoardFromEngine();
-                        MoveList.Items.Clear();
+                        ResetGameHistory();
                         RefreshAll();
                     }
                 }
                 else if (message.Type.Equals("move", StringComparison.OrdinalIgnoreCase))
                 {
                     var before = _engine.GetState();
+                    var preMoveFen = _engine.GetFen();
                     if (_engine.TryMakeMove(message.FromFile, message.FromRank, message.ToFile, message.ToRank, message.Promotion, out var played))
                     {
-                        AddMoveToHistory(before, played);
+                        CommitMoveToHistory(preMoveFen, before, played);
                         _selected = null;
                         RefreshAll();
                     }
@@ -504,6 +512,7 @@ public partial class MainWindow : Window
         if (_selected is Square from)
         {
             var before = _engine.GetState();
+            var preMoveFen = _engine.GetFen();
             var promotion = SelectedPromotion();
             var candidates = _legalMoves
                 .Where(m => m.FromFile == from.File && m.FromRank == from.Rank && m.ToFile == square.File && m.ToRank == square.Rank)
@@ -512,7 +521,12 @@ public partial class MainWindow : Window
             var chosen = candidates.FirstOrDefault(m => m.Promotion == 0 || m.Promotion == promotion);
             if (candidates.Length > 0 && _engine.TryMakeMove(from.File, from.Rank, square.File, square.Rank, chosen.Promotion, out var played))
             {
-                AddMoveToHistory(before, played);
+                if (!CommitMoveToHistory(preMoveFen, before, played))
+                {
+                    _selected = null;
+                    RefreshAll();
+                    return;
+                }
                 _selected = null;
                 RefreshAll();
                 _ = SendMoveOverNetworkAsync(played);
@@ -798,7 +812,7 @@ public partial class MainWindow : Window
 
         SetupModeBox.IsChecked = false;
         _selected = null;
-        MoveList.Items.Clear();
+        ResetGameHistory();
         RefreshAll();
         _ = SendFenOverNetworkAsync();
     }
@@ -807,6 +821,7 @@ public partial class MainWindow : Window
     {
         if (_engine.ClaimDraw())
         {
+            UpdateHistoryOutcome(_engine.GetState());
             RefreshAll();
             return;
         }
@@ -1541,28 +1556,205 @@ public partial class MainWindow : Window
         return $"{baseText} Легальных ходов: {state.LegalMoveCount}. Повторов: {state.RepetitionCount}.";
     }
 
-    private void AddMoveToHistory(ChessStateDto before, ChessMoveDto move)
+    private bool CommitMoveToHistory(string preMoveFen, ChessStateDto before, ChessMoveDto move)
     {
-        var prefix = before.SideToMove == NativeChessEngine.White
-            ? $"{before.FullmoveNumber}. "
-            : $"{before.FullmoveNumber}... ";
-        MoveList.Items.Add(prefix + FormatMove(move));
-        MoveList.ScrollIntoView(MoveList.Items[MoveList.Items.Count - 1]);
+        var postMoveFen = _engine.GetFen();
+        try
+        {
+            using var verifier = new NativeChessEngine();
+            if (!verifier.SetFen(preMoveFen) || !verifier.SetDrawRules(_engine.GetDrawRules()) ||
+                !verifier.TryGetMoveDescriptor(move.FromFile, move.FromRank, move.ToFile, move.ToRank, move.Promotion, out var descriptor))
+            {
+                return RejectCommittedMove("Legal move context could not be reconstructed.");
+            }
+
+            var sanContext = new ChessSanMoveContext(
+                true,
+                move.FromFile,
+                move.FromRank,
+                move.ToFile,
+                move.ToRank,
+                descriptor.MovedPiece,
+                descriptor.CapturedPiece,
+                move.Promotion,
+                (move.Flags & NativeChessEngine.MoveCapture) != 0,
+                (move.Flags & NativeChessEngine.MoveEnPassant) != 0,
+                (ChessCastleKind)descriptor.CastleKind,
+                (ChessSanDisambiguation)descriptor.Disambiguation,
+                descriptor.ResultingIsCheck != 0,
+                descriptor.ResultingStatus == NativeChessEngine.StatusCheckmate);
+            var san = ChessSanGenerator.Generate(sanContext);
+            if (!san.Success)
+            {
+                return RejectCommittedMove($"SAN generation failed: {san.Message}");
+            }
+            if (!verifier.TryMakeMove(move.FromFile, move.FromRank, move.ToFile, move.ToRank, move.Promotion, out _) ||
+                verifier.GetFen() != postMoveFen)
+            {
+                return RejectCommittedMove("Move replay did not reproduce the committed position.");
+            }
+
+            var state = _engine.GetState();
+            var (result, termination) = OutcomeForState(state);
+            var record = new ChessMoveRecord(
+                _gameHistory.Moves.Count,
+                before.FullmoveNumber,
+                before.SideToMove,
+                new ChessGameRecords.ChessSquare(move.FromFile, move.FromRank),
+                new ChessGameRecords.ChessSquare(move.ToFile, move.ToRank),
+                descriptor.MovedPiece,
+                descriptor.CapturedPiece,
+                move.Promotion,
+                (ChessCastleKind)descriptor.CastleKind,
+                (move.Flags & NativeChessEngine.MoveEnPassant) != 0,
+                (move.Flags & NativeChessEngine.MoveCapture) != 0,
+                descriptor.ResultingIsCheck != 0,
+                descriptor.ResultingStatus == NativeChessEngine.StatusCheckmate,
+                preMoveFen,
+                postMoveFen,
+                BuildUci(move),
+                san.San,
+                null,
+                null,
+                move.Score == 0 ? null : new ChessEvaluationMetadata(move.Score, null, null, null, null));
+            if (!_gameHistory.TryCommit(record, result, termination, out var historyError))
+            {
+                return RejectCommittedMove(historyError);
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            return RejectCommittedMove($"Move record failed: {ex.Message}");
+        }
     }
 
-    private static string FormatMove(ChessMoveDto move)
+    private bool RejectCommittedMove(string reason)
     {
-        var separator = (move.Flags & NativeChessEngine.MoveCapture) != 0 ? "x" : "-";
+        var rolledBack = _engine.Undo();
+        MessageBox.Show(this,
+            rolledBack ? reason : $"{reason} Native rollback also failed.",
+            "Chess history",
+            MessageBoxButton.OK,
+            MessageBoxImage.Error);
+        return false;
+    }
+
+    private void ResetGameHistory()
+    {
+        _gameHistory.Reset(_engine.GetFen());
+        RefreshMoveHistory();
+    }
+
+    private void UpdateHistoryOutcome(ChessStateDto state)
+    {
+        var (result, termination) = OutcomeForState(state);
+        _gameHistory.UpdateOutcome(result, termination);
+    }
+
+    private static (ChessGameResult Result, ChessTerminationReason Termination) OutcomeForState(ChessStateDto state)
+    {
+        return state.Status switch
+        {
+            NativeChessEngine.StatusCheckmate => state.SideToMove == NativeChessEngine.White
+                ? (ChessGameResult.BlackWin, ChessTerminationReason.Checkmate)
+                : (ChessGameResult.WhiteWin, ChessTerminationReason.Checkmate),
+            NativeChessEngine.StatusStalemate => (ChessGameResult.Draw, ChessTerminationReason.Stalemate),
+            NativeChessEngine.StatusRepetitionDraw => (ChessGameResult.Draw,
+                state.CanClaimFiftyMove != 0 ? ChessTerminationReason.FiftyMoveRule : ChessTerminationReason.Repetition),
+            NativeChessEngine.StatusSeventyFiveMoveDraw => (ChessGameResult.Draw, ChessTerminationReason.SeventyFiveMoveRule),
+            _ => (ChessGameResult.Ongoing, ChessTerminationReason.None)
+        };
+    }
+
+    private void RefreshMoveHistory()
+    {
+        if (MoveList == null || MoveSelectionBox == null)
+        {
+            return;
+        }
+        var selectedPly = (MoveSelectionBox.SelectedItem as MoveSelectionItem)?.Record.PlyIndex;
+        var rows = _gameHistory.Moves
+            .GroupBy(move => move.FullmoveNumber)
+            .Select(group => new MoveHistoryRow(
+                group.Key,
+                group.FirstOrDefault(move => move.Side == NativeChessEngine.White),
+                group.FirstOrDefault(move => move.Side == NativeChessEngine.Black)))
+            .ToArray();
+        MoveList.ItemsSource = rows;
+
+        var selections = _gameHistory.Moves.Select(move => new MoveSelectionItem(move)).ToArray();
+        MoveSelectionBox.ItemsSource = selections;
+        MoveSelectionBox.SelectedItem = selections.FirstOrDefault(item => item.Record.PlyIndex == selectedPly) ?? selections.LastOrDefault();
+        if (rows.Length > 0)
+        {
+            MoveList.ScrollIntoView(rows[^1]);
+        }
+        RefreshSelectedMoveDetails();
+    }
+
+    private void MoveList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (MoveList.SelectedItem is not MoveHistoryRow row)
+        {
+            return;
+        }
+        var record = row.Black ?? row.White;
+        if (record is null)
+        {
+            return;
+        }
+        MoveSelectionBox.SelectedItem = MoveSelectionBox.Items
+            .OfType<MoveSelectionItem>()
+            .FirstOrDefault(item => item.Record.PlyIndex == record.PlyIndex);
+    }
+
+    private void MoveSelectionBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        RefreshSelectedMoveDetails();
+    }
+
+    private void RefreshSelectedMoveDetails()
+    {
+        if (MoveHistoryStatusText == null || SelectedPreFenBox == null || SelectedPostFenBox == null)
+        {
+            return;
+        }
+        var selected = (MoveSelectionBox?.SelectedItem as MoveSelectionItem)?.Record;
+        MoveHistoryStatusText.Text = selected is null
+            ? $"Moves: {_gameHistory.Moves.Count}. Result: {_gameHistory.Result}."
+            : $"Ply {selected.PlyIndex + 1}/{_gameHistory.Moves.Count}: {selected.San} ({selected.Uci}).";
+        SelectedPreFenBox.Text = selected?.PreMoveFen ?? string.Empty;
+        SelectedPostFenBox.Text = selected?.PostMoveFen ?? string.Empty;
+    }
+
+    private void CopySan_Click(object sender, RoutedEventArgs e)
+    {
+        if ((MoveSelectionBox.SelectedItem as MoveSelectionItem)?.Record is { } record)
+        {
+            Clipboard.SetText(record.San);
+        }
+    }
+
+    private void CopyUci_Click(object sender, RoutedEventArgs e)
+    {
+        if ((MoveSelectionBox.SelectedItem as MoveSelectionItem)?.Record is { } record)
+        {
+            Clipboard.SetText(record.Uci);
+        }
+    }
+
+    private static string BuildUci(ChessMoveDto move)
+    {
         var promotion = move.Promotion switch
         {
-            NativeChessEngine.Queen => "=Q",
-            NativeChessEngine.Rook => "=R",
-            NativeChessEngine.Bishop => "=B",
-            NativeChessEngine.Knight => "=N",
+            NativeChessEngine.Queen => "q",
+            NativeChessEngine.Rook => "r",
+            NativeChessEngine.Bishop => "b",
+            NativeChessEngine.Knight => "n",
             _ => string.Empty
         };
-        var check = (move.Flags & NativeChessEngine.MoveCheck) != 0 ? "+" : string.Empty;
-        return $"{SquareName(move.FromFile, move.FromRank)}{separator}{SquareName(move.ToFile, move.ToRank)}{promotion}{check}";
+        return $"{SquareName(move.FromFile, move.FromRank)}{SquareName(move.ToFile, move.ToRank)}{promotion}";
     }
 
     private static string SquareName(int file, int rank)
@@ -1572,6 +1764,18 @@ public partial class MainWindow : Window
 
     private readonly record struct Square(int File, int Rank);
     private readonly record struct SetupDragData(int Piece, Square? From);
+    private sealed record MoveHistoryRow(int MoveNumber, ChessMoveRecord? White, ChessMoveRecord? Black)
+    {
+        public string WhiteSan => White?.San ?? string.Empty;
+        public string BlackSan => Black?.San ?? string.Empty;
+    }
+
+    private sealed record MoveSelectionItem(ChessMoveRecord Record)
+    {
+        public override string ToString() => Record.Side == NativeChessEngine.White
+            ? $"{Record.FullmoveNumber}. {Record.San}"
+            : $"{Record.FullmoveNumber}... {Record.San}";
+    }
     private enum PieceTheme
     {
         Transparent,

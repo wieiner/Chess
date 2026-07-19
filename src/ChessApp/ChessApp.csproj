@@ -12,6 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ChessGameRecords\ChessGameRecords.csproj" />
     <ProjectReference Include="..\ChessEngine\ChessEngine.vcxproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\ChessGpuBackend\ChessGpuBackend.vcxproj" ReferenceOutputAssembly="false" />
   </ItemGroup>

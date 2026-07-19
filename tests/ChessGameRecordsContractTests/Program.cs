@@ -90,6 +90,43 @@ CheckFailure(checks, Context(4, 6, 4, 7), ChessSanError.InvalidPromotion, "last-
 CheckFailure(checks, Context(4, 5, 4, 6, promotion: 5), ChessSanError.InvalidPromotion, "promotion before last rank");
 CheckFailure(checks, Context(6, 5, 6, 6, piece: 5, mate: true), ChessSanError.InvalidCheckState, "mate without check");
 
+var history = new ChessGameHistory(ChessGameHistory.StandardInitialFen);
+var e4 = Record(0, 1, 1, "e2e4", "e4", ChessGameHistory.StandardInitialFen,
+    "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+checks.Check(history.TryCommit(e4, ChessGameResult.Ongoing, ChessTerminationReason.None, out _),
+    "structured history commits a valid first record");
+checks.Check(history.Moves.Count == 1 && history.Moves[0].San == "e4", "structured history exposes committed SAN");
+
+var invalidChain = Record(1, 1, -1, "e7e5", "e5", ChessGameHistory.StandardInitialFen,
+    "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2");
+checks.Check(!history.TryCommit(invalidChain, ChessGameResult.Ongoing, ChessTerminationReason.None, out _),
+    "structured history rejects a broken FEN chain");
+checks.Check(history.Moves.Count == 1, "rejected history commit does not mutate the active line");
+
+checks.Check(history.TryUndo(ChessGameHistory.StandardInitialFen, out var undone, out _) && undone?.Uci == "e2e4",
+    "structured history undo validates the restored native FEN");
+checks.Check(history.Moves.Count == 0 && history.RedoMoves.Count == 1, "undo moves the record to deterministic redo storage");
+checks.Check(!history.TryUndo(ChessGameHistory.StandardInitialFen, out _, out _), "empty structured history undo clean-fails");
+
+checks.Check(history.TryCommit(e4, ChessGameResult.Ongoing, ChessTerminationReason.None, out _),
+    "new branch can recommit after undo");
+checks.Check(history.RedoMoves.Count == 0, "new branch clears redo records");
+var snapshot = history.Snapshot();
+history.Reset("8/8/8/8/8/8/4K3/7k w - - 0 1");
+checks.Check(snapshot.Moves.Count == 1 && snapshot.Moves[0].San == "e4", "history snapshot remains immutable after reset");
+checks.Check(history.Moves.Count == 0 && history.InitialPosition.FullmoveNumber == 1, "history reset starts a new empty game");
+
+var badFenRejected = false;
+try
+{
+    _ = ChessPositionRecord.FromFen("not-fen");
+}
+catch (ArgumentException)
+{
+    badFenRejected = true;
+}
+checks.Check(badFenRejected, "position record rejects incomplete FEN");
+
 return checks.Finish("ChessGameRecordsContractTests");
 
 static ChessSanMoveContext Context(
@@ -113,6 +150,28 @@ static void CheckFailure(ContractChecks checks, ChessSanMoveContext context, Che
     var result = ChessSanGenerator.Generate(context);
     checks.Check(!result.Success && result.Error == expected && string.IsNullOrEmpty(result.San), $"SAN rejects {name}");
 }
+
+static ChessMoveRecord Record(int ply, int fullmove, int side, string uci, string san, string preFen, string postFen) => new(
+    ply,
+    fullmove,
+    side,
+    new ChessSquare(uci[0] - 'a', uci[1] - '1'),
+    new ChessSquare(uci[2] - 'a', uci[3] - '1'),
+    side,
+    0,
+    0,
+    ChessCastleKind.None,
+    false,
+    false,
+    false,
+    false,
+    preFen,
+    postFen,
+    uci,
+    san,
+    null,
+    null,
+    null);
 
 internal sealed record SanFixture(string Name, ChessSanMoveContext Context, string Expected);
 

@@ -1703,3 +1703,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | Canonical SAN | [PGN Specification, SAN export rules](https://www.saremba.de/chessgml/standards/pgn/pgn-complete.htm) and Phase 03 contract | SAN formatting is deterministic once exact legal context, ambiguity, capture, promotion, and post-move status are known. | Implement a pure `net8.0` generator in a WPF-free `ChessGameRecords` library. Reject inconsistent/illegal contexts instead of emitting fallback notation. | New library and managed contracts | More than 50 formatting fixtures plus invalid-context, determinism, and token-decomposition checks. |
 | Test isolation | Decomposed repository test registry and existing console contract pattern | Native loading is unnecessary for formatter edge cases and would make the SAN unit surface slower and platform-specific. | Test the formatter independently; Phase 04 native contracts remain responsible for legal context truth and later integration tests join the two layers. | `tests/run-tests.ps1`, new test project | `-Only ChessGameRecordsContractTests` builds and runs under the C# watchdog. |
+
+## P4M Phase 06 - Structured Chess2D History Integration
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Record authority | Phase 02 record design, Phase 04 descriptor ABI, Phase 05 SAN generator, current `MainWindow` move flow | WPF currently appends long-coordinate strings after live moves and separately removes strings on undo. It cannot prove a pre/post position chain. | Add immutable records and a small history controller in `ChessGameRecords`; create records transactionally from a temporary native engine loaded with pre-move FEN. | Game-record library, ChessApp, contracts | Record-chain, undo/redo branch, reset, SAN/UCI/FEN projection, native build, WPF build, and Chess2D targeted suites. |
+| WPF history projection | [Microsoft WPF data binding overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/data/) and current code-behind architecture | A full MVVM rewrite is unnecessary, but the `ListBox` must stop being storage authority. | Render read-only full-move rows from record snapshots and expose selected-ply SAN/UCI/pre/post FEN controls. | `MainWindow.xaml(.cs)` | WPF compile validates bindings/handlers; managed contracts validate model behavior without UI automation. |
