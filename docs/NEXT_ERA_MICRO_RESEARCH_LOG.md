@@ -1870,3 +1870,12 @@ Date: 2026-07-19
 | Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
 | --- | --- | --- | --- | --- | --- |
 | Process-level evidence | [.NET Process redirected I/O](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.processstartinfo.redirectstandardoutput) and repository C# watchdog policy | Direct class tests cannot detect stdout contamination, input-loop blocking, leaked child processes, or DLL packaging errors. | Run a real redirected `ChessUci.exe` with bounded waits and unconditional process-tree cleanup. | New subprocess contract test and test registry | Handshake, positions, search modes, stop, malformed/illegal input, telemetry, quit, and stdout whitelist. |
+
+## P4M Phase 25 - Unified Asset Repository Audit
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Runtime inventory | Tracked model root, v1 catalog, OBJ/MTL loader, project copy items and release/verify scripts | One 25.6 MiB legacy OBJ set serves Chess2D/Chess3D; there are no GLB or textures and Rubik is procedural. | Preserve the working OBJ path while building a manifest-authoritative v2 layer and explicit procedural fallback. | Audit document | Re-run extension/size inventory and packaging assertions at Phase 40. |
+| Provenance/private paths | Enabled-set README and every MTL/manifest | License evidence is incomplete and white MTLs contain absolute source texture paths. | Mark the set legacy/pending provenance, sanitize private paths before QA, and never infer rights from exporter metadata. | Audit and later manifest/QA files | Validator rejects absolute paths; final tracked scan contains none in runtime MTL. |
