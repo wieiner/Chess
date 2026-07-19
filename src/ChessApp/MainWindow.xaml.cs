@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
+using System.Windows.Threading;
 using ChessGameRecords;
 using Microsoft.Win32;
 
@@ -38,6 +39,9 @@ public partial class MainWindow : Window
     private string _currentSessionHash = string.Empty;
     private bool _sessionDirty;
     private string _recoveryStatus = "Recovery idle";
+    private readonly ChessSessionRecoveryService _recovery = new(ChessSessionRecoveryService.DefaultDirectory());
+    private readonly DispatcherTimer _autosaveTimer = new() { Interval = TimeSpan.FromMilliseconds(750) };
+    private long _autosaveSequence;
     private PieceTheme _pieceTheme = PieceTheme.Transparent;
     private Point _dragStart;
     private bool _is3DDragging;
@@ -65,14 +69,18 @@ public partial class MainWindow : Window
         _network.MessageReceived += Network_MessageReceived;
         _network.StatusChanged += status => Dispatcher.Invoke(() => NetworkStatusText.Text = status);
         _network.PeerConnected += () => Dispatcher.Invoke(() => _ = SendFenOverNetworkAsync());
+        _autosaveTimer.Tick += AutosaveTimer_Tick;
         RefreshCoordinates();
         ApplyDrawRulesFromUi();
         ApplyTablebasePathFromUi();
         RefreshAll();
+        Dispatcher.BeginInvoke(CheckRecoveryOnStartup, DispatcherPriority.ApplicationIdle);
     }
 
     protected override void OnClosed(EventArgs e)
     {
+        _autosaveTimer.Stop();
+        if (_sessionDirty) TryAutosave();
         _network.Dispose();
         _engine.Dispose();
         base.OnClosed(e);
@@ -1866,6 +1874,7 @@ public partial class MainWindow : Window
         _currentSessionPath = Path.GetFullPath(path);
         _currentSessionHash = result.Hash;
         _sessionDirty = false;
+        _recovery.DiscardForSession(_sessionId);
         AddRecentSession(_currentSessionPath);
         RefreshSessionStatus("saved");
     }
@@ -1884,7 +1893,7 @@ public partial class MainWindow : Window
         if (RecentSessionsBox.SelectedItem is string path) LoadSessionFrom(path);
     }
 
-    private void LoadSessionFrom(string path)
+    private void LoadSessionFrom(string path, bool recoveredCopy = false)
     {
         var loaded = _sessionFiles.Load(path);
         if (!loaded.Success || loaded.Document is null)
@@ -1916,14 +1925,15 @@ public partial class MainWindow : Window
 
         ApplySessionPresentation(loaded.Document);
         _sessionId = loaded.Document.SessionId;
-        _currentSessionPath = Path.GetFullPath(path);
+        _currentSessionPath = recoveredCopy ? null : Path.GetFullPath(path);
         _currentSessionHash = loaded.Hash;
-        _sessionDirty = loaded.Document.Dirty;
+        _sessionDirty = recoveredCopy || loaded.Document.Dirty;
         _replayPly = _gameHistory.Moves.Count;
         _selected = null;
         SetupModeBox.IsChecked = false;
         SyncSetupBoardFromEngine();
-        AddRecentSession(_currentSessionPath);
+        if (!recoveredCopy) AddRecentSession(Path.GetFullPath(path));
+        _recoveryStatus = recoveredCopy ? "Recovered copy open" : "Recovery checked";
         RefreshAll();
         RefreshSessionStatus("loaded");
     }
@@ -1982,6 +1992,8 @@ public partial class MainWindow : Window
         _currentSessionPath = null;
         _currentSessionHash = string.Empty;
         _sessionDirty = false;
+        _autosaveSequence = 0;
+        _autosaveTimer.Stop();
         RefreshSessionStatus("new");
     }
 
@@ -1989,6 +2001,8 @@ public partial class MainWindow : Window
     {
         _sessionDirty = true;
         _currentSessionHash = string.Empty;
+        _autosaveTimer.Stop();
+        _autosaveTimer.Start();
         RefreshSessionStatus("modified");
     }
 
@@ -2008,6 +2022,68 @@ public partial class MainWindow : Window
         var file = string.IsNullOrWhiteSpace(_currentSessionPath) ? "untitled" : Path.GetFileName(_currentSessionPath);
         var hash = string.IsNullOrWhiteSpace(_currentSessionHash) ? "unsaved" : _currentSessionHash[..12];
         SessionStatusText.Text = $"Session: {file}{(_sessionDirty ? " *" : string.Empty)} | hash {hash} | {action ?? "ready"} | {_recoveryStatus}";
+    }
+
+    private void AutosaveTimer_Tick(object? sender, EventArgs e)
+    {
+        _autosaveTimer.Stop();
+        TryAutosave();
+    }
+
+    private void TryAutosave()
+    {
+        if (!_sessionDirty || _busy || IsSetupMode()) return;
+        try
+        {
+            var result = _recovery.SaveAutosave(BuildSessionDocument(dirty: true), ++_autosaveSequence);
+            _recoveryStatus = result.Success ? "Autosaved" : $"Autosave failed: {result.Error}";
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            _recoveryStatus = $"Autosave failed: {ex.Message}";
+        }
+        RefreshSessionStatus();
+    }
+
+    private void CheckRecoveryOnStartup()
+    {
+        ChessRecoveryCandidate? candidate;
+        try
+        {
+            candidate = _recovery.GetLatestCandidate();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _recoveryStatus = $"Recovery scan failed: {ex.Message}";
+            RefreshSessionStatus();
+            return;
+        }
+        if (candidate is null)
+        {
+            _recoveryStatus = "No recovery pending";
+            RefreshSessionStatus();
+            return;
+        }
+
+        var answer = MessageBox.Show(this,
+            $"Найдена автосохранённая партия от {candidate.Document.ModifiedUtc.LocalDateTime:g}.\n" +
+            "Да: открыть восстановленную копию. Нет: удалить autosave. Отмена: оставить на потом.",
+            "Chess recovery", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+        if (answer == MessageBoxResult.Yes)
+        {
+            LoadSessionFrom(candidate.Path, recoveredCopy: true);
+        }
+        else if (answer == MessageBoxResult.No)
+        {
+            _recovery.Discard(candidate.Path);
+            _recoveryStatus = "Recovery discarded";
+            RefreshSessionStatus();
+        }
+        else
+        {
+            _recoveryStatus = "Recovery retained";
+            RefreshSessionStatus();
+        }
     }
 
     private static string BuildUci(ChessMoveDto move)

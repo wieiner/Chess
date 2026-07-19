@@ -382,6 +382,44 @@ finally
     Directory.Delete(sessionDirectory, recursive: true);
 }
 
+var recoveryDirectory = Path.Combine(Path.GetTempPath(), $"chess-recovery-contract-{Guid.NewGuid():N}");
+Directory.CreateDirectory(recoveryDirectory);
+try
+{
+    var recovery = new ChessSessionRecoveryService(recoveryDirectory, retention: 2);
+    File.WriteAllText(Path.Combine(recoveryDirectory, "incomplete.chesssession.json.tmp"), "partial");
+    File.WriteAllText(Path.Combine(recoveryDirectory, "corrupt.chesssession.json"), "{bad json");
+    checks.Check(recovery.GetCandidates().Count == 0, "recovery scan ignores incomplete temp and corrupt autosave files");
+
+    var firstRecovery = recovery.SaveAutosave(session, 1);
+    Thread.Sleep(5);
+    var secondRecovery = recovery.SaveAutosave(session, 2);
+    Thread.Sleep(5);
+    var thirdRecovery = recovery.SaveAutosave(session, 3);
+    var retained = recovery.GetCandidates(session.SessionId);
+    checks.Check(firstRecovery.Success && secondRecovery.Success && thirdRecovery.Success && retained.Count == 2 &&
+        retained[0].Document.Autosave?.Sequence == 3, "recovery autosave is atomic, ordered, and retention-bounded");
+
+    var explicitPath = Path.Combine(recoveryDirectory, "explicit.chesssession.json");
+    var explicitNewer = session with { ModifiedUtc = DateTimeOffset.UtcNow.AddMinutes(5), Dirty = false };
+    checks.Check(new ChessSessionFileService().Save(explicitPath, explicitNewer).Success &&
+        recovery.GetLatestCandidate(explicitPath) is null, "newer explicit session suppresses stale recovery");
+    checks.Check(ChessSessionRecoveryService.ShouldScheduleAfterAction(true) &&
+        !ChessSessionRecoveryService.ShouldScheduleAfterAction(false), "only accepted actions schedule autosave");
+
+    var latest = recovery.GetLatestCandidate();
+    checks.Check(latest is not null, "recovery exposes the latest valid candidate without mutating it");
+    if (latest is not null)
+    {
+        recovery.Discard(latest.Path);
+        checks.Check(!File.Exists(latest.Path), "recovery candidate can be explicitly discarded");
+    }
+}
+finally
+{
+    Directory.Delete(recoveryDirectory, recursive: true);
+}
+
 return checks.Finish("ChessGameRecordsContractTests");
 
 static ChessSanMoveContext Context(

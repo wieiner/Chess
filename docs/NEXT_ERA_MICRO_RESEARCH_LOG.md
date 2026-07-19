@@ -1808,3 +1808,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | Session workflow | [WPF dialogs overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/windows/how-to-open-common-system-dialog-box) and current PGN controls | PGN controls already occupy the game tab, but session state needs separate commands and status. | Add compact Save/Save As/Load/Recent controls and a distinct filename/dirty/hash/recovery status line. | `MainWindow.xaml(.cs)` | WPF build plus managed session contracts; no fragile UI automation. |
 | Transactional UI apply | Current `NativeChessEngine.SetFen` and `ChessGameHistory.TryLoad` contracts | Applying a deserialized document directly could leave engine and history split on failure. | Validate against candidate engine/history first and retain a rollback snapshot around final apply. | MainWindow session handlers | Invalid file remains rejected by file service; WPF build verifies handler wiring. |
+
+## P4M Phase 18 - Autosave and Recovery
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| User-local recovery | [.NET application data folders](https://learn.microsoft.com/en-us/dotnet/api/system.environment.specialfolder) and existing atomic session writer | Recovery is machine-local and must not enter the repository or overwrite an explicit save. | Store bounded autosaves under LocalApplicationData, debounce accepted changes, and open recovery as an unsaved copy. | Recovery service and WPF lifecycle | Ignore incomplete/corrupt files, bound retention, explicit-newer suppression, accepted/rejected scheduling tests. |
+| Recovery choice | [WPF threading model](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/threading-model) | Startup scanning and prompts must occur after controls initialize, while writes remain short and deterministic. | Dispatch the startup prompt at application idle; expose restore/discard/retain choices and recovery state in the session status. | MainWindow | WPF compile plus headless recovery service contracts. |
