@@ -1721,3 +1721,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | End-to-end SAN history | Existing C# native wrapper, Phase 04 descriptor, Phase 05 generator, and Phase 06 history controller | Native and managed contracts are individually green, but a stage gate must prove their composed FEN/SAN/history behavior. | Add a Windows console integration contract with friend access to the internal wrapper; do not widen production API visibility. | ChessApp assembly metadata, new workflow contracts, test registry | Real DLL tests cover legal preview no-mutation, illegal no-record, three-ply SAN chain, undo/recommit, reset replay, Fool's mate, stalemate, and draw claim. |
 | Search semantics | Current `Chess_MakeBestMoveEx` behavior | The current search ABI chooses and commits a best move; there is no separate non-committing search-preview API. | Require every successful AI move to create a record. Treat legal descriptor generation as the existing no-record preview path and document the distinction. | Verification report | Descriptor/GetLegalMoves preserve FEN and zero records; committed AI integration remains covered by WPF flow/build. |
+
+## P4M Phase 08 - PGN Document Model
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| PGN document topology | [Portable Game Notation Specification and Implementation Guide](https://www.saremba.de/chessgml/standards/pgn/pgn-complete.htm), sections 8.1 and 8.2 | The structured game history can supply a main line, but it has no lossless representation for ordered tags, comments, NAGs, or recursive variations. | Add an immutable, WPF-independent PGN document tree. Keep duplicate/ordered tags representable so a later tolerant parser can diagnose them instead of losing input. | `ChessGameRecords`, managed contracts | Verify Seven Tag Roster order, result markers, defensive collection copies, SetUp/FEN and custom tag order, comments, NAG range, and nested RAV. |
+| Result authority | PGN sections 8.1.1 and 8.2.6 | PGN repeats the result in the `Result` tag and the final movetext marker; mismatches must be detectable later. | Keep typed `PgnResult` separate from raw ordered tag pairs. Export strictness and import diagnostics remain Phase 09/11 responsibilities. | PGN model | Roundtrip all four termination markers while preserving raw tags. |

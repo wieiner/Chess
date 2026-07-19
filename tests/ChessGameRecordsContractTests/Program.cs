@@ -127,6 +127,51 @@ catch (ArgumentException)
 }
 checks.Check(badFenRejected, "position record rejects incomplete FEN");
 
+checks.Check(PgnSevenTagRoster.Names.SequenceEqual(new[] { "Event", "Site", "Date", "Round", "White", "Black", "Result" }),
+    "PGN Seven Tag Roster has canonical order");
+checks.Check(PgnResult.WhiteWin.ToMarker() == "1-0" && PgnResult.Draw.ToMarker() == "1/2-1/2" &&
+    PgnResultExtensions.TryParseMarker("*", out var ongoingPgn) && ongoingPgn == PgnResult.Ongoing,
+    "PGN result markers roundtrip");
+
+var sourceTags = new List<PgnTagPair>
+{
+    new("Event", "Model Contract"), new("Site", "?"), new("Date", "2026.07.19"), new("Round", "1"),
+    new("White", "White"), new("Black", "Black"), new("Result", "1-0"),
+    new("SetUp", "1"), new("FEN", ChessGameHistory.StandardInitialFen), new("Annotator", "P4M")
+};
+var variationMoves = new List<PgnMoveNode> { new(1, "c5", trailingComments: new[] { new PgnComment("Sicilian") }) };
+var mainMoves = new List<PgnMoveNode>
+{
+    new(0, "e4", nags: new[] { new PgnNag(1) }, trailingComments: new[] { new PgnComment("Main line") },
+        variations: new[] { new PgnVariation(variationMoves) }),
+    new(1, "e5", leadingComments: new[] { new PgnComment("Symmetric reply", PgnCommentStyle.Semicolon) })
+};
+var pgnGame = new PgnGame(sourceTags, new PgnVariation(mainMoves), PgnResult.WhiteWin);
+var pgnDocument = new PgnDocument(new[] { pgnGame });
+sourceTags.Clear();
+variationMoves.Clear();
+mainMoves.Clear();
+
+checks.Check(pgnDocument.Games.Count == 1 && pgnGame.Tags.Count == 10 && pgnGame.MainLine.Moves.Count == 2,
+    "PGN document model defensively freezes source collections");
+checks.Check(pgnGame.Tags[7].Name == "SetUp" && pgnGame.Tags[8].Name == "FEN" && pgnGame.FindTag("Annotator") == "P4M",
+    "PGN model preserves ordered custom and setup tags");
+var firstPgnMove = pgnGame.MainLine.Moves[0];
+checks.Check(firstPgnMove.FullmoveNumber == 1 && !firstPgnMove.IsBlackMove && firstPgnMove.Nags[0].ToString() == "$1",
+    "PGN move node exposes move number, side, and NAG");
+checks.Check(firstPgnMove.Variations.Count == 1 && firstPgnMove.Variations[0].Moves[0].San == "c5" &&
+    firstPgnMove.TrailingComments[0].Text == "Main line",
+    "PGN model represents comments and recursive annotation variations");
+checks.Check(pgnGame.MainLine.Moves[1].IsBlackMove && pgnGame.MainLine.Moves[1].LeadingComments[0].Style == PgnCommentStyle.Semicolon,
+    "PGN model preserves semicolon comment style");
+
+var invalidTagRejected = false;
+try { _ = new PgnTagPair("Bad-Tag", "value"); } catch (ArgumentException) { invalidTagRejected = true; }
+checks.Check(invalidTagRejected, "PGN model rejects invalid tag names");
+var invalidNagRejected = false;
+try { _ = new PgnNag(256); } catch (ArgumentOutOfRangeException) { invalidNagRejected = true; }
+checks.Check(invalidNagRejected, "PGN model rejects out-of-range NAG values");
+
 return checks.Finish("ChessGameRecordsContractTests");
 
 static ChessSanMoveContext Context(
