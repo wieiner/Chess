@@ -248,6 +248,36 @@ var boundedTokens = PgnTokenizer.Tokenize("1. e4 e5 *", new PgnTokenizerOptions(
 checks.Check(!boundedTokens.Success && boundedTokens.Tokens.Count == 0 && boundedTokens.Diagnostics.Single().Code == "tooManyTokens",
     "PGN tokenizer enforces token bound without partial output");
 
+var parsedExport = PgnParser.Parse(exported.Text, new PgnParserOptions(PgnParserMode.ExportStrict));
+checks.Check(parsedExport.Success && parsedExport.Document?.Games.Count == 1, "PGN parser reads strict exported document");
+var parsedGame = parsedExport.Document!.Games[0];
+checks.Check(parsedGame.Tags.Count == pgnGame.Tags.Count && parsedGame.Result == PgnResult.WhiteWin &&
+    parsedGame.MainLine.Moves.Select(move => move.San).SequenceEqual(new[] { "e4", "e5" }),
+    "PGN parser preserves tags, result, and main line");
+checks.Check(parsedGame.MainLine.Moves[0].Nags.Single().Value == 1 &&
+    parsedGame.MainLine.Moves[0].TrailingComments.Single().Text == "Main line" &&
+    parsedGame.MainLine.Moves[0].Variations.Single().Moves.Single().San == "c5",
+    "PGN parser preserves comments, NAG, and RAV");
+checks.Check(parsedGame.MainLine.Moves[1].LeadingComments.Single().Text == "Symmetric reply" &&
+    parsedGame.MainLine.Moves[1].LeadingComments.Single().Style == PgnCommentStyle.Brace,
+    "PGN parser preserves leading comment placement in canonical export");
+
+var tolerantParse = PgnParser.Parse("1. e4 e5 *", new PgnParserOptions(PgnParserMode.ImportTolerant));
+checks.Check(tolerantParse.Success && tolerantParse.Document?.Games[0].Tags.Count == 0,
+    "PGN tolerant parser accepts movetext without roster");
+var strictParse = PgnParser.Parse("1. e4 e5 *", new PgnParserOptions(PgnParserMode.ExportStrict));
+checks.Check(!strictParse.Success && strictParse.Diagnostics.Single().Code == "missingRequiredTag",
+    "PGN strict parser requires Seven Tag Roster");
+var duplicateRequiredParse = PgnParser.Parse("[Result \"*\"] [Result \"*\"] *");
+checks.Check(!duplicateRequiredParse.Success && duplicateRequiredParse.Diagnostics.Single().Code == "duplicateRequiredTag",
+    "PGN parser detects duplicate required tags");
+var mismatchParse = PgnParser.Parse("[Result \"1-0\"] 1. e4 0-1");
+checks.Check(!mismatchParse.Success && mismatchParse.Diagnostics.Single().Code == "resultMismatch",
+    "PGN parser rejects inconsistent termination marker");
+var badVariationParse = PgnParser.Parse("1. e4 (1... c5 *");
+checks.Check(!badVariationParse.Success && badVariationParse.Diagnostics.Single().Code == "unterminatedVariation",
+    "PGN parser rejects unterminated RAV without partial document");
+
 return checks.Finish("ChessGameRecordsContractTests");
 
 static ChessSanMoveContext Context(

@@ -1748,3 +1748,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | PGN lexical grammar | [PGN Specification](https://www.saremba.de/chessgml/standards/pgn/pgn-complete.htm), sections 7 and 8 | The exporter produces valid text, but import needs bounded lexical diagnostics before any document or engine mutation. | Implement a single-pass scanner without regular expressions. Emit explicit tokens for tag delimiters/names/strings, integers/periods, SAN symbols, both comment forms, NAG, RAV, results, and EOF. | `PgnTokenizer`, managed contracts | Comprehensive token fixture plus malformed string/comment/NAG, source locations, input bound, token bound, and empty output on failure. |
 | Import safety | PGN import-format tolerance and repository transaction boundary | A malformed or hostile file must not create a partial document that later code could mistake for a valid candidate game. | Bound input, tokens, token/comment lengths and return no tokens on the first lexical diagnostic. Preserve 1-based line/column for UI errors. | Tokenizer API | Fail-atomic assertions and deterministic linear scans; parser remains a separate phase. |
+
+## P4M Phase 11 - PGN Parser
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| PGN grammar | [PGN Specification](https://www.saremba.de/chessgml/standards/pgn/pgn-complete.htm), sections 8.1-8.2.6 | Phase 10 supplies bounded tokens, but no semantic document construction or result consistency checks. | Build a pure in-memory parser with tolerant/strict modes, ordered tags, mainline, comments, NAG, bounded nested RAV, and mandatory movetext result marker. | `PgnParser`, managed contracts | Strict exporter roundtrip, tolerant no-roster input, duplicate roster, result mismatch, comments/NAG/RAV, and unterminated variation. |
+| Transaction boundary | Current WPF/native game flow | Parsing must never apply SAN to the live engine; legality belongs to Phase 12/13 candidate replay. | Return either a complete immutable `PgnDocument` or one located diagnostic and no document. | Parser API | Every semantic failure asserts `Document == null`; no native dependency is introduced. |
