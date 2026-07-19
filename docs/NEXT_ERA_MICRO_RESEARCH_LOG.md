@@ -1817,3 +1817,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | User-local recovery | [.NET application data folders](https://learn.microsoft.com/en-us/dotnet/api/system.environment.specialfolder) and existing atomic session writer | Recovery is machine-local and must not enter the repository or overwrite an explicit save. | Store bounded autosaves under LocalApplicationData, debounce accepted changes, and open recovery as an unsaved copy. | Recovery service and WPF lifecycle | Ignore incomplete/corrupt files, bound retention, explicit-newer suppression, accepted/rejected scheduling tests. |
 | Recovery choice | [WPF threading model](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/threading-model) | Startup scanning and prompts must occur after controls initialize, while writes remain short and deterministic. | Dispatch the startup prompt at application idle; expose restore/discard/retain choices and recovery state in the session status. | MainWindow | WPF compile plus headless recovery service contracts. |
+
+## P4M Phase 19 - UCI Architecture Boundary
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| UCI process boundary | [UCI protocol specification mirror](https://backscattering.de/chess/uci/) and current ChessEngine C ABI | Native search currently commits its best move and has no public cancellation export. WPF is not an appropriate protocol host. | Build a console-only adapter with candidate engines for position/search and add one append-only cancellation export in Phase 22. | UCI architecture document; future console/native files | Subprocess transcripts must prove stdout cleanliness, responsiveness, timeout and process cleanup. |
+| Honest options/telemetry | Current search options and stats DTO | Hash size, worker threads, seldepth and multi-move PV are not exposed by the engine. | Do not advertise or synthesize unsupported values; emit only native depth/score/nodes/time and the validated best move. | UCI design | Transcript assertions reject invented option/info lines. |
