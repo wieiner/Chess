@@ -1739,3 +1739,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | Export format | [PGN Specification](https://www.saremba.de/chessgml/standards/pgn/pgn-complete.htm), sections 4.3, 8.1.1, 8.2, and 8.2.6 | Structured records contain canonical SAN and complete initial FEN, but no standards-compliant text writer exists. | Add a strict deterministic exporter with canonical roster order, escaped tag strings, move numbering, comments/NAG/RAV, result consistency, and bounded line width. | PGN exporter, contracts, export guide | Exact text assertions, deterministic repeat, escaping, result mismatch, missing roster, standard/nonstandard record adapters. |
 | Nonstandard start | PGN `SetUp` and `FEN` supplemental tag rules | A session can begin from any valid six-field FEN, including Black to move at an arbitrary fullmove number. | Carry explicit move side/fullmove in PGN nodes and emit paired `SetUp "1"`/`FEN` for nonstandard starts. | PGN model and exporter | Export a Black-to-move fullmove-23 fixture without deriving side from local ply index. |
+
+## P4M Phase 10 - PGN Tokenizer
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| PGN lexical grammar | [PGN Specification](https://www.saremba.de/chessgml/standards/pgn/pgn-complete.htm), sections 7 and 8 | The exporter produces valid text, but import needs bounded lexical diagnostics before any document or engine mutation. | Implement a single-pass scanner without regular expressions. Emit explicit tokens for tag delimiters/names/strings, integers/periods, SAN symbols, both comment forms, NAG, RAV, results, and EOF. | `PgnTokenizer`, managed contracts | Comprehensive token fixture plus malformed string/comment/NAG, source locations, input bound, token bound, and empty output on failure. |
+| Import safety | PGN import-format tolerance and repository transaction boundary | A malformed or hostile file must not create a partial document that later code could mistake for a valid candidate game. | Bound input, tokens, token/comment lengths and return no tokens on the first lexical diagnostic. Preserve 1-based line/column for UI errors. | Tokenizer API | Fail-atomic assertions and deterministic linear scans; parser remains a separate phase. |

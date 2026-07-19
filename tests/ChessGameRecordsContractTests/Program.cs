@@ -209,6 +209,45 @@ checks.Check(nonstandardExport.Success && nonstandardExport.Text.Contains("[SetU
     nonstandardExport.Text.Contains("[FEN \"7k/5Q2/6K1/8/8/8/8/8 b - - 0 23\"]", StringComparison.Ordinal),
     "structured nonstandard start exports matching SetUp and FEN tags");
 
+const string tokenFixture = "[Event \"A \\\"quoted\\\" event\"]\n[Result \"1-0\"]\n\n1. e4 $1 {main\ncomment} (1... c5 ;reply\n2. Nf3) e5 1-0";
+var tokenized = PgnTokenizer.Tokenize(tokenFixture);
+checks.Check(tokenized.Success && tokenized.Diagnostics.Count == 0, "PGN tokenizer accepts tags and annotated movetext");
+checks.Check(tokenized.Tokens.Select(token => token.Kind).Contains(PgnTokenKind.TagName) &&
+    tokenized.Tokens.Select(token => token.Kind).Contains(PgnTokenKind.QuotedString) &&
+    tokenized.Tokens.Select(token => token.Kind).Contains(PgnTokenKind.Nag) &&
+    tokenized.Tokens.Select(token => token.Kind).Contains(PgnTokenKind.Comment) &&
+    tokenized.Tokens.Select(token => token.Kind).Contains(PgnTokenKind.SemicolonComment) &&
+    tokenized.Tokens.Select(token => token.Kind).Contains(PgnTokenKind.LeftParenthesis) &&
+    tokenized.Tokens[^1].Kind == PgnTokenKind.EndOfFile,
+    "PGN tokenizer emits the complete lexical token family");
+checks.Check(tokenized.Tokens.First(token => token.Kind == PgnTokenKind.QuotedString).Value == "A \"quoted\" event",
+    "PGN tokenizer decodes quoted tag escapes");
+var c5Token = tokenized.Tokens.First(token => token.Value == "c5");
+checks.Check(c5Token.Location.Line == 5 && c5Token.Location.Column > 1,
+    "PGN tokenizer records one-based line and column locations");
+checks.Check(tokenized.Tokens.Count(token => token.Kind == PgnTokenKind.Result) == 1 &&
+    tokenized.Tokens.Count(token => token.Kind == PgnTokenKind.Integer) == 3 &&
+    tokenized.Tokens.Count(token => token.Kind == PgnTokenKind.Period) == 5,
+    "PGN tokenizer distinguishes results, move integers, and periods");
+
+var unterminatedString = PgnTokenizer.Tokenize("[Event \"broken]");
+checks.Check(!unterminatedString.Success && unterminatedString.Tokens.Count == 0 &&
+    unterminatedString.Diagnostics.Single().Code == "unterminatedString",
+    "PGN tokenizer fails atomically on unterminated string");
+var unterminatedComment = PgnTokenizer.Tokenize("1. e4 {broken");
+checks.Check(!unterminatedComment.Success && unterminatedComment.Tokens.Count == 0 &&
+    unterminatedComment.Diagnostics.Single().Code == "unterminatedComment",
+    "PGN tokenizer fails atomically on unterminated comment");
+var badNag = PgnTokenizer.Tokenize("1. e4 $256 *");
+checks.Check(!badNag.Success && badNag.Diagnostics.Single().Code == "invalidNag",
+    "PGN tokenizer rejects out-of-range NAG");
+var boundedInput = PgnTokenizer.Tokenize("12345", new PgnTokenizerOptions(MaxInputLength: 4));
+checks.Check(!boundedInput.Success && boundedInput.Diagnostics.Single().Code == "inputTooLarge",
+    "PGN tokenizer enforces input bound before scanning");
+var boundedTokens = PgnTokenizer.Tokenize("1. e4 e5 *", new PgnTokenizerOptions(MaxTokens: 3));
+checks.Check(!boundedTokens.Success && boundedTokens.Tokens.Count == 0 && boundedTokens.Diagnostics.Single().Code == "tooManyTokens",
+    "PGN tokenizer enforces token bound without partial output");
+
 return checks.Finish("ChessGameRecordsContractTests");
 
 static ChessSanMoveContext Context(
