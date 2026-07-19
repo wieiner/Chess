@@ -86,6 +86,21 @@ var invalidImport = NativeChessPgnImporter.Import(foolsMatePgn.Replace("Qh4#", "
 checks.Check(!invalidImport.Success && invalidImport.Game is null && engine.GetFen() == preservedFen,
     "invalid PGN import does not mutate live engine state");
 
+var fixtureRoot = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Pgn");
+foreach (var name in new[] { "standard_fools_mate", "castle_both_sides", "en_passant", "promotion_setup", "stalemate_setup", "comments_nag_rav" })
+{
+    var fixture = NativeChessPgnImporter.Import(File.ReadAllText(Path.Combine(fixtureRoot, name + ".pgn")));
+    checks.Check(fixture.Success, $"PGN interoperability legal fixture imports: {name}");
+}
+var annotationDocument = PgnParser.Parse(File.ReadAllText(Path.Combine(fixtureRoot, "comments_nag_rav.pgn"))).Document;
+checks.Check(annotationDocument?.Games[0].MainLine.Moves[0] is { Nags.Count: 1, Variations.Count: 1 },
+    "PGN interoperability fixture preserves NAG and simple RAV");
+foreach (var name in new[] { "malformed_tag", "illegal_san", "ambiguous_san", "inconsistent_result" })
+{
+    var fixture = NativeChessPgnImporter.Import(File.ReadAllText(Path.Combine(fixtureRoot, name + ".pgn")));
+    checks.Check(!fixture.Success && fixture.Game is null, $"PGN interoperability invalid fixture fails atomically: {name}");
+}
+
 return checks.Finish("Chess2DWorkflowContractTests");
 
 static ChessMoveRecord Commit(

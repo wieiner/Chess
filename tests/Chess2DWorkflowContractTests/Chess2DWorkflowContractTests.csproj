@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\ChessApp\ChessApp.csproj" />
     <ProjectReference Include="..\..\src\ChessGameRecords\ChessGameRecords.csproj" />
+    <Content Include="..\fixtures\pgn\*.pgn" Link="Fixtures\Pgn\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="CopyNativeChessEngine" AfterTargets="Build">
     <PropertyGroup>

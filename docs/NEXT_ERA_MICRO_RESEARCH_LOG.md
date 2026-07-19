@@ -1773,3 +1773,11 @@ Date: 2026-07-19
 | Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
 | --- | --- | --- | --- | --- | --- |
 | Transactional replay | PGN import rules, existing native FEN/legal-move APIs, WPF file dialogs | Parser and resolver are pure, but live UI state must not be used as the replay candidate. | Replay on an isolated `NativeChessEngine`, build a validated immutable history, then load final FEN/history into WPF only after success. | ChessApp importer/UI, history load API, workflow tests | Fool's mate import/result, illegal SAN no live mutation, WPF build, save/export path. |
+
+## P4M Phase 14 - PGN Interoperability Fixtures
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Interoperability corpus | PGN specification examples and repository legal-move contracts | External databases are unnecessary and introduce provenance risk. | Keep a compact authored fixture pack covering special legal moves, outcomes, setup FEN, annotations/RAV, and fail-closed malformed inputs. | `tests/fixtures/pgn`, workflow contracts, result doc | Copy fixtures to test output; run all legal files through native candidate replay and all invalid files through atomic rejection. |
