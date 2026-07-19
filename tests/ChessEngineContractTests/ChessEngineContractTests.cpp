@@ -37,6 +37,11 @@ bool TryMove(void* game, int fromFile, int fromRank, int toFile, int toRank, int
     ChessMoveDto local{};
     return Chess_TryMakeMove(game, fromFile, fromRank, toFile, toRank, promotion, played != nullptr ? played : &local) != 0;
 }
+
+bool DescribeMove(void* game, int fromFile, int fromRank, int toFile, int toRank, int promotion, ChessMoveDescriptorDto& descriptor)
+{
+    return Chess_GetMoveDescriptor(game, fromFile, fromRank, toFile, toRank, promotion, &descriptor) != 0;
+}
 }
 
 int main()
@@ -59,6 +64,17 @@ int main()
     const int moveCount = Chess_GetLegalMoves(game, moves, 256);
     test.Check(moveCount == 20, "Chess_GetLegalMoves returns 20 start moves");
     test.Check(HasMove(moves, moveCount, 4, 1, 4, 3), "e2e4 is legal in the start position");
+
+    ChessMoveDescriptorDto descriptor{};
+    const std::string descriptorStartFen = GetFen(game);
+    test.Check(DescribeMove(game, 4, 1, 4, 3, 0, descriptor), "Move descriptor accepts legal e2e4");
+    test.Check(descriptor.movedPiece == 1 && descriptor.capturedPiece == 0, "Move descriptor exposes moved and captured pieces");
+    test.Check(descriptor.move.fromFile == 4 && descriptor.move.toRank == 3, "Move descriptor carries the exact legal move");
+    test.Check(descriptor.disambiguation == 0 && descriptor.castleKind == 0, "Pawn move needs no piece disambiguation or castle kind");
+    test.Check(GetFen(game) == descriptorStartFen, "Move descriptor does not mutate FEN");
+    test.Check(Chess_Undo(game) == 0, "Move descriptor does not append undo history");
+    test.Check(!DescribeMove(game, 0, 0, 0, 3, 0, descriptor), "Move descriptor rejects an illegal blocked rook move");
+    test.Check(GetFen(game) == descriptorStartFen, "Rejected descriptor does not mutate FEN");
 
     ChessMoveDto played{};
     test.Check(TryMove(game, 4, 1, 4, 3, 0, &played), "Chess_TryMakeMove accepts e2e4");
@@ -88,11 +104,58 @@ int main()
     test.Check(TryMove(game, 4, 4, 3, 5, 0, &epMove), "En-passant capture e5xd6 is accepted");
     test.Check((epMove.flags & 4) != 0, "En-passant move reports en-passant flag");
 
+    Chess_Reset(game);
+    test.Check(TryMove(game, 4, 1, 4, 3), "EP descriptor setup: e2e4");
+    test.Check(TryMove(game, 0, 6, 0, 5), "EP descriptor setup: a7a6");
+    test.Check(TryMove(game, 4, 3, 4, 4), "EP descriptor setup: e4e5");
+    test.Check(TryMove(game, 3, 6, 3, 4), "EP descriptor setup: d7d5");
+    test.Check(DescribeMove(game, 4, 4, 3, 5, 0, descriptor), "En-passant descriptor is available");
+    test.Check((descriptor.move.flags & 4) != 0 && descriptor.capturedPiece == -1, "En-passant descriptor reports the captured pawn");
+
     const char* promotionFen = "8/P7/8/8/8/8/8/k6K w - - 0 1";
     test.Check(Chess_SetFen(game, promotionFen) == 1, "Promotion FEN loads");
     ChessMoveDto promotion{};
     test.Check(TryMove(game, 0, 6, 0, 7, 5, &promotion), "Promotion a7a8=Q is accepted");
     test.Check((promotion.flags & 8) != 0 && promotion.promotion == 5, "Promotion move reports promotion flag and queen");
+
+    test.Check(Chess_SetFen(game, promotionFen) == 1, "Promotion descriptor FEN reloads");
+    test.Check(DescribeMove(game, 0, 6, 0, 7, 2, descriptor), "Knight promotion descriptor is available");
+    test.Check((descriptor.move.flags & 8) != 0 && descriptor.move.promotion == 2, "Descriptor preserves the exact promotion choice");
+
+    test.Check(Chess_SetFen(game, castleFen) == 1, "Castling descriptor FEN reloads");
+    test.Check(DescribeMove(game, 4, 0, 6, 0, 0, descriptor), "King-side castling descriptor is available");
+    test.Check((descriptor.move.flags & 2) != 0 && descriptor.castleKind == 1, "Castling descriptor reports king-side kind");
+
+    const char* knightAmbiguityFen = "7k/8/8/8/8/8/8/1N3N1K w - - 0 1";
+    test.Check(Chess_SetFen(game, knightAmbiguityFen) == 1, "Knight ambiguity FEN loads");
+    test.Check(DescribeMove(game, 1, 0, 3, 1, 0, descriptor), "Ambiguous knight descriptor is available");
+    test.Check(descriptor.disambiguation == 1, "Knights on different files require file disambiguation");
+
+    const char* rookAmbiguityFen = "7k/8/8/8/8/R7/8/R6K w - - 0 1";
+    test.Check(Chess_SetFen(game, rookAmbiguityFen) == 1, "Rook ambiguity FEN loads");
+    test.Check(DescribeMove(game, 0, 0, 0, 1, 0, descriptor), "Ambiguous rook descriptor is available");
+    test.Check(descriptor.disambiguation == 2, "Rooks on the same file require rank disambiguation");
+
+    const char* bishopAmbiguityFen = "7k/8/8/8/8/8/8/2B3BK w - - 0 1";
+    test.Check(Chess_SetFen(game, bishopAmbiguityFen) == 1, "Bishop ambiguity FEN loads");
+    test.Check(DescribeMove(game, 2, 0, 4, 2, 0, descriptor), "Ambiguous bishop descriptor is available");
+    test.Check(descriptor.disambiguation == 1, "Bishops on different files require file disambiguation");
+
+    const char* bothAmbiguityFen = "7k/8/8/8/8/Q7/8/Q1Q4K w - - 0 1";
+    test.Check(Chess_SetFen(game, bothAmbiguityFen) == 1, "Both-coordinate ambiguity FEN loads");
+    test.Check(DescribeMove(game, 0, 0, 2, 2, 0, descriptor), "Both-coordinate descriptor is available");
+    test.Check(descriptor.disambiguation == 3, "File and rank conflicts require both-coordinate disambiguation");
+
+    const char* captureFen = "7k/8/8/8/8/8/4p3/4R2K w - - 0 1";
+    test.Check(Chess_SetFen(game, captureFen) == 1, "Capture descriptor FEN loads");
+    test.Check(DescribeMove(game, 4, 0, 4, 1, 0, descriptor), "Capture descriptor is available");
+    test.Check((descriptor.move.flags & 1) != 0 && descriptor.capturedPiece == -1, "Capture descriptor exposes capture flag and piece");
+
+    const char* mateMoveFen = "7k/8/5KQ1/8/8/8/8/8 w - - 0 1";
+    test.Check(Chess_SetFen(game, mateMoveFen) == 1, "Mate move descriptor FEN loads");
+    test.Check(DescribeMove(game, 6, 5, 6, 6, 0, descriptor), "Checkmate move descriptor is available");
+    test.Check(descriptor.resultingIsCheck == 1 && descriptor.resultingStatus == 1 && descriptor.resultingLegalMoveCount == 0,
+        "Move descriptor distinguishes checkmate from check");
 
     const char* mateFen = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3";
     test.Check(Chess_SetFen(game, mateFen) == 1, "Checkmate FEN loads");
@@ -144,4 +207,3 @@ int main()
     Chess_Destroy(game);
     return test.Finish("ChessEngineContractTests");
 }
-

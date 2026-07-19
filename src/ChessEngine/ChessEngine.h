@@ -43,6 +43,18 @@ struct ChessStateDto
     int canClaimFiftyMove;
 };
 
+struct ChessMoveDescriptorDto
+{
+    ChessMoveDto move;
+    int movedPiece;
+    int capturedPiece;
+    int castleKind;               // 0 none, 1 king-side, 2 queen-side
+    int disambiguation;           // file=1, rank=2; both bits may be set
+    int resultingStatus;
+    int resultingIsCheck;
+    int resultingLegalMoveCount;
+};
+
 struct ChessSearchOptionsDto
 {
     int depth;                  // 1..64, practical UI warning starts around 8
@@ -105,6 +117,7 @@ CHESS_API int Chess_SetTablebasePath(void* handle, const char* path);
 CHESS_API int Chess_GetTablebaseInfo(void* handle, ChessTablebaseInfoDto* info);
 CHESS_API int Chess_ClaimDraw(void* handle);
 CHESS_API int Chess_GetLegalMoves(void* handle, ChessMoveDto* buffer, int capacity);
+CHESS_API int Chess_GetMoveDescriptor(void* handle, int fromFile, int fromRank, int toFile, int toRank, int promotion, ChessMoveDescriptorDto* descriptor);
 CHESS_API int Chess_TryMakeMove(void* handle, int fromFile, int fromRank, int toFile, int toRank, int promotion, ChessMoveDto* playedMove);
 CHESS_API int Chess_MakeBestMove(void* handle, int depth, ChessMoveDto* playedMove);
 CHESS_API int Chess_MakeBestMoveEx(void* handle, const ChessSearchOptionsDto* options, ChessMoveDto* playedMove);

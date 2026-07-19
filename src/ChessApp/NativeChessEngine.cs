@@ -155,6 +155,12 @@ internal sealed class NativeChessEngine : IDisposable
         return buffer;
     }
 
+    public bool TryGetMoveDescriptor(int fromFile, int fromRank, int toFile, int toRank, int promotion, out ChessMoveDescriptorDto descriptor)
+    {
+        ThrowIfDisposed();
+        return Chess_GetMoveDescriptor(_handle, fromFile, fromRank, toFile, toRank, promotion, out descriptor) != 0;
+    }
+
     public bool TryMakeMove(int fromFile, int fromRank, int toFile, int toRank, int promotion, out ChessMoveDto move)
     {
         ThrowIfDisposed();
@@ -227,6 +233,9 @@ internal sealed class NativeChessEngine : IDisposable
     private static extern int Chess_GetLegalMoves(IntPtr handle, [Out] ChessMoveDto[] buffer, int capacity);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    private static extern int Chess_GetMoveDescriptor(IntPtr handle, int fromFile, int fromRank, int toFile, int toRank, int promotion, out ChessMoveDescriptorDto descriptor);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
     private static extern int Chess_TryMakeMove(IntPtr handle, int fromFile, int fromRank, int toFile, int toRank, int promotion, out ChessMoveDto playedMove);
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -255,6 +264,19 @@ internal struct ChessMoveDto
     public int Promotion;
     public int Flags;
     public int Score;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct ChessMoveDescriptorDto
+{
+    public ChessMoveDto Move;
+    public int MovedPiece;
+    public int CapturedPiece;
+    public int CastleKind;
+    public int Disambiguation;
+    public int ResultingStatus;
+    public int ResultingIsCheck;
+    public int ResultingLegalMoveCount;
 }
 
 [StructLayout(LayoutKind.Sequential)]

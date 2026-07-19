@@ -2033,6 +2033,99 @@ CHESS_API int Chess_GetLegalMoves(void* handle, ChessMoveDto* buffer, int capaci
     return static_cast<int>(legal.size());
 }
 
+CHESS_API int Chess_GetMoveDescriptor(
+    void* handle,
+    int fromFile,
+    int fromRank,
+    int toFile,
+    int toRank,
+    int promotion,
+    ChessMoveDescriptorDto* descriptor)
+{
+    if (descriptor == nullptr)
+    {
+        return 0;
+    }
+    *descriptor = ChessMoveDescriptorDto{};
+
+    auto* game = asGame(handle);
+    if (game == nullptr || !isInside(fromFile, fromRank) || !isInside(toFile, toRank) ||
+        game->drawClaimed || isDrawByRules(game->pos, game->drawRules))
+    {
+        return 0;
+    }
+
+    const int from = squareOf(fromFile, fromRank);
+    const int to = squareOf(toFile, toRank);
+    const int movingPiece = game->pos.board[from];
+    if (movingPiece == Empty)
+    {
+        return 0;
+    }
+
+    int wantedPromotion = promotion;
+    if (pieceType(movingPiece) == Pawn && (toRank == 0 || toRank == 7) && wantedPromotion == 0)
+    {
+        wantedPromotion = Queen;
+    }
+
+    const auto legal = generateLegalMoves(game->pos, false);
+    const auto selected = std::find_if(legal.begin(), legal.end(), [=](const Move& move)
+    {
+        return move.from == from && move.to == to && move.promotion == wantedPromotion;
+    });
+    if (selected == legal.end())
+    {
+        return 0;
+    }
+
+    Move move = *selected;
+    descriptor->move = toDto(move);
+    descriptor->movedPiece = movingPiece;
+    descriptor->capturedPiece = (move.flags & MoveEnPassant)
+        ? makePiece(-pieceColor(movingPiece), Pawn)
+        : game->pos.board[to];
+    if (move.flags & MoveCastle)
+    {
+        descriptor->castleKind = toFile == 6 ? 1 : (toFile == 2 ? 2 : 0);
+    }
+
+    const int movingType = pieceType(movingPiece);
+    if (movingType != Pawn)
+    {
+        bool hasConflict = false;
+        bool conflictOnFile = false;
+        bool conflictOnRank = false;
+        for (const Move& other : legal)
+        {
+            if (other.from == move.from || other.to != move.to)
+            {
+                continue;
+            }
+            const int otherPiece = game->pos.board[other.from];
+            if (pieceColor(otherPiece) != pieceColor(movingPiece) || pieceType(otherPiece) != movingType)
+            {
+                continue;
+            }
+            hasConflict = true;
+            conflictOnFile = conflictOnFile || fileOf(other.from) == fromFile;
+            conflictOnRank = conflictOnRank || rankOf(other.from) == fromRank;
+        }
+        if (hasConflict)
+        {
+            descriptor->disambiguation = !conflictOnFile ? 1 : (!conflictOnRank ? 2 : 3);
+        }
+    }
+
+    Position child = game->pos;
+    applyMove(child, move, false);
+    const auto resultingLegal = generateLegalMoves(child, false);
+    descriptor->resultingLegalMoveCount = static_cast<int>(resultingLegal.size());
+    descriptor->resultingIsCheck = isInCheck(child, child.side) ? 1 : 0;
+    descriptor->resultingStatus = statusOf(child, descriptor->resultingLegalMoveCount, game->drawRules, false);
+    return 1;
+}
+
 CHESS_API int Chess_TryMakeMove(void* handle, int fromFile, int fromRank, int toFile, int toRank, int promotion, ChessMoveDto* playedMove)
 {
     auto* game = asGame(handle);
