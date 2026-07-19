@@ -1826,3 +1826,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | UCI process boundary | [UCI protocol specification mirror](https://backscattering.de/chess/uci/) and current ChessEngine C ABI | Native search currently commits its best move and has no public cancellation export. WPF is not an appropriate protocol host. | Build a console-only adapter with candidate engines for position/search and add one append-only cancellation export in Phase 22. | UCI architecture document; future console/native files | Subprocess transcripts must prove stdout cleanliness, responsiveness, timeout and process cleanup. |
 | Honest options/telemetry | Current search options and stats DTO | Hash size, worker threads, seldepth and multi-move PV are not exposed by the engine. | Do not advertise or synthesize unsupported values; emit only native depth/score/nodes/time and the validated best move. | UCI design | Transcript assertions reject invented option/info lines. |
+
+## P4M Phase 20 - Bounded UCI Command Parser
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Command grammar | [UCI protocol specification mirror](https://backscattering.de/chess/uci/) | Commands are line-oriented and unknown input must not terminate the process. | Parse a bounded 16 KiB/256-token command line into typed commands; keep diagnostics on stderr. | `ChessUci` parser and entrypoint | Build now; Phase 24 exercises malformed/oversized input through an external process. |
+| Option honesty | Native search option/telemetry DTOs | Only adapter move overhead and opening-book toggle have real current behavior. | Advertise `MoveOverhead` and `OwnBook`; omit Hash and Threads until native contracts exist. | UCI handshake | Transcript checks expected options and absence of unsupported claims. |
