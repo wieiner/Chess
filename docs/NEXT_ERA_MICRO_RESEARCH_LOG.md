@@ -1790,3 +1790,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | Versioned JSON contract | [System.Text.Json overview](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/overview) and existing structured game records | PGN deliberately omits application presentation and search settings, while ad-hoc UI persistence would leak paths and lose deterministic move state. | Define a closed, versioned `chess2d-session` v1 schema containing structured game, semantic presentation IDs, engine limits, dirty state, and optional recovery metadata. | Session JSON Schema and format guide | Parse the schema in managed contracts in Phase 16 and roundtrip representative documents. |
 | Secret and path exclusion | [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html) | Session state does not need credentials or machine-specific absolute paths. | Exclude authentication material by design and permit only bounded semantic theme/model/backend identifiers. | Schema, format guide, validator | Reject rooted/path-shaped identifiers and scan tracked fixtures for credential fields. |
+
+## P4M Phase 16 - Transactional Session Persistence
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Durable replacement | [FileStream.Flush(Boolean)](https://learn.microsoft.com/en-us/dotnet/api/system.io.filestream.flush) and [File.Replace](https://learn.microsoft.com/en-us/dotnet/api/system.io.file.replace) | Direct overwrite could truncate the only recoverable session after a crash. | Write and flush a sibling `.tmp`, re-read and hash-validate it, then replace atomically with optional `.bak`. | Session serializer/file service | Inject failures before every replacement stage and prove the original remains byte-identical. |
+| Deterministic serialization | [System.Text.Json serialization](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/how-to) | Additional PGN tags are dictionary-backed and can otherwise inherit insertion order. | Normalize dictionaries with ordinal sorting, use explicit enum strings and reject unmapped JSON members. | Session document/serializer | Repeated serialization and save/load produce identical SHA-256 diagnostic fingerprints. |

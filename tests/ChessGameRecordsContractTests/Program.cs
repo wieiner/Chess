@@ -311,6 +311,77 @@ checks.Check(ChessSanResolver.Resolve("e8=R+", resolverCandidates).Error == Ches
 checks.Check(ChessSanResolver.Resolve("e8=Q", resolverCandidates).Error == ChessSanResolutionError.WrongCheckSuffix,
     "SAN resolver reports wrong check suffix");
 
+var sessionHistory = new ChessGameHistory(ChessGameHistory.StandardInitialFen);
+checks.Check(sessionHistory.TryCommit(e4, ChessGameResult.Ongoing, ChessTerminationReason.None, out _),
+    "session fixture commits a structured move");
+var session = ChessSessionDocument.FromGame(
+    sessionHistory.Snapshot(), e4.PostMoveFen,
+    new ChessSessionPresentation(ChessSessionBoardOrientation.White, "Classic", "procedural",
+        ChessSessionUiMode.Board2D),
+    new ChessSessionEngineOptions(true, "Cpu", 8, 1500, 100000, 2), dirty: true,
+    sessionId: Guid.Parse("d449b760-53e0-49ea-a6ef-fcb470dd76ae"));
+var serializedSession = ChessSessionSerializer.Serialize(session);
+checks.Check(serializedSession.Success && serializedSession.Json.Contains("\"format\": \"chess2d-session\"", StringComparison.Ordinal),
+    "session serializer emits valid versioned JSON");
+var repeatedSession = ChessSessionSerializer.Serialize(session);
+checks.Check(repeatedSession.Hash == serializedSession.Hash && repeatedSession.Json == serializedSession.Json,
+    "session JSON and diagnostic hash are deterministic");
+var loadedSession = ChessSessionSerializer.Deserialize(serializedSession.Json);
+checks.Check(loadedSession.Success && loadedSession.Document?.CurrentFen == e4.PostMoveFen &&
+    loadedSession.Document.ToGameRecord().Moves.Single().San == "e4",
+    "session JSON roundtrips structured game state");
+checks.Check(!ChessSessionSerializer.Deserialize("{not json").Success,
+    "invalid session JSON fails without a partial document");
+checks.Check(!ChessSessionSerializer.Serialize(session with { CurrentFen = ChessGameHistory.StandardInitialFen }).Success,
+    "session validator rejects a broken final FEN chain");
+checks.Check(!ChessSessionSerializer.Serialize(session with
+{
+    Presentation = session.Presentation with { ModelSetId = "C:\\private\\model.obj" }
+}).Success, "session validator rejects absolute presentation paths");
+
+var sessionDirectory = Path.Combine(Path.GetTempPath(), $"chess-session-contract-{Guid.NewGuid():N}");
+Directory.CreateDirectory(sessionDirectory);
+try
+{
+    var sessionPath = Path.Combine(sessionDirectory, "game.chesssession.json");
+    var fileService = new ChessSessionFileService();
+    var savedSession = fileService.Save(sessionPath, session);
+    checks.Check(savedSession.Success && File.Exists(sessionPath), "session file service saves through verified sibling file");
+    var originalBytes = File.ReadAllBytes(sessionPath);
+    var diskSession = fileService.Load(sessionPath);
+    checks.Check(diskSession.Success && diskSession.Hash == serializedSession.Hash,
+        "session file load preserves deterministic hash");
+
+    foreach (var stage in new[]
+             {
+                 ChessSessionFileStage.AfterTempWrite,
+                 ChessSessionFileStage.AfterFlush,
+                 ChessSessionFileStage.AfterVerify,
+                 ChessSessionFileStage.BeforeReplace
+             })
+    {
+        var failingService = new ChessSessionFileService(current =>
+        {
+            if (current == stage) throw new InvalidOperationException($"Injected {stage}");
+        });
+        var failedSave = failingService.Save(sessionPath, session with { Dirty = false });
+        checks.Check(!failedSave.Success && File.ReadAllBytes(sessionPath).SequenceEqual(originalBytes) &&
+            !File.Exists(sessionPath + ".tmp"), $"session save failure at {stage} preserves original and cleans temp");
+    }
+
+    var afterReplaceService = new ChessSessionFileService(stage =>
+    {
+        if (stage == ChessSessionFileStage.AfterReplace) throw new InvalidOperationException("Injected AfterReplace");
+    });
+    var afterReplace = afterReplaceService.Save(sessionPath, session);
+    checks.Check(!afterReplace.Success && fileService.Load(sessionPath).Success,
+        "post-replace injected failure leaves a complete readable destination");
+}
+finally
+{
+    Directory.Delete(sessionDirectory, recursive: true);
+}
+
 return checks.Finish("ChessGameRecordsContractTests");
 
 static ChessSanMoveContext Context(
