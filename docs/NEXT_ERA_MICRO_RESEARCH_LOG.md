@@ -1757,3 +1757,11 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | PGN grammar | [PGN Specification](https://www.saremba.de/chessgml/standards/pgn/pgn-complete.htm), sections 8.1-8.2.6 | Phase 10 supplies bounded tokens, but no semantic document construction or result consistency checks. | Build a pure in-memory parser with tolerant/strict modes, ordered tags, mainline, comments, NAG, bounded nested RAV, and mandatory movetext result marker. | `PgnParser`, managed contracts | Strict exporter roundtrip, tolerant no-roster input, duplicate roster, result mismatch, comments/NAG/RAV, and unterminated variation. |
 | Transaction boundary | Current WPF/native game flow | Parsing must never apply SAN to the live engine; legality belongs to Phase 12/13 candidate replay. | Return either a complete immutable `PgnDocument` or one located diagnostic and no document. | Parser API | Every semantic failure asserts `Document == null`; no native dependency is introduced. |
+
+## P4M Phase 12 - SAN to Legal Move Resolution
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| SAN resolution | PGN Specification section 8.2.3 and Phase 04 legal descriptor ABI | Current SAN parser tokens describe generated output, but import needs the inverse mapping against current legal moves. | Parse SAN constraints and filter only engine-supplied legal candidates by piece, destination, capture, disambiguation, promotion, castle, and check/mate. Never infer a coordinate move without exactly one legal match. | `ChessSanResolver`, managed and native workflow contracts | Normal/pawn/capture/en-passant/promotion/castle, ambiguity/disambiguation, mismatch categories, and no-mutation engine integration. |

@@ -11,6 +11,11 @@ checks.Check(engine.TryGetMoveDescriptor(4, 1, 4, 3, 0, out var e4Descriptor), "
 checks.Check(e4Descriptor.MovedPiece == NativeChessEngine.Pawn && engine.GetFen() == initialFen,
     "legal preview preserves native FEN");
 checks.Check(history.Moves.Count == 0, "legal preview creates no game record");
+var resolvedStartMove = ResolveSan(engine, "e4");
+checks.Check(resolvedStartMove.Success && resolvedStartMove.Move is { FromFile: 4, FromRank: 1, ToFile: 4, ToRank: 3 },
+    "SAN resolver selects e2e4 from real native legal candidates");
+checks.Check(engine.GetFen() == initialFen && history.Moves.Count == 0,
+    "SAN resolution preserves native FEN and structured history");
 
 checks.Check(!engine.TryMakeMove(0, 0, 0, 3, 0, out _), "illegal blocked rook move is rejected");
 checks.Check(engine.GetFen() == initialFen && history.Moves.Count == 0, "illegal move preserves FEN and history");
@@ -148,6 +153,28 @@ static string Uci(ChessMoveDto move)
         _ => string.Empty
     };
     return $"{(char)('a' + move.FromFile)}{move.FromRank + 1}{(char)('a' + move.ToFile)}{move.ToRank + 1}{promotion}";
+}
+
+static ChessSanResolutionResult ResolveSan(NativeChessEngine engine, string san)
+{
+    var candidates = new List<ChessLegalMoveCandidate>();
+    foreach (var move in engine.GetLegalMoves())
+    {
+        if (!engine.TryGetMoveDescriptor(move.FromFile, move.FromRank, move.ToFile, move.ToRank, move.Promotion, out var descriptor))
+        {
+            continue;
+        }
+        candidates.Add(new ChessLegalMoveCandidate(move.FromFile, move.FromRank, move.ToFile, move.ToRank, move.Promotion,
+            new ChessSanMoveContext(true, move.FromFile, move.FromRank, move.ToFile, move.ToRank,
+                descriptor.MovedPiece, descriptor.CapturedPiece, move.Promotion,
+                (move.Flags & NativeChessEngine.MoveCapture) != 0,
+                (move.Flags & NativeChessEngine.MoveEnPassant) != 0,
+                (ChessCastleKind)descriptor.CastleKind,
+                (ChessSanDisambiguation)descriptor.Disambiguation,
+                descriptor.ResultingIsCheck != 0,
+                descriptor.ResultingStatus == NativeChessEngine.StatusCheckmate)));
+    }
+    return ChessSanResolver.Resolve(san, candidates);
 }
 
 internal sealed class ContractChecks

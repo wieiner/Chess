@@ -278,6 +278,39 @@ var badVariationParse = PgnParser.Parse("1. e4 (1... c5 *");
 checks.Check(!badVariationParse.Success && badVariationParse.Diagnostics.Single().Code == "unterminatedVariation",
     "PGN parser rejects unterminated RAV without partial document");
 
+var resolverCandidates = new[]
+{
+    Candidate(6, 0, 5, 2, piece: 2),
+    Candidate(1, 0, 3, 1, piece: 2),
+    Candidate(4, 1, 4, 3),
+    Candidate(4, 4, 3, 5, captured: -1, enPassant: true),
+    Candidate(4, 6, 4, 7, promotion: 5, check: true),
+    Candidate(4, 0, 6, 0, piece: 6, castle: ChessCastleKind.KingSide)
+};
+checks.Check(ChessSanResolver.Resolve("Nf3", resolverCandidates).Move is { FromFile: 6, FromRank: 0 },
+    "SAN resolver selects a unique legal knight move");
+checks.Check(ChessSanResolver.Resolve("e4", resolverCandidates).Move is { FromFile: 4, ToRank: 3 },
+    "SAN resolver selects a legal pawn move");
+checks.Check(ChessSanResolver.Resolve("exd6", resolverCandidates).Move is { Context.IsEnPassant: true },
+    "SAN resolver selects legal en passant by constraints");
+checks.Check(ChessSanResolver.Resolve("e8=Q+", resolverCandidates).Move is { PromotionPiece: 5 },
+    "SAN resolver selects legal promotion and check suffix");
+checks.Check(ChessSanResolver.Resolve("O-O", resolverCandidates).Move is { Context.CastleKind: ChessCastleKind.KingSide },
+    "SAN resolver selects legal castling");
+checks.Check(ChessSanResolver.Resolve("Qa8", resolverCandidates).Error == ChessSanResolutionError.NoMatchingMove,
+    "SAN resolver reports no matching move");
+checks.Check(ChessSanResolver.Resolve("Nxd2", resolverCandidates).Error == ChessSanResolutionError.WrongCaptureMarker,
+    "SAN resolver reports wrong capture marker");
+var ambiguousCandidates = new[] { Candidate(1, 0, 3, 1, piece: 2), Candidate(5, 0, 3, 1, piece: 2) };
+checks.Check(ChessSanResolver.Resolve("Nd2", ambiguousCandidates).Error == ChessSanResolutionError.AmbiguousSan,
+    "SAN resolver rejects ambiguous SAN");
+checks.Check(ChessSanResolver.Resolve("Nbd2", ambiguousCandidates).Move is { FromFile: 1 },
+    "SAN resolver applies file disambiguation");
+checks.Check(ChessSanResolver.Resolve("e8=R+", resolverCandidates).Error == ChessSanResolutionError.WrongPromotion,
+    "SAN resolver reports wrong promotion");
+checks.Check(ChessSanResolver.Resolve("e8=Q", resolverCandidates).Error == ChessSanResolutionError.WrongCheckSuffix,
+    "SAN resolver reports wrong check suffix");
+
 return checks.Finish("ChessGameRecordsContractTests");
 
 static ChessSanMoveContext Context(
@@ -323,6 +356,12 @@ static ChessMoveRecord Record(int ply, int fullmove, int side, string uci, strin
     null,
     null,
     null);
+
+static ChessLegalMoveCandidate Candidate(int fromFile, int fromRank, int toFile, int toRank, int piece = 1,
+    int captured = 0, int promotion = 0, ChessCastleKind castle = ChessCastleKind.None, bool check = false,
+    bool mate = false, bool enPassant = false) => new(fromFile, fromRank, toFile, toRank, promotion,
+    Context(fromFile, fromRank, toFile, toRank, piece, captured, promotion, castle, check: check, mate: mate,
+        enPassant: enPassant));
 
 internal sealed record SanFixture(string Name, ChessSanMoveContext Context, string Expected);
 
