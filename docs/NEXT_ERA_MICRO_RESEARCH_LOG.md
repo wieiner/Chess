@@ -1694,3 +1694,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | SAN legal context | [PGN Specification, SAN section](https://www.saremba.de/chessgml/standards/pgn/pgn-complete.htm) and current `generateLegalMoves`/`applyMove` paths | Correct SAN needs pre-move capture/piece facts, legal same-piece alternatives, and post-move check/mate status. The public move DTO alone cannot distinguish mate or expose disambiguation. | Add one append-only `Chess_GetMoveDescriptor` ABI that evaluates an exact legal move on a copied position and returns all SAN context without mutating board/history. | `ChessEngine.h/.cpp`, C# wrapper, native contracts | Descriptor fixtures cover ordinary moves, captures, en passant, promotion, castling, file/rank/both disambiguation, checkmate, invalid input, and FEN/undo no-mutation. |
 | ABI stability | Existing packed DTOs and Cdecl P/Invoke declarations | Existing exports and DTO layouts are consumed by ChessApp and contract tests. | Append a new packed DTO and export; leave every existing field/function unchanged and mirror the layout in managed code. | Native header and `NativeChessEngine.cs` | Sequential native test and WPF builds catch C++ layout/export and P/Invoke compile regressions. |
+
+## P4M Phase 05 - Canonical SAN Generator
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Canonical SAN | [PGN Specification, SAN export rules](https://www.saremba.de/chessgml/standards/pgn/pgn-complete.htm) and Phase 03 contract | SAN formatting is deterministic once exact legal context, ambiguity, capture, promotion, and post-move status are known. | Implement a pure `net8.0` generator in a WPF-free `ChessGameRecords` library. Reject inconsistent/illegal contexts instead of emitting fallback notation. | New library and managed contracts | More than 50 formatting fixtures plus invalid-context, determinism, and token-decomposition checks. |
+| Test isolation | Decomposed repository test registry and existing console contract pattern | Native loading is unnecessary for formatter edge cases and would make the SAN unit surface slower and platform-specific. | Test the formatter independently; Phase 04 native contracts remain responsible for legal context truth and later integration tests join the two layers. | `tests/run-tests.ps1`, new test project | `-Only ChessGameRecordsContractTests` builds and runs under the C# watchdog. |
