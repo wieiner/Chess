@@ -1835,3 +1835,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | Command grammar | [UCI protocol specification mirror](https://backscattering.de/chess/uci/) | Commands are line-oriented and unknown input must not terminate the process. | Parse a bounded 16 KiB/256-token command line into typed commands; keep diagnostics on stderr. | `ChessUci` parser and entrypoint | Build now; Phase 24 exercises malformed/oversized input through an external process. |
 | Option honesty | Native search option/telemetry DTOs | Only adapter move overhead and opening-book toggle have real current behavior. | Advertise `MoveOverhead` and `OwnBook`; omit Hash and Threads until native contracts exist. | UCI handshake | Transcript checks expected options and absence of unsupported claims. |
+
+## P4M Phase 21 - Transactional UCI Position
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Position replay | UCI `position` grammar and native FEN/move ABI | `Chess_TryMakeMove` validates coordinates but mutates its handle. | Parse startpos or exactly six FEN fields, replay all coordinate moves on a candidate handle, and commit only its final FEN. | UCI native adapter and position controller | External Phase 24 transcript checks startpos/FEN/promotion and illegal no-partial-commit behavior. |
+| Process resilience | UCI protocol error handling | A malformed GUI command must not terminate an engine process. | Route errors to stderr, retain authority FEN, and continue the input loop. | UCI entrypoint | Send malformed then valid `isready` in one subprocess. |

@@ -3,6 +3,7 @@ using ChessUci;
 var debug = false;
 var moveOverhead = 30;
 var ownBook = true;
+using var position = new UciPositionController();
 
 while (Console.ReadLine() is { } line)
 {
@@ -43,9 +44,17 @@ while (Console.ReadLine() is { } line)
         case UciCommandKind.PonderHit:
             if (debug) Console.Error.WriteLine($"UCI debug: {command.Kind} is a compatibility no-op");
             break;
+        case UciCommandKind.NewGame:
+            position.Authority.Reset();
+            break;
+        case UciCommandKind.Position:
+            if (!position.TryApply(command.Arguments, out var positionError))
+                Console.Error.WriteLine($"UCI error: {positionError}");
+            break;
         case UciCommandKind.Quit:
             return 0;
-        default:
+        case UciCommandKind.Go:
+        case UciCommandKind.Stop:
             Console.Error.WriteLine($"UCI error: {command.Kind} is recognized but not active in this build stage");
             break;
     }
