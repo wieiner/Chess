@@ -31,6 +31,13 @@ public partial class MainWindow : Window
     private bool _busy;
     private string? _currentPgnPath;
     private int _replayPly;
+    private readonly ChessSessionFileService _sessionFiles = new();
+    private readonly List<string> _recentSessionPaths = new();
+    private Guid _sessionId = Guid.NewGuid();
+    private string? _currentSessionPath;
+    private string _currentSessionHash = string.Empty;
+    private bool _sessionDirty;
+    private string _recoveryStatus = "Recovery idle";
     private PieceTheme _pieceTheme = PieceTheme.Transparent;
     private Point _dragStart;
     private bool _is3DDragging;
@@ -331,6 +338,7 @@ public partial class MainWindow : Window
         SetupModeBox.IsChecked = false;
         SyncSetupBoardFromEngine();
         ResetGameHistory();
+        StartNewSession();
         RefreshAll();
         _ = SendFenOverNetworkAsync();
     }
@@ -348,6 +356,7 @@ public partial class MainWindow : Window
             _gameHistory.Reset(_engine.GetFen());
             MessageBox.Show(this, historyError, "Chess history", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+        MarkSessionDirty();
         RefreshAll();
         _ = SendFenOverNetworkAsync();
     }
@@ -369,6 +378,7 @@ public partial class MainWindow : Window
         SetupModeBox.IsChecked = false;
         SyncSetupBoardFromEngine();
         ResetGameHistory();
+        StartNewSession();
         RefreshAll();
         _ = SendFenOverNetworkAsync();
     }
@@ -1624,6 +1634,8 @@ public partial class MainWindow : Window
             {
                 return RejectCommittedMove(historyError);
             }
+            _replayPly = _gameHistory.Moves.Count;
+            MarkSessionDirty();
             return true;
         }
         catch (Exception ex)
@@ -1730,6 +1742,7 @@ public partial class MainWindow : Window
               (string.IsNullOrWhiteSpace(selected.Comment) ? string.Empty : $" Comment: {selected.Comment}");
         SelectedPreFenBox.Text = selected?.PreMoveFen ?? string.Empty;
         SelectedPostFenBox.Text = selected?.PostMoveFen ?? string.Empty;
+        RefreshSessionStatus();
     }
 
     private void CopySan_Click(object sender, RoutedEventArgs e)
@@ -1763,6 +1776,8 @@ public partial class MainWindow : Window
         _currentPgnPath = dialog.FileName;
         _replayPly = _gameHistory.Moves.Count;
         _selected = null;
+        StartNewSession();
+        MarkSessionDirty();
         RefreshAll();
     }
 
@@ -1806,6 +1821,193 @@ public partial class MainWindow : Window
             MoveSelectionBox.SelectedItem = MoveSelectionBox.Items.OfType<MoveSelectionItem>()
                 .FirstOrDefault(item => item.Record.PlyIndex == plyCount - 1);
         }
+    }
+
+    private void SaveSession_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_currentSessionPath))
+        {
+            SaveSessionAs_Click(sender, e);
+            return;
+        }
+        SaveSessionTo(_currentSessionPath);
+    }
+
+    private void SaveSessionAs_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Chess session (*.chesssession.json)|*.chesssession.json",
+            DefaultExt = ".chesssession.json",
+            AddExtension = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        SaveSessionTo(dialog.FileName);
+    }
+
+    private void SaveSessionTo(string path)
+    {
+        ChessSessionDocument document;
+        try
+        {
+            document = BuildSessionDocument(dirty: false);
+        }
+        catch (InvalidOperationException ex)
+        {
+            MessageBox.Show(this, ex.Message, "Session save", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var result = _sessionFiles.Save(path, document);
+        if (!result.Success)
+        {
+            MessageBox.Show(this, result.Error, "Session save", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+        _currentSessionPath = Path.GetFullPath(path);
+        _currentSessionHash = result.Hash;
+        _sessionDirty = false;
+        AddRecentSession(_currentSessionPath);
+        RefreshSessionStatus("saved");
+    }
+
+    private void LoadSession_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = "Chess session (*.chesssession.json)|*.chesssession.json|All files (*.*)|*.*"
+        };
+        if (dialog.ShowDialog(this) == true) LoadSessionFrom(dialog.FileName);
+    }
+
+    private void OpenRecentSession_Click(object sender, RoutedEventArgs e)
+    {
+        if (RecentSessionsBox.SelectedItem is string path) LoadSessionFrom(path);
+    }
+
+    private void LoadSessionFrom(string path)
+    {
+        var loaded = _sessionFiles.Load(path);
+        if (!loaded.Success || loaded.Document is null)
+        {
+            MessageBox.Show(this, loaded.Error, "Session load", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        var candidateHistory = new ChessGameHistory(loaded.Document.StartingFen);
+        using var candidateEngine = new NativeChessEngine();
+        var game = loaded.Document.ToGameRecord();
+        var validationError = "Session candidate engine rejected the current position.";
+        if (!candidateEngine.SetFen(loaded.Document.CurrentFen) || !candidateHistory.TryLoad(game, out validationError))
+        {
+            MessageBox.Show(this, validationError, "Session load", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        var previousFen = _engine.GetFen();
+        var previousGame = _gameHistory.Snapshot();
+        var applyError = "Live engine rejected the validated session position.";
+        if (!_engine.SetFen(loaded.Document.CurrentFen) || !_gameHistory.TryLoad(game, out applyError))
+        {
+            _engine.SetFen(previousFen);
+            _gameHistory.TryLoad(previousGame, out _);
+            MessageBox.Show(this, applyError, "Session load", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        ApplySessionPresentation(loaded.Document);
+        _sessionId = loaded.Document.SessionId;
+        _currentSessionPath = Path.GetFullPath(path);
+        _currentSessionHash = loaded.Hash;
+        _sessionDirty = loaded.Document.Dirty;
+        _replayPly = _gameHistory.Moves.Count;
+        _selected = null;
+        SetupModeBox.IsChecked = false;
+        SyncSetupBoardFromEngine();
+        AddRecentSession(_currentSessionPath);
+        RefreshAll();
+        RefreshSessionStatus("loaded");
+    }
+
+    private ChessSessionDocument BuildSessionDocument(bool dirty)
+    {
+        var fullGame = _gameHistory.Snapshot();
+        var currentFen = _engine.GetFen();
+        var currentPly = fullGame.Moves.Count;
+        if (currentFen != (currentPly == 0 ? fullGame.InitialPosition.Fen : fullGame.Moves[^1].PostMoveFen))
+        {
+            currentPly = currentFen == fullGame.InitialPosition.Fen
+                ? 0
+                : fullGame.Moves.TakeWhile(move => move.PostMoveFen != currentFen).Count() + 1;
+            if (currentPly > fullGame.Moves.Count ||
+                (currentPly > 0 && fullGame.Moves[currentPly - 1].PostMoveFen != currentFen))
+                throw new InvalidOperationException("Current board is not part of the structured history chain.");
+        }
+        var currentGame = currentPly == fullGame.Moves.Count
+            ? fullGame
+            : fullGame with
+            {
+                Moves = fullGame.Moves.Take(currentPly).ToArray(),
+                RedoMoves = Array.Empty<ChessMoveRecord>(),
+                Result = ChessGameResult.Ongoing,
+                Termination = ChessTerminationReason.None
+            };
+        var search = BuildSearchOptions();
+        var presentation = new ChessSessionPresentation(
+            IsBlackView() ? ChessSessionBoardOrientation.Black : ChessSessionBoardOrientation.White,
+            _pieceTheme.ToString(),
+            (ModelSetBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "procedural",
+            Mode3DBox.IsChecked == true ? ChessSessionUiMode.Board3D : ChessSessionUiMode.Board2D);
+        var engine = new ChessSessionEngineOptions(true, "NativeChessEngine", search.Depth, search.TimeLimitMs, 0, 1);
+        return ChessSessionDocument.FromGame(currentGame, currentFen, presentation, engine, dirty, _sessionId);
+    }
+
+    private void ApplySessionPresentation(ChessSessionDocument document)
+    {
+        PlayerSideBox.SelectedIndex = document.Presentation.BoardOrientation == ChessSessionBoardOrientation.Black ? 1 : 0;
+        ThemeBox.SelectedIndex = Enum.TryParse<PieceTheme>(document.Presentation.PieceTheme, out var theme)
+            ? theme switch { PieceTheme.ClassicBmp => 1, PieceTheme.Unicode => 2, _ => 0 }
+            : 0;
+        Mode3DBox.IsChecked = document.Presentation.UiMode == ChessSessionUiMode.Board3D;
+        var model = ModelSetBox.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => string.Equals(item.Content?.ToString(), document.Presentation.ModelSetId,
+                StringComparison.OrdinalIgnoreCase));
+        if (model is not null) ModelSetBox.SelectedItem = model;
+        DepthBox.Text = document.Engine.MaxDepth.ToString();
+        TimeLimitBox.Text = document.Engine.TimeLimitMilliseconds.ToString();
+    }
+
+    private void StartNewSession()
+    {
+        _sessionId = Guid.NewGuid();
+        _currentSessionPath = null;
+        _currentSessionHash = string.Empty;
+        _sessionDirty = false;
+        RefreshSessionStatus("new");
+    }
+
+    private void MarkSessionDirty()
+    {
+        _sessionDirty = true;
+        _currentSessionHash = string.Empty;
+        RefreshSessionStatus("modified");
+    }
+
+    private void AddRecentSession(string path)
+    {
+        _recentSessionPaths.RemoveAll(item => string.Equals(item, path, StringComparison.OrdinalIgnoreCase));
+        _recentSessionPaths.Insert(0, path);
+        if (_recentSessionPaths.Count > 8) _recentSessionPaths.RemoveRange(8, _recentSessionPaths.Count - 8);
+        RecentSessionsBox.ItemsSource = null;
+        RecentSessionsBox.ItemsSource = _recentSessionPaths.ToArray();
+        RecentSessionsBox.SelectedIndex = 0;
+    }
+
+    private void RefreshSessionStatus(string? action = null)
+    {
+        if (SessionStatusText is null) return;
+        var file = string.IsNullOrWhiteSpace(_currentSessionPath) ? "untitled" : Path.GetFileName(_currentSessionPath);
+        var hash = string.IsNullOrWhiteSpace(_currentSessionHash) ? "unsaved" : _currentSessionHash[..12];
+        SessionStatusText.Text = $"Session: {file}{(_sessionDirty ? " *" : string.Empty)} | hash {hash} | {action ?? "ready"} | {_recoveryStatus}";
     }
 
     private static string BuildUci(ChessMoveDto move)

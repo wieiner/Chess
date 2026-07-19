@@ -1799,3 +1799,12 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | Durable replacement | [FileStream.Flush(Boolean)](https://learn.microsoft.com/en-us/dotnet/api/system.io.filestream.flush) and [File.Replace](https://learn.microsoft.com/en-us/dotnet/api/system.io.file.replace) | Direct overwrite could truncate the only recoverable session after a crash. | Write and flush a sibling `.tmp`, re-read and hash-validate it, then replace atomically with optional `.bak`. | Session serializer/file service | Inject failures before every replacement stage and prove the original remains byte-identical. |
 | Deterministic serialization | [System.Text.Json serialization](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/how-to) | Additional PGN tags are dictionary-backed and can otherwise inherit insertion order. | Normalize dictionaries with ordinal sorting, use explicit enum strings and reject unmapped JSON members. | Session document/serializer | Repeated serialization and save/load produce identical SHA-256 diagnostic fingerprints. |
+
+## P4M Phase 17 - Chess2D Session UI
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Session workflow | [WPF dialogs overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/windows/how-to-open-common-system-dialog-box) and current PGN controls | PGN controls already occupy the game tab, but session state needs separate commands and status. | Add compact Save/Save As/Load/Recent controls and a distinct filename/dirty/hash/recovery status line. | `MainWindow.xaml(.cs)` | WPF build plus managed session contracts; no fragile UI automation. |
+| Transactional UI apply | Current `NativeChessEngine.SetFen` and `ChessGameHistory.TryLoad` contracts | Applying a deserialized document directly could leave engine and history split on failure. | Validate against candidate engine/history first and retain a rollback snapshot around final apply. | MainWindow session handlers | Invalid file remains rejected by file service; WPF build verifies handler wiring. |

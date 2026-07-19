@@ -224,6 +224,8 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <ListView x:Name="MoveList" Background="#20252B" Foreground="{StaticResource TextBrush}"
                                       BorderBrush="#46505C" SelectionChanged="MoveList_SelectionChanged">
@@ -248,10 +250,19 @@
                                 <Button Content="Копировать SAN" Click="CopySan_Click" />
                                 <Button Content="Копировать UCI" Click="CopyUci_Click" />
                             </WrapPanel>
-                            <TextBlock x:Name="MoveHistoryStatusText" Grid.Row="3" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,8" />
-                            <TextBox x:Name="SelectedPreFenBox" Grid.Row="4" IsReadOnly="True" TextWrapping="Wrap"
+                            <WrapPanel Grid.Row="3" Margin="0,0,0,8">
+                                <Button Content="Save Session" Click="SaveSession_Click" />
+                                <Button Content="Save Session As" Click="SaveSessionAs_Click" />
+                                <Button Content="Load Session" Click="LoadSession_Click" />
+                                <ComboBox x:Name="RecentSessionsBox" Width="180" Margin="0,0,6,0"
+                                          ToolTip="Recent sessions (current app run)" />
+                                <Button Content="Open Recent" Click="OpenRecentSession_Click" />
+                            </WrapPanel>
+                            <TextBlock x:Name="SessionStatusText" Grid.Row="4" Foreground="#8FD3A9" TextWrapping="Wrap" Margin="0,0,0,6" />
+                            <TextBlock x:Name="MoveHistoryStatusText" Grid.Row="5" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,8" />
+                            <TextBox x:Name="SelectedPreFenBox" Grid.Row="6" IsReadOnly="True" TextWrapping="Wrap"
                                      MinHeight="48" Margin="0,0,0,8" ToolTip="FEN до выбранного хода" />
-                            <TextBox x:Name="SelectedPostFenBox" Grid.Row="5" IsReadOnly="True" TextWrapping="Wrap"
+                            <TextBox x:Name="SelectedPostFenBox" Grid.Row="7" IsReadOnly="True" TextWrapping="Wrap"
                                      MinHeight="48" ToolTip="FEN после выбранного хода" />
                         </Grid>
                     </TabItem>
