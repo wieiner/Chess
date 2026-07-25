@@ -16,6 +16,11 @@ Run("Khronos adapter skips when unavailable", TestKhronosSkip, failures);
 Run("runtime model boundary freezes collections", TestRuntimeBoundary, failures);
 Run("runtime resource policy rejects external paths", TestRuntimeResourcePolicy, failures);
 Run("runtime checked arithmetic rejects overflow", TestRuntimeArithmetic, failures);
+Run("GLB loader reads triangle hierarchy and material", TestGlbTriangle, failures);
+Run("GLB loader reads embedded texture and multiple primitives", TestGlbTextureAndPrimitives, failures);
+Run("GLB loader rejects corrupt and unsafe accessors", TestGlbFailures, failures);
+Run("GLB loader reports optional and rejects required extensions", TestGlbExtensions, failures);
+Run("GLB loader enforces declared limits", TestGlbLimits, failures);
 Run("exactly five Chess3D rule profiles remain", TestFiveProfiles, failures);
 
 if (failures.Count > 0)
@@ -190,6 +195,82 @@ static void TestRuntimeArithmetic()
     Throws<FormatException>(() => RuntimeModelSecurity.CheckedRangeEnd(0, 1, 4, 8));
 }
 
+static void TestGlbTriangle()
+{
+    using var fixture = GlbFixture.Create(requiredExtension: false, invalidIndex: false, nanPosition: false);
+    var model = new GlbRuntimeModelLoader().LoadAsync(new()
+    {
+        Path = fixture.Path,
+        ExpectedSha256 = fixture.Sha256
+    }).GetAwaiter().GetResult();
+    Equal(1, model.Meshes.Count, "GLB mesh count");
+    Equal(1, model.Meshes[0].Primitives.Count, "GLB primitive count");
+    Equal(3, model.Meshes[0].Primitives[0].Vertices.Positions.Count, "GLB vertices");
+    Equal(3, model.Meshes[0].Primitives[0].Indices.Indices.Count, "GLB indices");
+    Equal(1, model.Materials.Count, "GLB materials");
+    if (!model.Bounds.IsFinite || model.Bounds.Minimum.X < 1.9f)
+        throw new InvalidOperationException("Nested node translation did not affect world bounds.");
+}
+
+static void TestGlbTextureAndPrimitives()
+{
+    using var fixture = GlbFixture.Create(false, false, false, textured: true, multiplePrimitives: true);
+    var model = Load(fixture);
+    Equal(2, model.Meshes[0].Primitives.Count, "multiple primitive count");
+    Equal(1, model.Textures.Count, "embedded texture count");
+    Equal("image/png", model.Textures[0].MimeType, "embedded texture MIME");
+    Equal(0, model.Materials[0].BaseColorTextureIndex, "base color texture index");
+}
+
+static void TestGlbFailures()
+{
+    using (var fixture = GlbFixture.Create(false, invalidIndex: true, nanPosition: false))
+        Throws<FormatException>(() => Load(fixture));
+    using (var fixture = GlbFixture.Create(false, invalidIndex: false, nanPosition: true))
+        Throws<FormatException>(() => Load(fixture));
+    using (var fixture = GlbFixture.Create(false, false, false))
+    {
+        var bytes = File.ReadAllBytes(fixture.Path);
+        bytes[0] = 0;
+        File.WriteAllBytes(fixture.Path, bytes);
+        var sha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
+        Throws<FormatException>(() => new GlbRuntimeModelLoader().LoadAsync(new()
+        {
+            Path = fixture.Path,
+            ExpectedSha256 = sha
+        }).GetAwaiter().GetResult());
+    }
+}
+
+static void TestGlbExtensions()
+{
+    using (var optional = GlbFixture.Create(false, false, false, optionalExtension: true))
+    {
+        var model = Load(optional);
+        Equal(1, model.Diagnostics.UnsupportedFeatures.Count, "optional extension diagnostics");
+    }
+    using var required = GlbFixture.Create(requiredExtension: true, false, false);
+    Throws<NotSupportedException>(() => Load(required));
+}
+
+static void TestGlbLimits()
+{
+    using var fixture = GlbFixture.Create(false, false, false);
+    Throws<FormatException>(() => new GlbRuntimeModelLoader().LoadAsync(new()
+    {
+        Path = fixture.Path,
+        ExpectedSha256 = fixture.Sha256,
+        Limits = new RuntimeModelLoadLimits { MaxFileBytes = 20 }
+    }).GetAwaiter().GetResult());
+}
+
+static RuntimeModelAsset Load(GlbFixture fixture) =>
+    new GlbRuntimeModelLoader().LoadAsync(new()
+    {
+        Path = fixture.Path,
+        ExpectedSha256 = fixture.Sha256
+    }).GetAwaiter().GetResult();
+
 static void TestFiveProfiles()
 {
     var profileRoot = Path.Combine(Root(), "assets", "rules", "profiles");
@@ -305,6 +386,149 @@ sealed class ValidatorFixture : IDisposable
             }
         ]
     };
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);
+    }
+}
+
+sealed class GlbFixture : IDisposable
+{
+    private readonly string _root;
+    public string Path { get; }
+    public string Sha256 { get; }
+
+    private GlbFixture(string root, string path, string sha256)
+    {
+        _root = root;
+        Path = path;
+        Sha256 = sha256;
+    }
+
+    public static GlbFixture Create(
+        bool requiredExtension,
+        bool invalidIndex,
+        bool nanPosition,
+        bool optionalExtension = false,
+        bool textured = false,
+        bool multiplePrimitives = false)
+    {
+        var root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chess-glb", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var path = System.IO.Path.Combine(root, "fixture.glb");
+        var binary = new List<byte>();
+        void Float(float value) => binary.AddRange(BitConverter.GetBytes(value));
+        Float(nanPosition ? float.NaN : 0); Float(0); Float(0);
+        Float(1); Float(0); Float(0);
+        Float(0); Float(1); Float(0);
+        var indexOffset = binary.Count;
+        binary.AddRange(BitConverter.GetBytes((ushort)0));
+        binary.AddRange(BitConverter.GetBytes((ushort)1));
+        binary.AddRange(BitConverter.GetBytes((ushort)(invalidIndex ? 9 : 2)));
+        while (binary.Count % 4 != 0) binary.Add(0);
+        var imageOffset = binary.Count;
+        if (textured) binary.AddRange(new byte[] { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a });
+
+        var bufferViews = new List<object>
+        {
+            new Dictionary<string, object?> { ["buffer"] = 0, ["byteOffset"] = 0, ["byteLength"] = 36 },
+            new Dictionary<string, object?> { ["buffer"] = 0, ["byteOffset"] = indexOffset, ["byteLength"] = 6 }
+        };
+        if (textured)
+            bufferViews.Add(new Dictionary<string, object?> { ["buffer"] = 0, ["byteOffset"] = imageOffset, ["byteLength"] = 8 });
+        var primitive = new Dictionary<string, object?>
+        {
+            ["attributes"] = new Dictionary<string, object?> { ["POSITION"] = 0 },
+            ["indices"] = 1,
+            ["material"] = 0
+        };
+        var primitives = multiplePrimitives ? new object[] { primitive, new Dictionary<string, object?>(primitive) } : new object[] { primitive };
+        var pbr = new Dictionary<string, object?>
+        {
+            ["baseColorFactor"] = new[] { 0.9, 0.8, 0.7, 1.0 }
+        };
+        if (textured) pbr["baseColorTexture"] = new Dictionary<string, object?> { ["index"] = 0 };
+
+        var gltf = new Dictionary<string, object?>
+        {
+            ["asset"] = new Dictionary<string, object?> { ["version"] = "2.0" },
+            ["buffers"] = new object[] { new Dictionary<string, object?> { ["byteLength"] = binary.Count } },
+            ["bufferViews"] = bufferViews,
+            ["accessors"] = new object[]
+            {
+                new Dictionary<string, object?> { ["bufferView"] = 0, ["componentType"] = 5126, ["count"] = 3, ["type"] = "VEC3" },
+                new Dictionary<string, object?> { ["bufferView"] = 1, ["componentType"] = 5123, ["count"] = 3, ["type"] = "SCALAR" }
+            },
+            ["materials"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["name"] = "Ivory",
+                    ["pbrMetallicRoughness"] = pbr
+                }
+            },
+            ["meshes"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["name"] = "Triangle",
+                    ["primitives"] = primitives
+                }
+            },
+            ["nodes"] = new object[]
+            {
+                new Dictionary<string, object?> { ["name"] = "Parent", ["translation"] = new[] { 2, 0, 0 }, ["children"] = new[] { 1 } },
+                new Dictionary<string, object?> { ["name"] = "Piece", ["mesh"] = 0 }
+            },
+            ["scenes"] = new object[] { new Dictionary<string, object?> { ["nodes"] = new[] { 0 } } },
+            ["scene"] = 0
+        };
+        if (optionalExtension || requiredExtension)
+            gltf["extensionsUsed"] = new[] { "KHR_example_unsupported" };
+        if (requiredExtension)
+            gltf["extensionsRequired"] = new[] { "KHR_example_unsupported" };
+        if (textured)
+        {
+            gltf["images"] = new object[]
+            {
+                new Dictionary<string, object?> { ["bufferView"] = 2, ["mimeType"] = "image/png", ["name"] = "Tiny" }
+            };
+            gltf["textures"] = new object[]
+            {
+                new Dictionary<string, object?> { ["source"] = 0 }
+            };
+        }
+        var json = JsonSerializer.Serialize(gltf);
+        var jsonBytes = System.Text.Encoding.UTF8.GetBytes(json);
+        var paddedJson = Pad(jsonBytes, 0x20);
+        var paddedBin = Pad(binary.ToArray(), 0);
+        using var stream = File.Create(path);
+        using var writer = new BinaryWriter(stream);
+        writer.Write((uint)0x46546C67);
+        writer.Write((uint)2);
+        writer.Write((uint)(12 + 8 + paddedJson.Length + 8 + paddedBin.Length));
+        writer.Write((uint)paddedJson.Length);
+        writer.Write((uint)0x4E4F534A);
+        writer.Write(paddedJson);
+        writer.Write((uint)paddedBin.Length);
+        writer.Write((uint)0x004E4942);
+        writer.Write(paddedBin);
+        writer.Flush();
+        writer.Dispose();
+        stream.Dispose();
+        var sha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            File.ReadAllBytes(path))).ToLowerInvariant();
+        return new(root, path, sha);
+    }
+
+    private static byte[] Pad(byte[] input, byte value)
+    {
+        var length = (input.Length + 3) & ~3;
+        var result = Enumerable.Repeat(value, length).Select(item => (byte)item).ToArray();
+        input.CopyTo(result, 0);
+        return result;
+    }
 
     public void Dispose()
     {

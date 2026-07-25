@@ -1947,3 +1947,11 @@ Date: 2026-07-25
 | Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
 | Parser/renderer isolation | glTF scene/node/accessor model and [WPF 3D overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/3-d-graphics-overview) | Existing OBJ loader builds WPF objects while parsing, preventing headless GLB validation and safe background loading. | Introduce immutable renderer-neutral nodes, primitives, materials, textures, bounds, diagnostics and explicit limits. | Exposing JSON/library objects to WPF would couple security and presentation concerns. | `RuntimeModelAsset` boundary and contracts | Collection copy, SHA identity, URI/traversal rejection and checked-overflow contracts. |
+
+## P4M Phase 34 - Bounded GLB Loading
+
+Date: 2026-07-25
+
+| Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| Static GLB parser | [Khronos glTF 2.0 specification](https://github.com/KhronosGroup/glTF/tree/main/specification/2.0), especially GLB, accessors, meshes, nodes and materials | Runtime needs static pieces/markers, not arbitrary animation or extension execution. | Parse a closed embedded GLB subset with checked offsets/counts and all-or-nothing immutable output. | Silent extension skipping, external URI fetching and broad generic deserialization violate the bounded loader decision. | Loader, generated contracts, runtime guide | Triangle/material/hierarchy, corrupt header, bad index, NaN, optional/required extension fixtures. |
