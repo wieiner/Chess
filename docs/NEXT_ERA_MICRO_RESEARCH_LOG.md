@@ -1922,3 +1922,12 @@ Date: 2026-07-25
 | Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
 | Optional authoring conversion | [Blender 4.2 glTF manual](https://docs.blender.org/manual/en/4.2/addons/import_export/scene_gltf2.html) and Blender background scripting behavior | Blender is not installed locally; runtime must not depend on it. | Provide an explicit offline adapter with factory/background mode, disabled autoexec, bounded process execution, deterministic normalization and report. | Installing Blender automatically or invoking files with auto-run scripts would cross the requested trust boundary. | PowerShell adapter, Blender Python script, operator note | Missing-Blender dry run must return `SKIPPED`; Python syntax compiles with the bundled Python parser when available. |
+
+## P4M Phase 31 - Asset Validation Service
+
+Date: 2026-07-25
+
+| Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| Mandatory internal validation | Khronos glTF 2.0 container rules, Khronos glTF Validator CLI model, and .NET bounded file/process APIs | Import currently proves copies and hashes but cannot establish usable mesh topology. | Add a managed package validator with strict manifest, containment, hashes, size/license/role gates and bounded OBJ/GLB inspection. | Depending only on an external validator would make CI and offline import nondeterministic. | `ModelAssetValidator`, contracts, validation guide | Valid OBJ, missing/SHA, NaN/index, required role, and optional-validator skip contracts. |
+| External validator adapter | [Khronos glTF Validator repository](https://github.com/KhronosGroup/glTF-Validator) | The validator is not installed in the current environment. | Run only when an executable is explicitly configured; timeout and normalize the result, otherwise report `SKIPPED`. | Auto-download or network execution is outside the offline trust boundary. | Khronos adapter | Missing executable produces deterministic `SKIPPED`; internal checks still run. |

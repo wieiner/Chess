@@ -128,6 +128,19 @@ try {
         throw "Generated manifest contains an unsafe path."
     }
 
+    $validator = Join-Path $repositoryRoot "tools\ModelAssetValidator\bin\Release\net8.0\ModelAssetValidator.exe"
+    if (-not (Test-Path -LiteralPath $validator)) {
+        dotnet build (Join-Path $repositoryRoot "tools\ModelAssetValidator\ModelAssetValidator.csproj") `
+            -c Release --nologo | Out-Host
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $validator)) {
+            throw "Model asset validator build failed."
+        }
+    }
+    $validationOutput = & $validator --manifest $manifestPath 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Model asset validation failed: $($validationOutput -join [Environment]::NewLine)"
+    }
+
     $result = [ordered]@{
         setId = $SetId
         role = $Role
@@ -137,6 +150,7 @@ try {
         staging = ".tmp/asset-import/$([IO.Path]::GetFileName($staging))"
         destination = ([IO.Path]::GetRelativePath($repositoryRoot, $setDestination) -replace '\\', '/')
         dryRun = [bool]$DryRun
+        validation = "PASS"
         status = if ($DryRun) { "DRY_RUN_VALID" } else { "PROMOTED" }
     }
     $result | ConvertTo-Json -Depth 4

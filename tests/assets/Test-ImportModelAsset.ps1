@@ -19,7 +19,21 @@ try {
     $glb = Join-Path $caseRoot "placeholder.glb"
     $license = Join-Path $caseRoot "LICENSE.txt"
     "v 0 0 0`nv 1 0 0`nv 0 1 0`nf 1 2 3" | Set-Content -LiteralPath $obj -Encoding ascii
-    [IO.File]::WriteAllBytes($glb, [byte[]](0x67,0x6c,0x54,0x46,0x02,0x00,0x00,0x00,0x0c,0x00,0x00,0x00))
+    $jsonBytes = [Text.Encoding]::UTF8.GetBytes('{"asset":{"version":"2.0"}}')
+    $paddedLength = [int]([Math]::Ceiling($jsonBytes.Length / 4.0) * 4)
+    $memory = [IO.MemoryStream]::new()
+    $writer = [IO.BinaryWriter]::new($memory)
+    $writer.Write([uint32]0x46546C67)
+    $writer.Write([uint32]2)
+    $writer.Write([uint32](12 + 8 + $paddedLength))
+    $writer.Write([uint32]$paddedLength)
+    $writer.Write([uint32]0x4E4F534A)
+    $writer.Write($jsonBytes)
+    for ($index = $jsonBytes.Length; $index -lt $paddedLength; $index++) { $writer.Write([byte]0x20) }
+    $writer.Flush()
+    [IO.File]::WriteAllBytes($glb, $memory.ToArray())
+    $writer.Dispose()
+    $memory.Dispose()
     "CC0-1.0 synthetic contract fixture" | Set-Content -LiteralPath $license -Encoding ascii
 
     $dry = & $importer -InputPath $obj -SetId "dry-run" -Role "chess.white.king" `
