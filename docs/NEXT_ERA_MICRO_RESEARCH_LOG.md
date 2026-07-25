@@ -1931,3 +1931,11 @@ Date: 2026-07-25
 | --- | --- | --- | --- | --- | --- | --- |
 | Mandatory internal validation | Khronos glTF 2.0 container rules, Khronos glTF Validator CLI model, and .NET bounded file/process APIs | Import currently proves copies and hashes but cannot establish usable mesh topology. | Add a managed package validator with strict manifest, containment, hashes, size/license/role gates and bounded OBJ/GLB inspection. | Depending only on an external validator would make CI and offline import nondeterministic. | `ModelAssetValidator`, contracts, validation guide | Valid OBJ, missing/SHA, NaN/index, required role, and optional-validator skip contracts. |
 | External validator adapter | [Khronos glTF Validator repository](https://github.com/KhronosGroup/glTF-Validator) | The validator is not installed in the current environment. | Run only when an executable is explicitly configured; timeout and normalize the result, otherwise report `SKIPPED`. | Auto-download or network execution is outside the offline trust boundary. | Khronos adapter | Missing executable produces deterministic `SKIPPED`; internal checks still run. |
+
+## P4M Phase 32 - GLB Loader Decision
+
+Date: 2026-07-25
+
+| Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| WPF GLB runtime | [glTF 2.0 specification](https://github.com/KhronosGroup/glTF/tree/main/specification/2.0), [SharpGLTF](https://github.com/vpenades/SharpGLTF), [Unity glTFast](https://github.com/atteneder/glTFast), [UnityGLTF](https://github.com/KhronosGroup/UnityGLTF), and [Assimp](https://github.com/assimp/assimp) | WPF needs a small immutable static-mesh subset; no current application uses Unity or an extra native importer. | Implement a bounded no-library GLB subset, retain OBJ/procedural fallbacks, and repeat the audit if advanced features become required. | Unity libraries do not fit WPF; Assimp broadens native deployment; adding SharpGLTF now gives less control without a demonstrated feature need. | Loader decision document | Phase 34 fixtures cover every supported accessor/container/material path and every declared unsupported class. |
