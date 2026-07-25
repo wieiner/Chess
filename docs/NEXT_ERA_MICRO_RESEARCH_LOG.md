@@ -1906,3 +1906,11 @@ Date: 2026-07-25
 | Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
 | Git/LFS boundary | [GitHub LFS](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-git-large-file-storage), [repository limits](https://docs.github.com/en/repositories/creating-and-managing-repositories/repository-limits), [billing](https://docs.github.com/en/billing/using-the-new-billing-platform/about-billing-for-git-large-file-storage), and [archive behavior](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/managing-git-lfs-objects-in-archives-of-your-repository) | Runtime models total 25.6 MiB; largest legacy OBJ is 2.60 MiB. Git LFS is installed locally but no model pattern uses it. | Keep current stable assets in normal Git; make 5 MiB a review trigger and require explicit approval before LFS. | Automatic extension-wide LFS would make clones/archives/CI depend on LFS before any approved large asset exists. | Storage policy only | `.gitattributes` remains unchanged; inventory and tracked raw-archive scans are recorded. |
+
+## P4M Phase 29 - Offline Model Import
+
+Date: 2026-07-25
+
+| Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| Transactional local import | .NET `Path.GetFullPath`, `FileInfo.Attributes`, SHA-256 APIs, and the Phase 26 repository boundary | Raw assets are deliberately ignored and cannot be made runtime-ready by a blind copy. | Require local file, license and provenance; hash an isolated copy and promote a v2 draft only after bounded checks. | URL import, implicit archive extraction, source overwrite, and implicit FBX conversion expand the trust boundary. | Import script, contract script, operator note | OBJ dry run, GLB promotion, SHA, missing license, extension, traversal, duplicate, URL, and cleanup checks. |
