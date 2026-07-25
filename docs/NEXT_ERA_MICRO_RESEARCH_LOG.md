@@ -1955,3 +1955,12 @@ Date: 2026-07-25
 | Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
 | Static GLB parser | [Khronos glTF 2.0 specification](https://github.com/KhronosGroup/glTF/tree/main/specification/2.0), especially GLB, accessors, meshes, nodes and materials | Runtime needs static pieces/markers, not arbitrary animation or extension execution. | Parse a closed embedded GLB subset with checked offsets/counts and all-or-nothing immutable output. | Silent extension skipping, external URI fetching and broad generic deserialization violate the bounded loader decision. | Loader, generated contracts, runtime guide | Triangle/material/hierarchy, corrupt header, bad index, NaN, optional/required extension fixtures. |
+
+## P4M Phase 35 - WPF Conversion and Fallback
+
+Date: 2026-07-25
+
+| Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| WPF conversion/cache | [Microsoft WPF 3D performance](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/maximize-wpf-3d-performance) and [Freezable overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/freezable-objects-overview) | Existing OBJ meshes are cached, but GLB needs renderer conversion without parsing on the UI thread. | Add a small WPF library that pre-sizes, freezes and caches geometry/material/texture/model resources by validated content identity. | Mutable per-frame geometry and unconditional back materials increase WPF render cost. | `ModelAssets.Wpf`, WPF contracts | Frozen model/mesh, cache reuse, double-sided behavior and build. |
+| Fallback authority | Existing OBJ/procedural paths | GLB failure must not make pieces disappear or hide the cause. | Resolve validated GLB, then validated OBJ, then procedural with an explicit reason. | Silent exception swallowing would make QA non-reproducible. | Pure resolver and contracts | GLB preference, unsupported-to-OBJ, missing-to-procedural cases. |
