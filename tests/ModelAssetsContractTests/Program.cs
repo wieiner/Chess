@@ -14,6 +14,7 @@ Run("catalog discovers complete GLB Chess2D set", TestGlbCatalogDiscovery, failu
 Run("incomplete Chess2D set reports missing roles", TestIncompleteSet, failures);
 Run("model set selection falls back by semantic id", TestSetSelectionFallback, failures);
 Run("Chess3D profile asset plans remain isolated", TestChess3DProfilePlans, failures);
+Run("Rubik overrides preserve authoritative stickers", TestRubikOverridePlan, failures);
 Run("validator accepts synthetic OBJ", TestValidatorAcceptsObj, failures);
 Run("validator rejects file and SHA failures", TestValidatorRejectsFiles, failures);
 Run("validator rejects malformed geometry", TestValidatorRejectsGeometry, failures);
@@ -208,6 +209,31 @@ static void TestChess3DProfilePlans()
     Equal(true, plans[4].OptionalRoles.Contains("hodge.projectionArrow"), "Hodge arrow role");
     Equal(false, plans[4].OptionalRoles.Any(role => role.StartsWith("asgard.", StringComparison.Ordinal)),
         "Hodge isolation");
+}
+
+static void TestRubikOverridePlan()
+{
+    var procedural = RubikAssetOverridePlanner.Plan(null);
+    Equal(false, procedural.HasCubieBody, "procedural body");
+    Equal(true, procedural.StickersRemainAuthoritative, "procedural sticker authority");
+
+    var manifest = Sample() with
+    {
+        SupportedApps = ["Rubik"],
+        Assets =
+        [
+            Sample().Assets[0] with
+            {
+                AssetId = "rubik-body",
+                Role = "rubik.cubieBody"
+            }
+        ]
+    };
+    var set = new ModelAssetSetDescriptor(manifest, Root(), "synthetic", false, "synthetic");
+    var body = RubikAssetOverridePlanner.Plan(set);
+    Equal(true, body.HasCubieBody, "optional body");
+    Equal(false, body.HasStickerShape, "missing sticker shape");
+    Equal(true, body.StickersRemainAuthoritative, "override sticker authority");
 }
 
 static void TestValidatorAcceptsObj()

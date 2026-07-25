@@ -12,9 +12,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ModelAssets\ModelAssets.csproj" />
+    <ProjectReference Include="..\ModelAssets.Wpf\ModelAssets.Wpf.csproj" />
     <ProjectReference Include="..\RubikEngine\RubikEngine.vcxproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\RubikState\RubikState.csproj" />
     <ProjectReference Include="..\RubikVisuals\RubikVisuals.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\ChessApp\ObjModelLibrary.cs" Link="ObjModelLibrary.cs" />
+    <Content Include="..\..\assets\models\**\*.*" Link="Assets\Models\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <Target Name="CopyNativeRubikEngine" AfterTargets="Build">

@@ -102,6 +102,14 @@
                     </Border>
 
                     <Border Style="{StaticResource CommandGroupStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Model override" Style="{StaticResource LabelStyle}" />
+                            <ComboBox x:Name="ModelSetBox" Width="190"
+                                      SelectionChanged="ModelSetBox_SelectionChanged" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CommandGroupStyle}">
                         <StackPanel>
                             <WrapPanel>
                                 <Button Content="Save State" Click="SaveStateFile_Click" />

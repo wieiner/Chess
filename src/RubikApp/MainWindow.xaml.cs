@@ -9,7 +9,10 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
+using ChessApp;
 using Microsoft.Win32;
+using ModelAssets;
+using ModelAssets.Wpf;
 using RubikState;
 using RubikVisuals;
 
@@ -24,6 +27,14 @@ public partial class MainWindow : Window
     private readonly RubikStateFileService _stateFileService = new();
     private readonly List<string> _recentStateFiles = new();
     private readonly Model3DGroup _scene = new();
+    private ModelAssetCatalogResult _modelCatalog = new([], []);
+    private ModelAssetSetDescriptor? _selectedModelSet;
+    private readonly ObjModelLibrary _objModels = new();
+    private readonly GlbRuntimeModelLoader _glbLoader = new();
+    private readonly WpfRuntimeModelFactory _wpfModelFactory = new();
+    private Model3D? _rubikBodyPrototype;
+    private CancellationTokenSource? _modelLoadCancellation;
+    private string _modelOverrideDiagnostics = "procedural Rubik renderer";
     private readonly List<CubeVisual> _cubeVisuals = new();
     private readonly Dictionary<Model3D, CubeVisual> _cubeHitMap = new();
     private NativeRubikEngine.RubikMoveDto[] _lastSolution = Array.Empty<NativeRubikEngine.RubikMoveDto>();
@@ -69,6 +80,7 @@ public partial class MainWindow : Window
         _engine = new NativeRubikEngine();
         InitializeFileTracking();
         SetupViewport();
+        LoadModelSets();
         RefreshScene();
         var arguments = Environment.GetCommandLineArgs();
         if (arguments.Any(argument =>
@@ -87,6 +99,8 @@ public partial class MainWindow : Window
     {
         _solverCancellation?.Cancel();
         _solverCancellation?.Dispose();
+        _modelLoadCancellation?.Cancel();
+        _modelLoadCancellation?.Dispose();
         _engine.Dispose();
         base.OnClosed(e);
     }
@@ -100,6 +114,64 @@ public partial class MainWindow : Window
         RubikViewport.Camera = _camera;
         RubikViewport.Children.Add(new ModelVisual3D { Content = _scene });
         UpdateCamera();
+    }
+
+    private void LoadModelSets()
+    {
+        _modelCatalog = ModelAssetCatalog.Discover(ModelRoots(), "Rubik");
+        ModelSetBox.Items.Clear();
+        foreach (var set in _modelCatalog.Sets)
+            ModelSetBox.Items.Add(new ComboBoxItem { Content = set.DisplayName, Tag = set });
+        ModelSetBox.Items.Add(new ComboBoxItem { Content = "Procedural", Tag = null });
+        ModelSetBox.SelectedIndex = 0;
+    }
+
+    private static IEnumerable<string> ModelRoots()
+    {
+        yield return Path.Combine(AppContext.BaseDirectory, "Assets", "Models");
+        yield return Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "assets", "models"));
+    }
+
+    private async void ModelSetBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _modelLoadCancellation?.Cancel();
+        _modelLoadCancellation?.Dispose();
+        _modelLoadCancellation = new CancellationTokenSource();
+        var cancellationToken = _modelLoadCancellation.Token;
+        _selectedModelSet = (ModelSetBox.SelectedItem as ComboBoxItem)?.Tag as ModelAssetSetDescriptor;
+        _objModels.SelectedSetPath = _selectedModelSet?.PackageRoot;
+        _objModels.ClearCache();
+        _wpfModelFactory.Clear();
+        _rubikBodyPrototype = null;
+        var plan = RubikAssetOverridePlanner.Plan(_selectedModelSet);
+        _modelOverrideDiagnostics = plan.Diagnostics;
+        try
+        {
+            if (_selectedModelSet?.FindRole("rubik.cubieBody") is { } body &&
+                body.Format.Equals("glb", StringComparison.OrdinalIgnoreCase))
+            {
+                var loaded = await _glbLoader.LoadAsync(new RuntimeModelLoadRequest
+                {
+                    Path = _selectedModelSet.ResolveAssetPath(body),
+                    ExpectedSha256 = body.Sha256
+                }, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                _rubikBodyPrototype = _wpfModelFactory.Create(loaded).Model;
+                _modelOverrideDiagnostics += "; GLB body loaded";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _rubikBodyPrototype = null;
+            _modelOverrideDiagnostics = $"invalid override; procedural fallback: {ex.Message}";
+        }
+        if (!cancellationToken.IsCancellationRequested && _camera is not null)
+            RefreshScene();
     }
 
     private void RefreshScene()
@@ -165,7 +237,7 @@ public partial class MainWindow : Window
             _scene.Children.Add(model);
             var visual = new CubeVisual(x, y, z, center, model);
             _cubeVisuals.Add(visual);
-            foreach (var child in model.Children.OfType<GeometryModel3D>())
+            foreach (var child in GeometryDescendants(model))
             {
                 _cubeHitMap[child] = visual;
             }
@@ -188,6 +260,7 @@ public partial class MainWindow : Window
                           $"centers {_renderedCenterCount}, internal {_renderedInternalCount}, invalid {_invalidStickerCount}); " +
                           $"facelets: {(_faceletsSynchronized ? "sync" : "unavailable")}, orientation: {(_orientationAvailable ? "available" : "unavailable")}, " +
                           $"fallback: {(_fallbackRendererActive ? "active" : "off")}; " +
+                          $"model override: {_modelOverrideDiagnostics}; " +
                           $"build {_lastSceneBuildMilliseconds:0.0} ms / {_lastSceneAllocatedBytes / 1024.0:0} KiB, " +
                           $"shared meshes {SharedStickerMeshes.Length + 1}, materials {SharedMaterialCache.Count}";
         UpdateFileStatus();
@@ -1891,7 +1964,7 @@ public partial class MainWindow : Window
         };
     }
 
-    private static Model3DGroup CreateRubikCubie(
+    private Model3DGroup CreateRubikCubie(
         Point3D center,
         double size,
         IReadOnlyList<StickerVisual> stickers,
@@ -1902,11 +1975,18 @@ public partial class MainWindow : Window
         var bodyColor = selected ? Color.FromRgb(72, 74, 62) : Color.FromRgb(30, 34, 41);
         var modelTransform = CreateCubieModelTransform(center, size);
         var bodyMaterial = CreateMaterial(bodyColor, opacity, 34);
-        group.Children.Add(new GeometryModel3D(SharedCubieBodyMesh, bodyMaterial)
+        if (TryCreateRubikBody(bodyColor, modelTransform, out var overrideBody))
         {
-            Material = bodyMaterial,
-            Transform = modelTransform
-        });
+            group.Children.Add(overrideBody);
+        }
+        else
+        {
+            group.Children.Add(new GeometryModel3D(SharedCubieBodyMesh, bodyMaterial)
+            {
+                Material = bodyMaterial,
+                Transform = modelTransform
+            });
+        }
         foreach (var sticker in stickers)
         {
             var color = selected
@@ -1920,6 +2000,69 @@ public partial class MainWindow : Window
             });
         }
         return group;
+    }
+
+    private bool TryCreateRubikBody(
+        Color fallbackColor,
+        Transform3D modelTransform,
+        out Model3D bodyModel)
+    {
+        bodyModel = null!;
+        if (_selectedModelSet?.FindRole("rubik.cubieBody") is not { } entry)
+            return false;
+
+        Model3D content;
+        if (entry.Format.Equals("glb", StringComparison.OrdinalIgnoreCase))
+        {
+            if (_rubikBodyPrototype is null) return false;
+            content = _rubikBodyPrototype;
+        }
+        else if (entry.Format.Equals("obj", StringComparison.OrdinalIgnoreCase))
+        {
+            var mesh = _objModels.LoadMesh(entry.Path);
+            if (mesh is null) return false;
+            var material = _objModels.CreateRoleMaterial(entry.Path, fallbackColor);
+            content = new GeometryModel3D(mesh, material) { BackMaterial = material };
+        }
+        else
+        {
+            return false;
+        }
+
+        var transform = new Transform3DGroup();
+        var scale = _selectedModelSet.Manifest.DefaultScale * entry.Scale;
+        transform.Children.Add(new ScaleTransform3D(scale, scale, scale));
+        if (entry.Rotation.X != 0)
+            transform.Children.Add(new RotateTransform3D(
+                new AxisAngleRotation3D(new Vector3D(1, 0, 0), entry.Rotation.X)));
+        if (entry.Rotation.Y != 0)
+            transform.Children.Add(new RotateTransform3D(
+                new AxisAngleRotation3D(new Vector3D(0, 1, 0), entry.Rotation.Y)));
+        if (entry.Rotation.Z != 0)
+            transform.Children.Add(new RotateTransform3D(
+                new AxisAngleRotation3D(new Vector3D(0, 0, 1), entry.Rotation.Z)));
+        transform.Children.Add(new TranslateTransform3D(
+            entry.Origin.X, entry.Origin.Y, entry.Origin.Z));
+        transform.Children.Add(modelTransform);
+        bodyModel = new Model3DGroup
+        {
+            Children = { content },
+            Transform = transform
+        };
+        return true;
+    }
+
+    private static IEnumerable<GeometryModel3D> GeometryDescendants(Model3D model)
+    {
+        if (model is GeometryModel3D geometry)
+        {
+            yield return geometry;
+            yield break;
+        }
+        if (model is not Model3DGroup group) yield break;
+        foreach (var child in group.Children)
+        foreach (var descendant in GeometryDescendants(child))
+            yield return descendant;
     }
 
     private static Transform3D CreateCubieModelTransform(Point3D center, double size)

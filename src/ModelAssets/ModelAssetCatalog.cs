@@ -210,3 +210,30 @@ public static class Chess3DProfileAssetPlanner
     private static Chess3DProfileAssetPlan New(string mode, params string[] optionalRoles) =>
         new(mode, CommonRoles, optionalRoles);
 }
+
+public sealed record RubikAssetOverridePlan(
+    bool HasCubieBody,
+    bool HasStickerShape,
+    bool HasCore,
+    bool StickersRemainAuthoritative,
+    string Diagnostics);
+
+public static class RubikAssetOverridePlanner
+{
+    public static RubikAssetOverridePlan Plan(ModelAssetSetDescriptor? set)
+    {
+        if (set is null)
+            return new(false, false, false, true, "procedural Rubik renderer");
+        var body = set.FindRole("rubik.cubieBody") is not null;
+        var sticker = set.FindRole("rubik.sticker") is not null;
+        var core = set.FindRole("rubik.core") is not null;
+        return new(
+            body,
+            sticker,
+            core,
+            true,
+            $"set '{set.SetId}': body {(body ? "available" : "procedural")}, " +
+            $"sticker {(sticker ? "catalogued; facelet-authoritative" : "procedural")}, " +
+            $"core {(core ? "catalogued" : "procedural")}");
+    }
+}

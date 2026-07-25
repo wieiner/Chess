@@ -1996,3 +1996,11 @@ Date: 2026-07-25
 | Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
 | Visual/profile isolation | Existing five JSON profiles, current capability-driven overlays, and [WPF 3D hit testing](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/3-d-graphics-overview) | Chess3D used one alternating white/black OBJ set while profile overlays were procedural and already independent from native rules. | Resolve common and optional semantic roles from a pure five-profile plan; add optional models alongside existing overlays and keep them out of the hit map. | Making the native engine resolve files or replacing overlays would couple model availability to gameplay correctness. | Shared role planner, Chess3DApp model selector/render path | Five isolated plans, missing-role fallbacks, model contracts, x64 Chess3DApp build, unchanged profile JSON. |
+
+## P4M Phase 40 - Optional Rubik Model Overrides
+
+Date: 2026-07-25
+
+| Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| Facelet authority under model overrides | P4L `RubikVisualDescriptorBuilder`, native cubie orientation contract, and [WPF model transforms](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/3-d-transformations-overview) | Body and stickers shared one procedural group, but sticker colors/orientation already came from authoritative facelets. | Permit an optional instanced body model only; always build stickers from facelets and extend hit mapping through nested geometry. | Letting imported materials replace stickers could lose corner/edge colors and invalidate visual orientation. | Rubik model selector, catalog planner, body instancing | Planner authority contract, RubikApp x64 build, existing N=2/3/8/11 state and animation tests. |
