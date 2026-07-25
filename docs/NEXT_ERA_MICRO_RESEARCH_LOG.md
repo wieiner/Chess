@@ -1914,3 +1914,11 @@ Date: 2026-07-25
 | Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
 | Transactional local import | .NET `Path.GetFullPath`, `FileInfo.Attributes`, SHA-256 APIs, and the Phase 26 repository boundary | Raw assets are deliberately ignored and cannot be made runtime-ready by a blind copy. | Require local file, license and provenance; hash an isolated copy and promote a v2 draft only after bounded checks. | URL import, implicit archive extraction, source overwrite, and implicit FBX conversion expand the trust boundary. | Import script, contract script, operator note | OBJ dry run, GLB promotion, SHA, missing license, extension, traversal, duplicate, URL, and cleanup checks. |
+
+## P4M Phase 30 - Blender Conversion Adapter
+
+Date: 2026-07-25
+
+| Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| Optional authoring conversion | [Blender 4.2 glTF manual](https://docs.blender.org/manual/en/4.2/addons/import_export/scene_gltf2.html) and Blender background scripting behavior | Blender is not installed locally; runtime must not depend on it. | Provide an explicit offline adapter with factory/background mode, disabled autoexec, bounded process execution, deterministic normalization and report. | Installing Blender automatically or invoking files with auto-run scripts would cross the requested trust boundary. | PowerShell adapter, Blender Python script, operator note | Missing-Blender dry run must return `SKIPPED`; Python syntax compiles with the bundled Python parser when available. |
