@@ -1939,3 +1939,11 @@ Date: 2026-07-25
 | Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
 | WPF GLB runtime | [glTF 2.0 specification](https://github.com/KhronosGroup/glTF/tree/main/specification/2.0), [SharpGLTF](https://github.com/vpenades/SharpGLTF), [Unity glTFast](https://github.com/atteneder/glTFast), [UnityGLTF](https://github.com/KhronosGroup/UnityGLTF), and [Assimp](https://github.com/assimp/assimp) | WPF needs a small immutable static-mesh subset; no current application uses Unity or an extra native importer. | Implement a bounded no-library GLB subset, retain OBJ/procedural fallbacks, and repeat the audit if advanced features become required. | Unity libraries do not fit WPF; Assimp broadens native deployment; adding SharpGLTF now gives less control without a demonstrated feature need. | Loader decision document | Phase 34 fixtures cover every supported accessor/container/material path and every declared unsupported class. |
+
+## P4M Phase 33 - Runtime Model Boundary
+
+Date: 2026-07-25
+
+| Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| Parser/renderer isolation | glTF scene/node/accessor model and [WPF 3D overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/3-d-graphics-overview) | Existing OBJ loader builds WPF objects while parsing, preventing headless GLB validation and safe background loading. | Introduce immutable renderer-neutral nodes, primitives, materials, textures, bounds, diagnostics and explicit limits. | Exposing JSON/library objects to WPF would couple security and presentation concerns. | `RuntimeModelAsset` boundary and contracts | Collection copy, SHA identity, URI/traversal rejection and checked-overflow contracts. |

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Numerics;
 using ModelAssets;
 
 var failures = new List<string>();
@@ -12,6 +13,9 @@ Run("validator accepts synthetic OBJ", TestValidatorAcceptsObj, failures);
 Run("validator rejects file and SHA failures", TestValidatorRejectsFiles, failures);
 Run("validator rejects malformed geometry", TestValidatorRejectsGeometry, failures);
 Run("Khronos adapter skips when unavailable", TestKhronosSkip, failures);
+Run("runtime model boundary freezes collections", TestRuntimeBoundary, failures);
+Run("runtime resource policy rejects external paths", TestRuntimeResourcePolicy, failures);
+Run("runtime checked arithmetic rejects overflow", TestRuntimeArithmetic, failures);
 Run("exactly five Chess3D rule profiles remain", TestFiveProfiles, failures);
 
 if (failures.Count > 0)
@@ -147,6 +151,43 @@ static void TestKhronosSkip()
     {
         Environment.SetEnvironmentVariable("KHRONOS_GLTF_VALIDATOR", old);
     }
+}
+
+static void TestRuntimeBoundary()
+{
+    var nodes = new List<RuntimeNode>
+    {
+        new(0, "root", null, Array.Empty<int>(), RuntimeTransform.Identity, RuntimeTransform.Identity)
+    };
+    var model = RuntimeModelAsset.Freeze(
+        new string('a', 64),
+        nodes,
+        Array.Empty<RuntimeMesh>(),
+        Array.Empty<RuntimeMaterial>(),
+        Array.Empty<RuntimeTexture>(),
+        new RuntimeBounds(Vector3.Zero, Vector3.One),
+        new RuntimeModelDiagnostics(TimeSpan.Zero, 0, Array.Empty<string>(), Array.Empty<RuntimeUnsupportedFeature>()));
+    nodes.Add(new(1, "late", null, Array.Empty<int>(), RuntimeTransform.Identity, RuntimeTransform.Identity));
+    Equal(1, model.Nodes.Count, "frozen node count");
+    if (!model.Bounds.IsFinite) throw new InvalidOperationException("Finite bounds reported invalid.");
+}
+
+static void TestRuntimeResourcePolicy()
+{
+    var root = Path.Combine(Path.GetTempPath(), "runtime-model-root");
+    Throws<FormatException>(() => RuntimeModelSecurity.ResolvePackageResource(root, "https://example.invalid/a.bin"));
+    Throws<FormatException>(() => RuntimeModelSecurity.ResolvePackageResource(root, "../escape.bin"));
+    var local = RuntimeModelSecurity.ResolvePackageResource(root, "textures/base.png");
+    if (!local.StartsWith(Path.GetFullPath(root), StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException("Local resource did not stay below package root.");
+}
+
+static void TestRuntimeArithmetic()
+{
+    Equal(32, RuntimeModelSecurity.CheckedRangeEnd(0, 3, 12, 8), "checked range");
+    Throws<OverflowException>(() => RuntimeModelSecurity.CheckedRangeEnd(
+        int.MaxValue - 1, 2, int.MaxValue, 4));
+    Throws<FormatException>(() => RuntimeModelSecurity.CheckedRangeEnd(0, 1, 4, 8));
 }
 
 static void TestFiveProfiles()
