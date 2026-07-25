@@ -73,6 +73,9 @@ internal sealed class ObjModelLibrary
         return CreateMaterial(relativeObjPath, fallback, preferTexture: true);
     }
 
+    public Material CreateRoleMaterial(string relativeObjPath, Color fallback) =>
+        CreateMaterial(relativeObjPath, fallback, preferTexture: true);
+
     public static Material CreateFallbackPieceMaterial(int side, byte opacity = 255)
     {
         return CreateMaterialGroup(PieceColor(side, opacity), Colors.White, 42, subtleEmissive: true);

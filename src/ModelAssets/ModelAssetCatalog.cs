@@ -164,6 +164,49 @@ public static class ChessModelRoles
     public static string BoardTile(bool light) =>
         light ? "chess.board.lightTile" : "chess.board.darkTile";
 
+    public static string Chess3DCommonPiece(int pieceType)
+    {
+        var index = Math.Abs(pieceType) - 1;
+        if ((uint)index >= (uint)PieceNames.Length)
+            throw new ArgumentOutOfRangeException(nameof(pieceType));
+        return $"chess3d.common.{PieceNames[index]}";
+    }
+
     public static IReadOnlyList<string> MissingChess2DRoles(ModelAssetSetDescriptor set) =>
         Chess2DRequired.Where(role => set.FindRole(role) is null).ToArray();
+}
+
+public sealed record Chess3DProfileAssetPlan(
+    string Mode,
+    IReadOnlyList<string> CommonRoles,
+    IReadOnlyList<string> OptionalRoles);
+
+public static class Chess3DProfileAssetPlanner
+{
+    private static readonly string[] CommonRoles =
+    [
+        "chess3d.common.pawn", "chess3d.common.knight", "chess3d.common.bishop",
+        "chess3d.common.rook", "chess3d.common.queen", "chess3d.common.king"
+    ];
+
+    public static Chess3DProfileAssetPlan Plan(string rulesetId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rulesetId);
+        if (rulesetId.Contains("rubik-convergence", StringComparison.OrdinalIgnoreCase))
+            return New("rubik-convergence",
+                "asgard.core", "asgard.anchor", "asgard.reserveSlot", "asgard.fusionMarker",
+                "rubikConvergence.core", "rubikConvergence.layerMarker", "rubikConvergence.turnMarker");
+        if (rulesetId.Contains("asgard-convergence", StringComparison.OrdinalIgnoreCase))
+            return New("asgard",
+                "asgard.core", "asgard.anchor", "asgard.reserveSlot", "asgard.fusionMarker");
+        if (rulesetId.Contains("hodge-projection", StringComparison.OrdinalIgnoreCase))
+            return New("hodge",
+                "hodge.primaryMarker", "hodge.mirrorMarker", "hodge.projectionArrow");
+        if (rulesetId.Contains("single-side", StringComparison.OrdinalIgnoreCase))
+            return New("single-side");
+        return New("classic");
+    }
+
+    private static Chess3DProfileAssetPlan New(string mode, params string[] optionalRoles) =>
+        new(mode, CommonRoles, optionalRoles);
 }

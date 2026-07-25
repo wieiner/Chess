@@ -13,6 +13,7 @@ Run("catalog discovers complete legacy Chess2D set", TestCatalogDiscovery, failu
 Run("catalog discovers complete GLB Chess2D set", TestGlbCatalogDiscovery, failures);
 Run("incomplete Chess2D set reports missing roles", TestIncompleteSet, failures);
 Run("model set selection falls back by semantic id", TestSetSelectionFallback, failures);
+Run("Chess3D profile asset plans remain isolated", TestChess3DProfilePlans, failures);
 Run("validator accepts synthetic OBJ", TestValidatorAcceptsObj, failures);
 Run("validator rejects file and SHA failures", TestValidatorRejectsFiles, failures);
 Run("validator rejects malformed geometry", TestValidatorRejectsGeometry, failures);
@@ -187,6 +188,26 @@ static void TestSetSelectionFallback()
     var missing = ModelAssetSetSelector.Select(catalog.Sets, "deleted-set");
     Equal(true, missing.UsedFallback, "missing set fallback");
     Equal("default-obj", missing.Set?.SetId, "fallback set id");
+}
+
+static void TestChess3DProfilePlans()
+{
+    var plans = new[]
+    {
+        Chess3DProfileAssetPlanner.Plan("classic-six-side-3d-8x8x8-v0.1"),
+        Chess3DProfileAssetPlanner.Plan("single-side-3d-8x8x8-v0.1"),
+        Chess3DProfileAssetPlanner.Plan("asgard-convergence-3d-8x8x8-v0.1"),
+        Chess3DProfileAssetPlanner.Plan("rubik-convergence-3d-8x8x8-v0.1"),
+        Chess3DProfileAssetPlanner.Plan("hodge-projection-duel-3d-8x8x8-v0.1")
+    };
+    Equal(6, plans.SelectMany(plan => plan.CommonRoles).Distinct().Count(), "common piece roles");
+    Equal(0, plans[0].OptionalRoles.Count, "classic optional roles");
+    Equal(0, plans[1].OptionalRoles.Count, "single optional roles");
+    Equal(true, plans[2].OptionalRoles.Contains("asgard.core"), "Asgard core role");
+    Equal(true, plans[3].OptionalRoles.Contains("rubikConvergence.layerMarker"), "Rubik layer role");
+    Equal(true, plans[4].OptionalRoles.Contains("hodge.projectionArrow"), "Hodge arrow role");
+    Equal(false, plans[4].OptionalRoles.Any(role => role.StartsWith("asgard.", StringComparison.Ordinal)),
+        "Hodge isolation");
 }
 
 static void TestValidatorAcceptsObj()

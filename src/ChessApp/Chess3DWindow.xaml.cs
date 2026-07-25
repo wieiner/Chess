@@ -6,6 +6,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using Microsoft.Win32;
+using ModelAssets;
+using ModelAssets.Wpf;
 
 namespace ChessApp;
 
@@ -13,6 +15,13 @@ public partial class Chess3DWindow : Window
 {
     private readonly NativeChess3DEngine _engine = new();
     private readonly ObjModelLibrary _models = new();
+    private ModelAssetCatalogResult _modelCatalog = new([], []);
+    private ModelAssetSetDescriptor? _selectedModelSet;
+    private readonly GlbRuntimeModelLoader _glbLoader = new();
+    private readonly WpfRuntimeModelFactory _wpfModelFactory = new();
+    private readonly Dictionary<string, Model3D> _runtimeRoleModels = new(StringComparer.Ordinal);
+    private CancellationTokenSource? _modelLoadCancellation;
+    private string _modelCatalogDiagnostics = "procedural fallback";
     private readonly Chess3DNetworkEndpoint _network = new();
     private readonly Button[,] _cells = new Button[8, 8];
     private readonly Brush _light = new SolidColorBrush(Color.FromRgb(224, 226, 214));
@@ -91,6 +100,8 @@ public partial class Chess3DWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _modelLoadCancellation?.Cancel();
+        _modelLoadCancellation?.Dispose();
         _network.Dispose();
         _engine.Dispose();
         base.OnClosed(e);
@@ -115,20 +126,49 @@ public partial class Chess3DWindow : Window
     private void LoadModelSets()
     {
         ModelSetBox.Items.Clear();
-        foreach (var (name, path) in ObjModelLibrary.DiscoverSets())
+        _modelCatalog = ModelAssetCatalog.Discover(GetModelRoots(), "Chess3D");
+        foreach (var set in _modelCatalog.Sets)
         {
             ModelSetBox.Items.Add(new ComboBoxItem
             {
-                Content = name,
-                Tag = path
+                Content = set.DisplayName,
+                Tag = set
             });
         }
-        if (ModelSetBox.Items.Count == 0)
-        {
-            ModelSetBox.Items.Add(new ComboBoxItem { Content = "Procedural", Tag = null });
-        }
+        ModelSetBox.Items.Add(new ComboBoxItem { Content = "Procedural", Tag = null });
         ModelSetBox.SelectedIndex = 0;
-        _models.SelectedSetPath = (ModelSetBox.SelectedItem as ComboBoxItem)?.Tag as string;
+    }
+
+    private static IEnumerable<string> GetModelRoots()
+    {
+        yield return Path.Combine(AppContext.BaseDirectory, "Assets", "Models");
+        foreach (var root in ObjModelLibrary.ModelRoots()) yield return root;
+        yield return Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "assets", "models"));
+    }
+
+    private async Task LoadSelectedGlbModelsAsync(
+        ModelAssetSetDescriptor? set,
+        CancellationToken cancellationToken)
+    {
+        if (set is null) return;
+        var loaded = new List<(ModelAssetEntry Entry, RuntimeModelAsset Model)>();
+        foreach (var entry in set.Manifest.Assets.Where(asset =>
+                     asset.Format.Equals("glb", StringComparison.OrdinalIgnoreCase)))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            loaded.Add((entry, await _glbLoader.LoadAsync(new RuntimeModelLoadRequest
+            {
+                Path = set.ResolveAssetPath(entry),
+                ExpectedSha256 = entry.Sha256
+            }, cancellationToken)));
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        foreach (var item in loaded)
+            _runtimeRoleModels[item.Entry.Role] = _wpfModelFactory.Create(item.Model).Model;
+        _modelCatalogDiagnostics = loaded.Count == 0
+            ? $"{set.Diagnostics}; OBJ compatibility path"
+            : $"{set.Diagnostics}; loaded {loaded.Count} GLB roles";
     }
 
     private void BuildLayerGrid()
@@ -421,7 +461,7 @@ public partial class Chess3DWindow : Window
         var visualDiagnostics =
             $"Visual state: {_visualState.ModeState} / {_visualState.SelectionState}, turn {_visualState.TurnState.CurrentTurnKind}, phase {_visualState.TurnState.GamePhase}, outcome {_visualState.TurnState.GameOutcome}\n" +
             $"Options: background {_visualState.Options.BackgroundTheme}, high contrast {_visualState.Options.HighContrastPieces}, core {_visualState.Options.ShowCore}, Rubik {_visualState.Options.ShowRubikLayer}, Hodge {_visualState.Options.ShowHodgeArrows}\n" +
-            $"Piece set: {SelectedModelSetName()}\nOBJ loaded: {_lastObjModels}, fallback primitives: {_lastFallbackModels}, overlays: {_lastOverlayModels}\nAnimation: {(_animationInProgress ? "in progress" : "idle")}\nMaterial: {_models.LastDiagnostics}\nLast invalid/click reason: {_visualState.ActionState.LastInvalidReason}";
+            $"Piece set: {SelectedModelSetName()}\nOBJ/GLB loaded: {_lastObjModels}, fallback primitives: {_lastFallbackModels}, overlays: {_lastOverlayModels}\nAsset catalog: {_modelCatalogDiagnostics}\nAnimation: {(_animationInProgress ? "in progress" : "idle")}\nMaterial: {_models.LastDiagnostics}\nLast invalid/click reason: {_visualState.ActionState.LastInvalidReason}";
         PositionText.Text = $"Models: {SelectedModelSetName()}, OBJ {_lastObjModels}, fallback {_lastFallbackModels}, overlays {_lastOverlayModels}, hints {selectedMoveCount}\n{_engine.GetPositionText()}";
         VisualDiagnosticsText.Text = visualDiagnostics;
         RefreshControlCenterStatus(state, selectedMoveCount, anchorCount, requiredAnchors, knockback, layerTurn, restoreInfo, selectedPreview);
@@ -760,11 +800,34 @@ public partial class Chess3DWindow : Window
         {
             group.Children.Add(CreateCellOverlay(square, Chess3DTheme.CoreCell, 0.82, 0.045, -3.04));
             _lastOverlayModels++;
+            if (square == new Square3D(3, 3, 3))
+            {
+                var plan = Chess3DProfileAssetPlanner.Plan(_engine.GetCurrentRulesetId());
+                var coreRole = plan.Mode == "rubik-convergence"
+                    ? "rubikConvergence.core"
+                    : "asgard.core";
+                if (TryCreateAssetRoleModel(
+                        coreRole, Chess3DTheme.CoreCell,
+                        square.X - 3.5, square.Z - 2.7, square.Y - 3.5,
+                        out var coreModel, preferAssetMaterial: true))
+                {
+                    group.Children.Add(coreModel);
+                    _lastOverlayModels++;
+                }
+            }
         }
         if (state.IsAnchor)
         {
             group.Children.Add(CreateCellOverlay(square, Chess3DTheme.Anchor, 0.38, 0.07, -2.82));
             _lastOverlayModels++;
+            if (TryCreateAssetRoleModel(
+                    "asgard.anchor", Chess3DTheme.Anchor,
+                    square.X - 3.5, square.Z - 2.72, square.Y - 3.5,
+                    out var anchorModel, preferAssetMaterial: true))
+            {
+                group.Children.Add(anchorModel);
+                _lastOverlayModels++;
+            }
         }
         if (state.IsKingInCheck)
         {
@@ -801,6 +864,14 @@ public partial class Chess3DWindow : Window
             var color = FusionOverlayColor(state.FusionKind, state.IsContested);
             group.Children.Add(CreateCellOverlay(square, color, state.FusionKind == 4 ? 0.92 : 0.74, 0.09, -2.74));
             _lastOverlayModels++;
+            if (TryCreateAssetRoleModel(
+                    "asgard.fusionMarker", color,
+                    square.X - 3.5, square.Z - 2.62, square.Y - 3.5,
+                    out var fusionModel, preferAssetMaterial: true))
+            {
+                group.Children.Add(fusionModel);
+                _lastOverlayModels++;
+            }
         }
     }
 
@@ -857,6 +928,22 @@ public partial class Chess3DWindow : Window
                     _lastOverlayModels++;
                 }
             }
+        }
+
+        var marker = axis switch
+        {
+            2 => new Square3D(layer, 3, 3),
+            1 => new Square3D(3, layer, 3),
+            _ => new Square3D(3, 3, layer)
+        };
+        if (SquareVisibleInCurrentView(marker) &&
+            TryCreateAssetRoleModel(
+                "rubikConvergence.layerMarker", Chess3DTheme.RubikLayer,
+                marker.X - 3.5, marker.Z - 2.55, marker.Y - 3.5,
+                out var markerModel, preferAssetMaterial: true))
+        {
+            group.Children.Add(markerModel);
+            _lastOverlayModels++;
         }
     }
 
@@ -917,6 +1004,15 @@ public partial class Chess3DWindow : Window
             });
             _lastOverlayModels++;
         }
+        var markerRole = segment.IsPrimary ? "hodge.primaryMarker" : "hodge.mirrorMarker";
+        if (TryCreateAssetRoleModel(
+                markerRole, color,
+                segment.To.X - 3.5, segment.To.Z - 2.25, segment.To.Y - 3.5,
+                out var endpointMarker, preferAssetMaterial: true))
+        {
+            group.Children.Add(endpointMarker);
+            _lastOverlayModels++;
+        }
     }
 
     private IEnumerable<Square3D> VisibleBoardSquares(int[] board)
@@ -957,7 +1053,7 @@ public partial class Chess3DWindow : Window
         };
     }
 
-    private GeometryModel3D CreateTileModel(Square3D square)
+    private Model3D CreateTileModel(Square3D square)
     {
         var axis = SelectedAxis();
         var alpha = TileOpacity(square);
@@ -968,16 +1064,18 @@ public partial class Chess3DWindow : Window
 
         if (axis == SliceAxis.Z)
         {
-            var tileName = (square.X + square.Y + square.Z) % 2 == 0 ? "light_tile.obj" : "dark_tile.obj";
-            var mesh = _models.LoadMesh(Path.Combine("Board", tileName));
-            if (mesh != null)
+            var role = ChessModelRoles.BoardTile((square.X + square.Y + square.Z) % 2 == 0);
+            if (TryCreateAssetRoleModel(
+                    role,
+                    color,
+                    square.X - 3.5,
+                    square.Z - 3.5,
+                    square.Y - 3.5,
+                    out var tile,
+                    preferAssetMaterial: true))
             {
                 _lastObjModels++;
-                return new GeometryModel3D(mesh, material)
-                {
-                    BackMaterial = material,
-                    Transform = new TranslateTransform3D(square.X - 3.5, square.Z - 3.5, square.Y - 3.5)
-                };
+                return tile;
             }
         }
 
@@ -995,31 +1093,90 @@ public partial class Chess3DWindow : Window
         };
     }
 
-    private GeometryModel3D CreatePieceModel(int piece, Square3D square)
+    private Model3D CreatePieceModel(int piece, Square3D square)
     {
         var side = piece / 10;
         var type = piece % 10;
-        var relativePath = Path.Combine("Pieces", ObjModelLibrary.ModelFileNameForClassicPiece(type, side % 2 == 1));
-        var mesh = _models.LoadMesh(relativePath);
-        var material = HighContrastBox?.IsChecked == true
-            ? ObjModelLibrary.CreateFallbackPieceMaterial(side, PieceOpacity(square))
-            : _models.CreatePieceMaterial(relativePath, side, type, PieceOpacity(square));
-        if (mesh != null)
+        var role = ChessModelRoles.Chess3DCommonPiece(type);
+        if (_selectedModelSet?.FindRole(role) is null)
+            role = ChessModelRoles.Piece(side % 2 == 1 ? type : -type);
+        if (TryCreateAssetRoleModel(
+                role,
+                ObjModelLibrary.PieceColor(side, PieceOpacity(square)),
+                square.X - 3.5,
+                square.Z - 3.43,
+                square.Y - 3.5,
+                out var roleModel,
+                preferAssetMaterial: HighContrastBox?.IsChecked != true))
         {
             _lastObjModels++;
-            return new GeometryModel3D(mesh, material)
-            {
-                BackMaterial = material,
-                Transform = new TranslateTransform3D(square.X - 3.5, square.Z - 3.43, square.Y - 3.5)
-            };
+            return roleModel;
         }
 
+        var material = HighContrastBox?.IsChecked == true
+            ? ObjModelLibrary.CreateFallbackPieceMaterial(side, PieceOpacity(square))
+            : ObjModelLibrary.CreateFallbackPieceMaterial(side, PieceOpacity(square));
         _lastFallbackModels++;
         return new GeometryModel3D(CubeMesh(0.42, 0.42, 0.42), material)
         {
             BackMaterial = material,
             Transform = new TranslateTransform3D(square.X - 3.5, square.Z - 3.25, square.Y - 3.5)
         };
+    }
+
+    private bool TryCreateAssetRoleModel(
+        string role,
+        Color fallbackColor,
+        double x,
+        double y,
+        double z,
+        out Model3D model,
+        bool preferAssetMaterial)
+    {
+        model = null!;
+        if (_selectedModelSet?.FindRole(role) is not { } entry)
+            return false;
+
+        Model3D content;
+        if (entry.Format.Equals("glb", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!preferAssetMaterial) return false;
+            if (!_runtimeRoleModels.TryGetValue(role, out content!)) return false;
+        }
+        else if (entry.Format.Equals("obj", StringComparison.OrdinalIgnoreCase))
+        {
+            var mesh = _models.LoadMesh(entry.Path);
+            if (mesh is null) return false;
+            var material = preferAssetMaterial
+                ? _models.CreateRoleMaterial(entry.Path, fallbackColor)
+                : ObjModelLibrary.CreateSurfaceMaterial(fallbackColor);
+            content = new GeometryModel3D(mesh, material) { BackMaterial = material };
+        }
+        else
+        {
+            return false;
+        }
+
+        var transform = new Transform3DGroup();
+        var scale = _selectedModelSet.Manifest.DefaultScale * entry.Scale;
+        transform.Children.Add(new ScaleTransform3D(scale, scale, scale));
+        if (entry.Rotation.X != 0)
+            transform.Children.Add(new RotateTransform3D(
+                new AxisAngleRotation3D(new Vector3D(1, 0, 0), entry.Rotation.X)));
+        if (entry.Rotation.Y != 0)
+            transform.Children.Add(new RotateTransform3D(
+                new AxisAngleRotation3D(new Vector3D(0, 1, 0), entry.Rotation.Y)));
+        if (entry.Rotation.Z != 0)
+            transform.Children.Add(new RotateTransform3D(
+                new AxisAngleRotation3D(new Vector3D(0, 0, 1), entry.Rotation.Z)));
+        transform.Children.Add(new TranslateTransform3D(
+            x + entry.Origin.X, y + entry.Origin.Y, z + entry.Origin.Z));
+        model = new Model3DGroup
+        {
+            Children = { content },
+            Transform = transform
+        };
+        return true;
     }
 
     private GeometryModel3D CreateSelectionMarker(Square3D square)
@@ -1789,10 +1946,32 @@ public partial class Chess3DWindow : Window
         }
     }
 
-    private void ModelSetBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void ModelSetBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        _models.SelectedSetPath = (ModelSetBox.SelectedItem as ComboBoxItem)?.Tag as string;
+        _modelLoadCancellation?.Cancel();
+        _modelLoadCancellation?.Dispose();
+        _modelLoadCancellation = new CancellationTokenSource();
+        var cancellationToken = _modelLoadCancellation.Token;
+        _selectedModelSet = (ModelSetBox.SelectedItem as ComboBoxItem)?.Tag as ModelAssetSetDescriptor;
+        _models.SelectedSetPath = _selectedModelSet?.PackageRoot;
         _models.ClearCache();
+        _wpfModelFactory.Clear();
+        _runtimeRoleModels.Clear();
+        _modelCatalogDiagnostics = _selectedModelSet?.Diagnostics ?? "procedural set selected";
+        try
+        {
+            await LoadSelectedGlbModelsAsync(_selectedModelSet, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _runtimeRoleModels.Clear();
+            _modelCatalogDiagnostics = $"GLB load failed; OBJ/procedural fallback: {ex.Message}";
+        }
+        if (cancellationToken.IsCancellationRequested) return;
         if (_cells[0, 0] != null)
         {
             RefreshAll();
