@@ -1879,3 +1879,13 @@ Date: 2026-07-19
 | --- | --- | --- | --- | --- | --- |
 | Runtime inventory | Tracked model root, v1 catalog, OBJ/MTL loader, project copy items and release/verify scripts | One 25.6 MiB legacy OBJ set serves Chess2D/Chess3D; there are no GLB or textures and Rubik is procedural. | Preserve the working OBJ path while building a manifest-authoritative v2 layer and explicit procedural fallback. | Audit document | Re-run extension/size inventory and packaging assertions at Phase 40. |
 | Provenance/private paths | Enabled-set README and every MTL/manifest | License evidence is incomplete and white MTLs contain absolute source texture paths. | Mark the set legacy/pending provenance, sanitize private paths before QA, and never infer rights from exporter metadata. | Audit and later manifest/QA files | Validator rejects absolute paths; final tracked scan contains none in runtime MTL. |
+
+## P4M Phase 26 - Source and Runtime Asset Layout
+
+Date: 2026-07-19
+
+| Topic | Primary sources checked | Current repository finding | Decision | Files affected | Verification plan |
+| --- | --- | --- | --- | --- | --- |
+| Authoring/runtime separation | Existing project copy items and release packaging | The current tree had only a runtime piece root, so source archives could be copied accidentally if placed beside it. | Establish explicit `assets-source/models`, `assets/models`, and disposable `.tmp/assets-import` boundaries; runtime remains manifest-authoritative. | Layout marker files and layout guide | Confirm source files are absent from application and ProductionOutput copy inputs. |
+| Profile isolation | Five profile catalog and current visual fallbacks | Special visuals need namespaces but must never create or enable rules. | Give Asgard, Rubik Convergence, and Hodge separate visual namespaces with mandatory existing fallbacks. | Runtime/source namespace markers | Profile count stays five; no rule JSON changes. |
+| Local inbox safety | `.gitignore`, `scripts/verify.ps1` rude-resource probe, and current asset copy items | `rude-resource/` is already ignored and excluded from all package inputs. | Create the raw drop hierarchy there through an idempotent initializer; never place marker files inside the ignored tree. | Inbox initializer and source policy | Run initializer twice, use `git check-ignore`, and confirm `git status` shows no inbox content. |
