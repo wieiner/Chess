@@ -1972,3 +1972,11 @@ Date: 2026-07-25
 | Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
 | Isolated preview/evidence | [WPF 3D overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/3-d-graphics-overview), `RenderTargetBitmap`, and current large ChessApp code-behind | Asset diagnostics should not first land in game UI, and desktop screenshots alone are weak evidence. | Add a standalone preview with shared validator/loader/factory, camera/overlay controls, structured report and in-process evidence. | Embedding the first diagnostic surface into ChessApp would mix import QA with gameplay state. | `ModelAssetPreview` and guide | x64 WPF build through contract project; evidence output is `.tmp`-ignored. |
+
+## P4M Phase 37 - User Model Onboarding
+
+Date: 2026-07-25
+
+| Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| Repeatable author workflow | Phase 26 inbox, manifest role registry, import/conversion/preview gates | A directory policy alone does not tell a user which roles/evidence are missing. | Generate an ignored per-set draft with source/textures/license/metadata folders and one of six role templates. | Creating a runtime manifest immediately would bypass license, conversion and QA. | `New-ModelSet.ps1` and author/import guides | Generate under ignored `.tmp`, parse role draft, reject invalid/duplicate set, confirm no tracked output. |
