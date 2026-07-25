@@ -2004,3 +2004,11 @@ Date: 2026-07-25
 | Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
 | Facelet authority under model overrides | P4L `RubikVisualDescriptorBuilder`, native cubie orientation contract, and [WPF model transforms](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/3-d-transformations-overview) | Body and stickers shared one procedural group, but sticker colors/orientation already came from authoritative facelets. | Permit an optional instanced body model only; always build stickers from facelets and extend hit mapping through nested geometry. | Letting imported materials replace stickers could lose corner/edge colors and invalidate visual orientation. | Rubik model selector, catalog planner, body instancing | Planner authority contract, RubikApp x64 build, existing N=2/3/8/11 state and animation tests. |
+
+## P4M Phase 41 - Enabled Asset-Set QA
+
+Date: 2026-07-25
+
+| Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| License/provenance gate | [SPDX `NoAssertionLicense`](https://spdx.github.io/spdx-spec/v3.0.1/model/ExpandedLicensing/Individuals/NoAssertionLicense/) and [GitHub repository licensing guidance](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository) | The only physical runtime set has no author, source URL, license notice, or acquisition evidence; its adapter correctly reports `NOASSERTION`. Twelve MTL files also contain invalid private/placeholder texture paths. | Mark Phase 41 blocked and request owner evidence before sanitizing, approving, or repackaging the set. Preserve procedural fallback and completed integration work. | Inferring a license from a public repository, Blender comments, or a local migration path would make an unsupported redistribution claim. | QA result and research log only | Inventory, adapter metadata, tracked-file search, private-path scan, and completed targeted model/app tests. |
