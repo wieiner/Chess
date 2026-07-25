@@ -7,6 +7,8 @@ using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using ChessGameRecords;
 using Microsoft.Win32;
+using ModelAssets;
+using ModelAssets.Wpf;
 
 namespace ChessApp;
 
@@ -51,6 +53,13 @@ public partial class MainWindow : Window
     private double _orbitPitch = 58;
     private double _orbitDistance = 10.5;
     private string? _selectedModelSetPath;
+    private ModelAssetCatalogResult _modelCatalog = new([], []);
+    private ModelAssetSetDescriptor? _selectedModelSet;
+    private readonly GlbRuntimeModelLoader _glbLoader = new();
+    private readonly WpfRuntimeModelFactory _wpfModelFactory = new();
+    private readonly Dictionary<string, Model3D> _runtimeRoleModels = new(StringComparer.Ordinal);
+    private CancellationTokenSource? _modelLoadCancellation;
+    private string _modelDiagnostics = "procedural fallback";
     private readonly ObjModelLibrary _models = new();
     private readonly Dictionary<string, MeshGeometry3D?> _meshCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<Model3D, Square> _hitSquares3D = new();
@@ -81,6 +90,8 @@ public partial class MainWindow : Window
     {
         _autosaveTimer.Stop();
         if (_sessionDirty) TryAutosave();
+        _modelLoadCancellation?.Cancel();
+        _modelLoadCancellation?.Dispose();
         _network.Dispose();
         _engine.Dispose();
         base.OnClosed(e);
@@ -276,7 +287,7 @@ public partial class MainWindow : Window
         var tablebase = _engine.GetTablebaseInfo();
         var tbLine = $"TB: built-in {(tablebase.BuiltInEndgameTables != 0 ? "on" : "off")}, Syzygy WDL {tablebase.SyzygyWdlFiles}, DTZ {tablebase.SyzygyDtzFiles}, max {tablebase.MaxPieces}";
         var modelsLine = Mode3DBox.IsChecked == true
-            ? $"3D: set {ModelSetBox.Text}, loaded {_lastLoaded3DModels}, fallback {_lastMissing3DModels}, {_models.LastDiagnostics}"
+            ? $"3D: set {ModelSetBox.Text}, loaded {_lastLoaded3DModels}, fallback {_lastMissing3DModels}, {_modelDiagnostics}; {_models.LastDiagnostics}"
             : "3D: off";
         SearchText.Text = $"{_engine.GetLastSearchInfo()}\n{searchLine}\n{gpuLine}\n{tbLine}\n{modelsLine}";
         FenBox.Text = IsSetupMode() ? BuildSetupFen() : _engine.GetFen();
@@ -905,42 +916,91 @@ public partial class MainWindow : Window
         }
 
         ModelSetBox.Items.Clear();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (name, path) in ObjModelLibrary.DiscoverSets())
+        _modelCatalog = ModelAssetCatalog.Discover(GetModelRoots(), "Chess2D");
+        foreach (var set in _modelCatalog.Sets)
         {
-            if (!seen.Add(name))
-            {
-                continue;
-            }
             ModelSetBox.Items.Add(new ComboBoxItem
             {
-                Content = name,
-                Tag = path
+                Content = set.DisplayName,
+                Tag = set
             });
         }
 
-        if (ModelSetBox.Items.Count == 0)
-        {
-            ModelSetBox.Items.Add(new ComboBoxItem { Content = "Procedural", Tag = null });
-        }
+        ModelSetBox.Items.Add(new ComboBoxItem { Content = "Procedural", Tag = null });
         ModelSetBox.SelectedIndex = 0;
-        _selectedModelSetPath = (ModelSetBox.SelectedItem as ComboBoxItem)?.Tag as string;
-        _models.SelectedSetPath = _selectedModelSetPath;
     }
 
     private static IEnumerable<string> GetModelRoots()
     {
-        yield return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "Assets", "Models"));
         yield return Path.Combine(AppContext.BaseDirectory, "Assets", "Models");
+        foreach (var root in ObjModelLibrary.ModelRoots()) yield return root;
+        yield return Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "assets", "models"));
     }
 
-    private void ModelSetBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void ModelSetBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        _selectedModelSetPath = (ModelSetBox.SelectedItem as ComboBoxItem)?.Tag as string;
+        _modelLoadCancellation?.Cancel();
+        _modelLoadCancellation?.Dispose();
+        _modelLoadCancellation = new CancellationTokenSource();
+        var cancellationToken = _modelLoadCancellation.Token;
+        _selectedModelSet = (ModelSetBox.SelectedItem as ComboBoxItem)?.Tag as ModelAssetSetDescriptor;
+        _selectedModelSetPath = _selectedModelSet?.PackageRoot;
         _models.SelectedSetPath = _selectedModelSetPath;
         _models.ClearCache();
+        _wpfModelFactory.Clear();
+        _runtimeRoleModels.Clear();
+        _modelDiagnostics = _selectedModelSet is null
+            ? "procedural set selected"
+            : _selectedModelSet.Diagnostics;
+        try
+        {
+            await LoadSelectedGlbModelsAsync(_selectedModelSet, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _runtimeRoleModels.Clear();
+            _modelDiagnostics = $"GLB load failed; OBJ/procedural fallback: {ex.Message}";
+        }
+        if (cancellationToken.IsCancellationRequested) return;
         Refresh3DScene();
         RefreshStatus();
+    }
+
+    private async Task LoadSelectedGlbModelsAsync(
+        ModelAssetSetDescriptor? set,
+        CancellationToken cancellationToken)
+    {
+        if (set is null) return;
+        var glbAssets = set.Manifest.Assets
+            .Where(asset => asset.Format.Equals("glb", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (glbAssets.Length == 0)
+        {
+            _modelDiagnostics = $"{set.Diagnostics}; OBJ compatibility path";
+            return;
+        }
+
+        var loaded = new List<(ModelAssetEntry Entry, RuntimeModelAsset Model)>();
+        foreach (var entry in glbAssets)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var model = await _glbLoader.LoadAsync(new RuntimeModelLoadRequest
+            {
+                Path = set.ResolveAssetPath(entry),
+                ExpectedSha256 = entry.Sha256
+            }, cancellationToken);
+            loaded.Add((entry, model));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        foreach (var item in loaded)
+            _runtimeRoleModels[item.Entry.Role] = _wpfModelFactory.Create(item.Model).Model;
+        _modelDiagnostics = $"{set.Diagnostics}; loaded {_runtimeRoleModels.Count} GLB roles";
     }
 
     private string BuildSetupFen()
@@ -1112,10 +1172,20 @@ public partial class MainWindow : Window
             : new SolidColorBrush(Color.FromRgb(230, 224, 194));
     }
 
-    private GeometryModel3D CreateTileModel(int file, int rank, Brush brush)
+    private Model3D CreateTileModel(int file, int rank, Brush brush)
     {
-        var tileName = ((file + rank) & 1) == 0 ? "light_tile.obj" : "dark_tile.obj";
-        var mesh = LoadModelMesh(Path.Combine("Board", tileName));
+        var role = ChessModelRoles.BoardTile(((file + rank) & 1) == 0);
+        if (TryCreateGlbRoleModel(role, file - 3.5, 0, rank - 3.5, out var glb))
+        {
+            _lastLoaded3DModels++;
+            return glb;
+        }
+
+        var entry = _selectedModelSet?.FindRole(role);
+        var mesh = entry is { Format: var format } &&
+                   format.Equals("obj", StringComparison.OrdinalIgnoreCase)
+            ? LoadModelMesh(entry.Path)
+            : null;
         if (mesh != null)
         {
             _lastLoaded3DModels++;
@@ -1130,11 +1200,25 @@ public partial class MainWindow : Window
         return CreateBox(file - 3.5, -0.04, rank - 3.5, 0.98, 0.08, 0.98, brush);
     }
 
-    private GeometryModel3D CreatePieceModel(int piece, double x, double z)
+    private Model3D CreatePieceModel(int piece, double x, double z)
     {
-        var mesh = LoadModelMesh(Path.Combine("Pieces", ModelFileName(piece)));
+        var role = ChessModelRoles.Piece(piece);
+        if (TryCreateGlbRoleModel(role, x, 0.02, z, out var glb))
+        {
+            _lastLoaded3DModels++;
+            return glb;
+        }
+
+        var entry = _selectedModelSet?.FindRole(role);
+        var relativePath = entry is { Format: var format } &&
+                           format.Equals("obj", StringComparison.OrdinalIgnoreCase)
+            ? entry.Path
+            : string.Empty;
+        var mesh = relativePath.Length > 0 ? LoadModelMesh(relativePath) : null;
         var type = Math.Abs(piece);
-        var material = _models.CreatePieceMaterial(Path.Combine("Pieces", ModelFileName(piece)), piece > 0 ? 1 : 2, type);
+        var material = relativePath.Length > 0
+            ? _models.CreatePieceMaterial(relativePath, piece > 0 ? 1 : 2, type)
+            : ObjModelLibrary.CreateFallbackPieceMaterial(piece > 0 ? 1 : 2);
         if (mesh != null)
         {
             _lastLoaded3DModels++;
@@ -1167,6 +1251,40 @@ public partial class MainWindow : Window
             _ => 0.6
         };
         return CreateCylinder(x, 0.0, z, radius, height, 28, new SolidColorBrush(ObjModelLibrary.PieceColor(piece > 0 ? 1 : 2)));
+    }
+
+    private bool TryCreateGlbRoleModel(
+        string role,
+        double x,
+        double y,
+        double z,
+        out Model3D model)
+    {
+        model = null!;
+        if (!_runtimeRoleModels.TryGetValue(role, out var prototype) ||
+            _selectedModelSet?.FindRole(role) is not { } entry)
+            return false;
+
+        var transform = new Transform3DGroup();
+        var scale = _selectedModelSet.Manifest.DefaultScale * entry.Scale;
+        transform.Children.Add(new ScaleTransform3D(scale, scale, scale));
+        if (entry.Rotation.X != 0)
+            transform.Children.Add(new RotateTransform3D(
+                new AxisAngleRotation3D(new Vector3D(1, 0, 0), entry.Rotation.X)));
+        if (entry.Rotation.Y != 0)
+            transform.Children.Add(new RotateTransform3D(
+                new AxisAngleRotation3D(new Vector3D(0, 1, 0), entry.Rotation.Y)));
+        if (entry.Rotation.Z != 0)
+            transform.Children.Add(new RotateTransform3D(
+                new AxisAngleRotation3D(new Vector3D(0, 0, 1), entry.Rotation.Z)));
+        transform.Children.Add(new TranslateTransform3D(
+            x + entry.Origin.X, y + entry.Origin.Y, z + entry.Origin.Z));
+        model = new Model3DGroup
+        {
+            Children = { prototype },
+            Transform = transform
+        };
+        return true;
     }
 
     private MeshGeometry3D? LoadModelMesh(string relativePath)
@@ -1965,7 +2083,7 @@ public partial class MainWindow : Window
         var presentation = new ChessSessionPresentation(
             IsBlackView() ? ChessSessionBoardOrientation.Black : ChessSessionBoardOrientation.White,
             _pieceTheme.ToString(),
-            (ModelSetBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "procedural",
+            _selectedModelSet?.SetId ?? "procedural",
             Mode3DBox.IsChecked == true ? ChessSessionUiMode.Board3D : ChessSessionUiMode.Board2D);
         var engine = new ChessSessionEngineOptions(true, "NativeChessEngine", search.Depth, search.TimeLimitMs, 0, 1);
         return ChessSessionDocument.FromGame(currentGame, currentFen, presentation, engine, dirty, _sessionId);
@@ -1979,9 +2097,26 @@ public partial class MainWindow : Window
             : 0;
         Mode3DBox.IsChecked = document.Presentation.UiMode == ChessSessionUiMode.Board3D;
         var model = ModelSetBox.Items.OfType<ComboBoxItem>()
-            .FirstOrDefault(item => string.Equals(item.Content?.ToString(), document.Presentation.ModelSetId,
-                StringComparison.OrdinalIgnoreCase));
-        if (model is not null) ModelSetBox.SelectedItem = model;
+            .FirstOrDefault(item =>
+                item.Tag is ModelAssetSetDescriptor set &&
+                string.Equals(set.SetId, document.Presentation.ModelSetId, StringComparison.OrdinalIgnoreCase));
+        if (model is not null)
+        {
+            ModelSetBox.SelectedItem = model;
+        }
+        else
+        {
+            var fallback = ModelAssetSetSelector.Select(
+                ModelSetBox.Items.OfType<ComboBoxItem>()
+                    .Select(item => item.Tag)
+                    .OfType<ModelAssetSetDescriptor>(),
+                document.Presentation.ModelSetId);
+            ModelSetBox.SelectedItem = fallback.Set is null
+                ? ModelSetBox.Items.OfType<ComboBoxItem>().First(item => item.Tag is null)
+                : ModelSetBox.Items.OfType<ComboBoxItem>().First(item =>
+                    ReferenceEquals(item.Tag, fallback.Set));
+            _modelDiagnostics = fallback.Diagnostics;
+        }
         DepthBox.Text = document.Engine.MaxDepth.ToString();
         TimeLimitBox.Text = document.Engine.TimeLimitMilliseconds.ToString();
     }

@@ -1980,3 +1980,11 @@ Date: 2026-07-25
 | Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
 | Repeatable author workflow | Phase 26 inbox, manifest role registry, import/conversion/preview gates | A directory policy alone does not tell a user which roles/evidence are missing. | Generate an ignored per-set draft with source/textures/license/metadata folders and one of six role templates. | Creating a runtime manifest immediately would bypass license, conversion and QA. | `New-ModelSet.ps1` and author/import guides | Generate under ignored `.tmp`, parse role draft, reject invalid/duplicate set, confirm no tracked output. |
+
+## P4M Phase 38 - Chess2D Unified Model Integration
+
+Date: 2026-07-25
+
+| Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| Background model loading | [WPF threading model](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/threading-model) and [WPF 3D performance guidance](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/maximize-wpf-3d-performance) | ChessApp synchronously read OBJ files from a selected directory and persisted the display label. | Discover semantic sets centrally, parse bounded GLB off the dispatcher path, cancel stale set loads, then assign frozen WPF models while preserving the existing square hit map and camera. | Replacing the board control or moving gameplay state into the asset layer would expand risk without improving model compatibility. | Shared catalog, ChessApp 3D mode, model contracts | Complete GLB and OBJ catalogs, incomplete/deleted set fallback, GLB/WPF contracts, and targeted x64 ChessApp build. |

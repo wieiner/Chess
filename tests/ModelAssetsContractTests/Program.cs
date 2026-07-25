@@ -9,6 +9,10 @@ Run("unknown member rejected", TestUnknownMember, failures);
 Run("invalid paths and hashes rejected", TestUnsafeValues, failures);
 Run("duplicate roles rejected", TestDuplicates, failures);
 Run("v1 adapter exposes complete runtime view", TestV1Adapter, failures);
+Run("catalog discovers complete legacy Chess2D set", TestCatalogDiscovery, failures);
+Run("catalog discovers complete GLB Chess2D set", TestGlbCatalogDiscovery, failures);
+Run("incomplete Chess2D set reports missing roles", TestIncompleteSet, failures);
+Run("model set selection falls back by semantic id", TestSetSelectionFallback, failures);
 Run("validator accepts synthetic OBJ", TestValidatorAcceptsObj, failures);
 Run("validator rejects file and SHA failures", TestValidatorRejectsFiles, failures);
 Run("validator rejects malformed geometry", TestValidatorRejectsGeometry, failures);
@@ -107,6 +111,82 @@ static void TestV1Adapter()
     Equal("pending-review", manifest.License.Status, "legacy license status");
     if (manifest.Assets.Any(asset => asset.Sha256.Length != 64))
         throw new InvalidOperationException("Adapter did not calculate SHA-256.");
+}
+
+static void TestCatalogDiscovery()
+{
+    var result = ModelAssetCatalog.Discover(
+        [Path.Combine(Root(), "assets", "models")], "Chess2D");
+    var set = result.Sets.Single(item => item.SetId == "default-obj");
+    Equal(true, set.IsLegacyV1, "legacy marker");
+    Equal(0, ChessModelRoles.MissingChess2DRoles(set).Count, "required Chess2D roles");
+    Equal("obj", set.FindRole("chess.white.king")?.Format, "white king format");
+    Equal("obj", set.FindRole("chess.board.darkTile")?.Format, "dark tile format");
+}
+
+static void TestGlbCatalogDiscovery()
+{
+    using var fixture = GlbFixture.Create(
+        requiredExtension: false,
+        invalidIndex: false,
+        nanPosition: false);
+    var root = Path.GetDirectoryName(fixture.Path)!;
+    var assets = ChessModelRoles.Chess2DRequired.Select((role, index) => new ModelAssetEntry
+    {
+        AssetId = $"asset-{index}",
+        Role = role,
+        Format = "glb",
+        Path = Path.GetFileName(fixture.Path),
+        Sha256 = fixture.Sha256
+    }).ToArray();
+    var manifest = Sample() with
+    {
+        SetId = "synthetic-complete-glb",
+        DisplayName = "Synthetic Complete GLB",
+        SupportedApps = ["Chess2D"],
+        Assets = assets
+    };
+    File.WriteAllText(
+        Path.Combine(root, ModelAssetCatalog.V2ManifestName),
+        ModelAssetManifestJson.Serialize(manifest));
+
+    var catalog = ModelAssetCatalog.Discover([root], "Chess2D");
+    var set = catalog.Sets.Single();
+    Equal(false, set.IsLegacyV1, "v2 marker");
+    Equal(0, ChessModelRoles.MissingChess2DRoles(set).Count, "complete GLB role set");
+    Equal("glb", set.FindRole("chess.black.queen")?.Format, "GLB role format");
+}
+
+static void TestIncompleteSet()
+{
+    var manifest = Sample() with
+    {
+        SupportedApps = ["Chess2D"],
+        Assets =
+        [
+            Sample().Assets[0] with
+            {
+                AssetId = "white-pawn",
+                Role = "chess.white.pawn"
+            }
+        ]
+    };
+    var set = new ModelAssetSetDescriptor(
+        manifest, Root(), "synthetic", false, "synthetic");
+    Equal(13, ChessModelRoles.MissingChess2DRoles(set).Count, "missing role count");
+}
+
+static void TestSetSelectionFallback()
+{
+    var catalog = ModelAssetCatalog.Discover(
+        [Path.Combine(Root(), "assets", "models")], "Chess2D");
+    var selected = ModelAssetSetSelector.Select(catalog.Sets, "default-obj");
+    Equal(false, selected.UsedFallback, "known set selection");
+    Equal("default-obj", selected.Set?.SetId, "known set id");
+
+    var missing = ModelAssetSetSelector.Select(catalog.Sets, "deleted-set");
+    Equal(true, missing.UsedFallback, "missing set fallback");
+    Equal("default-obj", missing.Set?.SetId, "fallback set id");
 }
 
 static void TestValidatorAcceptsObj()

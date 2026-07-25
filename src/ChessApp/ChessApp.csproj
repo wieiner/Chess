@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ChessGameRecords\ChessGameRecords.csproj" />
+    <ProjectReference Include="..\ModelAssets\ModelAssets.csproj" />
+    <ProjectReference Include="..\ModelAssets.Wpf\ModelAssets.Wpf.csproj" />
     <ProjectReference Include="..\ChessEngine\ChessEngine.vcxproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\ChessGpuBackend\ChessGpuBackend.vcxproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
