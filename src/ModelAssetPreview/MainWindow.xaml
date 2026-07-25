@@ -1,0 +1,100 @@
+<Window x:Class="ModelAssetPreview.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Model Asset Preview" Width="1280" Height="820"
+        MinWidth="980" MinHeight="640"
+        Background="#30343A" Foreground="#F2F3F5">
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="310" />
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="330" />
+    </Grid.ColumnDefinitions>
+
+    <Border Grid.Column="0" Background="#25282D" Padding="14" BorderBrush="#4B515A" BorderThickness="0,0,1,0">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+          <TextBlock Text="MODEL ASSET PREVIEW" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,14" />
+          <WrapPanel Margin="0,0,0,8">
+            <Button Content="Open Manifest" Click="OpenManifest_Click" Margin="0,0,8,8" Padding="10,5" />
+            <Button Content="Open Model" Click="OpenModel_Click" Margin="0,0,8,8" Padding="10,5" />
+            <Button Content="Reload" Click="Reload_Click" Margin="0,0,8,8" Padding="10,5" />
+            <Button Content="Validate" Click="Validate_Click" Margin="0,0,8,8" Padding="10,5" />
+          </WrapPanel>
+
+          <TextBlock Text="Preview mode" FontWeight="SemiBold" Margin="0,8,0,4" />
+          <ComboBox x:Name="PreviewModeBox" SelectedIndex="0">
+            <ComboBoxItem Content="Neutral turntable" />
+            <ComboBoxItem Content="Chess2D board" />
+            <ComboBoxItem Content="Chess3D cube" />
+            <ComboBoxItem Content="Asgard core" />
+            <ComboBoxItem Content="Rubik Convergence marker" />
+            <ComboBoxItem Content="Hodge marker" />
+            <ComboBoxItem Content="Standalone Rubik cubie" />
+          </ComboBox>
+
+          <TextBlock Text="Camera" FontWeight="SemiBold" Margin="0,14,0,4" />
+          <WrapPanel>
+            <Button Content="Orbit left" Click="OrbitLeft_Click" Margin="0,0,6,6" />
+            <Button Content="Orbit right" Click="OrbitRight_Click" Margin="0,0,6,6" />
+            <Button Content="Zoom in" Click="ZoomIn_Click" Margin="0,0,6,6" />
+            <Button Content="Zoom out" Click="ZoomOut_Click" Margin="0,0,6,6" />
+            <Button Content="Reset camera" Click="ResetCamera_Click" Margin="0,0,6,6" />
+          </WrapPanel>
+
+          <TextBlock Text="Overlays" FontWeight="SemiBold" Margin="0,14,0,4" />
+          <CheckBox x:Name="ShowBoundsBox" Content="Show bounds" IsChecked="True" Click="Overlay_Click" />
+          <CheckBox x:Name="ShowOriginBox" Content="Show origin" IsChecked="True" Click="Overlay_Click" />
+          <CheckBox x:Name="ShowAxesBox" Content="Show axes" IsChecked="True" Click="Overlay_Click" />
+          <CheckBox x:Name="GroundPlaneBox" Content="Ground plane" IsChecked="True" Click="Overlay_Click" />
+          <CheckBox Content="Wireframe (WPF deferred)" IsEnabled="False" ToolTip="WPF Media3D has no native wireframe mode." />
+          <CheckBox Content="Show normals (WPF deferred)" IsEnabled="False" ToolTip="Normal glyphs are deferred to avoid per-vertex visual expansion." />
+
+          <TextBlock Text="Lighting" FontWeight="SemiBold" Margin="0,14,0,4" />
+          <ComboBox x:Name="LightingBox" SelectionChanged="LightingBox_SelectionChanged" SelectedIndex="0">
+            <ComboBoxItem Content="Studio" />
+            <ComboBoxItem Content="Neutral" />
+            <ComboBoxItem Content="High contrast" />
+          </ComboBox>
+
+          <TextBlock Text="Background" FontWeight="SemiBold" Margin="0,14,0,4" />
+          <ComboBox x:Name="BackgroundBox" SelectionChanged="BackgroundBox_SelectionChanged" SelectedIndex="0">
+            <ComboBoxItem Content="Graphite" />
+            <ComboBoxItem Content="Neutral gray" />
+            <ComboBoxItem Content="Light gray" />
+          </ComboBox>
+
+          <Separator Margin="0,16,0,12" />
+          <Button Content="Export report" Click="ExportReport_Click" Margin="0,0,0,8" />
+          <Button Content="Save evidence" Click="SaveEvidence_Click" />
+          <TextBlock x:Name="StatusText" Text="Open a v2 manifest, GLB, or OBJ." TextWrapping="Wrap" Margin="0,14,0,0" Foreground="#B8C7D9" />
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+
+    <Border Grid.Column="1" x:Name="ViewportBorder" Background="#454B53">
+      <Viewport3D x:Name="Viewport" ClipToBounds="True"
+                  MouseWheel="Viewport_MouseWheel"
+                  MouseLeftButtonDown="Viewport_MouseLeftButtonDown"
+                  MouseLeftButtonUp="Viewport_MouseLeftButtonUp"
+                  MouseMove="Viewport_MouseMove">
+        <Viewport3D.Camera>
+          <PerspectiveCamera x:Name="Camera" Position="4,3.2,5.5" LookDirection="-4,-2.6,-5.5" UpDirection="0,1,0" FieldOfView="42" />
+        </Viewport3D.Camera>
+        <ModelVisual3D x:Name="LightVisual" />
+        <ModelVisual3D x:Name="AssetVisual" />
+        <ModelVisual3D x:Name="OverlayVisual" />
+      </Viewport3D>
+    </Border>
+
+    <Border Grid.Column="2" Background="#292D32" Padding="14" BorderBrush="#4B515A" BorderThickness="1,0,0,0">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="ASSET DIAGNOSTICS" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
+        <TextBox x:Name="DiagnosticsText" IsReadOnly="True" TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                 Background="#202328" Foreground="#DDE2E8" BorderBrush="#505862" Padding="10"
+                 FontFamily="Consolas" FontSize="12" />
+      </DockPanel>
+    </Border>
+  </Grid>
+</Window>

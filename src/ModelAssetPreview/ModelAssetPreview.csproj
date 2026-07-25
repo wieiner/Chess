@@ -1,16 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>ModelAssetPreview</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ModelAssets\ModelAssets.csproj" />
-    <ProjectReference Include="..\..\src\ModelAssets.Wpf\ModelAssets.Wpf.csproj" />
-    <ProjectReference Include="..\..\src\ModelAssetPreview\ModelAssetPreview.csproj" />
+    <ProjectReference Include="..\ModelAssets\ModelAssets.csproj" />
+    <ProjectReference Include="..\ModelAssets.Wpf\ModelAssets.Wpf.csproj" />
+    <Compile Include="..\ChessApp\ObjModelLibrary.cs" Link="ObjModelLibrary.cs" />
   </ItemGroup>
 </Project>

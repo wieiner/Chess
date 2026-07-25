@@ -1964,3 +1964,11 @@ Date: 2026-07-25
 | --- | --- | --- | --- | --- | --- | --- |
 | WPF conversion/cache | [Microsoft WPF 3D performance](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/maximize-wpf-3d-performance) and [Freezable overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/freezable-objects-overview) | Existing OBJ meshes are cached, but GLB needs renderer conversion without parsing on the UI thread. | Add a small WPF library that pre-sizes, freezes and caches geometry/material/texture/model resources by validated content identity. | Mutable per-frame geometry and unconditional back materials increase WPF render cost. | `ModelAssets.Wpf`, WPF contracts | Frozen model/mesh, cache reuse, double-sided behavior and build. |
 | Fallback authority | Existing OBJ/procedural paths | GLB failure must not make pieces disappear or hide the cause. | Resolve validated GLB, then validated OBJ, then procedural with an explicit reason. | Silent exception swallowing would make QA non-reproducible. | Pure resolver and contracts | GLB preference, unsupported-to-OBJ, missing-to-procedural cases. |
+
+## P4M Phase 36 - Model Asset Preview
+
+Date: 2026-07-25
+
+| Topic | Primary sources | Repository finding | Decision | Rejected alternatives | Files affected | Verification |
+| --- | --- | --- | --- | --- | --- | --- |
+| Isolated preview/evidence | [WPF 3D overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/3-d-graphics-overview), `RenderTargetBitmap`, and current large ChessApp code-behind | Asset diagnostics should not first land in game UI, and desktop screenshots alone are weak evidence. | Add a standalone preview with shared validator/loader/factory, camera/overlay controls, structured report and in-process evidence. | Embedding the first diagnostic surface into ChessApp would mix import QA with gameplay state. | `ModelAssetPreview` and guide | x64 WPF build through contract project; evidence output is `.tmp`-ignored. |
